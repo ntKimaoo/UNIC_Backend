@@ -30,7 +30,7 @@ namespace BusinessLogic.Services.Implementation
             _smtpPassword = _configuration["Email:Password"] ?? "";
             _fromEmail = _configuration["Email:FromEmail"] ?? "";
             _fromName = _configuration["Email:FromName"] ?? "Member Management System";
-            _appBaseUrl = _configuration["AppSettings:BaseUrl"] ?? "https://localhost:7000";
+            _appBaseUrl = _configuration["AppSettings:BaseUrl"] ?? "https://localhost:7237";
         }
 
         public async Task<bool> SendVerificationEmailAsync(string toEmail, string verificationToken, string fullName)

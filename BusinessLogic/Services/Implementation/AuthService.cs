@@ -43,7 +43,6 @@ public class AuthService : IAuthService
 
     public async Task<LoginResponseDto?> LoginAsync(LoginRequestDto request, string? ipAddress)
     {
-        // Find member by email
         var member = await _memberRepository.GetByEmailAsync(request.Email);
 
         if (member == null || !VerifyPassword(request.Password, member.PasswordHash!))
@@ -99,13 +98,10 @@ public class AuthService : IAuthService
             return null;
         }
 
-        // Check if token is expired
         if (storedToken.ExpiresAt < DateTime.UtcNow)
         {
             return null;
         }
-
-        // Check if member is active
         if (storedToken.Member.Status?.ToLower() != "active")
         {
             return null;
@@ -170,20 +166,17 @@ public class AuthService : IAuthService
 
     public async Task<MemberInfoDto?> RegisterAsync(RegisterRequestDto request)
     {
-        // Check if email already exists
         if (await _memberRepository.EmailExistsAsync(request.Email))
         {
             throw new InvalidOperationException("Email already exists");
         }
-
-        // Create new member
         var member = new Member
         {
             FullName = request.FullName,
             Email = request.Email,
             PasswordHash = HashPassword(request.Password),
             JoinDate = DateOnly.FromDateTime(DateTime.UtcNow),
-            Status = "Pending", // Email verification required
+            Status = "Pending",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -205,7 +198,6 @@ public class AuthService : IAuthService
 
         await _emailVerificationTokenRepository.CreateAsync(emailVerificationToken);
 
-        // Send verification email
         await _emailService.SendVerificationEmailAsync(
             createdMember.Email,
             verificationToken,
