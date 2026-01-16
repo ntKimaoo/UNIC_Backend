@@ -5,7 +5,7 @@ namespace DataAccess.Models;
 
 public partial class Member
 {
-    public int MemberId { get; set; }
+    public Guid MemberId { get; set; }
 
     public string FullName { get; set; } = null!;
 

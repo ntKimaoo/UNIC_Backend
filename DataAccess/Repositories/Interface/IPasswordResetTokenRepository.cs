@@ -12,6 +12,6 @@ namespace DataAccess.Repositories.Interface
         Task<PasswordResetToken?> GetByTokenHashAsync(string tokenHash);
         Task<PasswordResetToken> CreateAsync(PasswordResetToken token);
         Task<bool> MarkAsUsedAsync(int tokenId);
-        Task<bool> InvalidateAllByMemberIdAsync(int memberId);
+        Task<bool> InvalidateAllByMemberIdAsync(Guid memberId);
     }
 }

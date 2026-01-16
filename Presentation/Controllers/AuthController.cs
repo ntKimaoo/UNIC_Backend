@@ -145,7 +145,7 @@ namespace Presentation.Controllers
             var memberIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                              ?? User.FindFirst("sub")?.Value;
 
-            if (string.IsNullOrEmpty(memberIdClaim) || !int.TryParse(memberIdClaim, out var memberId))
+            if (string.IsNullOrEmpty(memberIdClaim) || !Guid.TryParse(memberIdClaim, out var memberId))
             {
                 return Unauthorized(new { message = "Invalid token" });
             }
@@ -267,7 +267,7 @@ namespace Presentation.Controllers
             var memberIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                              ?? User.FindFirst("sub")?.Value;
 
-            if (string.IsNullOrEmpty(memberIdClaim) || !int.TryParse(memberIdClaim, out var memberId))
+            if (string.IsNullOrEmpty(memberIdClaim) || !Guid.TryParse(memberIdClaim, out var memberId))
             {
                 return Unauthorized(new { message = "Invalid token" });
             }

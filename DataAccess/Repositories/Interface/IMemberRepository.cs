@@ -10,12 +10,12 @@ namespace DataAccess.Repositories.Interface
     public interface IMemberRepository
     {
         Task<Member?> GetByEmailAsync(string email);
-        Task<Member?> GetByIdAsync(int memberId);
+        Task<Member?> GetByIdAsync(Guid memberId);
         Task<Member?> GetByStudentIdAsync(string studentId);
         Task<bool> EmailExistsAsync(string email);
         Task<bool> StudentIdExistsAsync(string studentId);
         Task<Member> CreateAsync(Member member);
         Task<bool> UpdateAsync(Member member);
-        Task<bool> DeleteAsync(int memberId);
+        Task<bool> DeleteAsync(Guid memberId);
     }
 }

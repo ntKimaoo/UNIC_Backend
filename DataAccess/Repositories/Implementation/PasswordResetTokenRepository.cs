@@ -52,7 +52,7 @@ namespace DataAccess.Repositories.Implementation
             }
         }
 
-        public async Task<bool> InvalidateAllByMemberIdAsync(int memberId)
+        public async Task<bool> InvalidateAllByMemberIdAsync(Guid memberId)
         {
             try
             {

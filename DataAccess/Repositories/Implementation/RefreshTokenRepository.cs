@@ -59,7 +59,7 @@ namespace DataAccess.Repositories.Implementation
             }
         }
 
-        public async Task<bool> RevokeAllByMemberIdAsync(int memberId)
+        public async Task<bool> RevokeAllByMemberIdAsync(Guid memberId)
         {
             try
             {
@@ -82,7 +82,7 @@ namespace DataAccess.Repositories.Implementation
             }
         }
 
-        public async Task<List<RefreshToken>> GetActiveTokensByMemberIdAsync(int memberId)
+        public async Task<List<RefreshToken>> GetActiveTokensByMemberIdAsync(Guid memberId)
         {
             return await _context.RefreshTokens
                 .Where(rt => rt.MemberId == memberId

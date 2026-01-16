@@ -32,7 +32,7 @@ namespace BusinessLogic.DTOs
     }
     public class MemberInfoDto
     {
-        public int MemberId { get; set; }
+        public Guid MemberId { get; set; }
         public string FullName { get; set; } = null!;
         public string Email { get; set; } = null!;
         public string? Avatar { get; set; }

@@ -13,7 +13,7 @@ namespace DataAccess.Repositories.Interface
         Task<RefreshToken?> GetByTokenHashWithMemberAsync(string tokenHash);
         Task<bool> AddAsync(RefreshToken refreshToken);
         Task<bool> UpdateAsync(RefreshToken refreshToken);
-        Task<bool> RevokeAllByMemberIdAsync(int memberId);
-        Task<List<RefreshToken>> GetActiveTokensByMemberIdAsync(int memberId);
+        Task<bool> RevokeAllByMemberIdAsync(Guid memberId);
+        Task<List<RefreshToken>> GetActiveTokensByMemberIdAsync(Guid memberId);
     }
 }

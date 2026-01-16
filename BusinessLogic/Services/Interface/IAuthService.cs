@@ -13,9 +13,9 @@ namespace BusinessLogic.Services.Interface
         Task<LoginResponseDto?> LoginAsync(LoginRequestDto request, string? ipAddress);
         Task<LoginResponseDto?> RefreshTokenAsync(string refreshToken, string? ipAddress);
         Task<bool> RevokeTokenAsync(string refreshToken);
-        Task<bool> LogoutAllDevicesAsync(int memberId);
+        Task<bool> LogoutAllDevicesAsync(Guid memberId);
         Task<MemberInfoDto?> RegisterAsync(RegisterRequestDto request);
-        Task<bool> ChangePasswordAsync(int memberId, ChangePasswordRequestDto request);
+        Task<bool> ChangePasswordAsync(Guid memberId, ChangePasswordRequestDto request);
         Task<bool> ForgotPasswordAsync(ForgotPasswordRequestDto request);
         Task<bool> ResetPasswordAsync(ResetPasswordRequestDto request);
         Task<bool> VerifyEmailAsync(VerifyEmailRequestDto request);

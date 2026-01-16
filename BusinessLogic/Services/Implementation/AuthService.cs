@@ -60,7 +60,7 @@ public class AuthService : IAuthService
         var accessToken = _jwtService.GenerateAccessToken(member);
         var refreshToken = _jwtService.GenerateRefreshToken();
         var refreshTokenExpiration = DateTime.UtcNow.AddDays(
-            double.Parse(_configuration["Jwt:RefreshTokenExpirationDays"] ?? "7"));
+            double.Parse(_configuration["Jwt:ExpireMinutes"] ?? "7"));
 
         // Save refresh token to database
         var tokenHash = HashToken(refreshToken);
@@ -116,7 +116,7 @@ public class AuthService : IAuthService
         var newAccessToken = _jwtService.GenerateAccessToken(storedToken.Member);
         var newRefreshToken = _jwtService.GenerateRefreshToken();
         var newRefreshTokenExpiration = DateTime.UtcNow.AddDays(
-            double.Parse(_configuration["Jwt:RefreshTokenExpirationDays"] ?? "7"));
+            double.Parse(_configuration["Jwt:ExpireMinutes"] ?? "7"));
 
         // Save new refresh token
         var newTokenHash = HashToken(newRefreshToken);
@@ -159,7 +159,7 @@ public class AuthService : IAuthService
         return await _refreshTokenRepository.UpdateAsync(storedToken);
     }
 
-    public async Task<bool> LogoutAllDevicesAsync(int memberId)
+    public async Task<bool> LogoutAllDevicesAsync(Guid memberId)
     {
         return await _refreshTokenRepository.RevokeAllByMemberIdAsync(memberId);
     }
@@ -207,7 +207,7 @@ public class AuthService : IAuthService
         return MapToMemberInfoDto(createdMember);
     }
 
-    public async Task<bool> ChangePasswordAsync(int memberId, ChangePasswordRequestDto request)
+    public async Task<bool> ChangePasswordAsync(Guid memberId, ChangePasswordRequestDto request)
     {
         var member = await _memberRepository.GetByIdAsync(memberId);
 

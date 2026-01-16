@@ -24,7 +24,7 @@ namespace DataAccess.Repositories.Implementation
                 .FirstOrDefaultAsync(m => m.Email == email);
         }
 
-        public async Task<Member?> GetByIdAsync(int memberId)
+        public async Task<Member?> GetByIdAsync(Guid memberId)
         {
             return await _context.Members
                 .FirstOrDefaultAsync(m => m.MemberId == memberId);
@@ -73,7 +73,7 @@ namespace DataAccess.Repositories.Implementation
             }
         }
 
-        public async Task<bool> DeleteAsync(int memberId)
+        public async Task<bool> DeleteAsync(Guid memberId)
         {
             try
             {
