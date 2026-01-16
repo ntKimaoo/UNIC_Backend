@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  unic-backend:
+    container_name: unic_backend_api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    expose:
+      - "8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=UniClubDb;User Id=sa;Password=YourStrong@Password123;TrustServerCertificate=True;
+    depends_on:
+      - sqlserver
+    networks:
+      - unic-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: unic_nginx_proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - unic-backend
+    networks:
+      - unic-network
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: unic_sql_server
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Password123
+    ports:
+      - "1433:1433"
+    volumes:
+      - sql_data:/var/opt/mssql
+    networks:
+      - unic-network
+
+networks:
+  unic-network:
+    driver: bridge
+
+volumes:
+  sql_data:
