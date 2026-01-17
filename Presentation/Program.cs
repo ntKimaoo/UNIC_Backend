@@ -91,6 +91,20 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<UnicAuthenticateContext>();
+
+    var retry = 0;
+    while (!db.Database.CanConnect())
+    {
+        retry++;
+        if (retry > 10)
+        {
+            throw new Exception("SQL Server is not ready after waiting.");
+        }
+
+        Console.WriteLine("Waiting for SQL Server...");
+        Thread.Sleep(3000);
+    }
+
     db.Database.Migrate();
 }
 
