@@ -11,9 +11,9 @@ namespace DataAccess.Repositories.Implementation
 {
     public class PasswordResetTokenRepository : IPasswordResetTokenRepository
     {
-        private readonly UnicAuthenticateContext _context;
+        private readonly UnicContext _context;
 
-        public PasswordResetTokenRepository(UnicAuthenticateContext context)
+        public PasswordResetTokenRepository(UnicContext context)
         {
             _context = context;
         }

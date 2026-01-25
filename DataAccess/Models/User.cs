@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace DataAccess.Models;
 
-public partial class User
+public class User
 {
     public Guid UserId { get; set; }
 
@@ -40,4 +40,11 @@ public partial class User
     public virtual ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = new List<PasswordResetToken>();
 
     public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+    public virtual ICollection<UserRole> UserRoles { get; set; }
+    public virtual ICollection<ClubMember> ClubMembers { get; set; }
+    public virtual ICollection<DepartmentMember> DepartmentMembers { get; set; }
+    public virtual ICollection<ClubPost> ClubPosts { get; set; }
+    public virtual ICollection<Notification> Notifications { get; set; }
+    public virtual ICollection<Attendance> Attendances { get; set; }
+    public virtual ICollection<Application> Applications { get; set; }
 }

@@ -11,9 +11,9 @@ namespace DataAccess.Repositories.Implementation
 {
     public class EmailVerificationTokenRepository : IEmailVerificationTokenRepository
     {
-        private readonly UnicAuthenticateContext _context;
+        private readonly UnicContext _context;
 
-        public EmailVerificationTokenRepository(UnicAuthenticateContext context)
+        public EmailVerificationTokenRepository(UnicContext context)
         {
             _context = context;
         }

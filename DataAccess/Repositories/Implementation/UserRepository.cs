@@ -11,9 +11,9 @@ namespace DataAccess.Repositories.Implementation
 {
     public class UserRepository : IUserRepository
     {
-        private readonly UnicAuthenticateContext _context;
+        private readonly UnicContext _context;
 
-        public UserRepository(UnicAuthenticateContext context)
+        public UserRepository(UnicContext context)
         {
             _context = context;
         }

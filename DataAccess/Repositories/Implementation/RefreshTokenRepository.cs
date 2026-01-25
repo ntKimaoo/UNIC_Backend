@@ -11,9 +11,9 @@ namespace DataAccess.Repositories.Implementation
 {
     public class RefreshTokenRepository : IRefreshTokenRepository
     {
-        private readonly UnicAuthenticateContext _context;
+        private readonly UnicContext _context;
 
-        public RefreshTokenRepository(UnicAuthenticateContext context)
+        public RefreshTokenRepository(UnicContext context)
         {
             _context = context;
         }

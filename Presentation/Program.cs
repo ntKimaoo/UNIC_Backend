@@ -18,7 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddDbContext<UnicAuthenticateContext>(options =>
+builder.Services.AddDbContext<UnicContext>(options =>
     options.UseSqlServer(connectionString));
 builder.Services.AddCors(options =>
 {
@@ -90,7 +90,7 @@ IEdmModel GetEdmModel()
 var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<UnicAuthenticateContext>();
+    var db = scope.ServiceProvider.GetRequiredService<UnicContext>();
 
     var retry = 0;
     while (!db.Database.CanConnect())
