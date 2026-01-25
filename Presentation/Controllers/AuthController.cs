@@ -142,15 +142,15 @@ namespace Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> LogoutAllDevices()
         {
-            var memberIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                              ?? User.FindFirst("sub")?.Value;
 
-            if (string.IsNullOrEmpty(memberIdClaim) || !Guid.TryParse(memberIdClaim, out var memberId))
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
             {
                 return Unauthorized(new { message = "Invalid token" });
             }
 
-            var result = await _authService.LogoutAllDevicesAsync(memberId);
+            var result = await _authService.LogoutAllDevicesAsync(userId);
 
             if (!result)
             {
@@ -178,13 +178,13 @@ namespace Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public IActionResult GetCurrentUser()
         {
-            var memberIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                              ?? User.FindFirst("sub")?.Value;
             var email = User.FindFirst(ClaimTypes.Email)?.Value;
             var name = User.FindFirst(ClaimTypes.Name)?.Value;
             var studentId = User.FindFirst("StudentId")?.Value;
 
-            if (string.IsNullOrEmpty(memberIdClaim))
+            if (string.IsNullOrEmpty(userIdClaim))
             {
                 return Unauthorized(new { message = "Invalid token" });
             }
@@ -194,7 +194,7 @@ namespace Presentation.Controllers
                 success = true,
                 data = new
                 {
-                    memberId = memberIdClaim,
+                    userId = userIdClaim,
                     email = email,
                     fullName = name,
                     studentId = studentId
@@ -203,12 +203,12 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
-        /// Register a new member
+        /// Register a new user
         /// </summary>
         /// <param name="request">Registration information</param>
-        /// <returns>Created member information</returns>
+        /// <returns>Created user information</returns>
         [HttpPost("register")]
-        [ProducesResponseType(typeof(MemberInfoDto), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(UserInfoDto), StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
         {
@@ -264,17 +264,17 @@ namespace Presentation.Controllers
                 });
             }
 
-            var memberIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                              ?? User.FindFirst("sub")?.Value;
 
-            if (string.IsNullOrEmpty(memberIdClaim) || !Guid.TryParse(memberIdClaim, out var memberId))
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
             {
                 return Unauthorized(new { message = "Invalid token" });
             }
 
             try
             {
-                var result = await _authService.ChangePasswordAsync(memberId, request);
+                var result = await _authService.ChangePasswordAsync(userId, request);
 
                 if (!result)
                 {

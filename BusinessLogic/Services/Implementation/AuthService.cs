@@ -1,6 +1,7 @@
 ﻿using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
+using DataAccess.Repositories.Implementation;
 using DataAccess.Repositories.Interface;
 using DocumentFormat.OpenXml.Math;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +16,7 @@ namespace API.Services;
 
 public class AuthService : IAuthService
 {
-    private readonly IMemberRepository _memberRepository;
+    private readonly IUserRepository _userRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IPasswordResetTokenRepository _passwordResetTokenRepository;
     private readonly IEmailVerificationTokenRepository _emailVerificationTokenRepository;
@@ -24,7 +25,7 @@ public class AuthService : IAuthService
     private readonly IConfiguration _configuration;
 
     public AuthService(
-        IMemberRepository memberRepository,
+        IUserRepository userRepository,
         IRefreshTokenRepository refreshTokenRepository,
         IPasswordResetTokenRepository passwordResetTokenRepository,
         IEmailVerificationTokenRepository emailVerificationTokenRepository,
@@ -32,7 +33,7 @@ public class AuthService : IAuthService
         IEmailService emailService,
         IConfiguration configuration)
     {
-        _memberRepository = memberRepository;
+        _userRepository = userRepository;
         _refreshTokenRepository = refreshTokenRepository;
         _passwordResetTokenRepository = passwordResetTokenRepository;
         _emailVerificationTokenRepository = emailVerificationTokenRepository;
@@ -43,30 +44,27 @@ public class AuthService : IAuthService
 
     public async Task<LoginResponseDto?> LoginAsync(LoginRequestDto request, string? ipAddress)
     {
-        var member = await _memberRepository.GetByEmailAsync(request.Email);
+        var user = await _userRepository.GetByEmailAsync(request.Email);
 
-        if (member == null || !VerifyPassword(request.Password, member.PasswordHash!))
+        if (user == null || !VerifyPassword(request.Password, user.PasswordHash!))
         {
             return null;
         }
 
-        // Check if member is active
-        if (member.Status?.ToLower() != "active")
+        if (user.Status?.ToLower() != "active")
         {
             return null;
         }
 
-        // Generate tokens
-        var accessToken = _jwtService.GenerateAccessToken(member);
+        var accessToken = _jwtService.GenerateAccessToken(user);
         var refreshToken = _jwtService.GenerateRefreshToken();
         var refreshTokenExpiration = DateTime.UtcNow.AddDays(
             double.Parse(_configuration["Jwt:ExpireMinutes"] ?? "7"));
 
-        // Save refresh token to database
         var tokenHash = HashToken(refreshToken);
         var refreshTokenEntity = new RefreshToken
         {
-            MemberId = member.MemberId,
+            UserId = user.UserId,
             TokenHash = tokenHash,
             DeviceInfo = request.DeviceInfo,
             Ipaddress = ipAddress,
@@ -82,7 +80,7 @@ public class AuthService : IAuthService
             AccessToken = accessToken,
             RefreshToken = refreshToken,
             ExpiresAt = refreshTokenExpiration,
-            Member = MapToMemberInfoDto(member)
+            User = MapToUserInfoDto(user)
         };
     }
 
@@ -90,8 +88,7 @@ public class AuthService : IAuthService
     {
         var tokenHash = HashToken(refreshToken);
 
-        // Find refresh token in database
-        var storedToken = await _refreshTokenRepository.GetByTokenHashWithMemberAsync(tokenHash);
+        var storedToken = await _refreshTokenRepository.GetByTokenHashWithUserAsync(tokenHash);
 
         if (storedToken == null || storedToken.IsRevoked == true)
         {
@@ -102,18 +99,17 @@ public class AuthService : IAuthService
         {
             return null;
         }
-        if (storedToken.Member.Status?.ToLower() != "active")
+        if (storedToken.User.Status?.ToLower() != "active")
         {
             return null;
         }
 
-        // Revoke old refresh token
         storedToken.IsRevoked = true;
         storedToken.RevokedAt = DateTime.UtcNow;
         await _refreshTokenRepository.UpdateAsync(storedToken);
 
         // Generate new tokens
-        var newAccessToken = _jwtService.GenerateAccessToken(storedToken.Member);
+        var newAccessToken = _jwtService.GenerateAccessToken(storedToken.User);
         var newRefreshToken = _jwtService.GenerateRefreshToken();
         var newRefreshTokenExpiration = DateTime.UtcNow.AddDays(
             double.Parse(_configuration["Jwt:ExpireMinutes"] ?? "7"));
@@ -122,7 +118,7 @@ public class AuthService : IAuthService
         var newTokenHash = HashToken(newRefreshToken);
         var newRefreshTokenEntity = new RefreshToken
         {
-            MemberId = storedToken.MemberId,
+            UserId = storedToken.UserId,
             TokenHash = newTokenHash,
             DeviceInfo = storedToken.DeviceInfo,
             Ipaddress = ipAddress,
@@ -138,7 +134,7 @@ public class AuthService : IAuthService
             AccessToken = newAccessToken,
             RefreshToken = newRefreshToken,
             ExpiresAt = newRefreshTokenExpiration,
-            Member = MapToMemberInfoDto(storedToken.Member)
+            User = MapToUserInfoDto(storedToken.User)
         };
     }
 
@@ -159,18 +155,18 @@ public class AuthService : IAuthService
         return await _refreshTokenRepository.UpdateAsync(storedToken);
     }
 
-    public async Task<bool> LogoutAllDevicesAsync(Guid memberId)
+    public async Task<bool> LogoutAllDevicesAsync(Guid userId)
     {
-        return await _refreshTokenRepository.RevokeAllByMemberIdAsync(memberId);
+        return await _refreshTokenRepository.RevokeAllByUserIdAsync(userId);
     }
 
-    public async Task<MemberInfoDto?> RegisterAsync(RegisterRequestDto request)
+    public async Task<UserInfoDto?> RegisterAsync(RegisterRequestDto request)
     {
-        if (await _memberRepository.EmailExistsAsync(request.Email))
+        if (await _userRepository.EmailExistsAsync(request.Email))
         {
             throw new InvalidOperationException("Email already exists");
         }
-        var member = new Member
+        var user = new User
         {
             FullName = request.FullName,
             Email = request.Email,
@@ -181,7 +177,7 @@ public class AuthService : IAuthService
             UpdatedAt = DateTime.UtcNow
         };
 
-        var createdMember = await _memberRepository.CreateAsync(member);
+        var createdUser = await _userRepository.CreateAsync(user);
 
         // Generate verification token
         var verificationToken = GenerateResetToken();
@@ -189,7 +185,7 @@ public class AuthService : IAuthService
 
         var emailVerificationToken = new EmailVerificationToken
         {
-            MemberId = createdMember.MemberId,
+            UserId = createdUser.UserId,
             TokenHash = tokenHash,
             ExpiresAt = DateTime.UtcNow.AddHours(24),
             IsUsed = false,
@@ -199,39 +195,39 @@ public class AuthService : IAuthService
         await _emailVerificationTokenRepository.CreateAsync(emailVerificationToken);
 
         await _emailService.SendVerificationEmailAsync(
-            createdMember.Email,
+            createdUser.Email,
             verificationToken,
-            createdMember.FullName
+            createdUser.FullName
         );
 
-        return MapToMemberInfoDto(createdMember);
+        return MapToUserInfoDto(createdUser);
     }
 
-    public async Task<bool> ChangePasswordAsync(Guid memberId, ChangePasswordRequestDto request)
+    public async Task<bool> ChangePasswordAsync(Guid userId, ChangePasswordRequestDto request)
     {
-        var member = await _memberRepository.GetByIdAsync(memberId);
+        var user = await _userRepository.GetByIdAsync(userId);
 
-        if (member == null)
+        if (user == null)
         {
             return false;
         }
 
         // Verify current password
-        if (!VerifyPassword(request.CurrentPassword, member.PasswordHash!))
+        if (!VerifyPassword(request.CurrentPassword, user.PasswordHash!))
         {
             throw new InvalidOperationException("Current password is incorrect");
         }
 
         // Update password
-        member.PasswordHash = HashPassword(request.NewPassword);
-        member.UpdatedAt = DateTime.UtcNow;
+        user.PasswordHash = HashPassword(request.NewPassword);
+        user.UpdatedAt = DateTime.UtcNow;
 
-        var result = await _memberRepository.UpdateAsync(member);
+        var result = await _userRepository.UpdateAsync(user);
 
         if (result)
         {
             // Revoke all refresh tokens (force re-login on all devices)
-            await _refreshTokenRepository.RevokeAllByMemberIdAsync(memberId);
+            await _refreshTokenRepository.RevokeAllByUserIdAsync(userId);
         }
 
         return result;
@@ -239,9 +235,9 @@ public class AuthService : IAuthService
 
     public async Task<bool> ForgotPasswordAsync(ForgotPasswordRequestDto request)
     {
-        var member = await _memberRepository.GetByEmailAsync(request.Email);
+        var user = await _userRepository.GetByEmailAsync(request.Email);
 
-        if (member == null)
+        if (user == null)
         {
             // Don't reveal if email exists or not (security best practice)
             return true;
@@ -254,7 +250,7 @@ public class AuthService : IAuthService
 
         var passwordResetToken = new PasswordResetToken
         {
-            MemberId = member.MemberId,
+            UserId = user.UserId,
             TokenHash = tokenHash,
             ExpiresAt = resetTokenExpiry,
             IsUsed = false,
@@ -265,9 +261,9 @@ public class AuthService : IAuthService
 
         // Send reset password email
         await _emailService.SendPasswordResetEmailAsync(
-            member.Email,
+            user.Email,
             resetToken,
-            member.FullName
+            user.FullName
         );
 
         return true;
@@ -278,17 +274,17 @@ public class AuthService : IAuthService
         var tokenHash = HashToken(request.ResetToken);
         var storedToken = await _passwordResetTokenRepository.GetByTokenHashAsync(tokenHash);
 
-        if (storedToken == null || storedToken.Member.Email != request.Email)
+        if (storedToken == null || storedToken.User.Email != request.Email)
         {
             return false;
         }
 
         // Update password
-        var member = storedToken.Member;
-        member.PasswordHash = HashPassword(request.NewPassword);
-        member.UpdatedAt = DateTime.UtcNow;
+        var user = storedToken.User;
+        user.PasswordHash = HashPassword(request.NewPassword);
+        user.UpdatedAt = DateTime.UtcNow;
 
-        var result = await _memberRepository.UpdateAsync(member);
+        var result = await _userRepository.UpdateAsync(user);
 
         if (result)
         {
@@ -296,7 +292,7 @@ public class AuthService : IAuthService
             await _passwordResetTokenRepository.MarkAsUsedAsync(storedToken.PasswordResetTokenId);
 
             // Revoke all refresh tokens
-            await _refreshTokenRepository.RevokeAllByMemberIdAsync(member.MemberId);
+            await _refreshTokenRepository.RevokeAllByUserIdAsync(user.UserId);
         }
 
         return result;
@@ -307,25 +303,23 @@ public class AuthService : IAuthService
         var tokenHash = HashToken(request.VerificationToken);
         var storedToken = await _emailVerificationTokenRepository.GetByTokenHashAsync(tokenHash);
 
-        if (storedToken == null || storedToken.Member.Email != request.Email)
+        if (storedToken == null || storedToken.User.Email != request.Email)
         {
             return false;
         }
 
-        // Update member status to Active
-        var member = storedToken.Member;
-        member.Status = "Active";
-        member.UpdatedAt = DateTime.UtcNow;
+        // Update user status to Active
+        var user = storedToken.User;    
+        user.Status = "Active";
+        user.UpdatedAt = DateTime.UtcNow;
 
-        var result = await _memberRepository.UpdateAsync(member);
+        var result = await _userRepository.UpdateAsync(user);
 
         if (result)
         {
-            // Mark token as used
             await _emailVerificationTokenRepository.MarkAsUsedAsync(storedToken.EmailVerificationTokenId);
 
-            // Send welcome email
-            await _emailService.SendWelcomeEmailAsync(member.Email, member.FullName);
+            await _emailService.SendWelcomeEmailAsync(user.Email, user.FullName);
         }
 
         return result;
@@ -333,15 +327,15 @@ public class AuthService : IAuthService
 
     public async Task<bool> ResendVerificationEmailAsync(string email)
     {
-        var member = await _memberRepository.GetByEmailAsync(email);
+        var user = await _userRepository.GetByEmailAsync(email);
 
-        if (member == null || member.Status == "Active")
+        if (user == null || user.Status == "Active")
         {
             return false;
         }
 
         // Invalidate old tokens
-        await _emailVerificationTokenRepository.InvalidateAllByMemberIdAsync(member.MemberId);
+        await _emailVerificationTokenRepository.InvalidateAllByUserIdAsync(user.UserId);
 
         // Generate new verification token
         var verificationToken = GenerateResetToken();
@@ -349,7 +343,7 @@ public class AuthService : IAuthService
 
         var emailVerificationToken = new EmailVerificationToken
         {
-            MemberId = member.MemberId,
+            UserId = user.UserId,
             TokenHash = tokenHash,
             ExpiresAt = DateTime.UtcNow.AddHours(24),
             IsUsed = false,
@@ -360,9 +354,9 @@ public class AuthService : IAuthService
 
         // Send verification email
         await _emailService.SendVerificationEmailAsync(
-            member.Email,
+            user.Email,
             verificationToken,
-            member.FullName
+            user.FullName
         );
 
         return true;
@@ -394,17 +388,17 @@ public class AuthService : IAuthService
         return Convert.ToBase64String(randomNumber);
     }
 
-    private MemberInfoDto MapToMemberInfoDto(Member member)
+    private UserInfoDto MapToUserInfoDto(User user)
     {
-        return new MemberInfoDto
+        return new UserInfoDto
         {
-            MemberId = member.MemberId,
-            FullName = member.FullName,
-            Email = member.Email,
-            Avatar = member.Avatar,
-            StudentId = member.StudentId,
-            Major = member.Major,
-            Status = member.Status
+            UserId = user.UserId,
+            FullName = user.FullName,
+            Email = user.Email,
+            Avatar = user.Avatar,
+            StudentId = user.StudentId,
+            Major = user.Major,
+            Status = user.Status
         };
     }
 }

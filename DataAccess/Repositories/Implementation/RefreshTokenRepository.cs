@@ -24,10 +24,10 @@ namespace DataAccess.Repositories.Implementation
                 .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash);
         }
 
-        public async Task<RefreshToken?> GetByTokenHashWithMemberAsync(string tokenHash)
+        public async Task<RefreshToken?> GetByTokenHashWithUserAsync(string tokenHash)
         {
             return await _context.RefreshTokens
-                .Include(rt => rt.Member)
+                .Include(rt => rt.User)
                 .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash);
         }
 
@@ -59,12 +59,12 @@ namespace DataAccess.Repositories.Implementation
             }
         }
 
-        public async Task<bool> RevokeAllByMemberIdAsync(Guid memberId)
+        public async Task<bool> RevokeAllByUserIdAsync(Guid userId)
         {
             try
             {
                 var tokens = await _context.RefreshTokens
-                    .Where(rt => rt.MemberId == memberId && rt.IsRevoked == false)
+                    .Where(rt => rt.UserId == userId && rt.IsRevoked == false)
                     .ToListAsync();
 
                 foreach (var token in tokens)
@@ -82,10 +82,10 @@ namespace DataAccess.Repositories.Implementation
             }
         }
 
-        public async Task<List<RefreshToken>> GetActiveTokensByMemberIdAsync(Guid memberId)
+        public async Task<List<RefreshToken>> GetActiveTokensByUserIdAsync(Guid userId)
         {
             return await _context.RefreshTokens
-                .Where(rt => rt.MemberId == memberId
+                .Where(rt => rt.UserId == userId
                           && rt.IsRevoked == false
                           && rt.ExpiresAt > DateTime.UtcNow)
                 .ToListAsync();

@@ -21,7 +21,7 @@ namespace DataAccess.Repositories.Implementation
         public async Task<PasswordResetToken?> GetByTokenHashAsync(string tokenHash)
         {
             return await _context.PasswordResetTokens
-                .Include(t => t.Member)
+                .Include(t => t.User)
                 .FirstOrDefaultAsync(t => t.TokenHash == tokenHash
                                        && !t.IsUsed
                                        && t.ExpiresAt > DateTime.UtcNow);
@@ -52,12 +52,12 @@ namespace DataAccess.Repositories.Implementation
             }
         }
 
-        public async Task<bool> InvalidateAllByMemberIdAsync(Guid memberId)
+        public async Task<bool> InvalidateAllByUserIdAsync(Guid userId)
         {
             try
             {
                 var tokens = await _context.PasswordResetTokens
-                    .Where(t => t.MemberId == memberId && !t.IsUsed)
+                    .Where(t => t.UserId == userId && !t.IsUsed)
                     .ToListAsync();
 
                 foreach (var token in tokens)

@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicAuthenticateContext))]
-    [Migration("20260116050424_InitialAuthen")]
-    partial class InitialAuthen
+    [Migration("20260125071304_changeModelName")]
+    partial class changeModelName
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -46,8 +46,47 @@ namespace DataAccess.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
 
-                    b.Property<Guid>("MemberId")
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("EmailVerificationTokenId")
+                        .HasName("PK__EmailVer__B16196D29A5849AE");
+
+                    b.HasIndex(new[] { "TokenHash" }, "IX_EmailVerificationTokens_TokenHash");
+
+                    b.HasIndex(new[] { "UserId" }, "IX_EmailVerificationTokens_UserId");
+
+                    b.ToTable("EmailVerificationTokens");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.PasswordResetToken", b =>
+                {
+                    b.Property<int>("PasswordResetTokenId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PasswordResetTokenId"));
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(getutcdate())");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsUsed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("TokenHash")
                         .IsRequired()
@@ -57,22 +96,76 @@ namespace DataAccess.Migrations
                     b.Property<DateTime?>("UsedAt")
                         .HasColumnType("datetime2");
 
-                    b.HasKey("EmailVerificationTokenId")
-                        .HasName("PK__EmailVer__B16196D29A5849AE");
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
 
-                    b.HasIndex(new[] { "MemberId" }, "IX_EmailVerificationTokens_MemberId");
+                    b.HasKey("PasswordResetTokenId")
+                        .HasName("PK__Password__160661284C508CB5");
 
-                    b.HasIndex(new[] { "TokenHash" }, "IX_EmailVerificationTokens_TokenHash");
+                    b.HasIndex(new[] { "TokenHash" }, "IX_PasswordResetTokens_TokenHash");
 
-                    b.ToTable("EmailVerificationTokens");
+                    b.HasIndex(new[] { "UserId" }, "IX_PasswordResetTokens_UserId");
+
+                    b.ToTable("PasswordResetTokens");
                 });
 
-            modelBuilder.Entity("DataAccess.Models.Member", b =>
+            modelBuilder.Entity("DataAccess.Models.RefreshToken", b =>
                 {
-                    b.Property<Guid>("MemberId")
+                    b.Property<int>("RefreshTokenId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("RefreshTokenID");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RefreshTokenId"));
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasDefaultValueSql("(getdate())");
+
+                    b.Property<string>("DeviceInfo")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime");
+
+                    b.Property<string>("Ipaddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasColumnName("IPAddress");
+
+                    b.Property<bool?>("IsRevoked")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("UserID");
+
+                    b.HasKey("RefreshTokenId")
+                        .HasName("PK__RefreshT__F5845E595E9566E1");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RefreshTokens");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.User", b =>
+                {
+                    b.Property<Guid>("UserId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier")
-                        .HasColumnName("MemberID");
+                        .HasColumnName("UserId");
 
                     b.Property<string>("Address")
                         .HasMaxLength(500)
@@ -129,144 +222,51 @@ namespace DataAccess.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime");
 
-                    b.HasKey("MemberId")
-                        .HasName("PK__Members__0CF04B38FFE70BBA");
+                    b.HasKey("UserId")
+                        .HasName("PK__Users__0CF04B38FFE70BBA");
 
-                    b.HasIndex(new[] { "Email" }, "UQ__Members__A9D105345C1FCA58")
+                    b.HasIndex(new[] { "Email" }, "UQ__Users__A9D105345C1FCA58")
                         .IsUnique();
 
-                    b.ToTable("Members");
-                });
-
-            modelBuilder.Entity("DataAccess.Models.PasswordResetToken", b =>
-                {
-                    b.Property<int>("PasswordResetTokenId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PasswordResetTokenId"));
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getutcdate())");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsUsed")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
-
-                    b.Property<Guid>("MemberId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<DateTime?>("UsedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("PasswordResetTokenId")
-                        .HasName("PK__Password__160661284C508CB5");
-
-                    b.HasIndex(new[] { "MemberId" }, "IX_PasswordResetTokens_MemberId");
-
-                    b.HasIndex(new[] { "TokenHash" }, "IX_PasswordResetTokens_TokenHash");
-
-                    b.ToTable("PasswordResetTokens");
-                });
-
-            modelBuilder.Entity("DataAccess.Models.RefreshToken", b =>
-                {
-                    b.Property<int>("RefreshTokenId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("RefreshTokenID");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RefreshTokenId"));
-
-                    b.Property<DateTime?>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasDefaultValueSql("(getdate())");
-
-                    b.Property<string>("DeviceInfo")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime");
-
-                    b.Property<string>("Ipaddress")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasColumnName("IPAddress");
-
-                    b.Property<bool?>("IsRevoked")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
-
-                    b.Property<Guid>("MemberId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("MemberID");
-
-                    b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("datetime");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.HasKey("RefreshTokenId")
-                        .HasName("PK__RefreshT__F5845E595E9566E1");
-
-                    b.HasIndex("MemberId");
-
-                    b.ToTable("RefreshTokens");
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("DataAccess.Models.EmailVerificationToken", b =>
                 {
-                    b.HasOne("DataAccess.Models.Member", "Member")
+                    b.HasOne("DataAccess.Models.User", "User")
                         .WithMany("EmailVerificationTokens")
-                        .HasForeignKey("MemberId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("FK__EmailVeri__Membe__45F365D3");
+                        .HasConstraintName("FK__EmailVeri__User__45F365D3");
 
-                    b.Navigation("Member");
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("DataAccess.Models.PasswordResetToken", b =>
                 {
-                    b.HasOne("DataAccess.Models.Member", "Member")
+                    b.HasOne("DataAccess.Models.User", "User")
                         .WithMany("PasswordResetTokens")
-                        .HasForeignKey("MemberId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("FK__PasswordR__Membe__412EB0B6");
+                        .HasConstraintName("FK__PasswordR__User__412EB0B6");
 
-                    b.Navigation("Member");
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("DataAccess.Models.RefreshToken", b =>
                 {
-                    b.HasOne("DataAccess.Models.Member", "Member")
+                    b.HasOne("DataAccess.Models.User", "User")
                         .WithMany("RefreshTokens")
-                        .HasForeignKey("MemberId")
+                        .HasForeignKey("UserId")
                         .IsRequired()
-                        .HasConstraintName("FK__RefreshTo__Membe__3C69FB99");
+                        .HasConstraintName("FK__RefreshTo__User__3C69FB99");
 
-                    b.Navigation("Member");
+                    b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DataAccess.Models.Member", b =>
+            modelBuilder.Entity("DataAccess.Models.User", b =>
                 {
                     b.Navigation("EmailVerificationTokens");
 

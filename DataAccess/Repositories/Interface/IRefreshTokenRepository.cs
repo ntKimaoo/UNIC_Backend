@@ -10,10 +10,10 @@ namespace DataAccess.Repositories.Interface
     public interface IRefreshTokenRepository
     {
         Task<RefreshToken?> GetByTokenHashAsync(string tokenHash);
-        Task<RefreshToken?> GetByTokenHashWithMemberAsync(string tokenHash);
+        Task<RefreshToken?> GetByTokenHashWithUserAsync(string tokenHash);
         Task<bool> AddAsync(RefreshToken refreshToken);
         Task<bool> UpdateAsync(RefreshToken refreshToken);
-        Task<bool> RevokeAllByMemberIdAsync(Guid memberId);
-        Task<List<RefreshToken>> GetActiveTokensByMemberIdAsync(Guid memberId);
+        Task<bool> RevokeAllByUserIdAsync(Guid userId);
+        Task<List<RefreshToken>> GetActiveTokensByUserIdAsync(Guid userId);
     }
 }

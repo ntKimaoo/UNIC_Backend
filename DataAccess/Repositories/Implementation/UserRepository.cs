@@ -9,36 +9,36 @@ using System.Threading.Tasks;
 
 namespace DataAccess.Repositories.Implementation
 {
-    public class MemberRepository : IMemberRepository
+    public class UserRepository : IUserRepository
     {
         private readonly UnicAuthenticateContext _context;
 
-        public MemberRepository(UnicAuthenticateContext context)
+        public UserRepository(UnicAuthenticateContext context)
         {
             _context = context;
         }
 
-        public async Task<Member?> GetByEmailAsync(string email)
+        public async Task<User?> GetByEmailAsync(string email)
         {
-            return await _context.Members
+            return await _context.Users
                 .FirstOrDefaultAsync(m => m.Email == email);
         }
 
-        public async Task<Member?> GetByIdAsync(Guid memberId)
+        public async Task<User?> GetByIdAsync(Guid userId)
         {
-            return await _context.Members
-                .FirstOrDefaultAsync(m => m.MemberId == memberId);
+            return await _context.Users
+                .FirstOrDefaultAsync(m => m.UserId == userId);
         }
 
-        public async Task<Member?> GetByStudentIdAsync(string studentId)
+        public async Task<User?> GetByStudentIdAsync(string studentId)
         {
-            return await _context.Members
+            return await _context.Users
                 .FirstOrDefaultAsync(m => m.StudentId == studentId);
         }
 
         public async Task<bool> EmailExistsAsync(string email)
         {
-            return await _context.Members
+            return await _context.Users
                 .AnyAsync(m => m.Email == email);
         }
 
@@ -47,23 +47,23 @@ namespace DataAccess.Repositories.Implementation
             if (string.IsNullOrEmpty(studentId))
                 return false;
 
-            return await _context.Members
+            return await _context.Users
                 .AnyAsync(m => m.StudentId == studentId);
         }
 
-        public async Task<Member> CreateAsync(Member member)
+        public async Task<User> CreateAsync(User user)
         {
-            await _context.Members.AddAsync(member);
+            await _context.Users.AddAsync(user);
             await _context.SaveChangesAsync();
-            return member;
+            return user;
         }
 
-        public async Task<bool> UpdateAsync(Member member)
+        public async Task<bool> UpdateAsync(User user)
         {
             try
             {
-                member.UpdatedAt = DateTime.UtcNow;
-                _context.Members.Update(member);
+                user.UpdatedAt = DateTime.UtcNow;
+                _context.Users.Update(user);
                 await _context.SaveChangesAsync();
                 return true;
             }
@@ -73,15 +73,15 @@ namespace DataAccess.Repositories.Implementation
             }
         }
 
-        public async Task<bool> DeleteAsync(Guid memberId)
+        public async Task<bool> DeleteAsync(Guid userId)
         {
             try
             {
-                var member = await GetByIdAsync(memberId);
-                if (member == null)
+                var user = await GetByIdAsync(userId);
+                if (user == null)
                     return false;
 
-                _context.Members.Remove(member);
+                _context.Users.Remove(user);
                 await _context.SaveChangesAsync();
                 return true;
             }

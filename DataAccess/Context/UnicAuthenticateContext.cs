@@ -17,7 +17,7 @@ public partial class UnicAuthenticateContext : DbContext
 
     public virtual DbSet<EmailVerificationToken> EmailVerificationTokens { get; set; }
 
-    public virtual DbSet<Member> Members { get; set; }
+    public virtual DbSet<User> Users { get; set; }
 
     public virtual DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
 
@@ -34,7 +34,7 @@ public partial class UnicAuthenticateContext : DbContext
         {
             entity.HasKey(e => e.EmailVerificationTokenId).HasName("PK__EmailVer__B16196D29A5849AE");
 
-            entity.HasIndex(e => e.MemberId, "IX_EmailVerificationTokens_MemberId");
+            entity.HasIndex(e => e.UserId, "IX_EmailVerificationTokens_UserId");
 
             entity.HasIndex(e => e.TokenHash, "IX_EmailVerificationTokens_TokenHash");
 
@@ -42,18 +42,18 @@ public partial class UnicAuthenticateContext : DbContext
             entity.Property(e => e.IsUsed).HasDefaultValue(false);
             entity.Property(e => e.TokenHash).HasMaxLength(255);
 
-            entity.HasOne(d => d.Member).WithMany(p => p.EmailVerificationTokens)
-                .HasForeignKey(d => d.MemberId)
-                .HasConstraintName("FK__EmailVeri__Membe__45F365D3");
+            entity.HasOne(d => d.User).WithMany(p => p.EmailVerificationTokens)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK__EmailVeri__User__45F365D3");
         });
 
-        modelBuilder.Entity<Member>(entity =>
+        modelBuilder.Entity<User>(entity =>
         {
-            entity.HasKey(e => e.MemberId).HasName("PK__Members__0CF04B38FFE70BBA");
+            entity.HasKey(e => e.UserId).HasName("PK__Users__0CF04B38FFE70BBA");
 
-            entity.HasIndex(e => e.Email, "UQ__Members__A9D105345C1FCA58").IsUnique();
+            entity.HasIndex(e => e.Email, "UQ__Users__A9D105345C1FCA58").IsUnique();
 
-            entity.Property(e => e.MemberId).HasColumnName("MemberID");
+            entity.Property(e => e.UserId).HasColumnName("UserId");
             entity.Property(e => e.Address).HasMaxLength(500);
             entity.Property(e => e.Avatar).HasMaxLength(500);
             entity.Property(e => e.CreatedAt).HasColumnType("datetime");
@@ -74,7 +74,7 @@ public partial class UnicAuthenticateContext : DbContext
         {
             entity.HasKey(e => e.PasswordResetTokenId).HasName("PK__Password__160661284C508CB5");
 
-            entity.HasIndex(e => e.MemberId, "IX_PasswordResetTokens_MemberId");
+            entity.HasIndex(e => e.UserId, "IX_PasswordResetTokens_UserId");
 
             entity.HasIndex(e => e.TokenHash, "IX_PasswordResetTokens_TokenHash");
 
@@ -82,9 +82,9 @@ public partial class UnicAuthenticateContext : DbContext
             entity.Property(e => e.IsUsed).HasDefaultValue(false);
             entity.Property(e => e.TokenHash).HasMaxLength(255);
 
-            entity.HasOne(d => d.Member).WithMany(p => p.PasswordResetTokens)
-                .HasForeignKey(d => d.MemberId)
-                .HasConstraintName("FK__PasswordR__Membe__412EB0B6");
+            entity.HasOne(d => d.User).WithMany(p => p.PasswordResetTokens)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("FK__PasswordR__User__412EB0B6");
         });
 
         modelBuilder.Entity<RefreshToken>(entity =>
@@ -101,14 +101,14 @@ public partial class UnicAuthenticateContext : DbContext
                 .HasMaxLength(50)
                 .HasColumnName("IPAddress");
             entity.Property(e => e.IsRevoked).HasDefaultValue(false);
-            entity.Property(e => e.MemberId).HasColumnName("MemberID");
+            entity.Property(e => e.UserId).HasColumnName("UserID");
             entity.Property(e => e.RevokedAt).HasColumnType("datetime");
             entity.Property(e => e.TokenHash).HasMaxLength(500);
 
-            entity.HasOne(d => d.Member).WithMany(p => p.RefreshTokens)
-                .HasForeignKey(d => d.MemberId)
+            entity.HasOne(d => d.User).WithMany(p => p.RefreshTokens)
+                .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__RefreshTo__Membe__3C69FB99");
+                .HasConstraintName("FK__RefreshTo__User__3C69FB99");
         });
 
         OnModelCreatingPartial(modelBuilder);

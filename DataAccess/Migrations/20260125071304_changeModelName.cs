@@ -6,16 +6,16 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace DataAccess.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialAuthen : Migration
+    public partial class changeModelName : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "Members",
+                name: "Users",
                 columns: table => new
                 {
-                    MemberID = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     FullName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     Email = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     PhoneNumber = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
@@ -33,7 +33,7 @@ namespace DataAccess.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK__Members__0CF04B38FFE70BBA", x => x.MemberID);
+                    table.PrimaryKey("PK__Users__0CF04B38FFE70BBA", x => x.UserId);
                 });
 
             migrationBuilder.CreateTable(
@@ -42,7 +42,7 @@ namespace DataAccess.Migrations
                 {
                     EmailVerificationTokenId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    MemberId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     TokenHash = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     IsUsed = table.Column<bool>(type: "bit", nullable: true, defaultValue: false),
@@ -53,10 +53,10 @@ namespace DataAccess.Migrations
                 {
                     table.PrimaryKey("PK__EmailVer__B16196D29A5849AE", x => x.EmailVerificationTokenId);
                     table.ForeignKey(
-                        name: "FK__EmailVeri__Membe__45F365D3",
-                        column: x => x.MemberId,
-                        principalTable: "Members",
-                        principalColumn: "MemberID",
+                        name: "FK__EmailVeri__User__45F365D3",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "UserId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -66,7 +66,7 @@ namespace DataAccess.Migrations
                 {
                     PasswordResetTokenId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    MemberId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     TokenHash = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     IsUsed = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
@@ -77,10 +77,10 @@ namespace DataAccess.Migrations
                 {
                     table.PrimaryKey("PK__Password__160661284C508CB5", x => x.PasswordResetTokenId);
                     table.ForeignKey(
-                        name: "FK__PasswordR__Membe__412EB0B6",
-                        column: x => x.MemberId,
-                        principalTable: "Members",
-                        principalColumn: "MemberID",
+                        name: "FK__PasswordR__User__412EB0B6",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "UserId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -90,7 +90,7 @@ namespace DataAccess.Migrations
                 {
                     RefreshTokenID = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    MemberID = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UserID = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     TokenHash = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
                     DeviceInfo = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
                     IPAddress = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
@@ -103,16 +103,11 @@ namespace DataAccess.Migrations
                 {
                     table.PrimaryKey("PK__RefreshT__F5845E595E9566E1", x => x.RefreshTokenID);
                     table.ForeignKey(
-                        name: "FK__RefreshTo__Membe__3C69FB99",
-                        column: x => x.MemberID,
-                        principalTable: "Members",
-                        principalColumn: "MemberID");
+                        name: "FK__RefreshTo__User__3C69FB99",
+                        column: x => x.UserID,
+                        principalTable: "Users",
+                        principalColumn: "UserId");
                 });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_EmailVerificationTokens_MemberId",
-                table: "EmailVerificationTokens",
-                column: "MemberId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_EmailVerificationTokens_TokenHash",
@@ -120,15 +115,9 @@ namespace DataAccess.Migrations
                 column: "TokenHash");
 
             migrationBuilder.CreateIndex(
-                name: "UQ__Members__A9D105345C1FCA58",
-                table: "Members",
-                column: "Email",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_PasswordResetTokens_MemberId",
-                table: "PasswordResetTokens",
-                column: "MemberId");
+                name: "IX_EmailVerificationTokens_UserId",
+                table: "EmailVerificationTokens",
+                column: "UserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_PasswordResetTokens_TokenHash",
@@ -136,9 +125,20 @@ namespace DataAccess.Migrations
                 column: "TokenHash");
 
             migrationBuilder.CreateIndex(
-                name: "IX_RefreshTokens_MemberID",
+                name: "IX_PasswordResetTokens_UserId",
+                table: "PasswordResetTokens",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RefreshTokens_UserID",
                 table: "RefreshTokens",
-                column: "MemberID");
+                column: "UserID");
+
+            migrationBuilder.CreateIndex(
+                name: "UQ__Users__A9D105345C1FCA58",
+                table: "Users",
+                column: "Email",
+                unique: true);
         }
 
         /// <inheritdoc />
@@ -154,7 +154,7 @@ namespace DataAccess.Migrations
                 name: "RefreshTokens");
 
             migrationBuilder.DropTable(
-                name: "Members");
+                name: "Users");
         }
     }
 }

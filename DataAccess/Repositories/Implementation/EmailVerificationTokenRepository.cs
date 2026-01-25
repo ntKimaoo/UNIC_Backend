@@ -21,7 +21,7 @@ namespace DataAccess.Repositories.Implementation
         public async Task<EmailVerificationToken?> GetByTokenHashAsync(string tokenHash)
         {
             return await _context.EmailVerificationTokens
-                .Include(t => t.Member)
+                .Include(t => t.User)
                 .FirstOrDefaultAsync(t => t.TokenHash == tokenHash
                                        && t.IsUsed==false
                                        && t.ExpiresAt > DateTime.UtcNow);
@@ -52,12 +52,12 @@ namespace DataAccess.Repositories.Implementation
             }
         }
 
-        public async Task<bool> InvalidateAllByMemberIdAsync(Guid memberId)
+        public async Task<bool> InvalidateAllByUserIdAsync(Guid userId)
         {
             try
             {
                 var tokens = await _context.EmailVerificationTokens
-                    .Where(t => t.MemberId == memberId && t.IsUsed==false)
+                    .Where(t => t.UserId == userId && t.IsUsed==false)
                     .ToListAsync();
 
                 foreach (var token in tokens)

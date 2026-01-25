@@ -42,7 +42,7 @@ builder.Services.AddControllers()
         .Count()
         .SetMaxTop(100)
         .AddRouteComponents("api", GetEdmModel()));
-builder.Services.AddScoped<IMemberRepository, MemberRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();

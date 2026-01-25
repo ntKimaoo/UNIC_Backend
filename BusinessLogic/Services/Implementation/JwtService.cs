@@ -22,7 +22,7 @@ namespace BusinessLogic.Services.Implementation
             _configuration = configuration;
         }
 
-        public string GenerateAccessToken(Member member)
+        public string GenerateAccessToken(User user)
         {
             var securityKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
@@ -30,9 +30,9 @@ namespace BusinessLogic.Services.Implementation
 
             var claims = new[]
             {
-            new Claim(JwtRegisteredClaimNames.Sub, member.MemberId.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, member.Email),
-            new Claim(ClaimTypes.Name, member.FullName),
+            new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
+            new Claim(JwtRegisteredClaimNames.Email, user.Email),
+            new Claim(ClaimTypes.Name, user.FullName),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
@@ -71,16 +71,16 @@ namespace BusinessLogic.Services.Implementation
                     ValidIssuer = _configuration["Jwt:Issuer"],
                     ValidateAudience = true,
                     ValidAudience = _configuration["Jwt:Audience"],
-                    ValidateLifetime = false, // For refresh, we check expired tokens
+                    ValidateLifetime = false,
                     ClockSkew = TimeSpan.Zero
                 };
 
                 var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
-                var memberIdClaim = principal.FindFirst(JwtRegisteredClaimNames.Sub);
+                var userIdClaim = principal.FindFirst(JwtRegisteredClaimNames.Sub);
 
-                if (memberIdClaim != null && int.TryParse(memberIdClaim.Value, out var memberId))
+                if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var userId))
                 {
-                    return memberId;
+                    return userId;
                 }
 
                 return null;

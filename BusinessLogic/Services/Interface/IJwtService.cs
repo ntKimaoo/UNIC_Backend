@@ -10,7 +10,7 @@ namespace BusinessLogic.Services.Interface
 {
     public interface IJwtService
     {
-        string GenerateAccessToken(Member member);
+        string GenerateAccessToken(User user);
         string GenerateRefreshToken();
         int? ValidateAccessToken(string token);
     }

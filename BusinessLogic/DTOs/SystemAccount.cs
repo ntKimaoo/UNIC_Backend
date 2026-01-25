@@ -23,16 +23,16 @@ namespace BusinessLogic.DTOs
         public string AccessToken { get; set; } = null!;
         public string RefreshToken { get; set; } = null!;
         public DateTime ExpiresAt { get; set; }
-        public MemberInfoDto Member { get; set; } = null!;
+        public UserInfoDto User { get; set; } = null!;
     }
     public class RefreshTokenRequestDto
     {
         [Required(ErrorMessage = "Refresh token is required")]
         public string RefreshToken { get; set; } = null!;
     }
-    public class MemberInfoDto
+    public class UserInfoDto
     {
-        public Guid MemberId { get; set; }
+        public Guid UserId { get; set; }
         public string FullName { get; set; } = null!;
         public string Email { get; set; } = null!;
         public string? Avatar { get; set; }

@@ -3,9 +3,9 @@ using System.Collections.Generic;
 
 namespace DataAccess.Models;
 
-public partial class Member
+public partial class User
 {
-    public Guid MemberId { get; set; }
+    public Guid UserId { get; set; }
 
     public string FullName { get; set; } = null!;
 

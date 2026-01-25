@@ -12,6 +12,6 @@ namespace DataAccess.Repositories.Interface
         Task<EmailVerificationToken?> GetByTokenHashAsync(string tokenHash);
         Task<EmailVerificationToken> CreateAsync(EmailVerificationToken token);
         Task<bool> MarkAsUsedAsync(int tokenId);
-        Task<bool> InvalidateAllByMemberIdAsync(Guid memberId);
+        Task<bool> InvalidateAllByUserIdAsync(Guid userId);
     }
 }
