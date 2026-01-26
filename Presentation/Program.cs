@@ -1,5 +1,6 @@
 using API.Services;
 using BusinessLogic.DTOs;
+using BusinessLogic.Services.Background;
 using BusinessLogic.Services.Implementation;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
@@ -16,10 +17,17 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+//database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<UnicContext>(options =>
     options.UseSqlServer(connectionString));
+
+//redis
+builder.Services.AddStackExchangeRedisCache(redisOptions=>
+{
+    redisOptions.Configuration = builder.Configuration.GetConnectionString("RedisConnection");
+});
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFE",
@@ -49,6 +57,8 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
 builder.Services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddHostedService<TokenCleanupService>();
+builder.Services.AddHostedService<EmailQueueService>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
