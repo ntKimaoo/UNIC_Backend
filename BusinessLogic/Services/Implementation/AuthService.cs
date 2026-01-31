@@ -1,4 +1,6 @@
 ﻿using BusinessLogic.DTOs;
+using BusinessLogic.Services.Background;
+using BusinessLogic.Services.Implementation;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Implementation;
@@ -179,7 +181,6 @@ public class AuthService : IAuthService
 
         var createdUser = await _userRepository.CreateAsync(user);
 
-        // Generate verification token
         var verificationToken = GenerateResetToken();
         var tokenHash = HashToken(verificationToken);
 
@@ -194,11 +195,13 @@ public class AuthService : IAuthService
 
         await _emailVerificationTokenRepository.CreateAsync(emailVerificationToken);
 
-        await _emailService.SendVerificationEmailAsync(
-            createdUser.Email,
-            verificationToken,
-            createdUser.FullName
-        );
+        EmailQueueService.EnqueueEmail(new EmailQueueItem
+        {
+            ToEmail = createdUser.Email,
+            FullName = createdUser.FullName,
+            Token = verificationToken,
+            EmailType = EmailType.Verification
+        });
 
         return MapToUserInfoDto(createdUser);
     }
@@ -212,13 +215,11 @@ public class AuthService : IAuthService
             return false;
         }
 
-        // Verify current password
         if (!VerifyPassword(request.CurrentPassword, user.PasswordHash!))
         {
             throw new InvalidOperationException("Current password is incorrect");
         }
 
-        // Update password
         user.PasswordHash = HashPassword(request.NewPassword);
         user.UpdatedAt = DateTime.UtcNow;
 
@@ -226,7 +227,6 @@ public class AuthService : IAuthService
 
         if (result)
         {
-            // Revoke all refresh tokens (force re-login on all devices)
             await _refreshTokenRepository.RevokeAllByUserIdAsync(userId);
         }
 
@@ -239,11 +239,9 @@ public class AuthService : IAuthService
 
         if (user == null)
         {
-            // Don't reveal if email exists or not (security best practice)
             return true;
         }
 
-        // Generate reset token
         var resetToken = GenerateResetToken();
         var tokenHash = HashToken(resetToken);
         var resetTokenExpiry = DateTime.UtcNow.AddHours(1);
@@ -259,12 +257,13 @@ public class AuthService : IAuthService
 
         await _passwordResetTokenRepository.CreateAsync(passwordResetToken);
 
-        // Send reset password email
-        await _emailService.SendPasswordResetEmailAsync(
-            user.Email,
-            resetToken,
-            user.FullName
-        );
+        EmailQueueService.EnqueueEmail(new EmailQueueItem
+        {
+            ToEmail = user.Email,
+            FullName = user.FullName,
+            Token = resetToken,
+            EmailType = EmailType.PasswordReset
+        });
 
         return true;
     }
@@ -319,7 +318,12 @@ public class AuthService : IAuthService
         {
             await _emailVerificationTokenRepository.MarkAsUsedAsync(storedToken.EmailVerificationTokenId);
 
-            await _emailService.SendWelcomeEmailAsync(user.Email, user.FullName);
+            EmailQueueService.EnqueueEmail(new EmailQueueItem
+            {
+                ToEmail = user.Email,
+                FullName = user.FullName,
+                EmailType = EmailType.Welcome
+            });
         }
 
         return result;
@@ -352,12 +356,13 @@ public class AuthService : IAuthService
 
         await _emailVerificationTokenRepository.CreateAsync(emailVerificationToken);
 
-        // Send verification email
-        await _emailService.SendVerificationEmailAsync(
-            user.Email,
-            verificationToken,
-            user.FullName
-        );
+        EmailQueueService.EnqueueEmail(new EmailQueueItem
+        {
+            ToEmail = user.Email,
+            FullName = user.FullName,
+            Token = verificationToken,
+            EmailType = EmailType.Verification
+        });
 
         return true;
     }

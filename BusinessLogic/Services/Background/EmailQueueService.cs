@@ -1,0 +1,110 @@
+﻿using BusinessLogic.DTOs;
+using BusinessLogic.Services.Interface;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BusinessLogic.Services.Background
+{
+    public class EmailQueueService : BackgroundService
+    {
+        private readonly ILogger<EmailQueueService> _logger;
+        private readonly IServiceProvider _serviceProvider;
+        private static readonly ConcurrentQueue<EmailQueueItem> _emailQueue = new();
+        private readonly SemaphoreSlim _signal = new(0);
+
+        public EmailQueueService(
+            ILogger<EmailQueueService> logger,
+            IServiceProvider serviceProvider)
+        {
+            _logger = logger;
+            _serviceProvider = serviceProvider;
+        }
+
+        public static void EnqueueEmail(EmailQueueItem item)
+        {
+            _emailQueue.Enqueue(item);
+        }
+
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            _logger.LogInformation("Email Queue Service is starting.");
+
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    while (_emailQueue.TryDequeue(out var emailItem))
+                    {
+                        await ProcessEmailAsync(emailItem);
+                    }
+
+                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error occurred while processing email queue.");
+                    await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+                }
+            }
+
+            _logger.LogInformation("Email Queue Service is stopping.");
+        }
+
+        private async Task ProcessEmailAsync(EmailQueueItem item)
+        {
+            using var scope = _serviceProvider.CreateScope();
+            var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+
+            try
+            {
+                _logger.LogInformation("Processing email to {Email} with type {Type}", item.ToEmail, item.EmailType);
+
+                bool result = item.EmailType switch
+                {
+                    EmailType.Verification => await emailService.SendVerificationEmailAsync(
+                        item.ToEmail, item.Token!, item.FullName),
+                    EmailType.PasswordReset => await emailService.SendPasswordResetEmailAsync(
+                        item.ToEmail, item.Token!, item.FullName),
+                    EmailType.Welcome => await emailService.SendWelcomeEmailAsync(
+                        item.ToEmail, item.FullName),
+                    _ => false
+                };
+
+                if (result)
+                {
+                    _logger.LogInformation("Email sent successfully to {Email}", item.ToEmail);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to send email to {Email}", item.ToEmail);
+
+                    if (item.RetryCount < 3)
+                    {
+                        item.RetryCount++;
+                        _emailQueue.Enqueue(item);
+                        _logger.LogInformation("Re-queued email to {Email}, retry count: {Count}",
+                            item.ToEmail, item.RetryCount);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending email to {Email}", item.ToEmail);
+
+                // Retry on exception
+                if (item.RetryCount < 3)
+                {
+                    item.RetryCount++;
+                    _emailQueue.Enqueue(item);
+                }
+            }
+        }
+    }
+}

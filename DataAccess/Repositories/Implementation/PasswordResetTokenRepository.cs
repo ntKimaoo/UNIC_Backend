@@ -74,5 +74,26 @@ namespace DataAccess.Repositories.Implementation
                 return false;
             }
         }
+        public async Task<IEnumerable<PasswordResetToken>> GetExpiredTokensAsync(DateTime olderThan)
+        {
+            return await _context.PasswordResetTokens
+                .Where(t => (t.ExpiresAt < DateTime.UtcNow || t.IsUsed == true)
+                            && t.CreatedAt < olderThan)
+                .ToListAsync();
+        }
+
+        public async Task<bool> DeleteRangeAsync(IEnumerable<PasswordResetToken> tokens)
+        {
+            try
+            {
+                _context.PasswordResetTokens.RemoveRange(tokens);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 }

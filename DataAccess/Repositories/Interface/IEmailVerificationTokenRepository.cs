@@ -13,5 +13,7 @@ namespace DataAccess.Repositories.Interface
         Task<EmailVerificationToken> CreateAsync(EmailVerificationToken token);
         Task<bool> MarkAsUsedAsync(int tokenId);
         Task<bool> InvalidateAllByUserIdAsync(Guid userId);
+        Task<IEnumerable<EmailVerificationToken>> GetExpiredTokensAsync(DateTime olderThan);
+        Task<bool> DeleteRangeAsync(IEnumerable<EmailVerificationToken> tokens);
     }
 }

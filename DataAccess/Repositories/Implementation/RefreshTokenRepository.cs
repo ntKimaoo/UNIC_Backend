@@ -90,5 +90,26 @@ namespace DataAccess.Repositories.Implementation
                           && rt.ExpiresAt > DateTime.UtcNow)
                 .ToListAsync();
         }
+        public async Task<IEnumerable<RefreshToken>> GetExpiredTokensAsync(DateTime olderThan)
+        {
+            return await _context.RefreshTokens
+                .Where(t => (t.ExpiresAt < DateTime.UtcNow || t.IsRevoked == true)
+                            && t.CreatedAt < olderThan)
+                .ToListAsync();
+        }
+
+        public async Task<bool> DeleteRangeAsync(IEnumerable<RefreshToken> tokens)
+        {
+            try
+            {
+                _context.RefreshTokens.RemoveRange(tokens);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 }

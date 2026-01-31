@@ -15,5 +15,7 @@ namespace DataAccess.Repositories.Interface
         Task<bool> UpdateAsync(RefreshToken refreshToken);
         Task<bool> RevokeAllByUserIdAsync(Guid userId);
         Task<List<RefreshToken>> GetActiveTokensByUserIdAsync(Guid userId);
+        Task<IEnumerable<RefreshToken>> GetExpiredTokensAsync(DateTime olderThan);
+        Task<bool> DeleteRangeAsync(IEnumerable<RefreshToken> tokens);
     }
 }

@@ -1,5 +1,6 @@
 using API.Services;
 using BusinessLogic.DTOs;
+using BusinessLogic.Services.Background;
 using BusinessLogic.Services.Implementation;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
@@ -13,23 +14,31 @@ using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
 using System;
 using System.Text;
+using UNIC.Presentation.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+//database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<UnicContext>(options =>
     options.UseSqlServer(connectionString));
+
+//redis
+builder.Services.AddStackExchangeRedisCache(redisOptions=>
+{
+    redisOptions.Configuration = builder.Configuration.GetConnectionString("RedisConnection");
+});
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFE",
         policy =>
         {
             policy
-                .WithOrigins("https://localhost:7259") // FE origin
                 .AllowAnyHeader()
                 .AllowAnyMethod()
-                .AllowCredentials();
+                .AllowCredentials()
+                .SetIsOriginAllowed(_ => true);
         });
 });
 
@@ -50,10 +59,13 @@ builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepo
 builder.Services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddControllers();
+builder.Services.AddHostedService<TokenCleanupService>();
+builder.Services.AddHostedService<EmailQueueService>();
+builder.Services.AddControllers();  
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
+//signalR
+builder.Services.AddSignalR();
 //jwt
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]);
@@ -116,7 +128,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 app.UseCors("AllowFE");
-
+app.MapHub<WebRtcHub>("/webrtc");
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
