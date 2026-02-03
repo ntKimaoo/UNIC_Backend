@@ -14,6 +14,10 @@ using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
 using System;
 using System.Text;
+using UNIC.BusinessLogic.Services.Implementation;
+using UNIC.BusinessLogic.Services.Interface;
+using UNIC.DataAccess.Repositories.Implementation;
+using UNIC.DataAccess.Repositories.Interface;
 using UNIC.Presentation.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -52,6 +56,7 @@ builder.Services.AddControllers()
         .SetMaxTop(100)
         .AddRouteComponents("api", GetEdmModel()));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IDepartmentRepository, DepartmentRepository>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -59,6 +64,7 @@ builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepo
 builder.Services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
 builder.Services.AddControllers();  
