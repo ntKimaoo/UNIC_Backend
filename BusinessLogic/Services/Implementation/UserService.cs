@@ -67,7 +67,6 @@ namespace BusinessLogic.Services.Implementation
                 UserId = Guid.NewGuid(),
                 FullName = request.FullName,
                 Email = request.Email,
-                // Hash Password 
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
                 PhoneNumber = request.PhoneNumber,
                 StudentId = request.StudentId,
@@ -90,7 +89,6 @@ namespace BusinessLogic.Services.Implementation
             var user = await _userRepository.GetByIdAsync(id);
             if (user == null) return false;
 
-            // Kiem tra trung ID
             if (!string.IsNullOrEmpty(request.StudentId) &&
                 request.StudentId != user.StudentId &&
                 await _userRepository.StudentIdExistsAsync(request.StudentId))

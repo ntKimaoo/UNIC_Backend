@@ -14,6 +14,7 @@ using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
 using System;
 using System.Text;
+using UNIC.DataAccess.Repositories.Interface;
 using UNIC.Presentation.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -59,6 +60,8 @@ builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepo
 builder.Services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IFundRepository, FundRepository>();
+builder.Services.AddScoped<IClubFundService, ClubFundService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
 builder.Services.AddControllers();  

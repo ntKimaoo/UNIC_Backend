@@ -8,7 +8,6 @@ namespace Presentation.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    // [Authorize] // Uncomment nếu muốn chặn user chưa đăng nhập
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
@@ -19,7 +18,6 @@ namespace Presentation.Controllers
         }
 
         // GET: api/users
-        // Hỗ trợ OData: api/users?$select=fullName,email&$filter=status eq 'Active'
         [HttpGet]
         [EnableQuery]
         public async Task<IActionResult> GetAll()
@@ -42,7 +40,6 @@ namespace Presentation.Controllers
 
         // POST: api/users
         [HttpPost]
-        // [Authorize(Roles = "Admin")] // Thường chỉ Admin mới tạo được User trực tiếp
         public async Task<IActionResult> Create([FromBody] CreateUserDto request)
         {
             try
@@ -77,7 +74,6 @@ namespace Presentation.Controllers
 
         // DELETE: api/users/{id}
         [HttpDelete("{id}")]
-        // [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var result = await _userService.DeleteUserAsync(id);
