@@ -120,6 +120,162 @@ namespace UNIC.Presentation.Hubs
                          .SendAsync("UserLeft", leavingUser);
         }
 
+        /// <summary>
+        /// Thông báo trạng thái mic (bật/tắt) cho các user khác trong room
+        /// </summary>
+        public async Task ToggleMic(string roomId, bool isMuted)
+        {
+            RoomUser? user = null;
+            lock (_lock)
+            {
+                if (_rooms.ContainsKey(roomId) && _rooms[roomId].ContainsKey(Context.ConnectionId))
+                {
+                    user = _rooms[roomId][Context.ConnectionId];
+                }
+            }
+
+            if (user == null)
+            {
+                _logger.LogWarning("ToggleMic: User {ConnectionId} not found in room {RoomId}", Context.ConnectionId, roomId);
+                return;
+            }
+
+            _logger.LogInformation(
+                "User {UserId} ({FullName}) toggled mic to {IsMuted} in room {RoomId}",
+                user.UserId, user.FullName, isMuted ? "muted" : "unmuted", roomId);
+
+            await Clients.OthersInGroup(roomId)
+                         .SendAsync("UserToggleMic", new { user.ConnectionId, user.UserId, user.FullName, IsMuted = isMuted });
+        }
+
+        /// <summary>
+        /// Thông báo trạng thái camera (bật/tắt) cho các user khác trong room
+        /// </summary>
+        public async Task ToggleCamera(string roomId, bool isCameraOff)
+        {
+            RoomUser? user = null;
+            lock (_lock)
+            {
+                if (_rooms.ContainsKey(roomId) && _rooms[roomId].ContainsKey(Context.ConnectionId))
+                {
+                    user = _rooms[roomId][Context.ConnectionId];
+                }
+            }
+
+            if (user == null)
+            {
+                _logger.LogWarning("ToggleCamera: User {ConnectionId} not found in room {RoomId}", Context.ConnectionId, roomId);
+                return;
+            }
+
+            _logger.LogInformation(
+                "User {UserId} ({FullName}) toggled camera to {IsCameraOff} in room {RoomId}",
+                user.UserId, user.FullName, isCameraOff ? "off" : "on", roomId);
+
+            await Clients.OthersInGroup(roomId)
+                         .SendAsync("UserToggleCamera", new { user.ConnectionId, user.UserId, user.FullName, IsCameraOff = isCameraOff });
+        }
+
+        /// <summary>
+        /// Thông báo bắt đầu chia sẻ màn hình cho các user khác trong room
+        /// </summary>
+        public async Task StartScreenShare(string roomId)
+        {
+            RoomUser? user = null;
+            lock (_lock)
+            {
+                if (_rooms.ContainsKey(roomId) && _rooms[roomId].ContainsKey(Context.ConnectionId))
+                {
+                    user = _rooms[roomId][Context.ConnectionId];
+                }
+            }
+
+            if (user == null)
+            {
+                _logger.LogWarning("StartScreenShare: User {ConnectionId} not found in room {RoomId}", Context.ConnectionId, roomId);
+                return;
+            }
+
+            _logger.LogInformation(
+                "User {UserId} ({FullName}) started screen sharing in room {RoomId}",
+                user.UserId, user.FullName, roomId);
+
+            await Clients.OthersInGroup(roomId)
+                         .SendAsync("UserStartedScreenShare", new { user.ConnectionId, user.UserId, user.FullName });
+        }
+
+        /// <summary>
+        /// Thông báo dừng chia sẻ màn hình cho các user khác trong room
+        /// </summary>
+        public async Task StopScreenShare(string roomId)
+        {
+            RoomUser? user = null;
+            lock (_lock)
+            {
+                if (_rooms.ContainsKey(roomId) && _rooms[roomId].ContainsKey(Context.ConnectionId))
+                {
+                    user = _rooms[roomId][Context.ConnectionId];
+                }
+            }
+
+            if (user == null)
+            {
+                _logger.LogWarning("StopScreenShare: User {ConnectionId} not found in room {RoomId}", Context.ConnectionId, roomId);
+                return;
+            }
+
+            _logger.LogInformation(
+                "User {UserId} ({FullName}) stopped screen sharing in room {RoomId}",
+                user.UserId, user.FullName, roomId);
+
+            await Clients.OthersInGroup(roomId)
+                         .SendAsync("UserStoppedScreenShare", new { user.ConnectionId, user.UserId, user.FullName });
+        }
+
+        /// <summary>
+        /// Gửi tin nhắn chat đến tất cả user trong room
+        /// </summary>
+        public async Task SendMessage(string roomId, string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
+
+            RoomUser? user = null;
+            lock (_lock)
+            {
+                if (_rooms.ContainsKey(roomId) && _rooms[roomId].ContainsKey(Context.ConnectionId))
+                {
+                    user = _rooms[roomId][Context.ConnectionId];
+                }
+            }
+
+            if (user == null)
+            {
+                _logger.LogWarning("SendMessage: User {ConnectionId} not found in room {RoomId}", Context.ConnectionId, roomId);
+                return;
+            }
+
+            var chatMessage = new
+            {
+                MessageId = Guid.NewGuid(),
+                user.ConnectionId,
+                user.UserId,
+                user.FullName,
+                Message = message,
+                Timestamp = DateTime.UtcNow
+            };
+
+            _logger.LogInformation(
+                "User {UserId} ({FullName}) sent message in room {RoomId}: {Message}",
+                user.UserId, user.FullName, roomId, message.Length > 50 ? message[..50] + "..." : message);
+
+            // Gửi tin nhắn cho tất cả user trong room (bao gồm cả người gửi)
+            await Clients.Group(roomId)
+                         .SendAsync("ReceiveMessage", chatMessage);
+        }
+
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             _logger.LogWarning(
