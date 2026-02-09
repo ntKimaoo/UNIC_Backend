@@ -3,6 +3,7 @@ using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
+using System.Linq;
 
 namespace Presentation.Controllers
 {
@@ -25,7 +26,11 @@ namespace Presentation.Controllers
         public async Task<IActionResult> GetAll()
         {
             var users = await _userService.GetAllUsersAsync();
-            return Ok(users);
+            if (!users.Any())
+            {
+                return NotFound(new { success = false, message = "No users found" });
+            }
+            return Ok(new { success = true, data = users });
         }
 
         // GET: api/users/{id}
@@ -35,9 +40,13 @@ namespace Presentation.Controllers
             var user = await _userService.GetUserByIdAsync(id);
             if (user == null)
             {
-                return NotFound(new { message = "User not found" });
+                return NotFound(new { success = false, message = "User not found" });
             }
-            return Ok(user);
+            return Ok(new
+            {
+                success = true,
+                data = user
+            });
         }
 
         // POST: api/users
@@ -48,11 +57,15 @@ namespace Presentation.Controllers
             try
             {
                 var createdUser = await _userService.CreateUserAsync(request);
-                return CreatedAtAction(nameof(GetById), new { id = createdUser.UserId }, createdUser);
+                return CreatedAtAction(
+                    nameof(GetById),
+                    new { id = createdUser.UserId },
+                    new { success = true, data = createdUser }
+                );
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(new { success = false, message = ex.Message });
             }
         }
 
@@ -65,13 +78,14 @@ namespace Presentation.Controllers
                 var result = await _userService.UpdateUserAsync(id, request);
                 if (!result)
                 {
-                    return NotFound(new { message = "User not found" });
+                    return NotFound(new { success = false, message = "User not found" });
                 }
-                return NoContent();
+
+                return Ok(new { success = true, data = new { id } });
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(new { success = false, message = ex.Message });
             }
         }
 
@@ -83,9 +97,9 @@ namespace Presentation.Controllers
             var result = await _userService.DeleteUserAsync(id);
             if (!result)
             {
-                return NotFound(new { message = "User not found" });
+                return NotFound(new { success = false, message = "User not found" });
             }
-            return NoContent();
+            return Ok(new { success = true, data = new { id } });
         }
     }
 }

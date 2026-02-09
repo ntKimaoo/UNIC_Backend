@@ -23,9 +23,9 @@ namespace UNIC.Presentation.Controllers
             var departments = await _departmentService.GetAllDepartmentsAsync();
             if (!departments.Any())
             {
-                return NotFound(new {message = "No departments found"});
+                return NotFound(new { success = false, message = "No departments found" });
             }
-            return Ok(departments);
+            return Ok(new { success = true, data = departments });
         }
 
         [HttpGet("{id}")]
@@ -34,27 +34,34 @@ namespace UNIC.Presentation.Controllers
             var department = await _departmentService.GetDepartmentByIdAsync(id);
             if (department == null)
             {
-                return NotFound(new {message = "Department not found"});
+                return NotFound(new { success = false, message = "Department not found" });
             }
-            return Ok(department);
+            return Ok(new { success = true, data = department });
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateDepartment(int id, [FromBody]DepartmentResponseDto department)
+        public async Task<IActionResult> UpdateDepartment(int id, [FromBody] DepartmentResponseDto department)
         {
             var result = await _departmentService.UpdateDepartmentAsync(id, department);
             if (!result)
             {
-                return NotFound(new {message = "Department not found"});
+                return NotFound(new { success = false, message = "Department not found" });
             }
-            return NoContent();
+
+            // Ensure returned DTO reflects the id used for update
+            department.DepartmentId = id;
+            return Ok(new { success = true, data = department });
         }
 
         [HttpPost]
         public async Task<IActionResult> CreateDepartment([FromBody] CreateDepartmentDto request)
         {
             var createdDepartment = await _departmentService.CreateDepartmentAsync(request);
-            return CreatedAtAction(nameof(GetDepartmentById), new { id = createdDepartment.DepartmentId }, createdDepartment);
+            return CreatedAtAction(
+                nameof(GetDepartmentById),
+                new { id = createdDepartment.DepartmentId },
+                new { success = true, data = createdDepartment }
+            );
         }
 
         [HttpDelete("{id}")]
@@ -63,9 +70,9 @@ namespace UNIC.Presentation.Controllers
             var result = await _departmentService.DeleteDepartmentAsync(id);
             if (!result)
             {
-                return NotFound(new {message = "Department not found"});
+                return NotFound(new { success = false, message = "Department not found" });
             }
-            return NoContent();
+            return Ok(new { success = true, data = new { id } });
         }
     }
 }
