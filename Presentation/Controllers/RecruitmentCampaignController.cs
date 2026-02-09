@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Presentation.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api")]
     public class RecruitmentCampaignController : ControllerBase
     {
         private readonly IRecruitmentCampaignService _service;
@@ -19,7 +19,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Get all recruitment campaigns
         /// </summary>
-        [HttpGet]
+        [HttpGet("recruitment-campaign")]
         public async Task<IActionResult> GetAll()
         {
             var campaigns = await _service.GetAllAsync();
@@ -33,7 +33,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Get recruitment campaign by ID
         /// </summary>
-        [HttpGet("{id}")]
+        [HttpGet("recruitment-campaign/{id}")]
         public async Task<IActionResult> GetById(int id)
         {
             var campaign = await _service.GetByIdAsync(id);
@@ -56,7 +56,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Get recruitment campaigns by club ID
         /// </summary>
-        [HttpGet("club/{clubId}")]
+        [HttpGet("recruitment-campaign/club/{clubId}")]
         public async Task<IActionResult> GetByClubId(int clubId)
         {
             var campaigns = await _service.GetByClubIdAsync(clubId);
@@ -70,7 +70,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Create a new recruitment campaign
         /// </summary>
-        [HttpPost]
+        [HttpPost("recruitment-campaign")]
         public async Task<IActionResult> Create([FromBody] CreateRecruitmentCampaignDto dto)
         {
             if (!ModelState.IsValid)
@@ -109,7 +109,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Update an existing recruitment campaign
         /// </summary>
-        [HttpPut("{id}")]
+        [HttpPut("recruitment-campaign/{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateRecruitmentCampaignDto dto)
         {
             if (!ModelState.IsValid)
@@ -154,7 +154,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Delete a recruitment campaign
         /// </summary>
-        [HttpDelete("{id}")]
+        [HttpDelete("recruitment-campaign/{id}")]
         public async Task<IActionResult> Delete(int id)
         {
             var result = await _service.DeleteAsync(id);
