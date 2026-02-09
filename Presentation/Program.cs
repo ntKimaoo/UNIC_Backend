@@ -63,11 +63,40 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
 builder.Services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+<<<<<<< HEAD
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
 builder.Services.AddControllers();  
+=======
+builder.Services.AddScoped<IRecruitmentCampaignRepository, RecruitmentCampaignRepository>();
+builder.Services.AddScoped<IRecruitmentCampaignService, RecruitmentCampaignService>();
+builder.Services.AddScoped<IClubPostRepository, ClubPostRepository>();
+builder.Services.AddScoped<IClubPostService, ClubPostService>();
+builder.Services.AddScoped<IFileStorageService, FileStorageService>();
+
+// Register Cloudinary as a singleton
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var cloudName = config["Cloudinary:CloudName"];
+    var apiKey = config["Cloudinary:ApiKey"];
+    var apiSecret = config["Cloudinary:ApiSecret"];
+    return new CloudinaryDotNet.Account(cloudName, apiKey, apiSecret);
+});
+builder.Services.AddSingleton(sp =>
+{
+    var account = sp.GetRequiredService<CloudinaryDotNet.Account>();
+    return new CloudinaryDotNet.Cloudinary(account);
+});
+
+// Register Background Services
+builder.Services.AddHostedService<TokenCleanupService>();
+builder.Services.AddHostedService<EmailQueueService>();
+builder.Services.AddHostedService<ImageUploadQueueService>();
+builder.Services.AddControllers();
+>>>>>>> origin/kien_dev
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 //signalR
@@ -101,6 +130,15 @@ builder.Services.AddAuthorization(options =>
 });
 builder.Services.Configure<AdminSettings>(
     builder.Configuration.GetSection("AdminSettings"));
+
+// Configure file upload size limits
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10MB
+});
+
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
+
 IEdmModel GetEdmModel()
 {
     var odataBuilder = new ODataConventionModelBuilder();
@@ -134,6 +172,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 app.UseCors("AllowFE");
+app.UseStaticFiles(); // Enable serving files from wwwroot
 app.MapHub<WebRtcHub>("/webrtc");
 app.UseHttpsRedirection();
 app.UseAuthentication();
