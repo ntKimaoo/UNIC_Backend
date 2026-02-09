@@ -1,3 +1,4 @@
+
 using API.Services;
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Background;
@@ -34,7 +35,7 @@ builder.Services.AddCors(options =>
         policy =>
         {
             policy
-                .WithOrigins("https://localhost:7259") // FE origin
+                .WithOrigins("http://localhost:5173") // FE origin
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
@@ -59,6 +60,8 @@ builder.Services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationT
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IRecruitmentCampaignRepository, RecruitmentCampaignRepository>();
 builder.Services.AddScoped<IRecruitmentCampaignService, RecruitmentCampaignService>();
+builder.Services.AddScoped<IClubRepository, ClubRepository>();
+builder.Services.AddScoped<IClubService, ClubService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
 builder.Services.AddControllers();
