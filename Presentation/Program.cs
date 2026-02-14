@@ -57,24 +57,21 @@ builder.Services.AddControllers()
         .AddRouteComponents("api", GetEdmModel()));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IDepartmentRepository, DepartmentRepository>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
 builder.Services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
-<<<<<<< HEAD
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IDepartmentService, DepartmentService>();
-builder.Services.AddHostedService<TokenCleanupService>();
-builder.Services.AddHostedService<EmailQueueService>();
-builder.Services.AddControllers();  
-=======
 builder.Services.AddScoped<IRecruitmentCampaignRepository, RecruitmentCampaignRepository>();
 builder.Services.AddScoped<IRecruitmentCampaignService, RecruitmentCampaignService>();
 builder.Services.AddScoped<IClubPostRepository, ClubPostRepository>();
 builder.Services.AddScoped<IClubPostService, ClubPostService>();
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
+builder.Services.AddScoped<IApplicationService, ApplicationService>();
+builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
 
 // Register Cloudinary as a singleton
 builder.Services.AddSingleton(sp =>
@@ -96,7 +93,6 @@ builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
 builder.Services.AddHostedService<ImageUploadQueueService>();
 builder.Services.AddControllers();
->>>>>>> origin/kien_dev
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 //signalR
