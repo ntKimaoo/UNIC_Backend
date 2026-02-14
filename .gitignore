@@ -361,10 +361,5 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-<<<<<<< HEAD
-
-**/appsettings.json
-=======
 /Presentation/appsettings.json
 /Presentation/appsettings.json
->>>>>>> origin/kien_dev
