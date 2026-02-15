@@ -14,6 +14,9 @@ using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
 using System;
 using System.Text;
+using UNIC.BusinessLogic.Services.Implementation;
+using UNIC.BusinessLogic.Services.Interface;
+using UNIC.DataAccess.Repositories.Implementation;
 using UNIC.DataAccess.Repositories.Interface;
 using UNIC.Presentation.Hubs;
 
@@ -53,18 +56,46 @@ builder.Services.AddControllers()
         .SetMaxTop(100)
         .AddRouteComponents("api", GetEdmModel()));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IDepartmentRepository, DepartmentRepository>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
 builder.Services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IRecruitmentCampaignRepository, RecruitmentCampaignRepository>();
+builder.Services.AddScoped<IRecruitmentCampaignService, RecruitmentCampaignService>();
+builder.Services.AddScoped<IClubPostRepository, ClubPostRepository>();
+builder.Services.AddScoped<IClubPostService, ClubPostService>();
+builder.Services.AddScoped<IFileStorageService, FileStorageService>();
+builder.Services.AddScoped<IApplicationService, ApplicationService>();
+builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
+
+// Register Cloudinary as a singleton
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var cloudName = config["Cloudinary:CloudName"];
+    var apiKey = config["Cloudinary:ApiKey"];
+    var apiSecret = config["Cloudinary:ApiSecret"];
+    return new CloudinaryDotNet.Account(cloudName, apiKey, apiSecret);
+});
+builder.Services.AddSingleton(sp =>
+{
+    var account = sp.GetRequiredService<CloudinaryDotNet.Account>();
+    return new CloudinaryDotNet.Cloudinary(account);
+});
+
+// Register Background Services
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IFundRepository, FundRepository>();
 builder.Services.AddScoped<IClubFundService, ClubFundService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
-builder.Services.AddControllers();  
+builder.Services.AddHostedService<ImageUploadQueueService>();
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 //signalR
@@ -98,6 +129,15 @@ builder.Services.AddAuthorization(options =>
 });
 builder.Services.Configure<AdminSettings>(
     builder.Configuration.GetSection("AdminSettings"));
+
+// Configure file upload size limits
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10MB
+});
+
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
+
 IEdmModel GetEdmModel()
 {
     var odataBuilder = new ODataConventionModelBuilder();
@@ -131,6 +171,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 app.UseCors("AllowFE");
+app.UseStaticFiles(); // Enable serving files from wwwroot
 app.MapHub<WebRtcHub>("/webrtc");
 app.UseHttpsRedirection();
 app.UseAuthentication();
