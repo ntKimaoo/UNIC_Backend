@@ -1,4 +1,4 @@
-﻿using DataAccess.Models;
+using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -180,6 +180,56 @@ namespace UNIC.DataAccess.Repositories.Implementation
             if (existing == null) return false;
 
             _context.ApplicationQuestions.Remove(existing);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<IEnumerable<ApplicationAnswer>> GetAnswersByApplicationIdAsync(int applicationId)
+        {
+            return await _context.ApplicationAnswers
+                .Where(a => a.ApplicationId == applicationId)
+                .ToListAsync();
+        }
+
+        public async Task<ApplicationAnswer?> GetAnswerByIdAsync(int answerId)
+        {
+            return await _context.ApplicationAnswers
+                .FirstOrDefaultAsync(a => a.AnswerId == answerId);
+        }
+
+        public async Task<ApplicationAnswer> CreateAnswerAsync(ApplicationAnswer answer)
+        {
+            _context.ApplicationAnswers.Add(answer);
+            await _context.SaveChangesAsync();
+            return answer;
+        }
+
+        public async Task CreateAnswersAsync(IEnumerable<ApplicationAnswer> answers)
+        {
+            _context.ApplicationAnswers.AddRange(answers);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<bool> UpdateAnswerAsync(ApplicationAnswer answer)
+        {
+            try
+            {
+                _context.ApplicationAnswers.Update(answer);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task<bool> DeleteAnswerAsync(int answerId)
+        {
+            var existing = await _context.ApplicationAnswers.FindAsync(answerId);
+            if (existing == null) return false;
+
+            _context.ApplicationAnswers.Remove(existing);
             await _context.SaveChangesAsync();
             return true;
         }

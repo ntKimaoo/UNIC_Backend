@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
 using System;
 using System.Linq;
@@ -232,6 +232,96 @@ namespace UNIC.Presentation.Controllers
             if (!result)
             {
                 return NotFound(new { success = false, message = "Question not found" });
+            }
+            return Ok(new { success = true, data = new { id } });
+        }
+
+        //Application Answers
+        [HttpGet("{applicationId:int}/answers")]
+        public async Task<IActionResult> GetAnswersByApplication(int applicationId)
+        {
+            var answers = await _applicationService.GetAnswersByApplicationAsync(applicationId);
+            if (!answers.Any())
+            {
+                return NotFound(new { success = false, message = "No answers found for this application" });
+            }
+            return Ok(new { success = true, data = answers });
+        }
+
+        [HttpGet("answers/{id:int}")]
+        public async Task<IActionResult> GetAnswerById(int id)
+        {
+            var answer = await _applicationService.GetAnswerByIdAsync(id);
+            if (answer == null)
+            {
+                return NotFound(new { success = false, message = "Answer not found" });
+            }
+            return Ok(new { success = true, data = answer });
+        }
+
+        [HttpPost("{applicationId:int}/answers")]
+        public async Task<IActionResult> CreateAnswer(int applicationId, [FromBody] CreateApplicationAnswerDto request)
+        {
+            if (request.ApplicationId != applicationId)
+            {
+                request.ApplicationId = applicationId;
+            }
+            try
+            {
+                var created = await _applicationService.CreateAnswerAsync(request);
+                return CreatedAtAction(
+                    nameof(GetAnswerById),
+                    new { id = created.AnswerId },
+                    new { success = true, data = created }
+                );
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost("submit")]
+        public async Task<IActionResult> SubmitApplicationWithAnswers([FromBody] SubmitApplicationWithAnswersDto request)
+        {
+            try
+            {
+                var created = await _applicationService.SubmitApplicationWithAnswersAsync(request);
+                return CreatedAtAction(
+                    nameof(GetApplicationById),
+                    new { id = created.ApplicationId },
+                    new { success = true, data = created }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPut("answers/{id:int}")]
+        public async Task<IActionResult> UpdateAnswer(int id, [FromBody] ApplicationAnswerResponseDto answer)
+        {
+            var result = await _applicationService.UpdateAnswerAsync(id, answer);
+            if (!result)
+            {
+                return NotFound(new { success = false, message = "Answer not found" });
+            }
+            answer.AnswerId = id;
+            return Ok(new { success = true, data = answer });
+        }
+
+        [HttpDelete("answers/{id:int}")]
+        public async Task<IActionResult> DeleteAnswer(int id)
+        {
+            var result = await _applicationService.DeleteAnswerAsync(id);
+            if (!result)
+            {
+                return NotFound(new { success = false, message = "Answer not found" });
             }
             return Ok(new { success = true, data = new { id } });
         }

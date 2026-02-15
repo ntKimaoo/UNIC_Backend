@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using BusinessLogic.DTOs;
@@ -30,5 +30,12 @@ namespace UNIC.BusinessLogic.Services.Interface
         Task<ApplicationQuestionResponseDto> CreateQuestionAsync(CreateApplicationQuestionDto request);
         Task<bool> UpdateQuestionAsync(int id, ApplicationQuestionResponseDto question);
         Task<bool> DeleteQuestionAsync(int id);
+
+        Task<IEnumerable<ApplicationAnswerResponseDto>> GetAnswersByApplicationAsync(int applicationId);
+        Task<ApplicationAnswerResponseDto?> GetAnswerByIdAsync(int answerId);
+        Task<ApplicationAnswerResponseDto> CreateAnswerAsync(CreateApplicationAnswerDto request);
+        Task<ApplicationResponseDto> SubmitApplicationWithAnswersAsync(SubmitApplicationWithAnswersDto request);
+        Task<bool> UpdateAnswerAsync(int id, ApplicationAnswerResponseDto answer);
+        Task<bool> DeleteAnswerAsync(int id);
     }
 }

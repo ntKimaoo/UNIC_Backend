@@ -1,4 +1,4 @@
-﻿using DataAccess.Models;
+using DataAccess.Models;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -30,5 +30,12 @@ namespace UNIC.DataAccess.Repositories.Interface
         Task<ApplicationQuestion> CreateQuestionAsync(ApplicationQuestion question);
         Task<bool> UpdateQuestionAsync(ApplicationQuestion question);
         Task<bool> DeleteQuestionAsync(int questionId);
+
+        Task<IEnumerable<ApplicationAnswer>> GetAnswersByApplicationIdAsync(int applicationId);
+        Task<ApplicationAnswer?> GetAnswerByIdAsync(int answerId);
+        Task<ApplicationAnswer> CreateAnswerAsync(ApplicationAnswer answer);
+        Task CreateAnswersAsync(IEnumerable<ApplicationAnswer> answers);
+        Task<bool> UpdateAnswerAsync(ApplicationAnswer answer);
+        Task<bool> DeleteAnswerAsync(int answerId);
     }
 }

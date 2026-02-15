@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using BusinessLogic.DTOs;
 using DataAccess.Models;
+using UNIC.BusinessLogic.Constants;
 using UNIC.BusinessLogic.DTOs;
 using UNIC.BusinessLogic.Services.Interface;
 using UNIC.DataAccess.Repositories.Interface;
@@ -56,6 +57,26 @@ namespace UNIC.BusinessLogic.Services.Implementation
                 IsRequired = q.IsRequired,
                 DisplayOrder = q.DisplayOrder
             };
+        }
+
+        private static ApplicationAnswerResponseDto MapAnswerToDto(ApplicationAnswer a)
+        {
+            return new ApplicationAnswerResponseDto
+            {
+                AnswerId = a.AnswerId,
+                ApplicationId = a.ApplicationId,
+                QuestionId = a.QuestionId,
+                AnswerText = a.AnswerText
+            };
+        }
+
+        /// <summary>
+        /// Validate câu trả lời theo loại câu hỏi: IsRequired và (tuỳ loại) format.
+        /// </summary>
+        private static void ValidateAnswerForQuestion(ApplicationQuestion question, string? answerText)
+        {
+            if (question.IsRequired && string.IsNullOrWhiteSpace(answerText))
+                throw new ArgumentException($"Câu hỏi bắt buộc (QuestionId: {question.QuestionId}) chưa có câu trả lời.");
         }
 
         public async Task<ApplicationResponseDto> CreateApplicationAsync(CreateApplicationDto request)
@@ -223,6 +244,110 @@ namespace UNIC.BusinessLogic.Services.Implementation
         public async Task<bool> DeleteQuestionAsync(int id)
         {
             return await _applicationRepository.DeleteQuestionAsync(id);
+        }
+
+        public async Task<IEnumerable<ApplicationAnswerResponseDto>> GetAnswersByApplicationAsync(int applicationId)
+        {
+            var answers = await _applicationRepository.GetAnswersByApplicationIdAsync(applicationId);
+            return answers.Select(MapAnswerToDto);
+        }
+
+        public async Task<ApplicationAnswerResponseDto?> GetAnswerByIdAsync(int answerId)
+        {
+            var answer = await _applicationRepository.GetAnswerByIdAsync(answerId);
+            if (answer == null) return null;
+            return MapAnswerToDto(answer);
+        }
+
+        public async Task<ApplicationAnswerResponseDto> CreateAnswerAsync(CreateApplicationAnswerDto request)
+        {
+            var application = await _applicationRepository.GetByIdAsync(request.ApplicationId);
+            if (application == null)
+                throw new ArgumentException("Application không tồn tại.");
+
+            var question = await _applicationRepository.GetQuestionByIdAsync(request.QuestionId);
+            if (question == null)
+                throw new ArgumentException("Câu hỏi không tồn tại.");
+            if (question.FormId != application.FormId)
+                throw new ArgumentException("Câu hỏi không thuộc form của đơn này.");
+
+            ValidateAnswerForQuestion(question, request.AnswerText);
+
+            var answer = new ApplicationAnswer
+            {
+                ApplicationId = request.ApplicationId,
+                QuestionId = request.QuestionId,
+                AnswerText = request.AnswerText ?? string.Empty
+            };
+            var created = await _applicationRepository.CreateAnswerAsync(answer);
+            return MapAnswerToDto(created);
+        }
+
+        public async Task<ApplicationResponseDto> SubmitApplicationWithAnswersAsync(SubmitApplicationWithAnswersDto request)
+        {
+            var form = await _applicationRepository.GetFormByIdAsync(request.FormId);
+            if (form == null)
+                throw new ArgumentException("Form không tồn tại.");
+
+            var questionsOfForm = (await _applicationRepository.GetQuestionsByFormIdAsync(request.FormId)).ToList();
+            var questionsById = questionsOfForm.ToDictionary(q => q.QuestionId);
+
+            if (request.Answers != null)
+            {
+                foreach (var item in request.Answers)
+                {
+                    if (!questionsById.TryGetValue(item.QuestionId, out var question))
+                        throw new ArgumentException($"Câu hỏi (QuestionId: {item.QuestionId}) không thuộc form này.");
+                    ValidateAnswerForQuestion(question, item.AnswerText);
+                }
+
+                var requiredIds = questionsOfForm.Where(q => q.IsRequired).Select(q => q.QuestionId).ToHashSet();
+                var answeredIds = request.Answers.Select(a => a.QuestionId).ToHashSet();
+                var missing = requiredIds.Except(answeredIds).ToList();
+                if (missing.Any())
+                    throw new ArgumentException($"Thiếu câu trả lời bắt buộc cho QuestionId: {string.Join(", ", missing)}.");
+            }
+            else
+            {
+                var anyRequired = questionsOfForm.Any(q => q.IsRequired);
+                if (anyRequired)
+                    throw new ArgumentException("Form có câu hỏi bắt buộc nhưng không có câu trả lời nào.");
+            }
+
+            var application = new Application
+            {
+                FormId = request.FormId,
+                UserId = request.UserId,
+                SubmissionDate = DateTime.UtcNow,
+                Status = "PENDING"
+            };
+            var createdApp = await _applicationRepository.CreateAsync(application);
+            if (request.Answers != null && request.Answers.Any())
+            {
+                var answers = request.Answers.Select(a => new ApplicationAnswer
+                {
+                    ApplicationId = createdApp.ApplicationId,
+                    QuestionId = a.QuestionId,
+                    AnswerText = a.AnswerText ?? string.Empty
+                }).ToList();
+                await _applicationRepository.CreateAnswersAsync(answers);
+            }
+            return MapToDto(createdApp);
+        }
+
+        public async Task<bool> UpdateAnswerAsync(int id, ApplicationAnswerResponseDto dto)
+        {
+            var existing = await _applicationRepository.GetAnswerByIdAsync(id);
+            if (existing == null) return false;
+            if (dto.AnswerId != existing.AnswerId) return false;
+
+            existing.AnswerText = dto.AnswerText ?? string.Empty;
+            return await _applicationRepository.UpdateAnswerAsync(existing);
+        }
+
+        public async Task<bool> DeleteAnswerAsync(int id)
+        {
+            return await _applicationRepository.DeleteAnswerAsync(id);
         }
     }
 }

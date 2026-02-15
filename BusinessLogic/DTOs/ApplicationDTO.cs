@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -74,5 +74,48 @@ namespace UNIC.BusinessLogic.DTOs
         public string? QuestionType { get; set; }
         public bool IsRequired { get; set; }
         public int? DisplayOrder { get; set; }
+    }
+
+    public class CreateApplicationAnswerDto
+    {
+        [Required(ErrorMessage = "ApplicationId is required")]
+        public int ApplicationId { get; set; }
+
+        [Required(ErrorMessage = "QuestionId is required")]
+        public int QuestionId { get; set; }
+
+        public string? AnswerText { get; set; }
+    }
+
+    public class ApplicationAnswerResponseDto
+    {
+        public int AnswerId { get; set; }
+        public int ApplicationId { get; set; }
+        public int QuestionId { get; set; }
+        public string? AnswerText { get; set; }
+    }
+
+    /// <summary>
+    /// Dùng khi nộp đơn kèm danh sách câu trả lời (một lần gửi application + nhiều answer).
+    /// </summary>
+    public class SubmitApplicationWithAnswersDto
+    {
+        [Required]
+        public int FormId { get; set; }
+
+        [Required]
+        public Guid UserId { get; set; }
+
+        /// <summary>
+        /// Danh sách câu trả lời: QuestionId + AnswerText.
+        /// </summary>
+        public List<ApplicationAnswerItemDto> Answers { get; set; } = new();
+    }
+
+    public class ApplicationAnswerItemDto
+    {
+        [Required]
+        public int QuestionId { get; set; }
+        public string? AnswerText { get; set; }
     }
 }
