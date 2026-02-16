@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using UNIC.DataAccess.Models;
 
 namespace DataAccess.Models
 {
@@ -19,10 +20,9 @@ namespace DataAccess.Models
 
         public string Description { get; set; }
 
-        public string Permissions { get; set; }
-
         public int Level { get; set; } = 0;
 
-        public virtual ICollection<ClubMember> ClubMembers { get; set; }
+        public virtual ICollection<UserClubRole> ClubMembers { get; set; }
+        public virtual IList<ClubRolePolicy>? ClubRolePolicies { get; set; }
     }
 }

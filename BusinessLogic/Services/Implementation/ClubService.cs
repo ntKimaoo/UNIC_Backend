@@ -68,7 +68,6 @@ namespace BusinessLogic.Services.Implementation
                 FacebookUrl = dto.FacebookUrl,
                 WebsiteUrl = dto.WebsiteUrl,
                 Address = dto.Address,
-                MemberCount = 0,
                 IsActive = false,
                 IsDeleted = false,
                 CreatedAt = DateTime.UtcNow
@@ -172,7 +171,6 @@ namespace BusinessLogic.Services.Implementation
                 FacebookUrl = club.FacebookUrl,
                 WebsiteUrl = club.WebsiteUrl,
                 Address = club.Address,
-                MemberCount = club.MemberCount,
                 CreatedAt = club.CreatedAt,
                 UpdatedAt = club.UpdatedAt,
                 IsActive = club.IsActive,
