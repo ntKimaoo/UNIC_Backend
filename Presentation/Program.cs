@@ -8,11 +8,13 @@ using DataAccess.Models;
 using DataAccess.Repositories.Implementation;
 using DataAccess.Repositories.Interface;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
+using Presentation.Authorization;
 using System;
 using System.Text;
 
@@ -62,6 +64,8 @@ builder.Services.AddScoped<IRecruitmentCampaignRepository, RecruitmentCampaignRe
 builder.Services.AddScoped<IRecruitmentCampaignService, RecruitmentCampaignService>();
 builder.Services.AddScoped<IClubRepository, ClubRepository>();
 builder.Services.AddScoped<IClubService, ClubService>();
+builder.Services.AddScoped<IPolicyRepository, PolicyRepository>();
+builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
 builder.Services.AddControllers();
@@ -90,6 +94,12 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(key)
     };
 });
+// Register authorization handler
+builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
+
+// Register dynamic policy provider
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
+
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));

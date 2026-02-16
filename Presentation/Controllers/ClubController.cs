@@ -1,6 +1,7 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Mvc;
+using Presentation.Authorization;
 using System;
 using System.Threading.Tasks;
 
@@ -19,8 +20,10 @@ namespace Presentation.Controllers
 
         /// <summary>
         /// Get all clubs (excluding soft-deleted)
+        /// Requires "ViewClubs" policy
         /// </summary>
         [HttpGet]
+        [RequirePolicy("ViewClubs")]
         public async Task<IActionResult> GetAll()
         {
             var clubs = await _service.GetAllAsync();
