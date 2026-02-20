@@ -3,6 +3,7 @@ using BusinessLogic.DTOs;
 using BusinessLogic.Services.Background;
 using BusinessLogic.Services.Implementation;
 using BusinessLogic.Services.Interface;
+using DataAccess.Context;
 using DataAccess.Models;
 using DataAccess.Repositories.Implementation;
 using DataAccess.Repositories.Interface;
@@ -19,9 +20,10 @@ using UNIC.Presentation.Hubs;
 var builder = WebApplication.CreateBuilder(args);
 
 //database
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<UnicContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDbContext<MeetingDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("MeetingRoomConnection")));
 
 //redis
 builder.Services.AddStackExchangeRedisCache(redisOptions=>
@@ -135,6 +137,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<UnicContext>();
+    var meetingDb = scope.ServiceProvider.GetRequiredService<MeetingDbContext>();
 
     var retry = 0;
     while (!db.Database.CanConnect())
@@ -150,6 +153,7 @@ using (var scope = app.Services.CreateScope())
     }
 
     db.Database.Migrate();
+    meetingDb.Database.Migrate();
 }
 
 // Configure the HTTP request pipeline.
