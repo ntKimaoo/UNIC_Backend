@@ -23,7 +23,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<UnicContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddDbContext<MeetingDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("MeetingRoomConnection")));
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("MeetingRoomConnection"));
+});
 
 //redis
 builder.Services.AddStackExchangeRedisCache(redisOptions=>
