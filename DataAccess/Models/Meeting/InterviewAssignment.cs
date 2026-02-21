@@ -4,7 +4,10 @@ using DataAccess.Models.Meeting.Enums;
 namespace DataAccess.Models.Meeting;
 
 /// <summary>
-/// Assign một User (Interviewer) vào một InterviewSchedule.
+/// Assign một Interviewer (User) vào một buổi phỏng vấn.
+/// Mỗi dòng = 1 interviewer, 1 schedule.
+/// 
+/// InterviewerUserId → Users.UserId (FK mềm)
 /// </summary>
 public class InterviewAssignment
 {
@@ -14,8 +17,10 @@ public class InterviewAssignment
     public int               InterviewScheduleId { get; set; }
     public InterviewSchedule InterviewSchedule   { get; set; } = null!;
 
-    // ── Interviewer – FK mềm sang bảng User của bạn ─────────────
-    public string InterviewerUserId { get; set; } = null!;  // Guid as string
+    /// <summary>
+    /// Users.UserId – interviewer được assign.
+    /// </summary>
+    public Guid InterviewerUserId { get; set; }
 
     // ── Vai trò ──────────────────────────────────────────────────
     public InterviewerRole Role         { get; set; } = InterviewerRole.Interviewer;
@@ -23,8 +28,8 @@ public class InterviewAssignment
 
     // ── Feedback & kết quả ───────────────────────────────────────
     public string?          FeedbackNotes        { get; set; }
-    public InterviewResult? Result               { get; set; }
-    public int?             Score                { get; set; }  // 0–100
+    public InterviewResult? Result               { get; set; }   // null = chưa đánh giá
+    public int?             Score                { get; set; }   // 0–100
 
     public DateTime  AssignedAt          { get; set; } = DateTime.UtcNow;
     public DateTime? FeedbackSubmittedAt { get; set; }

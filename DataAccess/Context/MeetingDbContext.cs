@@ -9,7 +9,6 @@ public class MeetingDbContext : DbContext
     public MeetingDbContext(DbContextOptions<MeetingDbContext> options)
         : base(options) { }
 
-    public DbSet<Candidate>           Candidates           { get; set; }
     public DbSet<InterviewSchedule>   InterviewSchedules   { get; set; }
     public DbSet<InterviewAssignment> InterviewAssignments { get; set; }
     public DbSet<MeetingRoom>         MeetingRooms         { get; set; }
@@ -20,52 +19,55 @@ public class MeetingDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<Candidate>(e =>
-        {
-            e.ToTable("Candidate");
-            e.HasKey(c => c.Id);
-            e.Property(c => c.FullName).IsRequired().HasMaxLength(200);
-            e.Property(c => c.Email).IsRequired().HasMaxLength(256);
-            e.HasIndex(c => c.Email).IsUnique();
-        });
-
+        // ── InterviewSchedule ─────────────────────────────────────
         modelBuilder.Entity<InterviewSchedule>(e =>
         {
-            e.ToTable("InterviewSchedule");
+            e.ToTable("InterviewSchedules");
             e.HasKey(s => s.Id);
+
             e.Property(s => s.Title).IsRequired().HasMaxLength(300);
             e.Property(s => s.Status).HasConversion<string>().HasMaxLength(50);
-            e.Property(s => s.CreatedByUserId).IsRequired().HasMaxLength(36);
-            e.HasIndex(s => s.CreatedByUserId);
 
-            e.HasOne(s => s.Candidate)
-                .WithMany(c => c.InterviewSchedules)
-                .HasForeignKey(s => s.CandidateId)
-                .OnDelete(DeleteBehavior.Cascade);
+            // FK mềm – Guid columns, không tạo FK constraint thật
+            e.Property(s => s.ApplicationId).IsRequired();
+            e.Property(s => s.CandidateUserId).IsRequired();
+            e.Property(s => s.CampaignId).IsRequired();
+            e.Property(s => s.CreatedByUserId).IsRequired();
+
+            e.HasIndex(s => s.ApplicationId);
+            e.HasIndex(s => s.CandidateUserId);
+            e.HasIndex(s => s.CampaignId);
+            e.HasIndex(s => s.CreatedByUserId);
         });
 
+        // ── InterviewAssignment ───────────────────────────────────
         modelBuilder.Entity<InterviewAssignment>(e =>
         {
-            e.ToTable("InterviewAssignment");
+            e.ToTable("InterviewAssignments");
             e.HasKey(a => a.Id);
+
+            // Unique: 1 interviewer chỉ được assign 1 lần vào 1 lịch
             e.HasIndex(a => new { a.InterviewScheduleId, a.InterviewerUserId }).IsUnique();
+
             e.Property(a => a.Role).HasConversion<string>().HasMaxLength(50);
             e.Property(a => a.Result).HasConversion<string>().HasMaxLength(50);
-            e.Property(a => a.InterviewerUserId).IsRequired().HasMaxLength(36);
+            e.Property(a => a.InterviewerUserId).IsRequired();
             e.HasIndex(a => a.InterviewerUserId);
 
             e.HasOne(a => a.InterviewSchedule)
-                .WithMany(s => s.Assignments)
-                .HasForeignKey(a => a.InterviewScheduleId)
-                .OnDelete(DeleteBehavior.Cascade);
+             .WithMany(s => s.Assignments)
+             .HasForeignKey(a => a.InterviewScheduleId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // ── MeetingRoom ───────────────────────────────────────────
         modelBuilder.Entity<MeetingRoom>(e =>
         {
-            e.ToTable("MeetingRoom");
+            e.ToTable("MeetingRooms");
             e.HasKey(r => r.Id);
+
             e.Property(r => r.RoomCode).IsRequired().HasMaxLength(20);
-            e.HasIndex(r => r.RoomCode).IsUnique();   // Dùng để lookup /room/{code}
+            e.HasIndex(r => r.RoomCode).IsUnique();          // Lookup /room/{code}
 
             e.Property(r => r.Status).HasConversion<string>().HasMaxLength(50);
             e.Property(r => r.StunServerUri).HasMaxLength(500);
@@ -75,42 +77,45 @@ public class MeetingDbContext : DbContext
 
             // 1-1 với InterviewSchedule
             e.HasOne(r => r.InterviewSchedule)
-                .WithOne(s => s.MeetingRoom)
-                .HasForeignKey<MeetingRoom>(r => r.InterviewScheduleId)
-                .OnDelete(DeleteBehavior.Cascade);
+             .WithOne(s => s.MeetingRoom)
+             .HasForeignKey<MeetingRoom>(r => r.InterviewScheduleId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // ── RoomParticipant ───────────────────────────────────────
         modelBuilder.Entity<RoomParticipant>(e =>
         {
-            e.ToTable("RoomParticipant");
+            e.ToTable("RoomParticipants");
             e.HasKey(p => p.Id);
-            e.Property(p => p.ConnectionState).HasConversion<string>().HasMaxLength(50);
+
+            e.Property(p => p.UserId).IsRequired();
             e.Property(p => p.DisplayName).IsRequired().HasMaxLength(200);
-            e.Property(p => p.UserId).HasMaxLength(36);
+            e.Property(p => p.Role).HasMaxLength(50);
             e.Property(p => p.PeerId).HasMaxLength(100);
+            e.Property(p => p.ConnectionState).HasConversion<string>().HasMaxLength(50);
 
             e.HasIndex(p => p.UserId);
-            e.HasIndex(p => p.CandidateId);
 
             e.HasOne(p => p.MeetingRoom)
-                .WithMany(r => r.Participants)
-                .HasForeignKey(p => p.MeetingRoomId)
-                .OnDelete(DeleteBehavior.Cascade);
+             .WithMany(r => r.Participants)
+             .HasForeignKey(p => p.MeetingRoomId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // ── RoomEvent ─────────────────────────────────────────────
         modelBuilder.Entity<RoomEvent>(e =>
         {
-            e.ToTable("RoomEvent");
+            e.ToTable("RoomEvents");
             e.HasKey(ev => ev.Id);
+
             e.Property(ev => ev.EventType).IsRequired().HasMaxLength(100);
-            e.Property(ev => ev.ActorId).HasMaxLength(36);
             e.Property(ev => ev.Payload).HasColumnType("nvarchar(max)");
             e.HasIndex(ev => ev.OccurredAt);
 
             e.HasOne(ev => ev.MeetingRoom)
-                .WithMany(r => r.Events)
-                .HasForeignKey(ev => ev.MeetingRoomId)
-                .OnDelete(DeleteBehavior.Cascade);
+             .WithMany(r => r.Events)
+             .HasForeignKey(ev => ev.MeetingRoomId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

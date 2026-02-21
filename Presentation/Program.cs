@@ -67,6 +67,8 @@ builder.Services.AddScoped<IRecruitmentCampaignService, RecruitmentCampaignServi
 builder.Services.AddScoped<IClubPostRepository, ClubPostRepository>();
 builder.Services.AddScoped<IClubPostService, ClubPostService>();
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
+builder.Services.AddScoped<IInterviewRepository, InterviewRepository>();
+builder.Services.AddScoped<IInterviewService, InterviewService>();
 
 // Register Cloudinary as a singleton
 builder.Services.AddSingleton(sp =>

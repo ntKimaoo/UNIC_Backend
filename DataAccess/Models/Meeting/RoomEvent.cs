@@ -3,31 +3,29 @@ using System;
 namespace DataAccess.Models.Meeting;
 
 /// <summary>
-/// Log các sự kiện quan trọng trong phòng: join, leave, mute, record…
-/// Dùng để audit trail và debug WebRTC.
+/// Audit trail các sự kiện trong phòng:
+/// "room.started", "participant.joined", "participant.left",
+/// "recording.started", "recording.stopped", v.v.
 /// </summary>
 public class RoomEvent
 {
-    public int    Id          { get; set; }
+    public int Id { get; set; }
 
-    public int        MeetingRoomId { get; set; }
-    public MeetingRoom MeetingRoom  { get; set; } = null!;
+    public int         MeetingRoomId { get; set; }
+    public MeetingRoom MeetingRoom   { get; set; } = null!;
 
-    /// <summary>
-    /// UserId hoặc CandidateId (lưu dưới dạng string cho linh hoạt).
-    /// </summary>
-    public string? ActorId    { get; set; }
+    /// <summary>Users.UserId của người thực hiện hành động.</summary>
+    public Guid? ActorUserId { get; set; }
 
     /// <summary>
-    /// Loại sự kiện: "participant.joined", "participant.left",
-    /// "room.started", "room.ended", "recording.started", v.v.
+    /// Loại sự kiện. Ví dụ:
+    /// "room.started" | "room.ended" | "participant.joined" |
+    /// "participant.left" | "recording.started" | "ice.failed"
     /// </summary>
-    public string  EventType  { get; set; } = null!;
+    public string EventType { get; set; } = null!;
 
-    /// <summary>
-    /// JSON payload tuỳ chọn (ICE candidate, SDP info, v.v.)
-    /// </summary>
-    public string? Payload    { get; set; }
+    /// <summary>JSON payload tuỳ chọn (ICE info, SDP, error detail…)</summary>
+    public string? Payload { get; set; }
 
     public DateTime OccurredAt { get; set; } = DateTime.UtcNow;
 }
