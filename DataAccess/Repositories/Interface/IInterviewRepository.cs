@@ -9,7 +9,7 @@ namespace DataAccess.Repositories.Interface
     {
         // ── InterviewSchedule ─────────────────────────────────────
         Task<InterviewSchedule?> GetScheduleByIdAsync(int id);
-        Task<IEnumerable<InterviewSchedule>> GetSchedulesAsync(Guid? campaignId, string? status, DateTime? fromDate, DateTime? toDate);
+        Task<IEnumerable<InterviewSchedule>> GetSchedulesAsync(int? campaignId, string? status, DateTime? fromDate, DateTime? toDate);
         Task<InterviewSchedule> CreateScheduleAsync(InterviewSchedule schedule);
         Task<bool> UpdateScheduleAsync(InterviewSchedule schedule);
         Task<bool> DeleteScheduleAsync(int id);

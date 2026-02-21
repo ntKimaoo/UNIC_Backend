@@ -76,7 +76,7 @@ namespace BusinessLogic.Services.Implementation
         }
 
         public async Task<IEnumerable<InterviewScheduleResponseDto>> GetSchedulesAsync(
-            Guid? campaignId, string? status, DateTime? fromDate, DateTime? toDate)
+            int? campaignId, string? status, DateTime? fromDate, DateTime? toDate)
         {
             var schedules = await _repo.GetSchedulesAsync(campaignId, status, fromDate, toDate);
             return schedules.Select(MapScheduleToDto);

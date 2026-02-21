@@ -9,7 +9,7 @@ namespace BusinessLogic.Services.Interface
     {
         // ── Interview Schedule ────────────────────────────────────
         Task<InterviewScheduleResponseDto> CreateScheduleAsync(CreateInterviewScheduleDto dto);
-        Task<IEnumerable<InterviewScheduleResponseDto>> GetSchedulesAsync(Guid? campaignId, string? status, DateTime? fromDate, DateTime? toDate);
+        Task<IEnumerable<InterviewScheduleResponseDto>> GetSchedulesAsync(int? campaignId, string? status, DateTime? fromDate, DateTime? toDate);
         Task<InterviewScheduleResponseDto?> GetScheduleByIdAsync(int id);
         Task<InterviewScheduleResponseDto?> UpdateScheduleAsync(int id, UpdateInterviewScheduleDto dto);
         Task<bool> UpdateScheduleStatusAsync(int id, UpdateInterviewStatusDto dto);

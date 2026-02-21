@@ -11,13 +11,13 @@ namespace BusinessLogic.DTOs
     public class CreateInterviewScheduleDto
     {
         [Required]
-        public Guid ApplicationId { get; set; }
+        public int ApplicationId { get; set; }
 
         [Required]
         public Guid CandidateUserId { get; set; }
 
         [Required]
-        public Guid CampaignId { get; set; }
+        public int CampaignId { get; set; }
 
         [Required]
         public Guid CreatedByUserId { get; set; }
@@ -68,9 +68,9 @@ namespace BusinessLogic.DTOs
     public class InterviewScheduleResponseDto
     {
         public int Id { get; set; }
-        public Guid ApplicationId { get; set; }
+        public int ApplicationId { get; set; }
         public Guid CandidateUserId { get; set; }
-        public Guid CampaignId { get; set; }
+        public int CampaignId { get; set; }
         public Guid CreatedByUserId { get; set; }
         public string Title { get; set; } = null!;
         public string? Description { get; set; }

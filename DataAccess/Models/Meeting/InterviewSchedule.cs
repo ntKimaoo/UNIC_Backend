@@ -25,7 +25,7 @@ public class InterviewSchedule
     /// <summary>
     /// Applications.ApplicationId – đơn ứng tuyển được mời phỏng vấn.
     /// </summary>
-    public Guid ApplicationId { get; set; }
+    public int ApplicationId { get; set; }
 
     /// <summary>
     /// Users.UserId – ứng viên (người nộp đơn).
@@ -36,7 +36,7 @@ public class InterviewSchedule
     /// <summary>
     /// RecruitmentCampaigns.CampaignId – campaign tuyển dụng liên quan.
     /// </summary>
-    public Guid CampaignId { get; set; }
+    public int CampaignId { get; set; }
 
     /// <summary>
     /// Users.UserId – người tạo lịch phỏng vấn (HR / Club admin).

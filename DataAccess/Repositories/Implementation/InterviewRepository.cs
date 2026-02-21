@@ -32,7 +32,7 @@ namespace DataAccess.Repositories.Implementation
         }
 
         public async Task<IEnumerable<InterviewSchedule>> GetSchedulesAsync(
-            Guid? campaignId, string? status, DateTime? fromDate, DateTime? toDate)
+            int? campaignId, string? status, DateTime? fromDate, DateTime? toDate)
         {
             var query = _context.InterviewSchedules
                 .Include(s => s.Assignments)
