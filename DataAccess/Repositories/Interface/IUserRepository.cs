@@ -17,5 +17,6 @@ namespace DataAccess.Repositories.Interface
         Task<User> CreateAsync(User user);
         Task<bool> UpdateAsync(User user);
         Task<bool> DeleteAsync(Guid userId);
+        Task<IEnumerable<User>> GetAllAsync();
     }
 }

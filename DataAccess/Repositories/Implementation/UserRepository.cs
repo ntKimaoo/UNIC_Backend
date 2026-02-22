@@ -90,5 +90,10 @@ namespace DataAccess.Repositories.Implementation
                 return false;
             }
         }
+
+        public async Task<IEnumerable<User>> GetAllAsync()
+        {
+            return await _context.Users.ToListAsync();
+        }
     }
 }
