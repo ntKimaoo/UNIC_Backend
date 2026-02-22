@@ -19,6 +19,14 @@ namespace DataAccess.Models
         [MaxLength(20)]
         public string AttendanceStatus { get; set; } = "REGISTERED";
 
+        // Check-in fields
+        public DateTime? CheckInTime { get; set; }
+
+        // Evaluation fields
+        public int? Score { get; set; }
+        [MaxLength(500)]
+        public string? Comment { get; set; }
+
         [ForeignKey("UserId")]
         public virtual User User { get; set; }
 
