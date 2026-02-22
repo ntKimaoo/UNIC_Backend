@@ -6,36 +6,21 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace UNIC.DataAccess.Migrations
 {
     /// <inheritdoc />
-    public partial class InitMeeting : Migration
+    public partial class InitMeetingModules : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "Candidate",
+                name: "InterviewSchedules",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    FullName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
-                    PhoneNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ResumeUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Candidate", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "InterviewSchedule",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    CandidateId = table.Column<int>(type: "int", nullable: false),
-                    CreatedByUserId = table.Column<string>(type: "nvarchar(36)", maxLength: 36, nullable: false),
+                    ApplicationId = table.Column<int>(type: "int", nullable: false),
+                    CandidateUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    CampaignId = table.Column<int>(type: "int", nullable: false),
+                    CreatedByUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Title = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     ScheduledAt = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -47,23 +32,17 @@ namespace UNIC.DataAccess.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_InterviewSchedule", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_InterviewSchedule_Candidate_CandidateId",
-                        column: x => x.CandidateId,
-                        principalTable: "Candidate",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                    table.PrimaryKey("PK_InterviewSchedules", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
-                name: "InterviewAssignment",
+                name: "InterviewAssignments",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     InterviewScheduleId = table.Column<int>(type: "int", nullable: false),
-                    InterviewerUserId = table.Column<string>(type: "nvarchar(36)", maxLength: 36, nullable: false),
+                    InterviewerUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     Role = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     HasConfirmed = table.Column<bool>(type: "bit", nullable: false),
                     FeedbackNotes = table.Column<string>(type: "nvarchar(max)", nullable: true),
@@ -74,17 +53,17 @@ namespace UNIC.DataAccess.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_InterviewAssignment", x => x.Id);
+                    table.PrimaryKey("PK_InterviewAssignments", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_InterviewAssignment_InterviewSchedule_InterviewScheduleId",
+                        name: "FK_InterviewAssignments_InterviewSchedules_InterviewScheduleId",
                         column: x => x.InterviewScheduleId,
-                        principalTable: "InterviewSchedule",
+                        principalTable: "InterviewSchedules",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
-                name: "MeetingRoom",
+                name: "MeetingRooms",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
@@ -106,48 +85,48 @@ namespace UNIC.DataAccess.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_MeetingRoom", x => x.Id);
+                    table.PrimaryKey("PK_MeetingRooms", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_MeetingRoom_InterviewSchedule_InterviewScheduleId",
+                        name: "FK_MeetingRooms_InterviewSchedules_InterviewScheduleId",
                         column: x => x.InterviewScheduleId,
-                        principalTable: "InterviewSchedule",
+                        principalTable: "InterviewSchedules",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
-                name: "RoomEvent",
+                name: "RoomEvents",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     MeetingRoomId = table.Column<int>(type: "int", nullable: false),
-                    ActorId = table.Column<string>(type: "nvarchar(36)", maxLength: 36, nullable: true),
+                    ActorUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     EventType = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Payload = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     OccurredAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_RoomEvent", x => x.Id);
+                    table.PrimaryKey("PK_RoomEvents", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_RoomEvent_MeetingRoom_MeetingRoomId",
+                        name: "FK_RoomEvents_MeetingRooms_MeetingRoomId",
                         column: x => x.MeetingRoomId,
-                        principalTable: "MeetingRoom",
+                        principalTable: "MeetingRooms",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
-                name: "RoomParticipant",
+                name: "RoomParticipants",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     MeetingRoomId = table.Column<int>(type: "int", nullable: false),
-                    UserId = table.Column<string>(type: "nvarchar(36)", maxLength: 36, nullable: true),
-                    CandidateId = table.Column<int>(type: "int", nullable: true),
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     DisplayName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    Role = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     PeerId = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
                     ConnectionState = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     JoinedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -155,77 +134,76 @@ namespace UNIC.DataAccess.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_RoomParticipant", x => x.Id);
+                    table.PrimaryKey("PK_RoomParticipants", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_RoomParticipant_MeetingRoom_MeetingRoomId",
+                        name: "FK_RoomParticipants_MeetingRooms_MeetingRoomId",
                         column: x => x.MeetingRoomId,
-                        principalTable: "MeetingRoom",
+                        principalTable: "MeetingRooms",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Candidate_Email",
-                table: "Candidate",
-                column: "Email",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_InterviewAssignment_InterviewerUserId",
-                table: "InterviewAssignment",
+                name: "IX_InterviewAssignments_InterviewerUserId",
+                table: "InterviewAssignments",
                 column: "InterviewerUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_InterviewAssignment_InterviewScheduleId_InterviewerUserId",
-                table: "InterviewAssignment",
+                name: "IX_InterviewAssignments_InterviewScheduleId_InterviewerUserId",
+                table: "InterviewAssignments",
                 columns: new[] { "InterviewScheduleId", "InterviewerUserId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_InterviewSchedule_CandidateId",
-                table: "InterviewSchedule",
-                column: "CandidateId");
+                name: "IX_InterviewSchedules_ApplicationId",
+                table: "InterviewSchedules",
+                column: "ApplicationId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_InterviewSchedule_CreatedByUserId",
-                table: "InterviewSchedule",
+                name: "IX_InterviewSchedules_CampaignId",
+                table: "InterviewSchedules",
+                column: "CampaignId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_InterviewSchedules_CandidateUserId",
+                table: "InterviewSchedules",
+                column: "CandidateUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_InterviewSchedules_CreatedByUserId",
+                table: "InterviewSchedules",
                 column: "CreatedByUserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_MeetingRoom_InterviewScheduleId",
-                table: "MeetingRoom",
+                name: "IX_MeetingRooms_InterviewScheduleId",
+                table: "MeetingRooms",
                 column: "InterviewScheduleId",
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_MeetingRoom_RoomCode",
-                table: "MeetingRoom",
+                name: "IX_MeetingRooms_RoomCode",
+                table: "MeetingRooms",
                 column: "RoomCode",
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_RoomEvent_MeetingRoomId",
-                table: "RoomEvent",
+                name: "IX_RoomEvents_MeetingRoomId",
+                table: "RoomEvents",
                 column: "MeetingRoomId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_RoomEvent_OccurredAt",
-                table: "RoomEvent",
+                name: "IX_RoomEvents_OccurredAt",
+                table: "RoomEvents",
                 column: "OccurredAt");
 
             migrationBuilder.CreateIndex(
-                name: "IX_RoomParticipant_CandidateId",
-                table: "RoomParticipant",
-                column: "CandidateId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_RoomParticipant_MeetingRoomId",
-                table: "RoomParticipant",
+                name: "IX_RoomParticipants_MeetingRoomId",
+                table: "RoomParticipants",
                 column: "MeetingRoomId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_RoomParticipant_UserId",
-                table: "RoomParticipant",
+                name: "IX_RoomParticipants_UserId",
+                table: "RoomParticipants",
                 column: "UserId");
         }
 
@@ -233,22 +211,19 @@ namespace UNIC.DataAccess.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "InterviewAssignment");
+                name: "InterviewAssignments");
 
             migrationBuilder.DropTable(
-                name: "RoomEvent");
+                name: "RoomEvents");
 
             migrationBuilder.DropTable(
-                name: "RoomParticipant");
+                name: "RoomParticipants");
 
             migrationBuilder.DropTable(
-                name: "MeetingRoom");
+                name: "MeetingRooms");
 
             migrationBuilder.DropTable(
-                name: "InterviewSchedule");
-
-            migrationBuilder.DropTable(
-                name: "Candidate");
+                name: "InterviewSchedules");
         }
     }
 }

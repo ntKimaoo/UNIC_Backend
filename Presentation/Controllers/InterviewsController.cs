@@ -51,7 +51,7 @@ namespace Presentation.Controllers
         /// </summary>
         [HttpGet]
         public async Task<IActionResult> GetAll(
-            [FromQuery] Guid? campaignId,
+            [FromQuery] int? campaignId,
             [FromQuery] string? status,
             [FromQuery] DateTime? fromDate,
             [FromQuery] DateTime? toDate)

@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace UNIC.DataAccess.Migrations
 {
     [DbContext(typeof(MeetingDbContext))]
-    [Migration("20260221023458_ModifyMeetingModules")]
-    partial class ModifyMeetingModules
+    [Migration("20260222023946_InitMeetingModules")]
+    partial class InitMeetingModules
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -81,11 +81,11 @@ namespace UNIC.DataAccess.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("ApplicationId")
+                        .HasColumnType("int");
 
-                    b.Property<Guid>("CampaignId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("CampaignId")
+                        .HasColumnType("int");
 
                     b.Property<string>("CancelReason")
                         .HasColumnType("nvarchar(max)");

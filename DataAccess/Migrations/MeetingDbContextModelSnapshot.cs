@@ -78,11 +78,11 @@ namespace UNIC.DataAccess.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("ApplicationId")
+                        .HasColumnType("int");
 
-                    b.Property<Guid>("CampaignId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("CampaignId")
+                        .HasColumnType("int");
 
                     b.Property<string>("CancelReason")
                         .HasColumnType("nvarchar(max)");
