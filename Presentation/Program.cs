@@ -1,3 +1,4 @@
+
 using API.Services;
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Background;
@@ -98,6 +99,8 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IFundRepository, FundRepository>();
 builder.Services.AddScoped<IClubFundService, ClubFundService>();
+builder.Services.AddScoped<IClubRepository, ClubRepository>();
+builder.Services.AddScoped<IClubService, ClubService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
 builder.Services.AddHostedService<ImageUploadQueueService>();
