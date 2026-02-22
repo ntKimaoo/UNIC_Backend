@@ -36,16 +36,13 @@ namespace DataAccess.Models
         public string FacebookUrl { get; set; }
         public string WebsiteUrl { get; set; }
         public string Address { get; set; }
-
-        public int MemberCount { get; set; }
-
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime? UpdatedAt { get; set; }
         public bool IsActive { get; set; } = false;
         public bool IsDeleted { get; set; } = false;
 
         public virtual ICollection<Department> Departments { get; set; }
-        public virtual ICollection<ClubMember> ClubMembers { get; set; }
+        public virtual ICollection<UserClubRole> ClubMembers { get; set; }
         public virtual ICollection<ClubPost> ClubPosts { get; set; }
         public virtual ICollection<Event> Events { get; set; }
         public virtual ICollection<ClubFund> ClubFunds { get; set; }

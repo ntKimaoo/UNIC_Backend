@@ -16,5 +16,6 @@ namespace DataAccess.Repositories.Interface
         Task<bool> SoftDeleteAsync(int clubId);
         Task<bool> ExistsAsync(int clubId);
         Task<bool> ClubNameExistsAsync(string clubName);
+        Task<int> CountMemberAsync(int clubId);
     }
 }

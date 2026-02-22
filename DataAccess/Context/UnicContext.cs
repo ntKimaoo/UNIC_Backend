@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
+using UNIC.DataAccess.Models;
 
 namespace DataAccess.Models;
 
@@ -25,7 +26,7 @@ public partial class UnicContext : DbContext
     public DbSet<UserRole> UserRoles { get; set; }
     public DbSet<Club> Clubs { get; set; }
     public DbSet<ClubRole> ClubRoles { get; set; }
-    public DbSet<ClubMember> UserClubRoles { get; set; }
+    public DbSet<UserClubRole> UserClubRoles { get; set; }
     public DbSet<Department> Departments { get; set; }
     public DbSet<DepartmentRole> DepartmentRoles { get; set; }
     public DbSet<DepartmentMember> UserDepartmentRoles { get; set; }
@@ -45,6 +46,9 @@ public partial class UnicContext : DbContext
     public DbSet<ApplicationQuestion> ApplicationQuestions { get; set; }
     public DbSet<Application> Applications { get; set; }
     public DbSet<ApplicationAnswer> ApplicationAnswers { get; set; }
+    public DbSet<ClubMemberPolicy> ClubMemberPolicies { get; set; }
+    public DbSet<Policy> Policies { get; set; }
+    public DbSet<ClubRolePolicy> ClubRolePolicies { get; set; }
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
 
@@ -139,26 +143,26 @@ public partial class UnicContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
         // UserClubRole - Self-referencing for AssignedBy
-        modelBuilder.Entity<ClubMember>()
+        modelBuilder.Entity<UserClubRole>()
             .HasOne(ucr => ucr.AssignedByUser)
             .WithMany()
             .HasForeignKey(ucr => ucr.AssignedBy)
             .OnDelete(DeleteBehavior.NoAction);
 
         // UserClubRole relationships
-        modelBuilder.Entity<ClubMember>()
+        modelBuilder.Entity<UserClubRole>()
             .HasOne(ucr => ucr.User)
             .WithMany(u => u.ClubMembers)
             .HasForeignKey(ucr => ucr.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<ClubMember>()
+        modelBuilder.Entity<UserClubRole>()
             .HasOne(ucr => ucr.Club)
             .WithMany(c => c.ClubMembers)
             .HasForeignKey(ucr => ucr.ClubId)
             .OnDelete(DeleteBehavior.NoAction);
 
-        modelBuilder.Entity<ClubMember>()
+        modelBuilder.Entity<UserClubRole>()
             .HasOne(ucr => ucr.ClubRole)
             .WithMany(cr => cr.ClubMembers)
             .HasForeignKey(ucr => ucr.ClubRoleId)
@@ -355,6 +359,27 @@ public partial class UnicContext : DbContext
         modelBuilder.Entity<Application>()
             .HasIndex(a => a.Status);
         OnModelCreatingPartial(modelBuilder);
+        modelBuilder.Entity<ClubMemberPolicy>()
+            .HasKey(cmp => new { cmp.UserId, cmp.PolicyId });
+        modelBuilder.Entity<ClubRolePolicy>()
+            .HasKey(crp => new { crp.ClubRoleId, crp.PolicyId });
+        modelBuilder.Entity<ClubMemberPolicy>()
+            .HasOne<User>(u => u.User)
+            .WithMany(p => p.ClubMemberPolicies)
+            .HasForeignKey(crp => crp.UserId);
+        modelBuilder.Entity<ClubMemberPolicy>()
+            .HasOne<Policy>(p => p.Policy)
+            .WithMany(cmp => cmp.ClubMemberPolicies)
+            .HasForeignKey(crp => crp.PolicyId);
+        modelBuilder.Entity<ClubRolePolicy>()
+            .HasOne<ClubRole>(cr => cr.ClubRole)
+            .WithMany(cmp => cmp.ClubRolePolicies)
+            .HasForeignKey(crp=> crp.ClubRoleId);
+        modelBuilder.Entity<ClubRolePolicy>()
+            .HasOne<Policy>(p => p.Policy)
+            .WithMany(crp => crp.ClubRolePolicies)
+            .HasForeignKey(crp => crp.PolicyId);
+
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);

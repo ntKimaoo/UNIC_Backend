@@ -119,5 +119,11 @@ namespace DataAccess.Repositories.Implementation
             return await _context.Clubs
                 .AnyAsync(c => c.ClubName == clubName && !c.IsDeleted);
         }
+        public async Task<int> CountMemberAsync(int clubId)
+        {
+            return 0;
+            //return await _context.Users.Include(u => u.UserClubRoles)
+            //    .CountAsync(cm => cm.ClubMembers. == clubId && !cm.IsDeleted);
+        }
     }
 }
