@@ -37,7 +37,7 @@ namespace BusinessLogic.Services.Implementation
             _registrationValidator = registrationValidator;
         }
 
-        public async Task<EventDetailDto> CreateEventAsync(CreateEventRequest request)
+        public async Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null)
         {
             // Validate input
             var validationResult = await _createValidator.ValidateAsync(request);
@@ -50,12 +50,14 @@ namespace BusinessLogic.Services.Implementation
             var eventEntity = _mapper.Map<Event>(request);
             eventEntity.CreatedAt = DateTime.Now;
             eventEntity.Status = "PLANNED";
+            eventEntity.CheckInCode = Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper();
+            // Set ImageUrl from Cloudinary upload (null if no image provided)
+            eventEntity.ImageUrl = imageUrl;
 
             // Add to repository
             await _unitOfWork.Events.AddAsync(eventEntity);
             await _unitOfWork.SaveChangesAsync();
 
-            // Return DTO
             return _mapper.Map<EventDetailDto>(eventEntity);
         }
 
@@ -87,15 +89,15 @@ namespace BusinessLogic.Services.Implementation
             existingEvent.Location = request.Location;
             existingEvent.StartDate = request.StartDate;
             existingEvent.EndDate = request.EndDate;
-            existingEvent.ImageUrl = request.ImageUrl;
+            // Only update ImageUrl if a new one was provided (preserve existing if no new image)
+            if (request.ImageUrl != null)
+                existingEvent.ImageUrl = request.ImageUrl;
 
-            // Update
             _unitOfWork.Events.Update(existingEvent);
             await _unitOfWork.SaveChangesAsync();
 
-            // Return updated DTO
-            var updatedEvent = await _unitOfWork.Events.GetByIdWithDetailsAsync(request.EventId);
-            return _mapper.Map<EventDetailDto>(updatedEvent);
+            // Return from already-tracked entity — no extra DB round-trip needed
+            return _mapper.Map<EventDetailDto>(existingEvent);
         }
 
         public async Task<SessionDto> CreateSessionAsync(CreateSessionRequest request)

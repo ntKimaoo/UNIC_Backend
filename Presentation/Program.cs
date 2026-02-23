@@ -1,8 +1,10 @@
+
 using API.Services;
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Background;
 using BusinessLogic.Services.Implementation;
 using BusinessLogic.Services.Interface;
+using DataAccess.Context;
 using DataAccess.Models;
 using DataAccess.Repositories.Implementation;
 using DataAccess.Repositories.Interface;
@@ -14,6 +16,10 @@ using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
 using System;
 using System.Text;
+using UNIC.BusinessLogic.Services.Implementation;
+using UNIC.BusinessLogic.Services.Interface;
+using UNIC.DataAccess.Repositories.Implementation;
+using UNIC.DataAccess.Repositories.Interface;
 using UNIC.Presentation.Hubs;
 using FluentValidation;
 using FluentValidation.AspNetCore;
@@ -21,9 +27,12 @@ using FluentValidation.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 
 //database
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<UnicContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDbContext<MeetingDbContext>(options =>
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("MeetingRoomConnection"));
+});
 
 //redis
 builder.Services.AddStackExchangeRedisCache(redisOptions=>
@@ -54,12 +63,46 @@ builder.Services.AddControllers()
         .SetMaxTop(100)
         .AddRouteComponents("api", GetEdmModel()));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IDepartmentRepository, DepartmentRepository>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
 builder.Services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IRecruitmentCampaignRepository, RecruitmentCampaignRepository>();
+builder.Services.AddScoped<IRecruitmentCampaignService, RecruitmentCampaignService>();
+builder.Services.AddScoped<IClubPostRepository, ClubPostRepository>();
+builder.Services.AddScoped<IClubPostService, ClubPostService>();
+builder.Services.AddScoped<IFileStorageService, FileStorageService>();
+builder.Services.AddScoped<IApplicationService, ApplicationService>();
+builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
+builder.Services.AddScoped<IInterviewRepository, InterviewRepository>();
+builder.Services.AddScoped<IInterviewService, InterviewService>();
+
+// Register Cloudinary as a singleton
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var cloudName = config["Cloudinary:CloudName"];
+    var apiKey = config["Cloudinary:ApiKey"];
+    var apiSecret = config["Cloudinary:ApiSecret"];
+    return new CloudinaryDotNet.Account(cloudName, apiKey, apiSecret);
+});
+builder.Services.AddSingleton(sp =>
+{
+    var account = sp.GetRequiredService<CloudinaryDotNet.Account>();
+    return new CloudinaryDotNet.Cloudinary(account);
+});
+
+// Register Background Services
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IFundRepository, FundRepository>();
+builder.Services.AddScoped<IClubFundService, ClubFundService>();
+builder.Services.AddScoped<IClubRepository, ClubRepository>();
+builder.Services.AddScoped<IClubService, ClubService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
 
@@ -79,6 +122,7 @@ builder.Services.AddValidatorsFromAssemblyContaining<BusinessLogic.Validators.Cr
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(BusinessLogic.Mappings.EventMappingProfile).Assembly);
 
+builder.Services.AddHostedService<ImageUploadQueueService>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -113,6 +157,15 @@ builder.Services.AddAuthorization(options =>
 });
 builder.Services.Configure<AdminSettings>(
     builder.Configuration.GetSection("AdminSettings"));
+
+// Configure file upload size limits
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10MB
+});
+
+//builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
+
 IEdmModel GetEdmModel()
 {
     var odataBuilder = new ODataConventionModelBuilder();
@@ -122,6 +175,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<UnicContext>();
+    var meetingDb = scope.ServiceProvider.GetRequiredService<MeetingDbContext>();
 
     var retry = 0;
     while (!db.Database.CanConnect())
@@ -137,6 +191,7 @@ using (var scope = app.Services.CreateScope())
     }
 
     db.Database.Migrate();
+    meetingDb.Database.Migrate();
 }
 
 // Configure the HTTP request pipeline.
@@ -146,6 +201,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 app.UseCors("AllowFE");
+app.UseStaticFiles(); // Enable serving files from wwwroot
 app.MapHub<WebRtcHub>("/webrtc");
 app.UseHttpsRedirection();
 app.UseAuthentication();

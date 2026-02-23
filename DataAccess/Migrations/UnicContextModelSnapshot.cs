@@ -770,8 +770,14 @@ namespace DataAccess.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(15,2)");
 
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int?>("CategoryId")
                         .HasColumnType("int");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -779,6 +785,11 @@ namespace DataAccess.Migrations
 
                     b.Property<int>("FundId")
                         .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<DateTime>("TransactionDate")
                         .HasColumnType("datetime2");
