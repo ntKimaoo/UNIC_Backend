@@ -86,6 +86,20 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = application });
         }
 
+        [HttpGet("campaign/{campaignId:int}/applications")]
+        public async Task<IActionResult> GetApplicationsByCampaign(int campaignId, [FromQuery] string? status = null)
+        {
+            var applications = await _applicationService.GetApplicationsByCampaignAsync(campaignId, status);
+            return Ok(new { success = true, data = applications });
+        }
+
+        [HttpGet("club/{clubId:int}/applications")]
+        public async Task<IActionResult> GetApplicationsByClub(int clubId, [FromQuery] string? status = null)
+        {
+            var applications = await _applicationService.GetApplicationsByClubAsync(clubId, status);
+            return Ok(new { success = true, data = applications });
+        }
+
         [HttpPost]
         public async Task<IActionResult> CreateApplication([FromBody] CreateApplicationDto request)
         {
@@ -110,6 +124,28 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = application });
         }
 
+        /// <summary>
+        /// Duyệt đơn: cập nhật status (PENDING → APPROVED / REJECTED / SUCCESS).
+        /// SUCCESS = đạt, được mời phỏng vấn.
+        /// </summary>
+        [HttpPatch("{id:int}/status")]
+        public async Task<IActionResult> UpdateApplicationStatus(int id, [FromBody] UpdateApplicationStatusDto request)
+        {
+            try
+            {
+                var updated = await _applicationService.UpdateApplicationStatusAsync(id, request.Status);
+                if (updated == null)
+                {
+                    return NotFound(new { success = false, message = "Application not found" });
+                }
+                return Ok(new { success = true, data = updated });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> DeleteApplication(int id)
         {
@@ -129,6 +165,17 @@ namespace UNIC.Presentation.Controllers
             if (!forms.Any())
             {
                 return NotFound(new { success = false, message = "No forms found" });
+            }
+            return Ok(new { success = true, data = forms });
+        }
+
+        [HttpGet("forms/campaign/{campaignId:int}")]
+        public async Task<IActionResult> GetFormsByCampaign(int campaignId)
+        {
+            var forms = await _applicationService.GetFormsByCampaignAsync(campaignId);
+            if (!forms.Any())
+            {
+                return NotFound(new { success = false, message = "No forms found for this campaign" });
             }
             return Ok(new { success = true, data = forms });
         }

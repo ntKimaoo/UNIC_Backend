@@ -7,6 +7,7 @@ using BusinessLogic.Services.Interface;
 using DataAccess.Context;
 using DataAccess.Models;
 using DataAccess.Repositories.Implementation;
+using DataAccess.Seed;
 using DataAccess.Repositories.Interface;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -202,6 +203,8 @@ using (var scope = app.Services.CreateScope())
 
     db.Database.Migrate();
     meetingDb.Database.Migrate();
+
+    ApplicationDemoSeeder.SeedAsync(db).GetAwaiter().GetResult();
 }
 
 // Configure the HTTP request pipeline.

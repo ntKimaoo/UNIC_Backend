@@ -9,11 +9,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace DataAccess.Migrations
+namespace UNIC.DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    [Migration("20260208060113_AddMissingEventAndAttendanceFields")]
-    partial class AddMissingEventAndAttendanceFields
+    [Migration("20260223181351_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -248,9 +248,6 @@ namespace DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("MemberCount")
-                        .HasColumnType("int");
-
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -309,47 +306,6 @@ namespace DataAccess.Migrations
                     b.HasIndex("ClubId");
 
                     b.ToTable("ClubFunds");
-                });
-
-            modelBuilder.Entity("DataAccess.Models.ClubMember", b =>
-                {
-                    b.Property<int>("ClubMemberId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubMemberId"));
-
-                    b.Property<Guid?>("AssignedBy")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("ClubId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ClubRoleId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("JoinDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("ClubMemberId");
-
-                    b.HasIndex("AssignedBy");
-
-                    b.HasIndex("ClubId");
-
-                    b.HasIndex("ClubRoleId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UserClubRoles");
                 });
 
             modelBuilder.Entity("DataAccess.Models.ClubPost", b =>
@@ -419,10 +375,6 @@ namespace DataAccess.Migrations
 
                     b.Property<int>("Level")
                         .HasColumnType("int");
-
-                    b.Property<string>("Permissions")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RoleName")
                         .IsRequired()
@@ -773,8 +725,14 @@ namespace DataAccess.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(15,2)");
 
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int?>("CategoryId")
                         .HasColumnType("int");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -782,6 +740,11 @@ namespace DataAccess.Migrations
 
                     b.Property<int>("FundId")
                         .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<DateTime>("TransactionDate")
                         .HasColumnType("datetime2");
@@ -1088,6 +1051,47 @@ namespace DataAccess.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("DataAccess.Models.UserClubRole", b =>
+                {
+                    b.Property<int>("ClubMemberId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubMemberId"));
+
+                    b.Property<Guid?>("AssignedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ClubId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ClubRoleId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("JoinDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("ClubMemberId");
+
+                    b.HasIndex("AssignedBy");
+
+                    b.HasIndex("ClubId");
+
+                    b.HasIndex("ClubRoleId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserClubRoles");
+                });
+
             modelBuilder.Entity("DataAccess.Models.UserRole", b =>
                 {
                     b.Property<int>("RoleId")
@@ -1112,6 +1116,56 @@ namespace DataAccess.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("UserRoles");
+                });
+
+            modelBuilder.Entity("UNIC.DataAccess.Models.ClubMemberPolicy", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("PolicyId")
+                        .HasColumnType("int");
+
+                    b.HasKey("UserId", "PolicyId");
+
+                    b.HasIndex("PolicyId");
+
+                    b.ToTable("ClubMemberPolicies");
+                });
+
+            modelBuilder.Entity("UNIC.DataAccess.Models.ClubRolePolicy", b =>
+                {
+                    b.Property<int>("ClubRoleId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PolicyId")
+                        .HasColumnType("int");
+
+                    b.HasKey("ClubRoleId", "PolicyId");
+
+                    b.HasIndex("PolicyId");
+
+                    b.ToTable("ClubRolePolicies");
+                });
+
+            modelBuilder.Entity("UNIC.DataAccess.Models.Policy", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Policies");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Application", b =>
@@ -1202,40 +1256,6 @@ namespace DataAccess.Migrations
                         .IsRequired();
 
                     b.Navigation("Club");
-                });
-
-            modelBuilder.Entity("DataAccess.Models.ClubMember", b =>
-                {
-                    b.HasOne("DataAccess.Models.User", "AssignedByUser")
-                        .WithMany()
-                        .HasForeignKey("AssignedBy")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.HasOne("DataAccess.Models.Club", "Club")
-                        .WithMany("ClubMembers")
-                        .HasForeignKey("ClubId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("DataAccess.Models.ClubRole", "ClubRole")
-                        .WithMany("ClubMembers")
-                        .HasForeignKey("ClubRoleId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("ClubMembers")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AssignedByUser");
-
-                    b.Navigation("Club");
-
-                    b.Navigation("ClubRole");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("DataAccess.Models.ClubPost", b =>
@@ -1430,6 +1450,40 @@ namespace DataAccess.Migrations
                     b.Navigation("EventSchedule");
                 });
 
+            modelBuilder.Entity("DataAccess.Models.UserClubRole", b =>
+                {
+                    b.HasOne("DataAccess.Models.User", "AssignedByUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("DataAccess.Models.Club", "Club")
+                        .WithMany("ClubMembers")
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("DataAccess.Models.ClubRole", "ClubRole")
+                        .WithMany("ClubMembers")
+                        .HasForeignKey("ClubRoleId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("DataAccess.Models.User", "User")
+                        .WithMany("ClubMembers")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AssignedByUser");
+
+                    b.Navigation("Club");
+
+                    b.Navigation("ClubRole");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("DataAccess.Models.UserRole", b =>
                 {
                     b.HasOne("DataAccess.Models.User", "User")
@@ -1439,6 +1493,44 @@ namespace DataAccess.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("UNIC.DataAccess.Models.ClubMemberPolicy", b =>
+                {
+                    b.HasOne("UNIC.DataAccess.Models.Policy", "Policy")
+                        .WithMany("ClubMemberPolicies")
+                        .HasForeignKey("PolicyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DataAccess.Models.User", "User")
+                        .WithMany("ClubMemberPolicies")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Policy");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("UNIC.DataAccess.Models.ClubRolePolicy", b =>
+                {
+                    b.HasOne("DataAccess.Models.ClubRole", "ClubRole")
+                        .WithMany("ClubRolePolicies")
+                        .HasForeignKey("ClubRoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("UNIC.DataAccess.Models.Policy", "Policy")
+                        .WithMany("ClubRolePolicies")
+                        .HasForeignKey("PolicyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ClubRole");
+
+                    b.Navigation("Policy");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Application", b =>
@@ -1481,6 +1573,8 @@ namespace DataAccess.Migrations
             modelBuilder.Entity("DataAccess.Models.ClubRole", b =>
                 {
                     b.Navigation("ClubMembers");
+
+                    b.Navigation("ClubRolePolicies");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Department", b =>
@@ -1525,6 +1619,8 @@ namespace DataAccess.Migrations
 
                     b.Navigation("Attendances");
 
+                    b.Navigation("ClubMemberPolicies");
+
                     b.Navigation("ClubMembers");
 
                     b.Navigation("ClubPosts");
@@ -1540,6 +1636,13 @@ namespace DataAccess.Migrations
                     b.Navigation("RefreshTokens");
 
                     b.Navigation("UserRoles");
+                });
+
+            modelBuilder.Entity("UNIC.DataAccess.Models.Policy", b =>
+                {
+                    b.Navigation("ClubMemberPolicies");
+
+                    b.Navigation("ClubRolePolicies");
                 });
 #pragma warning restore 612, 618
         }

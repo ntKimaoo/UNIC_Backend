@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace DataAccess.Migrations
+namespace UNIC.DataAccess.Migrations
 {
     /// <inheritdoc />
-    public partial class initalCreateDB : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -19,7 +19,6 @@ namespace DataAccess.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     RoleName = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Permissions = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Level = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
@@ -46,7 +45,6 @@ namespace DataAccess.Migrations
                     FacebookUrl = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     WebsiteUrl = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Address = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    MemberCount = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
@@ -84,6 +82,20 @@ namespace DataAccess.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_FundCategories", x => x.CategoryId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Policies",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Title = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Policies", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -171,6 +183,11 @@ namespace DataAccess.Migrations
                     EndDate = table.Column<DateTime>(type: "datetime2", nullable: true),
                     IsPublic = table.Column<bool>(type: "bit", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    RegistrationStartDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    RegistrationEndDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    MaxAttendees = table.Column<int>(type: "int", nullable: true),
+                    CheckInCode = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
+                    CodeExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
@@ -208,6 +225,54 @@ namespace DataAccess.Migrations
                         column: x => x.ClubId,
                         principalTable: "Clubs",
                         principalColumn: "ClubId");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ClubRolePolicies",
+                columns: table => new
+                {
+                    ClubRoleId = table.Column<int>(type: "int", nullable: false),
+                    PolicyId = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ClubRolePolicies", x => new { x.ClubRoleId, x.PolicyId });
+                    table.ForeignKey(
+                        name: "FK_ClubRolePolicies_ClubRoles_ClubRoleId",
+                        column: x => x.ClubRoleId,
+                        principalTable: "ClubRoles",
+                        principalColumn: "ClubRoleId",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ClubRolePolicies_Policies_PolicyId",
+                        column: x => x.PolicyId,
+                        principalTable: "Policies",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ClubMemberPolicies",
+                columns: table => new
+                {
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    PolicyId = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ClubMemberPolicies", x => new { x.UserId, x.PolicyId });
+                    table.ForeignKey(
+                        name: "FK_ClubMemberPolicies_Policies_PolicyId",
+                        column: x => x.PolicyId,
+                        principalTable: "Policies",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ClubMemberPolicies_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "UserId",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -408,6 +473,9 @@ namespace DataAccess.Migrations
                     FundId = table.Column<int>(type: "int", nullable: false),
                     CategoryId = table.Column<int>(type: "int", nullable: true),
                     TransactionType = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    CreatedBy = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    ApprovedBy = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     Amount = table.Column<decimal>(type: "decimal(15,2)", nullable: false),
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     TransactionDate = table.Column<DateTime>(type: "datetime2", nullable: false)
@@ -475,7 +543,10 @@ namespace DataAccess.Migrations
                     UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                     EventId = table.Column<int>(type: "int", nullable: false),
                     RegistrationDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    AttendanceStatus = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false)
+                    AttendanceStatus = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    CheckInTime = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    Score = table.Column<int>(type: "int", nullable: true),
+                    Comment = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -732,6 +803,11 @@ namespace DataAccess.Migrations
                 column: "ClubId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ClubMemberPolicies_PolicyId",
+                table: "ClubMemberPolicies",
+                column: "PolicyId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ClubPosts_ClubId",
                 table: "ClubPosts",
                 column: "ClubId");
@@ -745,6 +821,11 @@ namespace DataAccess.Migrations
                 name: "IX_ClubPosts_UserId",
                 table: "ClubPosts",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ClubRolePolicies_PolicyId",
+                table: "ClubRolePolicies",
+                column: "PolicyId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Clubs_ClubName",
@@ -899,7 +980,13 @@ namespace DataAccess.Migrations
                 name: "Attendances");
 
             migrationBuilder.DropTable(
+                name: "ClubMemberPolicies");
+
+            migrationBuilder.DropTable(
                 name: "ClubPosts");
+
+            migrationBuilder.DropTable(
+                name: "ClubRolePolicies");
 
             migrationBuilder.DropTable(
                 name: "EmailVerificationTokens");
@@ -939,6 +1026,9 @@ namespace DataAccess.Migrations
 
             migrationBuilder.DropTable(
                 name: "Applications");
+
+            migrationBuilder.DropTable(
+                name: "Policies");
 
             migrationBuilder.DropTable(
                 name: "ClubFunds");

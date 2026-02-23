@@ -118,4 +118,14 @@ namespace UNIC.BusinessLogic.DTOs
         public int QuestionId { get; set; }
         public string? AnswerText { get; set; }
     }
+
+    /// <summary>
+    /// Dùng khi duyệt đơn: chỉ cập nhật status (PENDING → APPROVED / REJECTED / SUCCESS).
+    /// </summary>
+    public class UpdateApplicationStatusDto
+    {
+        [Required(ErrorMessage = "Status is required")]
+        [StringLength(20)]
+        public string Status { get; set; } = null!;
+    }
 }
