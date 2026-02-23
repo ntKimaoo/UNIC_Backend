@@ -208,6 +208,19 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline.
+// Luôn trả JSON khi API lỗi (tránh PARSING_ERROR ở FE - RTK Query cần JSON, không HTML).
+app.UseExceptionHandler(appError =>
+{
+    appError.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json";
+        var feature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        var ex = feature?.Error;
+        await context.Response.WriteAsJsonAsync(new { success = false, message = ex?.Message ?? "Internal server error" });
+    });
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

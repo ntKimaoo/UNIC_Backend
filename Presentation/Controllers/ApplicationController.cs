@@ -1,3 +1,4 @@
+using DataAccess.Seed;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
 using System;
@@ -17,6 +18,12 @@ namespace UNIC.Presentation.Controllers
         public ApplicationController(IApplicationService applicationService)
         {
             _applicationService = applicationService;
+        }
+
+        [HttpGet("test-user-id")]
+        public IActionResult GetTestUserId()
+        {
+            return Ok(new { userId = ApplicationDemoSeeder.TestUserId });
         }
 
         [HttpGet]
@@ -124,10 +131,6 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = application });
         }
 
-        /// <summary>
-        /// Duyệt đơn: cập nhật status (PENDING → APPROVED / REJECTED / SUCCESS).
-        /// SUCCESS = đạt, được mời phỏng vấn.
-        /// </summary>
         [HttpPatch("{id:int}/status")]
         public async Task<IActionResult> UpdateApplicationStatus(int id, [FromBody] UpdateApplicationStatusDto request)
         {
@@ -283,7 +286,6 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = new { id } });
         }
 
-        //Application Answers
         [HttpGet("{applicationId:int}/answers")]
         public async Task<IActionResult> GetAnswersByApplication(int applicationId)
         {
@@ -329,6 +331,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPost("submit")]
+        [Produces("application/json")]
         public async Task<IActionResult> SubmitApplicationWithAnswers([FromBody] SubmitApplicationWithAnswersDto request)
         {
             try
@@ -347,6 +350,10 @@ namespace UNIC.Presentation.Controllers
             catch (ArgumentException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Đã xảy ra lỗi khi xử lý đơn. Vui lòng thử lại.", detail = ex.Message });
             }
         }
 

@@ -7,8 +7,13 @@ namespace DataAccess.Seed
     {
         private const string DemoCampaignName = "Tuyển thành viên CLB Lập trình 2025 (Demo)";
 
+        public static readonly Guid TestUserId = new Guid("11111111-1111-1111-1111-111111111111");
+        private const string TestUserEmail = "test@unic.demo";
+
         public static async Task SeedAsync(UnicContext context)
         {
+            await EnsureTestUserExistsAsync(context);
+
             var hasDemo = await context.RecruitmentCampaigns
                 .AnyAsync(c => c.CampaignName == DemoCampaignName);
             if (hasDemo)
@@ -107,6 +112,21 @@ namespace DataAccess.Seed
             };
 
             context.ApplicationQuestions.AddRange(questions);
+            await context.SaveChangesAsync();
+        }
+
+        private static async Task EnsureTestUserExistsAsync(UnicContext context)
+        {
+            var exists = await context.Users.AnyAsync(u => u.UserId == TestUserId);
+            if (exists) return;
+
+            context.Users.Add(new User
+            {
+                UserId = TestUserId,
+                FullName = "Tài khoản test (chưa đăng nhập)",
+                Email = TestUserEmail,
+                CreatedAt = DateTime.UtcNow
+            });
             await context.SaveChangesAsync();
         }
     }

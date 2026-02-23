@@ -1,10 +1,5 @@
 namespace UNIC.BusinessLogic.Constants
 {
-    /// <summary>
-    /// Trạng thái đơn ứng tuyển.
-    /// PENDING → duyệt → APPROVED / REJECTED / SUCCESS.
-    /// SUCCESS = đạt, được mời phỏng vấn.
-    /// </summary>
     public static class ApplicationStatus
     {
         public const string Pending = "PENDING";
@@ -25,9 +20,6 @@ namespace UNIC.BusinessLogic.Constants
             return !string.IsNullOrWhiteSpace(status) && ValidStatuses.Contains(status);
         }
 
-        /// <summary>
-        /// Trạng thái cho phép chuyển sang phỏng vấn (tạo InterviewSchedule).
-        /// </summary>
         public static bool CanProceedToInterview(string? status)
         {
             return string.Equals(status, Success, StringComparison.OrdinalIgnoreCase);

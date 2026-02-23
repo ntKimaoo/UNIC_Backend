@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using BusinessLogic.DTOs;
 using DataAccess.Models;
+using DataAccess.Repositories.Interface;
 using UNIC.BusinessLogic.Constants;
 using UNIC.BusinessLogic.DTOs;
 using UNIC.BusinessLogic.Services.Interface;
@@ -14,10 +15,12 @@ namespace UNIC.BusinessLogic.Services.Implementation
     public class ApplicationService : IApplicationService
     {
         private readonly IApplicationRepository _applicationRepository;
+        private readonly IUserRepository _userRepository;
 
-        public ApplicationService(IApplicationRepository applicationRepository)
+        public ApplicationService(IApplicationRepository applicationRepository, IUserRepository userRepository)
         {
             _applicationRepository = applicationRepository;
+            _userRepository = userRepository;
         }
 
         private ApplicationResponseDto MapToDto(Application application)
@@ -317,6 +320,10 @@ namespace UNIC.BusinessLogic.Services.Implementation
 
         public async Task<ApplicationResponseDto> SubmitApplicationWithAnswersAsync(SubmitApplicationWithAnswersDto request)
         {
+            var user = await _userRepository.GetByIdAsync(request.UserId);
+            if (user == null)
+                throw new ArgumentException("Tài khoản không tồn tại. Vui lòng đăng nhập hoặc dùng UserId hợp lệ.");
+
             var form = await _applicationRepository.GetFormByIdAsync(request.FormId);
             if (form == null)
                 throw new ArgumentException("Form không tồn tại.");
