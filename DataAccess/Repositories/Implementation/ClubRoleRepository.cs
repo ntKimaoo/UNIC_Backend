@@ -22,7 +22,7 @@ namespace DataAccess.Repositories.Implementation
             return await _context.ClubRoles
                 .Include(cr => cr.ClubMembers)
                 .Include(cr => cr.ClubRolePolicies!)
-                    .ThenInclude(crp => crp.Policy)
+                    .ThenInclude(crp => crp.Policy).ThenInclude(p => p.PolicyGroup)
                 .FirstOrDefaultAsync(cr => cr.ClubRoleId == clubRoleId);
         }
 
@@ -31,7 +31,7 @@ namespace DataAccess.Repositories.Implementation
             return await _context.ClubRoles
                 .Include(cr => cr.ClubMembers)
                 .Include(cr => cr.ClubRolePolicies!)
-                    .ThenInclude(crp => crp.Policy)
+                    .ThenInclude(crp => crp.Policy).ThenInclude(p => p.PolicyGroup)
                 .OrderBy(cr => cr.Level)
                 .ToListAsync();
         }
@@ -99,6 +99,13 @@ namespace DataAccess.Repositories.Implementation
 
             await _context.ClubRolePolicies.AddRangeAsync(newEntries);
             await _context.SaveChangesAsync();
+        }
+        public async Task<IEnumerable<Policy>> GetPoliciesByRoleAsync(int groupId)
+        {
+            return await _context.Policies
+            .Where(p => p.ClubRolePolicies
+            .Any(crp => crp.ClubRoleId == groupId))
+            .ToListAsync();
         }
     }
 }

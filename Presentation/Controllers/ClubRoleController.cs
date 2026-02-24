@@ -30,8 +30,17 @@ namespace Presentation.Controllers
         /// <summary>
         /// Get club role by ID
         /// </summary>
-        [HttpGet("{id}")]
+        [HttpGet("{id}/policies")]
         public async Task<IActionResult> GetById(int id)
+        {
+            var role = await _service.GetPoliciesByRoleAsync(id);
+            if (role == null)
+                return NotFound(new { success = false, message = "This role haven't set up any poliecies yet." });
+
+            return Ok(new { success = true, data = role });
+        }
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetPoliciesById(int id)
         {
             var role = await _service.GetByIdAsync(id);
             if (role == null)

@@ -1,6 +1,7 @@
 using DataAccess.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using UNIC.DataAccess.Models;
 
 namespace DataAccess.Repositories.Interface
 {
@@ -13,5 +14,6 @@ namespace DataAccess.Repositories.Interface
         Task<bool> UpdateAsync(ClubRole clubRole);
         Task<bool> DeleteAsync(int clubRoleId);
         Task SetPoliciesAsync(int clubRoleId, IEnumerable<int> policyIds);
+        Task <IEnumerable<Policy>> GetPoliciesByRoleAsync(int clubRoleId);
     }
 }

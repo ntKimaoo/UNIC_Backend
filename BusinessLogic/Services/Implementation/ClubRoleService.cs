@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using UNIC.DataAccess.Models;
 
 namespace BusinessLogic.Services.Implementation
 {
@@ -102,10 +103,15 @@ namespace BusinessLogic.Services.Implementation
                     {
                         Id = crp.Policy.Id,
                         Title = crp.Policy.Title,
-                        Description = crp.Policy.Description
+                        Description = crp.Policy.Description,
+                        PolicyGroupId=crp.Policy.PolicyGroupId,
                     })
                     .ToList() ?? new()
             };
+        }
+        public async Task<IEnumerable<Policy>> GetPoliciesByRoleAsync(int clubRoleId)
+        {
+                        return await _repository.GetPoliciesByRoleAsync(clubRoleId);
         }
     }
 }
