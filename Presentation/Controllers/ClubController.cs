@@ -23,7 +23,7 @@ namespace Presentation.Controllers
         /// Requires "ViewClubs" policy
         /// </summary>
         [HttpGet]
-        [RequirePolicy("ViewClubs")]
+        //[RequirePolicy("ViewClubs")]
         public async Task<IActionResult> GetAll()
         {
             var clubs = await _service.GetAllAsync();
@@ -186,6 +186,39 @@ namespace Presentation.Controllers
                 });
             }
         }
+        /// <summary>
+        /// Chang status of a club (active/inactive)
+        /// </summary>
+        [HttpPut("changeStatus/{id}")]
+        public async Task<IActionResult> changStatus(int id)
+        {
+            try
+            {
+                await _service.ChangeStatusClub(id);
+                return Ok(new
+                {
+                    success = true,
+                    message = "Club updated successfully",
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "An error occurred while updating the club",
+                    error = ex.Message
+                });
+            }
+        }
 
         /// <summary>
         /// Soft delete a club (mark as deleted)
@@ -232,5 +265,6 @@ namespace Presentation.Controllers
                 message = "Club deleted permanently"
             });
         }
+        
     }
 }

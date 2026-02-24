@@ -14,5 +14,6 @@ namespace BusinessLogic.Services.Interface
         Task<ClubResponseDto?> UpdateAsync(int clubId, UpdateClubDto dto);
         Task<bool> DeleteAsync(int clubId);
         Task<bool> SoftDeleteAsync(int clubId);
+        Task ChangeStatusClub(int clubId);
     }
 }

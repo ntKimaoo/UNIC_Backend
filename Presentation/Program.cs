@@ -64,6 +64,8 @@ builder.Services.AddScoped<IRecruitmentCampaignRepository, RecruitmentCampaignRe
 builder.Services.AddScoped<IRecruitmentCampaignService, RecruitmentCampaignService>();
 builder.Services.AddScoped<IClubRepository, ClubRepository>();
 builder.Services.AddScoped<IClubService, ClubService>();
+builder.Services.AddScoped<IClubRoleRepository, ClubRoleRepository>();
+builder.Services.AddScoped<IClubRoleService, ClubRoleService>();
 builder.Services.AddScoped<IPolicyRepository, PolicyRepository>();
 builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddHostedService<TokenCleanupService>();
