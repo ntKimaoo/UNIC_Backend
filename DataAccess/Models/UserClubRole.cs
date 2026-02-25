@@ -15,7 +15,7 @@ namespace DataAccess.Models
         public int ClubId { get; set; }
 
         [Required]
-        public int ClubRoleId { get; set; }
+        public int? ClubRoleId { get; set; }
 
         public DateTime JoinDate { get; set; } = DateTime.Now;
 
@@ -31,7 +31,7 @@ namespace DataAccess.Models
         public virtual Club Club { get; set; }
 
         [ForeignKey("ClubRoleId")]
-        public virtual ClubRole ClubRole { get; set; }
+        public virtual ClubRole? ClubRole { get; set; }
 
         [ForeignKey("AssignedBy")]
         public virtual User AssignedByUser { get; set; }

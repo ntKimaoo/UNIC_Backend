@@ -384,6 +384,10 @@ public partial class UnicContext : DbContext
             .HasOne<PolicyGroup>(pg => pg.PolicyGroup)
             .WithMany(p => p.Policies)
             .HasForeignKey(p => p.PolicyGroupId);
+        modelBuilder.Entity<ClubRole>()
+            .HasOne<Club>(c => c.Club)
+            .WithMany(cr => cr.ClubRoles)
+            .HasForeignKey(cr => cr.ClubId);
 
     }
 

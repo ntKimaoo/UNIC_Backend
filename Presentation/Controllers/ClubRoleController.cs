@@ -104,7 +104,26 @@ namespace Presentation.Controllers
                 return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
             }
         }
+        [HttpPut("{id}/policies")]
+        public async Task<IActionResult> UpdatePolicies(int id, List<int> policyIds)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
 
+            try
+            {
+                await _service.UpdatePoliciesAsync(id, policyIds);
+                return Ok(new { success = true, message = "Club role updated successfully" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+            }
+        }
         /// <summary>
         /// Delete a club role
         /// </summary>

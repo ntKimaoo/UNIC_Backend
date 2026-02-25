@@ -83,7 +83,10 @@ namespace BusinessLogic.Services.Implementation
             var result = await _repository.GetByIdAsync(clubRoleId);
             return MapToResponseDto(result!);
         }
-
+        public async Task UpdatePoliciesAsync(int clubRoleId, List<int> policyIds)
+        {
+            await _repository.SetPoliciesAsync(clubRoleId, policyIds);
+        }
         public async Task<bool> DeleteAsync(int clubRoleId)
         {
             return await _repository.DeleteAsync(clubRoleId);

@@ -91,13 +91,15 @@ namespace DataAccess.Repositories.Implementation
             _context.ClubRolePolicies.RemoveRange(existing);
 
             // Thêm policies mới
-            var newEntries = policyIds.Distinct().Select(pid => new ClubRolePolicy
+            foreach (var id in policyIds)
             {
-                ClubRoleId = clubRoleId,
-                PolicyId = pid
-            });
-
-            await _context.ClubRolePolicies.AddRangeAsync(newEntries);
+                await _context.ClubRolePolicies.AddAsync(
+               new ClubRolePolicy
+                {
+                    ClubRoleId = clubRoleId,
+                    PolicyId = id
+                });
+            }
             await _context.SaveChangesAsync();
         }
         public async Task<IEnumerable<Policy>> GetPoliciesByRoleAsync(int groupId)
