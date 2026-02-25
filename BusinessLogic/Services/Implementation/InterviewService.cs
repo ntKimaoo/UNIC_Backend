@@ -126,6 +126,16 @@ namespace BusinessLogic.Services.Implementation
                         throw new InvalidOperationException("Chỉ có thể Confirm từ Scheduled hoặc Rescheduled.");
                     break;
 
+                case InterviewStatus.InProgress:
+                    if (schedule.Status != InterviewStatus.Confirmed && schedule.Status != InterviewStatus.Rescheduled)
+                        throw new InvalidOperationException("Chỉ có thể bắt đầu phỏng vấn khi đã Confirm hoặc Reschedule.");
+                    break;
+
+                case InterviewStatus.Completed:
+                    if (schedule.Status != InterviewStatus.InProgress)
+                        throw new InvalidOperationException("Chỉ có thể hoàn thành khi đang InProgress.");
+                    break;
+
                 case InterviewStatus.Cancelled:
                     if (schedule.Status == InterviewStatus.Completed || schedule.Status == InterviewStatus.Cancelled)
                         throw new InvalidOperationException("Không thể Cancel lịch đã Completed hoặc Cancelled.");
@@ -335,6 +345,29 @@ namespace BusinessLogic.Services.Implementation
 
             var events = await _repo.GetEventsByRoomIdAsync(room.Id);
             return events.Select(MapEventToDto);
+        }
+
+        public async Task<bool> CloseRoomAsync(string roomCode)
+        {
+            var room = await _repo.GetRoomByCodeAsync(roomCode);
+            if (room == null) return false;
+
+            if (room.Status == RoomStatus.Closed) return true;
+
+            room.Status = RoomStatus.Closed;
+            room.EndedAt = DateTime.UtcNow;
+
+            await _repo.UpdateRoomAsync(room);
+
+            await _repo.CreateEventAsync(new RoomEvent
+            {
+                MeetingRoomId = room.Id,
+                ActorUserId   = Guid.Empty, // System
+                EventType     = "room.closed",
+                OccurredAt    = DateTime.UtcNow
+            });
+
+            return true;
         }
 
         // ═══════════════════════════════════════════════════════════

@@ -23,7 +23,6 @@ namespace Presentation.Controllers
         /// Requires "ViewClubs" policy
         /// </summary>
         [HttpGet]
-        [RequirePolicy("ViewClubs")]
         public async Task<IActionResult> GetAll()
         {
             var clubs = await _service.GetAllAsync();

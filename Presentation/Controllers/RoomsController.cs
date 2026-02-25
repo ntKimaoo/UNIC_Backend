@@ -90,5 +90,18 @@ namespace Presentation.Controllers
                 return NotFound(new { success = false, message = "Room not found" });
             }
         }
+
+        /// <summary>
+        /// PATCH /api/rooms/{roomCode}/close – Đóng phòng
+        /// </summary>
+        [HttpPatch("{roomCode}/close")]
+        public async Task<IActionResult> CloseRoom(string roomCode)
+        {
+            var success = await _service.CloseRoomAsync(roomCode);
+            if (!success)
+                return NotFound(new { success = false, message = "Room not found" });
+
+            return Ok(new { success = true, message = "Room closed successfully" });
+        }
     }
 }

@@ -12,8 +12,13 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace UNIC.DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
+<<<<<<<< HEAD:DataAccess/Migrations/20260223181351_InitialCreate.Designer.cs
     [Migration("20260223181351_InitialCreate")]
     partial class InitialCreate
+========
+    [Migration("20260224040751_initalCreateDB")]
+    partial class initalCreateDB
+>>>>>>>> origin/kien_dev:DataAccess/Migrations/20260224040751_initalCreateDB.Designer.cs
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

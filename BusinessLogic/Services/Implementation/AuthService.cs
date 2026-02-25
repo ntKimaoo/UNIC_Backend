@@ -81,7 +81,6 @@ public class AuthService : IAuthService
         {
             AccessToken = accessToken,
             RefreshToken = refreshToken,
-            ExpiresAt = refreshTokenExpiration,
             User = MapToUserInfoDto(user)
         };
     }

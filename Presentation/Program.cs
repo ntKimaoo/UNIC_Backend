@@ -161,14 +161,6 @@ builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
 // Register dynamic policy provider
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
-    options.AddPolicy("StaffOnly", policy => policy.RequireRole("Staff"));
-});
-builder.Services.Configure<AdminSettings>(
-    builder.Configuration.GetSection("AdminSettings"));
-
 // Configure file upload size limits
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
@@ -205,6 +197,7 @@ using (var scope = app.Services.CreateScope())
     meetingDb.Database.Migrate();
 
     ApplicationDemoSeeder.SeedAsync(db).GetAwaiter().GetResult();
+    DataAccess.Context.DatabaseSeeder.SeedData(scope.ServiceProvider);
 }
 
 // Configure the HTTP request pipeline.
