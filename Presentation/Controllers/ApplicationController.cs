@@ -1,3 +1,4 @@
+using DataAccess.Seed;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
 using System;
@@ -17,6 +18,12 @@ namespace UNIC.Presentation.Controllers
         public ApplicationController(IApplicationService applicationService)
         {
             _applicationService = applicationService;
+        }
+
+        [HttpGet("test-user-id")]
+        public IActionResult GetTestUserId()
+        {
+            return Ok(new { userId = ApplicationDemoSeeder.TestUserId });
         }
 
         [HttpGet]
@@ -86,6 +93,20 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = application });
         }
 
+        [HttpGet("campaign/{campaignId:int}/applications")]
+        public async Task<IActionResult> GetApplicationsByCampaign(int campaignId, [FromQuery] string? status = null)
+        {
+            var applications = await _applicationService.GetApplicationsByCampaignAsync(campaignId, status);
+            return Ok(new { success = true, data = applications });
+        }
+
+        [HttpGet("club/{clubId:int}/applications")]
+        public async Task<IActionResult> GetApplicationsByClub(int clubId, [FromQuery] string? status = null)
+        {
+            var applications = await _applicationService.GetApplicationsByClubAsync(clubId, status);
+            return Ok(new { success = true, data = applications });
+        }
+
         [HttpPost]
         public async Task<IActionResult> CreateApplication([FromBody] CreateApplicationDto request)
         {
@@ -110,6 +131,24 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = application });
         }
 
+        [HttpPatch("{id:int}/status")]
+        public async Task<IActionResult> UpdateApplicationStatus(int id, [FromBody] UpdateApplicationStatusDto request)
+        {
+            try
+            {
+                var updated = await _applicationService.UpdateApplicationStatusAsync(id, request.Status);
+                if (updated == null)
+                {
+                    return NotFound(new { success = false, message = "Application not found" });
+                }
+                return Ok(new { success = true, data = updated });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> DeleteApplication(int id)
         {
@@ -129,6 +168,17 @@ namespace UNIC.Presentation.Controllers
             if (!forms.Any())
             {
                 return NotFound(new { success = false, message = "No forms found" });
+            }
+            return Ok(new { success = true, data = forms });
+        }
+
+        [HttpGet("forms/campaign/{campaignId:int}")]
+        public async Task<IActionResult> GetFormsByCampaign(int campaignId)
+        {
+            var forms = await _applicationService.GetFormsByCampaignAsync(campaignId);
+            if (!forms.Any())
+            {
+                return NotFound(new { success = false, message = "No forms found for this campaign" });
             }
             return Ok(new { success = true, data = forms });
         }
@@ -236,7 +286,6 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = new { id } });
         }
 
-        //Application Answers
         [HttpGet("{applicationId:int}/answers")]
         public async Task<IActionResult> GetAnswersByApplication(int applicationId)
         {
@@ -282,6 +331,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPost("submit")]
+        [Produces("application/json")]
         public async Task<IActionResult> SubmitApplicationWithAnswers([FromBody] SubmitApplicationWithAnswersDto request)
         {
             try
@@ -300,6 +350,10 @@ namespace UNIC.Presentation.Controllers
             catch (ArgumentException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Đã xảy ra lỗi khi xử lý đơn. Vui lòng thử lại.", detail = ex.Message });
             }
         }
 

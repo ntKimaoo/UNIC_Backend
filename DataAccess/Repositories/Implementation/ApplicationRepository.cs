@@ -92,9 +92,38 @@ namespace UNIC.DataAccess.Repositories.Implementation
                 .FirstOrDefaultAsync(a => a.UserId == userId && a.FormId == formId);
         }
 
+        public async Task<IEnumerable<Application>> GetByCampaignIdAsync(int campaignId, string? status = null)
+        {
+            var query = _context.Applications
+                .Include(a => a.ApplicationForm)
+                .Where(a => a.ApplicationForm.CampaignId == campaignId);
+            if (!string.IsNullOrWhiteSpace(status))
+                query = query.Where(a => a.Status == status);
+            return await query.ToListAsync();
+        }
+
+        public async Task<IEnumerable<Application>> GetByClubIdAsync(int clubId, string? status = null)
+        {
+            var query = _context.Applications
+                .Include(a => a.ApplicationForm)
+                    .ThenInclude(f => f.RecruitmentCampaign)
+                .Where(a => a.ApplicationForm.RecruitmentCampaign.ClubId == clubId);
+            if (!string.IsNullOrWhiteSpace(status))
+                query = query.Where(a => a.Status == status);
+            return await query.ToListAsync();
+        }
+
         public async Task<IEnumerable<ApplicationForm>> GetAllFormsAsync()
         {
             return await _context.ApplicationForms.ToListAsync();
+        }
+
+        public async Task<IEnumerable<ApplicationForm>> GetFormsByCampaignIdAsync(int campaignId)
+        {
+            return await _context.ApplicationForms
+                .Where(f => f.CampaignId == campaignId)
+                .OrderBy(f => f.FormId)
+                .ToListAsync();
         }
 
         public async Task<ApplicationForm?> GetFormByIdAsync(int formId)

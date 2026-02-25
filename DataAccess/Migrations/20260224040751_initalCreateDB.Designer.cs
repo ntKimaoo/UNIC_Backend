@@ -26,1624 +26,1624 @@ namespace UNIC.DataAccess.Migrations
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
             modelBuilder.Entity("DataAccess.Models.Application", b =>
-                {
-                    b.Property<int>("ApplicationId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("ApplicationId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ApplicationId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ApplicationId"));
 
-                    b.Property<int>("FormId")
-                        .HasColumnType("int");
+                b.Property<int>("FormId")
+                    .HasColumnType("int");
 
-                    b.Property<DateTime?>("ReviewedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("ReviewedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnType("nvarchar(20)");
 
-                    b.Property<DateTime>("SubmissionDate")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("SubmissionDate")
+                    .HasColumnType("datetime2");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uniqueidentifier");
 
-                    b.HasKey("ApplicationId");
+                b.HasKey("ApplicationId");
 
-                    b.HasIndex("FormId");
+                b.HasIndex("FormId");
 
-                    b.HasIndex("Status");
+                b.HasIndex("Status");
 
-                    b.HasIndex("UserId");
+                b.HasIndex("UserId");
 
-                    b.ToTable("Applications");
-                });
+                b.ToTable("Applications");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ApplicationAnswer", b =>
-                {
-                    b.Property<int>("AnswerId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("AnswerId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AnswerId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AnswerId"));
 
-                    b.Property<string>("AnswerText")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("AnswerText")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("ApplicationId")
-                        .HasColumnType("int");
+                b.Property<int>("ApplicationId")
+                    .HasColumnType("int");
 
-                    b.Property<int>("QuestionId")
-                        .HasColumnType("int");
+                b.Property<int>("QuestionId")
+                    .HasColumnType("int");
 
-                    b.HasKey("AnswerId");
+                b.HasKey("AnswerId");
 
-                    b.HasIndex("ApplicationId");
+                b.HasIndex("ApplicationId");
 
-                    b.HasIndex("QuestionId");
+                b.HasIndex("QuestionId");
 
-                    b.ToTable("ApplicationAnswers");
-                });
+                b.ToTable("ApplicationAnswers");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ApplicationForm", b =>
-                {
-                    b.Property<int>("FormId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("FormId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FormId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FormId"));
 
-                    b.Property<int>("CampaignId")
-                        .HasColumnType("int");
+                b.Property<int>("CampaignId")
+                    .HasColumnType("int");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Description")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("FormName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                b.Property<string>("FormName")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("nvarchar(200)");
 
-                    b.Property<string>("FormTitle")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("FormTitle")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("FormId");
+                b.HasKey("FormId");
 
-                    b.HasIndex("CampaignId");
+                b.HasIndex("CampaignId");
 
-                    b.ToTable("ApplicationForms");
-                });
+                b.ToTable("ApplicationForms");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ApplicationQuestion", b =>
-                {
-                    b.Property<int>("QuestionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("QuestionId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("QuestionId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("QuestionId"));
 
-                    b.Property<int?>("DisplayOrder")
-                        .HasColumnType("int");
+                b.Property<int?>("DisplayOrder")
+                    .HasColumnType("int");
 
-                    b.Property<int>("FormId")
-                        .HasColumnType("int");
+                b.Property<int>("FormId")
+                    .HasColumnType("int");
 
-                    b.Property<bool>("IsRequired")
-                        .HasColumnType("bit");
+                b.Property<bool>("IsRequired")
+                    .HasColumnType("bit");
 
-                    b.Property<string>("QuestionText")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("QuestionText")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("QuestionType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                b.Property<string>("QuestionType")
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasColumnType("nvarchar(50)");
 
-                    b.HasKey("QuestionId");
+                b.HasKey("QuestionId");
 
-                    b.HasIndex("FormId");
+                b.HasIndex("FormId");
 
-                    b.ToTable("ApplicationQuestions");
-                });
+                b.ToTable("ApplicationQuestions");
+            });
 
             modelBuilder.Entity("DataAccess.Models.Attendance", b =>
-                {
-                    b.Property<int>("AttendId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("AttendId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AttendId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AttendId"));
 
-                    b.Property<string>("AttendanceStatus")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                b.Property<string>("AttendanceStatus")
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnType("nvarchar(20)");
 
-                    b.Property<DateTime?>("CheckInTime")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("CheckInTime")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("Comment")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                b.Property<string>("Comment")
+                    .HasMaxLength(500)
+                    .HasColumnType("nvarchar(500)");
 
-                    b.Property<int>("EventId")
-                        .HasColumnType("int");
+                b.Property<int>("EventId")
+                    .HasColumnType("int");
 
-                    b.Property<DateTime>("RegistrationDate")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("RegistrationDate")
+                    .HasColumnType("datetime2");
 
-                    b.Property<int?>("Score")
-                        .HasColumnType("int");
+                b.Property<int?>("Score")
+                    .HasColumnType("int");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uniqueidentifier");
 
-                    b.HasKey("AttendId");
+                b.HasKey("AttendId");
 
-                    b.HasIndex("EventId");
+                b.HasIndex("EventId");
 
-                    b.HasIndex("UserId");
+                b.HasIndex("UserId");
 
-                    b.ToTable("Attendances");
-                });
+                b.ToTable("Attendances");
+            });
 
             modelBuilder.Entity("DataAccess.Models.Club", b =>
-                {
-                    b.Property<int>("ClubId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("ClubId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubId"));
 
-                    b.Property<string>("Address")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Address")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ClubName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                b.Property<string>("ClubName")
+                    .IsRequired()
+                    .HasMaxLength(100)
+                    .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("CoverImageUrl")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("CoverImageUrl")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Description")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Email")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("FacebookUrl")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("FacebookUrl")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("FoundedDate")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("FoundedDate")
+                    .HasColumnType("datetime2");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
+                b.Property<bool>("IsActive")
+                    .HasColumnType("bit");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
+                b.Property<bool>("IsDeleted")
+                    .HasColumnType("bit");
 
-                    b.Property<bool>("IsPublic")
-                        .HasColumnType("bit");
+                b.Property<bool>("IsPublic")
+                    .HasColumnType("bit");
 
-                    b.Property<string>("LogoUrl")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("LogoUrl")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("PhoneNumber")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("PhoneNumber")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ShortName")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                b.Property<string>("ShortName")
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasColumnType("nvarchar(50)");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnType("nvarchar(20)");
 
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("UpdatedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("WebsiteUrl")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("WebsiteUrl")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("ClubId");
+                b.HasKey("ClubId");
 
-                    b.HasIndex("ClubName");
+                b.HasIndex("ClubName");
 
-                    b.ToTable("Clubs");
-                });
+                b.ToTable("Clubs");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ClubFund", b =>
-                {
-                    b.Property<int>("FundId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("FundId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FundId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FundId"));
 
-                    b.Property<int>("ClubId")
-                        .HasColumnType("int");
+                b.Property<int>("ClubId")
+                    .HasColumnType("int");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<decimal>("CurrentBalance")
-                        .HasColumnType("decimal(15,2)");
+                b.Property<decimal>("CurrentBalance")
+                    .HasColumnType("decimal(15,2)");
 
-                    b.Property<string>("FundName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                b.Property<string>("FundName")
+                    .IsRequired()
+                    .HasMaxLength(100)
+                    .HasColumnType("nvarchar(100)");
 
-                    b.Property<decimal>("TotalAmount")
-                        .HasColumnType("decimal(15,2)");
+                b.Property<decimal>("TotalAmount")
+                    .HasColumnType("decimal(15,2)");
 
-                    b.HasKey("FundId");
+                b.HasKey("FundId");
 
-                    b.HasIndex("ClubId");
+                b.HasIndex("ClubId");
 
-                    b.ToTable("ClubFunds");
-                });
+                b.ToTable("ClubFunds");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ClubPost", b =>
-                {
-                    b.Property<int>("PostId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("PostId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PostId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PostId"));
 
-                    b.Property<string>("Caption")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Caption")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("ClubId")
-                        .HasColumnType("int");
+                b.Property<int>("ClubId")
+                    .HasColumnType("int");
 
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Content")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ImageUrl")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("ImageUrl")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("PostDate")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("PostDate")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnType("nvarchar(20)");
 
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                b.Property<string>("Title")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("nvarchar(200)");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<Guid?>("UserId")
-                        .HasColumnType("uniqueidentifier");
+                b.Property<Guid?>("UserId")
+                    .HasColumnType("uniqueidentifier");
 
-                    b.HasKey("PostId");
+                b.HasKey("PostId");
 
-                    b.HasIndex("ClubId");
+                b.HasIndex("ClubId");
 
-                    b.HasIndex("PostDate");
+                b.HasIndex("PostDate");
 
-                    b.HasIndex("UserId");
+                b.HasIndex("UserId");
 
-                    b.ToTable("ClubPosts");
-                });
+                b.ToTable("ClubPosts");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ClubRole", b =>
-                {
-                    b.Property<int>("ClubRoleId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("ClubRoleId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubRoleId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubRoleId"));
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Description")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("Level")
-                        .HasColumnType("int");
+                b.Property<int>("Level")
+                    .HasColumnType("int");
 
-                    b.Property<string>("RoleName")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                b.Property<string>("RoleName")
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasColumnType("nvarchar(50)");
 
-                    b.HasKey("ClubRoleId");
+                b.HasKey("ClubRoleId");
 
-                    b.ToTable("ClubRoles");
-                });
+                b.ToTable("ClubRoles");
+            });
 
             modelBuilder.Entity("DataAccess.Models.Department", b =>
-                {
-                    b.Property<int>("DepartmentId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("DepartmentId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DepartmentId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DepartmentId"));
 
-                    b.Property<int>("ClubId")
-                        .HasColumnType("int");
+                b.Property<int>("ClubId")
+                    .HasColumnType("int");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("DepartmentName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                b.Property<string>("DepartmentName")
+                    .IsRequired()
+                    .HasMaxLength(100)
+                    .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Description")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("datetime2");
 
-                    b.HasKey("DepartmentId");
+                b.HasKey("DepartmentId");
 
-                    b.HasIndex("ClubId");
+                b.HasIndex("ClubId");
 
-                    b.ToTable("Departments");
-                });
+                b.ToTable("Departments");
+            });
 
             modelBuilder.Entity("DataAccess.Models.DepartmentMember", b =>
-                {
-                    b.Property<int>("DeptMemberId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("DeptMemberId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DeptMemberId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DeptMemberId"));
 
-                    b.Property<DateTime>("AssignedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("AssignedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<Guid?>("AssignedBy")
-                        .HasColumnType("uniqueidentifier");
+                b.Property<Guid?>("AssignedBy")
+                    .HasColumnType("uniqueidentifier");
 
-                    b.Property<int>("DepartmentId")
-                        .HasColumnType("int");
+                b.Property<int>("DepartmentId")
+                    .HasColumnType("int");
 
-                    b.Property<int>("DeptRoleId")
-                        .HasColumnType("int");
+                b.Property<int>("DeptRoleId")
+                    .HasColumnType("int");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uniqueidentifier");
 
-                    b.HasKey("DeptMemberId");
+                b.HasKey("DeptMemberId");
 
-                    b.HasIndex("AssignedBy");
+                b.HasIndex("AssignedBy");
 
-                    b.HasIndex("DepartmentId");
+                b.HasIndex("DepartmentId");
 
-                    b.HasIndex("DeptRoleId");
+                b.HasIndex("DeptRoleId");
 
-                    b.HasIndex("UserId");
+                b.HasIndex("UserId");
 
-                    b.ToTable("UserDepartmentRoles");
-                });
+                b.ToTable("UserDepartmentRoles");
+            });
 
             modelBuilder.Entity("DataAccess.Models.DepartmentRole", b =>
-                {
-                    b.Property<int>("DeptRoleId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("DeptRoleId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DeptRoleId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DeptRoleId"));
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Description")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Permissions")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Permissions")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("RoleName")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                b.Property<string>("RoleName")
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasColumnType("nvarchar(50)");
 
-                    b.HasKey("DeptRoleId");
+                b.HasKey("DeptRoleId");
 
-                    b.ToTable("DepartmentRoles");
-                });
+                b.ToTable("DepartmentRoles");
+            });
 
             modelBuilder.Entity("DataAccess.Models.EmailVerificationToken", b =>
-                {
-                    b.Property<int>("EmailVerificationTokenId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("EmailVerificationTokenId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EmailVerificationTokenId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EmailVerificationTokenId"));
 
-                    b.Property<DateTime?>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getutcdate())");
+                b.Property<DateTime?>("CreatedAt")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("datetime2")
+                    .HasDefaultValueSql("(getutcdate())");
 
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("ExpiresAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<bool?>("IsUsed")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
+                b.Property<bool?>("IsUsed")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("bit")
+                    .HasDefaultValue(false);
 
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                b.Property<string>("TokenHash")
+                    .IsRequired()
+                    .HasMaxLength(255)
+                    .HasColumnType("nvarchar(255)");
 
-                    b.Property<DateTime?>("UsedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("UsedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uniqueidentifier");
 
-                    b.HasKey("EmailVerificationTokenId")
-                        .HasName("PK__EmailVer__B16196D29A5849AE");
+                b.HasKey("EmailVerificationTokenId")
+                    .HasName("PK__EmailVer__B16196D29A5849AE");
 
-                    b.HasIndex(new[] { "TokenHash" }, "IX_EmailVerificationTokens_TokenHash");
+                b.HasIndex(new[] { "TokenHash" }, "IX_EmailVerificationTokens_TokenHash");
 
-                    b.HasIndex(new[] { "UserId" }, "IX_EmailVerificationTokens_UserId");
+                b.HasIndex(new[] { "UserId" }, "IX_EmailVerificationTokens_UserId");
 
-                    b.ToTable("EmailVerificationTokens");
-                });
+                b.ToTable("EmailVerificationTokens");
+            });
 
             modelBuilder.Entity("DataAccess.Models.Event", b =>
-                {
-                    b.Property<int>("EventId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("EventId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EventId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EventId"));
 
-                    b.Property<string>("CheckInCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
+                b.Property<string>("CheckInCode")
+                    .HasMaxLength(10)
+                    .HasColumnType("nvarchar(10)");
 
-                    b.Property<int?>("ClubId")
-                        .HasColumnType("int");
+                b.Property<int?>("ClubId")
+                    .HasColumnType("int");
 
-                    b.Property<DateTime?>("CodeExpiresAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("CodeExpiresAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Description")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("EndDate")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("EndDate")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("EventName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                b.Property<string>("EventName")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("nvarchar(200)");
 
-                    b.Property<string>("ImageUrl")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("ImageUrl")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool>("IsPublic")
-                        .HasColumnType("bit");
+                b.Property<bool>("IsPublic")
+                    .HasColumnType("bit");
 
-                    b.Property<string>("Location")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                b.Property<string>("Location")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("nvarchar(200)");
 
-                    b.Property<int?>("MaxAttendees")
-                        .HasColumnType("int");
+                b.Property<int?>("MaxAttendees")
+                    .HasColumnType("int");
 
-                    b.Property<DateTime?>("RegistrationEndDate")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("RegistrationEndDate")
+                    .HasColumnType("datetime2");
 
-                    b.Property<DateTime?>("RegistrationStartDate")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("RegistrationStartDate")
+                    .HasColumnType("datetime2");
 
-                    b.Property<DateTime?>("StartDate")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("StartDate")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnType("nvarchar(20)");
 
-                    b.HasKey("EventId");
+                b.HasKey("EventId");
 
-                    b.HasIndex("ClubId");
+                b.HasIndex("ClubId");
 
-                    b.HasIndex("StartDate");
+                b.HasIndex("StartDate");
 
-                    b.ToTable("Events");
-                });
+                b.ToTable("Events");
+            });
 
             modelBuilder.Entity("DataAccess.Models.EventBudget", b =>
-                {
-                    b.Property<int>("BudgetId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("BudgetId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("BudgetId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("BudgetId"));
 
-                    b.Property<decimal>("BudgetAmount")
-                        .HasColumnType("decimal(15,2)");
+                b.Property<decimal>("BudgetAmount")
+                    .HasColumnType("decimal(15,2)");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<int>("EventId")
-                        .HasColumnType("int");
+                b.Property<int>("EventId")
+                    .HasColumnType("int");
 
-                    b.Property<string>("Notes")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Notes")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("SpendName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("SpendName")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<decimal>("SpentAmount")
-                        .HasColumnType("decimal(15,2)");
+                b.Property<decimal>("SpentAmount")
+                    .HasColumnType("decimal(15,2)");
 
-                    b.HasKey("BudgetId");
+                b.HasKey("BudgetId");
 
-                    b.HasIndex("EventId");
+                b.HasIndex("EventId");
 
-                    b.ToTable("EventBudgets");
-                });
+                b.ToTable("EventBudgets");
+            });
 
             modelBuilder.Entity("DataAccess.Models.EventImage", b =>
-                {
-                    b.Property<int>("ImageId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("ImageId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ImageId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ImageId"));
 
-                    b.Property<string>("Caption")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Caption")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("EventId")
-                        .HasColumnType("int");
+                b.Property<int>("EventId")
+                    .HasColumnType("int");
 
-                    b.Property<string>("ImageUrl")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                b.Property<string>("ImageUrl")
+                    .IsRequired()
+                    .HasMaxLength(500)
+                    .HasColumnType("nvarchar(500)");
 
-                    b.Property<DateTime>("UploadedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("UploadedAt")
+                    .HasColumnType("datetime2");
 
-                    b.HasKey("ImageId");
+                b.HasKey("ImageId");
 
-                    b.HasIndex("EventId");
+                b.HasIndex("EventId");
 
-                    b.ToTable("EventImages");
-                });
+                b.ToTable("EventImages");
+            });
 
             modelBuilder.Entity("DataAccess.Models.EventSchedule", b =>
-                {
-                    b.Property<int>("ScheduleId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("ScheduleId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ScheduleId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ScheduleId"));
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Description")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("EndTime")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("EndTime")
+                    .HasColumnType("datetime2");
 
-                    b.Property<int>("EventId")
-                        .HasColumnType("int");
+                b.Property<int>("EventId")
+                    .HasColumnType("int");
 
-                    b.Property<string>("ScheduleName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                b.Property<string>("ScheduleName")
+                    .IsRequired()
+                    .HasMaxLength(100)
+                    .HasColumnType("nvarchar(100)");
 
-                    b.Property<DateTime?>("StartTime")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("StartTime")
+                    .HasColumnType("datetime2");
 
-                    b.HasKey("ScheduleId");
+                b.HasKey("ScheduleId");
 
-                    b.HasIndex("EventId");
+                b.HasIndex("EventId");
 
-                    b.ToTable("EventSchedules");
-                });
+                b.ToTable("EventSchedules");
+            });
 
             modelBuilder.Entity("DataAccess.Models.FundCategory", b =>
-                {
-                    b.Property<int>("CategoryId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("CategoryId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CategoryId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CategoryId"));
 
-                    b.Property<string>("CategoryName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                b.Property<string>("CategoryName")
+                    .IsRequired()
+                    .HasMaxLength(100)
+                    .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Description")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("CategoryId");
+                b.HasKey("CategoryId");
 
-                    b.ToTable("FundCategories");
-                });
+                b.ToTable("FundCategories");
+            });
 
             modelBuilder.Entity("DataAccess.Models.FundTransaction", b =>
-                {
-                    b.Property<int>("TransactionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("TransactionId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TransactionId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TransactionId"));
 
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(15,2)");
+                b.Property<decimal>("Amount")
+                    .HasColumnType("decimal(15,2)");
 
-                    b.Property<Guid?>("ApprovedBy")
-                        .HasColumnType("uniqueidentifier");
+                b.Property<Guid?>("ApprovedBy")
+                    .HasColumnType("uniqueidentifier");
 
-                    b.Property<int?>("CategoryId")
-                        .HasColumnType("int");
+                b.Property<int?>("CategoryId")
+                    .HasColumnType("int");
 
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uniqueidentifier");
+                b.Property<Guid?>("CreatedBy")
+                    .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Description")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("FundId")
-                        .HasColumnType("int");
+                b.Property<int>("FundId")
+                    .HasColumnType("int");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnType("nvarchar(20)");
 
-                    b.Property<DateTime>("TransactionDate")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("TransactionDate")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("TransactionType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                b.Property<string>("TransactionType")
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnType("nvarchar(20)");
 
-                    b.HasKey("TransactionId");
+                b.HasKey("TransactionId");
 
-                    b.HasIndex("CategoryId");
+                b.HasIndex("CategoryId");
 
-                    b.HasIndex("FundId");
+                b.HasIndex("FundId");
 
-                    b.ToTable("FundTransactions");
-                });
+                b.ToTable("FundTransactions");
+            });
 
             modelBuilder.Entity("DataAccess.Models.Notification", b =>
-                {
-                    b.Property<int>("NotificationId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("NotificationId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("NotificationId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("NotificationId"));
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("bit");
+                b.Property<bool>("IsRead")
+                    .HasColumnType("bit");
 
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Message")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                b.Property<string>("Title")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("nvarchar(200)");
 
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                b.Property<string>("Type")
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasColumnType("nvarchar(50)");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uniqueidentifier");
 
-                    b.HasKey("NotificationId");
+                b.HasKey("NotificationId");
 
-                    b.HasIndex("UserId", "IsRead");
+                b.HasIndex("UserId", "IsRead");
 
-                    b.ToTable("Notifications");
-                });
+                b.ToTable("Notifications");
+            });
 
             modelBuilder.Entity("DataAccess.Models.PasswordResetToken", b =>
-                {
-                    b.Property<int>("PasswordResetTokenId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("PasswordResetTokenId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PasswordResetTokenId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PasswordResetTokenId"));
 
-                    b.Property<DateTime?>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getutcdate())");
+                b.Property<DateTime?>("CreatedAt")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("datetime2")
+                    .HasDefaultValueSql("(getutcdate())");
 
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("ExpiresAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<bool>("IsUsed")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
+                b.Property<bool>("IsUsed")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("bit")
+                    .HasDefaultValue(false);
 
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                b.Property<string>("TokenHash")
+                    .IsRequired()
+                    .HasMaxLength(255)
+                    .HasColumnType("nvarchar(255)");
 
-                    b.Property<DateTime?>("UsedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("UsedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uniqueidentifier");
 
-                    b.HasKey("PasswordResetTokenId")
-                        .HasName("PK__Password__160661284C508CB5");
+                b.HasKey("PasswordResetTokenId")
+                    .HasName("PK__Password__160661284C508CB5");
 
-                    b.HasIndex(new[] { "TokenHash" }, "IX_PasswordResetTokens_TokenHash");
+                b.HasIndex(new[] { "TokenHash" }, "IX_PasswordResetTokens_TokenHash");
 
-                    b.HasIndex(new[] { "UserId" }, "IX_PasswordResetTokens_UserId");
+                b.HasIndex(new[] { "UserId" }, "IX_PasswordResetTokens_UserId");
 
-                    b.ToTable("PasswordResetTokens");
-                });
+                b.ToTable("PasswordResetTokens");
+            });
 
             modelBuilder.Entity("DataAccess.Models.RecruitmentCampaign", b =>
-                {
-                    b.Property<int>("CampaignId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("CampaignId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CampaignId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CampaignId"));
 
-                    b.Property<string>("CampaignName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                b.Property<string>("CampaignName")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("nvarchar(200)");
 
-                    b.Property<int>("ClubId")
-                        .HasColumnType("int");
+                b.Property<int>("ClubId")
+                    .HasColumnType("int");
 
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Content")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Description")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("EndDate")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("EndDate")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("ImageUrl")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("ImageUrl")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("LinkCampaign")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("LinkCampaign")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("StartDate")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime?>("StartDate")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnType("nvarchar(20)");
 
-                    b.HasKey("CampaignId");
+                b.HasKey("CampaignId");
 
-                    b.HasIndex("ClubId");
+                b.HasIndex("ClubId");
 
-                    b.ToTable("RecruitmentCampaigns");
-                });
+                b.ToTable("RecruitmentCampaigns");
+            });
 
             modelBuilder.Entity("DataAccess.Models.RefreshToken", b =>
-                {
-                    b.Property<int>("RefreshTokenId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasColumnName("RefreshTokenID");
+            {
+                b.Property<int>("RefreshTokenId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int")
+                    .HasColumnName("RefreshTokenID");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RefreshTokenId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RefreshTokenId"));
 
-                    b.Property<DateTime?>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime")
-                        .HasDefaultValueSql("(getdate())");
+                b.Property<DateTime?>("CreatedAt")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("datetime")
+                    .HasDefaultValueSql("(getdate())");
 
-                    b.Property<string>("DeviceInfo")
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                b.Property<string>("DeviceInfo")
+                    .HasMaxLength(255)
+                    .HasColumnType("nvarchar(255)");
 
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime");
+                b.Property<DateTime>("ExpiresAt")
+                    .HasColumnType("datetime");
 
-                    b.Property<string>("Ipaddress")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasColumnName("IPAddress");
+                b.Property<string>("Ipaddress")
+                    .HasMaxLength(50)
+                    .HasColumnType("nvarchar(50)")
+                    .HasColumnName("IPAddress");
 
-                    b.Property<bool?>("IsRevoked")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
+                b.Property<bool?>("IsRevoked")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("bit")
+                    .HasDefaultValue(false);
 
-                    b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("datetime");
+                b.Property<DateTime?>("RevokedAt")
+                    .HasColumnType("datetime");
 
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                b.Property<string>("TokenHash")
+                    .IsRequired()
+                    .HasMaxLength(500)
+                    .HasColumnType("nvarchar(500)");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("UserID");
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uniqueidentifier")
+                    .HasColumnName("UserID");
 
-                    b.HasKey("RefreshTokenId")
-                        .HasName("PK__RefreshT__F5845E595E9566E1");
+                b.HasKey("RefreshTokenId")
+                    .HasName("PK__RefreshT__F5845E595E9566E1");
 
-                    b.HasIndex("UserId");
+                b.HasIndex("UserId");
 
-                    b.ToTable("RefreshTokens");
-                });
+                b.ToTable("RefreshTokens");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ScheduleDetail", b =>
-                {
-                    b.Property<int>("DetailId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("DetailId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DetailId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DetailId"));
 
-                    b.Property<string>("ActivityName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                b.Property<string>("ActivityName")
+                    .IsRequired()
+                    .HasMaxLength(100)
+                    .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Description")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("Duration")
-                        .HasColumnType("int");
+                b.Property<int?>("Duration")
+                    .HasColumnType("int");
 
-                    b.Property<int>("ScheduleId")
-                        .HasColumnType("int");
+                b.Property<int>("ScheduleId")
+                    .HasColumnType("int");
 
-                    b.HasKey("DetailId");
+                b.HasKey("DetailId");
 
-                    b.HasIndex("ScheduleId");
+                b.HasIndex("ScheduleId");
 
-                    b.ToTable("ScheduleDetails");
-                });
+                b.ToTable("ScheduleDetails");
+            });
 
             modelBuilder.Entity("DataAccess.Models.User", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("UserId");
+            {
+                b.Property<Guid>("UserId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("uniqueidentifier")
+                    .HasColumnName("UserId");
 
-                    b.Property<string>("Address")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                b.Property<string>("Address")
+                    .HasMaxLength(500)
+                    .HasColumnType("nvarchar(500)");
 
-                    b.Property<string>("Avatar")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                b.Property<string>("Avatar")
+                    .HasMaxLength(500)
+                    .HasColumnType("nvarchar(500)");
 
-                    b.Property<DateTime?>("CreatedAt")
-                        .HasColumnType("datetime");
+                b.Property<DateTime?>("CreatedAt")
+                    .HasColumnType("datetime");
 
-                    b.Property<DateOnly?>("DateOfBirth")
-                        .HasColumnType("date");
+                b.Property<DateOnly?>("DateOfBirth")
+                    .HasColumnType("date");
 
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                b.Property<string>("Email")
+                    .IsRequired()
+                    .HasMaxLength(100)
+                    .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("FullName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                b.Property<string>("FullName")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("nvarchar(200)");
 
-                    b.Property<string>("Gender")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
+                b.Property<string>("Gender")
+                    .HasMaxLength(10)
+                    .HasColumnType("nvarchar(10)");
 
-                    b.Property<DateOnly?>("JoinDate")
-                        .HasColumnType("date");
+                b.Property<DateOnly?>("JoinDate")
+                    .HasColumnType("date");
 
-                    b.Property<string>("Major")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                b.Property<string>("Major")
+                    .HasMaxLength(200)
+                    .HasColumnType("nvarchar(200)");
 
-                    b.Property<string>("PasswordHash")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                b.Property<string>("PasswordHash")
+                    .HasMaxLength(500)
+                    .HasColumnType("nvarchar(500)");
 
-                    b.Property<string>("PhoneNumber")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                b.Property<string>("PhoneNumber")
+                    .HasMaxLength(20)
+                    .HasColumnType("nvarchar(20)");
 
-                    b.Property<string>("Status")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                b.Property<string>("Status")
+                    .HasMaxLength(50)
+                    .HasColumnType("nvarchar(50)");
 
-                    b.Property<string>("StudentId")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)")
-                        .HasColumnName("StudentID");
+                b.Property<string>("StudentId")
+                    .HasMaxLength(50)
+                    .HasColumnType("nvarchar(50)")
+                    .HasColumnName("StudentID");
 
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime");
+                b.Property<DateTime?>("UpdatedAt")
+                    .HasColumnType("datetime");
 
-                    b.HasKey("UserId")
-                        .HasName("PK__Users__0CF04B38FFE70BBA");
+                b.HasKey("UserId")
+                    .HasName("PK__Users__0CF04B38FFE70BBA");
 
-                    b.HasIndex("Email")
-                        .IsUnique();
+                b.HasIndex("Email")
+                    .IsUnique();
 
-                    b.HasIndex(new[] { "Email" }, "UQ__Users__A9D105345C1FCA58")
-                        .IsUnique();
+                b.HasIndex(new[] { "Email" }, "UQ__Users__A9D105345C1FCA58")
+                    .IsUnique();
 
-                    b.ToTable("Users");
-                });
+                b.ToTable("Users");
+            });
 
             modelBuilder.Entity("DataAccess.Models.UserClubRole", b =>
-                {
-                    b.Property<int>("ClubMemberId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("ClubMemberId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubMemberId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubMemberId"));
 
-                    b.Property<Guid?>("AssignedBy")
-                        .HasColumnType("uniqueidentifier");
+                b.Property<Guid?>("AssignedBy")
+                    .HasColumnType("uniqueidentifier");
 
-                    b.Property<int>("ClubId")
-                        .HasColumnType("int");
+                b.Property<int>("ClubId")
+                    .HasColumnType("int");
 
-                    b.Property<int>("ClubRoleId")
-                        .HasColumnType("int");
+                b.Property<int>("ClubRoleId")
+                    .HasColumnType("int");
 
-                    b.Property<DateTime>("JoinDate")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("JoinDate")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                b.Property<string>("Status")
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnType("nvarchar(20)");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uniqueidentifier");
 
-                    b.HasKey("ClubMemberId");
+                b.HasKey("ClubMemberId");
 
-                    b.HasIndex("AssignedBy");
+                b.HasIndex("AssignedBy");
 
-                    b.HasIndex("ClubId");
+                b.HasIndex("ClubId");
 
-                    b.HasIndex("ClubRoleId");
+                b.HasIndex("ClubRoleId");
 
-                    b.HasIndex("UserId");
+                b.HasIndex("UserId");
 
-                    b.ToTable("UserClubRoles");
-                });
+                b.ToTable("UserClubRoles");
+            });
 
             modelBuilder.Entity("DataAccess.Models.UserRole", b =>
-                {
-                    b.Property<int>("RoleId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("RoleId")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RoleId"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RoleId"));
 
-                    b.Property<DateTime>("AssignedAt")
-                        .HasColumnType("datetime2");
+                b.Property<DateTime>("AssignedAt")
+                    .HasColumnType("datetime2");
 
-                    b.Property<string>("RoleName")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                b.Property<string>("RoleName")
+                    .IsRequired()
+                    .HasMaxLength(50)
+                    .HasColumnType("nvarchar(50)");
 
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uniqueidentifier");
 
-                    b.HasKey("RoleId");
+                b.HasKey("RoleId");
 
-                    b.HasIndex("UserId");
+                b.HasIndex("UserId");
 
-                    b.ToTable("UserRoles");
-                });
+                b.ToTable("UserRoles");
+            });
 
             modelBuilder.Entity("UNIC.DataAccess.Models.ClubMemberPolicy", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
+            {
+                b.Property<Guid>("UserId")
+                    .HasColumnType("uniqueidentifier");
 
-                    b.Property<int>("PolicyId")
-                        .HasColumnType("int");
+                b.Property<int>("PolicyId")
+                    .HasColumnType("int");
 
-                    b.HasKey("UserId", "PolicyId");
+                b.HasKey("UserId", "PolicyId");
 
-                    b.HasIndex("PolicyId");
+                b.HasIndex("PolicyId");
 
-                    b.ToTable("ClubMemberPolicies");
-                });
+                b.ToTable("ClubMemberPolicies");
+            });
 
             modelBuilder.Entity("UNIC.DataAccess.Models.ClubRolePolicy", b =>
-                {
-                    b.Property<int>("ClubRoleId")
-                        .HasColumnType("int");
+            {
+                b.Property<int>("ClubRoleId")
+                    .HasColumnType("int");
 
-                    b.Property<int>("PolicyId")
-                        .HasColumnType("int");
+                b.Property<int>("PolicyId")
+                    .HasColumnType("int");
 
-                    b.HasKey("ClubRoleId", "PolicyId");
+                b.HasKey("ClubRoleId", "PolicyId");
 
-                    b.HasIndex("PolicyId");
+                b.HasIndex("PolicyId");
 
-                    b.ToTable("ClubRolePolicies");
-                });
+                b.ToTable("ClubRolePolicies");
+            });
 
             modelBuilder.Entity("UNIC.DataAccess.Models.Policy", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+            {
+                b.Property<int>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Description")
+                    .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                b.Property<string>("Title")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("Id");
+                b.HasKey("Id");
 
-                    b.ToTable("Policies");
-                });
+                b.ToTable("Policies");
+            });
 
             modelBuilder.Entity("DataAccess.Models.Application", b =>
-                {
-                    b.HasOne("DataAccess.Models.ApplicationForm", "ApplicationForm")
-                        .WithMany("Applications")
-                        .HasForeignKey("FormId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.ApplicationForm", "ApplicationForm")
+                    .WithMany("Applications")
+                    .HasForeignKey("FormId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
 
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("Applications")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                b.HasOne("DataAccess.Models.User", "User")
+                    .WithMany("Applications")
+                    .HasForeignKey("UserId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
 
-                    b.Navigation("ApplicationForm");
+                b.Navigation("ApplicationForm");
 
-                    b.Navigation("User");
-                });
+                b.Navigation("User");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ApplicationAnswer", b =>
-                {
-                    b.HasOne("DataAccess.Models.Application", "Application")
-                        .WithMany("ApplicationAnswers")
-                        .HasForeignKey("ApplicationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.Application", "Application")
+                    .WithMany("ApplicationAnswers")
+                    .HasForeignKey("ApplicationId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.HasOne("DataAccess.Models.ApplicationQuestion", "ApplicationQuestion")
-                        .WithMany("ApplicationAnswers")
-                        .HasForeignKey("QuestionId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                b.HasOne("DataAccess.Models.ApplicationQuestion", "ApplicationQuestion")
+                    .WithMany("ApplicationAnswers")
+                    .HasForeignKey("QuestionId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
 
-                    b.Navigation("Application");
+                b.Navigation("Application");
 
-                    b.Navigation("ApplicationQuestion");
-                });
+                b.Navigation("ApplicationQuestion");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ApplicationForm", b =>
-                {
-                    b.HasOne("DataAccess.Models.RecruitmentCampaign", "RecruitmentCampaign")
-                        .WithMany("ApplicationForms")
-                        .HasForeignKey("CampaignId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.RecruitmentCampaign", "RecruitmentCampaign")
+                    .WithMany("ApplicationForms")
+                    .HasForeignKey("CampaignId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("RecruitmentCampaign");
-                });
+                b.Navigation("RecruitmentCampaign");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ApplicationQuestion", b =>
-                {
-                    b.HasOne("DataAccess.Models.ApplicationForm", "ApplicationForm")
-                        .WithMany("ApplicationQuestions")
-                        .HasForeignKey("FormId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.ApplicationForm", "ApplicationForm")
+                    .WithMany("ApplicationQuestions")
+                    .HasForeignKey("FormId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("ApplicationForm");
-                });
+                b.Navigation("ApplicationForm");
+            });
 
             modelBuilder.Entity("DataAccess.Models.Attendance", b =>
-                {
-                    b.HasOne("DataAccess.Models.Event", "Event")
-                        .WithMany("Attendances")
-                        .HasForeignKey("EventId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.Event", "Event")
+                    .WithMany("Attendances")
+                    .HasForeignKey("EventId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
 
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("Attendances")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                b.HasOne("DataAccess.Models.User", "User")
+                    .WithMany("Attendances")
+                    .HasForeignKey("UserId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
 
-                    b.Navigation("Event");
+                b.Navigation("Event");
 
-                    b.Navigation("User");
-                });
+                b.Navigation("User");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ClubFund", b =>
-                {
-                    b.HasOne("DataAccess.Models.Club", "Club")
-                        .WithMany("ClubFunds")
-                        .HasForeignKey("ClubId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.Club", "Club")
+                    .WithMany("ClubFunds")
+                    .HasForeignKey("ClubId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
 
-                    b.Navigation("Club");
-                });
+                b.Navigation("Club");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ClubPost", b =>
-                {
-                    b.HasOne("DataAccess.Models.Club", "Club")
-                        .WithMany("ClubPosts")
-                        .HasForeignKey("ClubId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.Club", "Club")
+                    .WithMany("ClubPosts")
+                    .HasForeignKey("ClubId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
 
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("ClubPosts")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                b.HasOne("DataAccess.Models.User", "User")
+                    .WithMany("ClubPosts")
+                    .HasForeignKey("UserId")
+                    .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("Club");
+                b.Navigation("Club");
 
-                    b.Navigation("User");
-                });
+                b.Navigation("User");
+            });
 
             modelBuilder.Entity("DataAccess.Models.Department", b =>
-                {
-                    b.HasOne("DataAccess.Models.Club", "Club")
-                        .WithMany("Departments")
-                        .HasForeignKey("ClubId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.Club", "Club")
+                    .WithMany("Departments")
+                    .HasForeignKey("ClubId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("Club");
-                });
+                b.Navigation("Club");
+            });
 
             modelBuilder.Entity("DataAccess.Models.DepartmentMember", b =>
-                {
-                    b.HasOne("DataAccess.Models.User", "AssignedByUser")
-                        .WithMany()
-                        .HasForeignKey("AssignedBy")
-                        .OnDelete(DeleteBehavior.NoAction);
+            {
+                b.HasOne("DataAccess.Models.User", "AssignedByUser")
+                    .WithMany()
+                    .HasForeignKey("AssignedBy")
+                    .OnDelete(DeleteBehavior.NoAction);
 
-                    b.HasOne("DataAccess.Models.Department", "Department")
-                        .WithMany("DepartmentMembers")
-                        .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                b.HasOne("DataAccess.Models.Department", "Department")
+                    .WithMany("DepartmentMembers")
+                    .HasForeignKey("DepartmentId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
 
-                    b.HasOne("DataAccess.Models.DepartmentRole", "DepartmentRole")
-                        .WithMany("DepartmentMembers")
-                        .HasForeignKey("DeptRoleId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                b.HasOne("DataAccess.Models.DepartmentRole", "DepartmentRole")
+                    .WithMany("DepartmentMembers")
+                    .HasForeignKey("DeptRoleId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
 
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("DepartmentMembers")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                b.HasOne("DataAccess.Models.User", "User")
+                    .WithMany("DepartmentMembers")
+                    .HasForeignKey("UserId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("AssignedByUser");
+                b.Navigation("AssignedByUser");
 
-                    b.Navigation("Department");
+                b.Navigation("Department");
 
-                    b.Navigation("DepartmentRole");
+                b.Navigation("DepartmentRole");
 
-                    b.Navigation("User");
-                });
+                b.Navigation("User");
+            });
 
             modelBuilder.Entity("DataAccess.Models.EmailVerificationToken", b =>
-                {
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("EmailVerificationTokens")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("FK__EmailVeri__User__45F365D3");
+            {
+                b.HasOne("DataAccess.Models.User", "User")
+                    .WithMany("EmailVerificationTokens")
+                    .HasForeignKey("UserId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired()
+                    .HasConstraintName("FK__EmailVeri__User__45F365D3");
 
-                    b.Navigation("User");
-                });
+                b.Navigation("User");
+            });
 
             modelBuilder.Entity("DataAccess.Models.Event", b =>
-                {
-                    b.HasOne("DataAccess.Models.Club", "Club")
-                        .WithMany("Events")
-                        .HasForeignKey("ClubId")
-                        .OnDelete(DeleteBehavior.NoAction);
+            {
+                b.HasOne("DataAccess.Models.Club", "Club")
+                    .WithMany("Events")
+                    .HasForeignKey("ClubId")
+                    .OnDelete(DeleteBehavior.NoAction);
 
-                    b.Navigation("Club");
-                });
+                b.Navigation("Club");
+            });
 
             modelBuilder.Entity("DataAccess.Models.EventBudget", b =>
-                {
-                    b.HasOne("DataAccess.Models.Event", "Event")
-                        .WithMany("EventBudgets")
-                        .HasForeignKey("EventId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.Event", "Event")
+                    .WithMany("EventBudgets")
+                    .HasForeignKey("EventId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("Event");
-                });
+                b.Navigation("Event");
+            });
 
             modelBuilder.Entity("DataAccess.Models.EventImage", b =>
-                {
-                    b.HasOne("DataAccess.Models.Event", "Event")
-                        .WithMany("EventImages")
-                        .HasForeignKey("EventId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.Event", "Event")
+                    .WithMany("EventImages")
+                    .HasForeignKey("EventId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
 
-                    b.Navigation("Event");
-                });
+                b.Navigation("Event");
+            });
 
             modelBuilder.Entity("DataAccess.Models.EventSchedule", b =>
-                {
-                    b.HasOne("DataAccess.Models.Event", "Event")
-                        .WithMany("EventSchedules")
-                        .HasForeignKey("EventId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.Event", "Event")
+                    .WithMany("EventSchedules")
+                    .HasForeignKey("EventId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("Event");
-                });
+                b.Navigation("Event");
+            });
 
             modelBuilder.Entity("DataAccess.Models.FundTransaction", b =>
-                {
-                    b.HasOne("DataAccess.Models.FundCategory", "FundCategory")
-                        .WithMany("FundTransactions")
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.SetNull);
+            {
+                b.HasOne("DataAccess.Models.FundCategory", "FundCategory")
+                    .WithMany("FundTransactions")
+                    .HasForeignKey("CategoryId")
+                    .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("DataAccess.Models.ClubFund", "ClubFund")
-                        .WithMany("FundTransactions")
-                        .HasForeignKey("FundId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                b.HasOne("DataAccess.Models.ClubFund", "ClubFund")
+                    .WithMany("FundTransactions")
+                    .HasForeignKey("FundId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
 
-                    b.Navigation("ClubFund");
+                b.Navigation("ClubFund");
 
-                    b.Navigation("FundCategory");
-                });
+                b.Navigation("FundCategory");
+            });
 
             modelBuilder.Entity("DataAccess.Models.Notification", b =>
-                {
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("Notifications")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.User", "User")
+                    .WithMany("Notifications")
+                    .HasForeignKey("UserId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("User");
-                });
+                b.Navigation("User");
+            });
 
             modelBuilder.Entity("DataAccess.Models.PasswordResetToken", b =>
-                {
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("PasswordResetTokens")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("FK__PasswordR__User__412EB0B6");
+            {
+                b.HasOne("DataAccess.Models.User", "User")
+                    .WithMany("PasswordResetTokens")
+                    .HasForeignKey("UserId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired()
+                    .HasConstraintName("FK__PasswordR__User__412EB0B6");
 
-                    b.Navigation("User");
-                });
+                b.Navigation("User");
+            });
 
             modelBuilder.Entity("DataAccess.Models.RecruitmentCampaign", b =>
-                {
-                    b.HasOne("DataAccess.Models.Club", "Club")
-                        .WithMany("RecruitmentCampaigns")
-                        .HasForeignKey("ClubId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.Club", "Club")
+                    .WithMany("RecruitmentCampaigns")
+                    .HasForeignKey("ClubId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
 
-                    b.Navigation("Club");
-                });
+                b.Navigation("Club");
+            });
 
             modelBuilder.Entity("DataAccess.Models.RefreshToken", b =>
-                {
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("RefreshTokens")
-                        .HasForeignKey("UserId")
-                        .IsRequired()
-                        .HasConstraintName("FK__RefreshTo__User__3C69FB99");
+            {
+                b.HasOne("DataAccess.Models.User", "User")
+                    .WithMany("RefreshTokens")
+                    .HasForeignKey("UserId")
+                    .IsRequired()
+                    .HasConstraintName("FK__RefreshTo__User__3C69FB99");
 
-                    b.Navigation("User");
-                });
+                b.Navigation("User");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ScheduleDetail", b =>
-                {
-                    b.HasOne("DataAccess.Models.EventSchedule", "EventSchedule")
-                        .WithMany("ScheduleDetails")
-                        .HasForeignKey("ScheduleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.EventSchedule", "EventSchedule")
+                    .WithMany("ScheduleDetails")
+                    .HasForeignKey("ScheduleId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("EventSchedule");
-                });
+                b.Navigation("EventSchedule");
+            });
 
             modelBuilder.Entity("DataAccess.Models.UserClubRole", b =>
-                {
-                    b.HasOne("DataAccess.Models.User", "AssignedByUser")
-                        .WithMany()
-                        .HasForeignKey("AssignedBy")
-                        .OnDelete(DeleteBehavior.NoAction);
+            {
+                b.HasOne("DataAccess.Models.User", "AssignedByUser")
+                    .WithMany()
+                    .HasForeignKey("AssignedBy")
+                    .OnDelete(DeleteBehavior.NoAction);
 
-                    b.HasOne("DataAccess.Models.Club", "Club")
-                        .WithMany("ClubMembers")
-                        .HasForeignKey("ClubId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                b.HasOne("DataAccess.Models.Club", "Club")
+                    .WithMany("ClubMembers")
+                    .HasForeignKey("ClubId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
 
-                    b.HasOne("DataAccess.Models.ClubRole", "ClubRole")
-                        .WithMany("ClubMembers")
-                        .HasForeignKey("ClubRoleId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                b.HasOne("DataAccess.Models.ClubRole", "ClubRole")
+                    .WithMany("ClubMembers")
+                    .HasForeignKey("ClubRoleId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
 
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("ClubMembers")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                b.HasOne("DataAccess.Models.User", "User")
+                    .WithMany("ClubMembers")
+                    .HasForeignKey("UserId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("AssignedByUser");
+                b.Navigation("AssignedByUser");
 
-                    b.Navigation("Club");
+                b.Navigation("Club");
 
-                    b.Navigation("ClubRole");
+                b.Navigation("ClubRole");
 
-                    b.Navigation("User");
-                });
+                b.Navigation("User");
+            });
 
             modelBuilder.Entity("DataAccess.Models.UserRole", b =>
-                {
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("UserRoles")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.User", "User")
+                    .WithMany("UserRoles")
+                    .HasForeignKey("UserId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("User");
-                });
+                b.Navigation("User");
+            });
 
             modelBuilder.Entity("UNIC.DataAccess.Models.ClubMemberPolicy", b =>
-                {
-                    b.HasOne("UNIC.DataAccess.Models.Policy", "Policy")
-                        .WithMany("ClubMemberPolicies")
-                        .HasForeignKey("PolicyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("UNIC.DataAccess.Models.Policy", "Policy")
+                    .WithMany("ClubMemberPolicies")
+                    .HasForeignKey("PolicyId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("ClubMemberPolicies")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                b.HasOne("DataAccess.Models.User", "User")
+                    .WithMany("ClubMemberPolicies")
+                    .HasForeignKey("UserId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("Policy");
+                b.Navigation("Policy");
 
-                    b.Navigation("User");
-                });
+                b.Navigation("User");
+            });
 
             modelBuilder.Entity("UNIC.DataAccess.Models.ClubRolePolicy", b =>
-                {
-                    b.HasOne("DataAccess.Models.ClubRole", "ClubRole")
-                        .WithMany("ClubRolePolicies")
-                        .HasForeignKey("ClubRoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+            {
+                b.HasOne("DataAccess.Models.ClubRole", "ClubRole")
+                    .WithMany("ClubRolePolicies")
+                    .HasForeignKey("ClubRoleId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.HasOne("UNIC.DataAccess.Models.Policy", "Policy")
-                        .WithMany("ClubRolePolicies")
-                        .HasForeignKey("PolicyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                b.HasOne("UNIC.DataAccess.Models.Policy", "Policy")
+                    .WithMany("ClubRolePolicies")
+                    .HasForeignKey("PolicyId")
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired();
 
-                    b.Navigation("ClubRole");
+                b.Navigation("ClubRole");
 
-                    b.Navigation("Policy");
-                });
+                b.Navigation("Policy");
+            });
 
             modelBuilder.Entity("DataAccess.Models.Application", b =>
-                {
-                    b.Navigation("ApplicationAnswers");
-                });
+            {
+                b.Navigation("ApplicationAnswers");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ApplicationForm", b =>
-                {
-                    b.Navigation("ApplicationQuestions");
+            {
+                b.Navigation("ApplicationQuestions");
 
-                    b.Navigation("Applications");
-                });
+                b.Navigation("Applications");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ApplicationQuestion", b =>
-                {
-                    b.Navigation("ApplicationAnswers");
-                });
+            {
+                b.Navigation("ApplicationAnswers");
+            });
 
             modelBuilder.Entity("DataAccess.Models.Club", b =>
-                {
-                    b.Navigation("ClubFunds");
+            {
+                b.Navigation("ClubFunds");
 
-                    b.Navigation("ClubMembers");
+                b.Navigation("ClubMembers");
 
-                    b.Navigation("ClubPosts");
+                b.Navigation("ClubPosts");
 
-                    b.Navigation("Departments");
+                b.Navigation("Departments");
 
-                    b.Navigation("Events");
+                b.Navigation("Events");
 
-                    b.Navigation("RecruitmentCampaigns");
-                });
+                b.Navigation("RecruitmentCampaigns");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ClubFund", b =>
-                {
-                    b.Navigation("FundTransactions");
-                });
+            {
+                b.Navigation("FundTransactions");
+            });
 
             modelBuilder.Entity("DataAccess.Models.ClubRole", b =>
-                {
-                    b.Navigation("ClubMembers");
+            {
+                b.Navigation("ClubMembers");
 
-                    b.Navigation("ClubRolePolicies");
-                });
+                b.Navigation("ClubRolePolicies");
+            });
 
             modelBuilder.Entity("DataAccess.Models.Department", b =>
-                {
-                    b.Navigation("DepartmentMembers");
-                });
+            {
+                b.Navigation("DepartmentMembers");
+            });
 
             modelBuilder.Entity("DataAccess.Models.DepartmentRole", b =>
-                {
-                    b.Navigation("DepartmentMembers");
-                });
+            {
+                b.Navigation("DepartmentMembers");
+            });
 
             modelBuilder.Entity("DataAccess.Models.Event", b =>
-                {
-                    b.Navigation("Attendances");
+            {
+                b.Navigation("Attendances");
 
-                    b.Navigation("EventBudgets");
+                b.Navigation("EventBudgets");
 
-                    b.Navigation("EventImages");
+                b.Navigation("EventImages");
 
-                    b.Navigation("EventSchedules");
-                });
+                b.Navigation("EventSchedules");
+            });
 
             modelBuilder.Entity("DataAccess.Models.EventSchedule", b =>
-                {
-                    b.Navigation("ScheduleDetails");
-                });
+            {
+                b.Navigation("ScheduleDetails");
+            });
 
             modelBuilder.Entity("DataAccess.Models.FundCategory", b =>
-                {
-                    b.Navigation("FundTransactions");
-                });
+            {
+                b.Navigation("FundTransactions");
+            });
 
             modelBuilder.Entity("DataAccess.Models.RecruitmentCampaign", b =>
-                {
-                    b.Navigation("ApplicationForms");
-                });
+            {
+                b.Navigation("ApplicationForms");
+            });
 
             modelBuilder.Entity("DataAccess.Models.User", b =>
-                {
-                    b.Navigation("Applications");
+            {
+                b.Navigation("Applications");
 
-                    b.Navigation("Attendances");
+                b.Navigation("Attendances");
 
-                    b.Navigation("ClubMemberPolicies");
+                b.Navigation("ClubMemberPolicies");
 
-                    b.Navigation("ClubMembers");
+                b.Navigation("ClubMembers");
 
-                    b.Navigation("ClubPosts");
+                b.Navigation("ClubPosts");
 
-                    b.Navigation("DepartmentMembers");
+                b.Navigation("DepartmentMembers");
 
-                    b.Navigation("EmailVerificationTokens");
+                b.Navigation("EmailVerificationTokens");
 
-                    b.Navigation("Notifications");
+                b.Navigation("Notifications");
 
-                    b.Navigation("PasswordResetTokens");
+                b.Navigation("PasswordResetTokens");
 
-                    b.Navigation("RefreshTokens");
+                b.Navigation("RefreshTokens");
 
-                    b.Navigation("UserRoles");
-                });
+                b.Navigation("UserRoles");
+            });
 
             modelBuilder.Entity("UNIC.DataAccess.Models.Policy", b =>
-                {
-                    b.Navigation("ClubMemberPolicies");
+            {
+                b.Navigation("ClubMemberPolicies");
 
-                    b.Navigation("ClubRolePolicies");
-                });
+                b.Navigation("ClubRolePolicies");
+            });
 #pragma warning restore 612, 618
         }
     }

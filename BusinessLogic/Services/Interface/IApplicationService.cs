@@ -12,14 +12,18 @@ namespace UNIC.BusinessLogic.Services.Interface
         Task<ApplicationResponseDto?> GetApplicationByIdAsync(int id);
         Task<ApplicationResponseDto> CreateApplicationAsync(CreateApplicationDto request);
         Task<bool> UpdateApplicationAsync(int id, ApplicationResponseDto application);
+        Task<ApplicationResponseDto?> UpdateApplicationStatusAsync(int id, string status);
         Task<bool> DeleteApplicationAsync(int id);
 
         Task<IEnumerable<ApplicationResponseDto>> GetApplicationsByUserAsync(Guid userId);
         Task<IEnumerable<ApplicationResponseDto>> GetApplicationsByFormAsync(int formId);
         Task<IEnumerable<ApplicationResponseDto>> GetApplicationsByStatusAsync(string status);
         Task<ApplicationResponseDto?> GetApplicationByUserAndFormAsync(Guid userId, int formId);
+        Task<IEnumerable<ApplicationResponseDto>> GetApplicationsByCampaignAsync(int campaignId, string? status = null);
+        Task<IEnumerable<ApplicationResponseDto>> GetApplicationsByClubAsync(int clubId, string? status = null);
 
         Task<IEnumerable<ApplicationFormResponseDto>> GetAllFormsAsync();
+        Task<IEnumerable<ApplicationFormResponseDto>> GetFormsByCampaignAsync(int campaignId);
         Task<ApplicationFormResponseDto?> GetFormByIdAsync(int id);
         Task<ApplicationFormResponseDto> CreateFormAsync(CreateApplicationFormDto request);
         Task<bool> UpdateFormAsync(int id, ApplicationFormResponseDto form);

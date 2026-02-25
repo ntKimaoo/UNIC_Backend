@@ -17,8 +17,11 @@ namespace UNIC.DataAccess.Repositories.Interface
         Task<IEnumerable<Application>> GetByFormIdAsync(int formId);
         Task<IEnumerable<Application>> GetByStatusAsync(string status);
         Task<Application?> GetByUserIdAndFormIdAsync(Guid userId, int formId);
+        Task<IEnumerable<Application>> GetByCampaignIdAsync(int campaignId, string? status = null);
+        Task<IEnumerable<Application>> GetByClubIdAsync(int clubId, string? status = null);
 
         Task<IEnumerable<ApplicationForm>> GetAllFormsAsync();
+        Task<IEnumerable<ApplicationForm>> GetFormsByCampaignIdAsync(int campaignId);
         Task<ApplicationForm?> GetFormByIdAsync(int formId);
         Task<ApplicationForm> CreateFormAsync(ApplicationForm form);
         Task<bool> UpdateFormAsync(ApplicationForm form);
