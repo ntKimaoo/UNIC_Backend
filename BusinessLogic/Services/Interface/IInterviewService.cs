@@ -27,6 +27,7 @@ namespace BusinessLogic.Services.Interface
         Task<bool> LeaveRoomAsync(string roomCode, LeaveRoomDto dto);
         Task<IEnumerable<RoomParticipantResponseDto>> GetParticipantsAsync(string roomCode);
         Task<IEnumerable<RoomEventResponseDto>> GetEventsAsync(string roomCode);
+        Task<bool> CloseRoomAsync(string roomCode);
 
         // ── Feedback ──────────────────────────────────────────────
         Task<bool> SubmitFeedbackAsync(int scheduleId, int assignmentId, SubmitFeedbackDto dto);

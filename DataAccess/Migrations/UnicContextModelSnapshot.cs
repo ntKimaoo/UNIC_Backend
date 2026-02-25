@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace DataAccess.Migrations
+namespace UNIC.DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
     partial class UnicContextModelSnapshot : ModelSnapshot
@@ -303,47 +303,6 @@ namespace DataAccess.Migrations
                     b.HasIndex("ClubId");
 
                     b.ToTable("ClubFunds");
-                });
-
-            modelBuilder.Entity("DataAccess.Models.ClubMember", b =>
-                {
-                    b.Property<int>("ClubMemberId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubMemberId"));
-
-                    b.Property<Guid?>("AssignedBy")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("ClubId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ClubRoleId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("JoinDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("ClubMemberId");
-
-                    b.HasIndex("AssignedBy");
-
-                    b.HasIndex("ClubId");
-
-                    b.HasIndex("ClubRoleId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UserClubRoles");
                 });
 
             modelBuilder.Entity("DataAccess.Models.ClubPost", b =>
@@ -1089,6 +1048,47 @@ namespace DataAccess.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("DataAccess.Models.UserClubRole", b =>
+                {
+                    b.Property<int>("ClubMemberId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubMemberId"));
+
+                    b.Property<Guid?>("AssignedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ClubId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ClubRoleId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("JoinDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("ClubMemberId");
+
+                    b.HasIndex("AssignedBy");
+
+                    b.HasIndex("ClubId");
+
+                    b.HasIndex("ClubRoleId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserClubRoles");
+                });
+
             modelBuilder.Entity("DataAccess.Models.UserRole", b =>
                 {
                     b.Property<int>("RoleId")
@@ -1253,40 +1253,6 @@ namespace DataAccess.Migrations
                         .IsRequired();
 
                     b.Navigation("Club");
-                });
-
-            modelBuilder.Entity("DataAccess.Models.ClubMember", b =>
-                {
-                    b.HasOne("DataAccess.Models.User", "AssignedByUser")
-                        .WithMany()
-                        .HasForeignKey("AssignedBy")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.HasOne("DataAccess.Models.Club", "Club")
-                        .WithMany("ClubMembers")
-                        .HasForeignKey("ClubId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("DataAccess.Models.ClubRole", "ClubRole")
-                        .WithMany("ClubMembers")
-                        .HasForeignKey("ClubRoleId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("ClubMembers")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AssignedByUser");
-
-                    b.Navigation("Club");
-
-                    b.Navigation("ClubRole");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("DataAccess.Models.ClubPost", b =>
@@ -1479,6 +1445,40 @@ namespace DataAccess.Migrations
                         .IsRequired();
 
                     b.Navigation("EventSchedule");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.UserClubRole", b =>
+                {
+                    b.HasOne("DataAccess.Models.User", "AssignedByUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedBy")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("DataAccess.Models.Club", "Club")
+                        .WithMany("ClubMembers")
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("DataAccess.Models.ClubRole", "ClubRole")
+                        .WithMany("ClubMembers")
+                        .HasForeignKey("ClubRoleId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("DataAccess.Models.User", "User")
+                        .WithMany("ClubMembers")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AssignedByUser");
+
+                    b.Navigation("Club");
+
+                    b.Navigation("ClubRole");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("DataAccess.Models.UserRole", b =>

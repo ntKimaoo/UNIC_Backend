@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace UNIC.DataAccess.Migrations.MeetingDb
 {
     [DbContext(typeof(MeetingDbContext))]
     partial class MeetingDbContextModelSnapshot : ModelSnapshot
