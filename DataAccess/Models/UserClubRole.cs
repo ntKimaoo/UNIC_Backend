@@ -14,7 +14,6 @@ namespace DataAccess.Models
         [Required]
         public int ClubId { get; set; }
 
-        [Required]
         public int? ClubRoleId { get; set; }
 
         public DateTime JoinDate { get; set; } = DateTime.Now;
