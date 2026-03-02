@@ -362,6 +362,7 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
+<<<<<<<<< Temporary merge branch 1
 # VS Code files for those working on multiple tools
 .vscode/*
 !.vscode/settings.json
@@ -431,3 +432,8 @@ EmailTemplates/cache/
 
 # Migration scripts (temporary)
 *.migration.sql
+=========
+# Ignore AppSettings (Sensitive Data)
+appsettings.json
+appsettings.Development.json
+>>>>>>>>> Temporary merge branch 2

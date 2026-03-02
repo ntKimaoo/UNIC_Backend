@@ -19,8 +19,6 @@ namespace BusinessLogic.DTOs
         [MaxLength(200, ErrorMessage = "Location cannot exceed 200 characters")]
         public string? Location { get; set; }
 
-        public string? ImageUrl { get; set; }
-
         [Required(ErrorMessage = "Start date is required")]
         public DateTime StartDate { get; set; }
 

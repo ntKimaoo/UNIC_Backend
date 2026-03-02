@@ -167,7 +167,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
     options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10MB
 });
 
-builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
+//builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
 
 IEdmModel GetEdmModel()
 {
