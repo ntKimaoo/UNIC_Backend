@@ -167,7 +167,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
     options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10MB
 });
 
-builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
+//builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
 
 IEdmModel GetEdmModel()
 {
@@ -197,6 +197,7 @@ using (var scope = app.Services.CreateScope())
     meetingDb.Database.Migrate();
 
     ApplicationDemoSeeder.SeedAsync(db).GetAwaiter().GetResult();
+
     DataAccess.Context.DatabaseSeeder.SeedData(scope.ServiceProvider);
 }
 

@@ -13,22 +13,37 @@ namespace UNIC.Presentation.Controllers
     public class EventsController : ControllerBase
     {
         private readonly IEventService _eventService;
+        private readonly IFileStorageService _fileStorageService;
 
-        public EventsController(IEventService eventService)
+        public EventsController(IEventService eventService, IFileStorageService fileStorageService)
         {
             _eventService = eventService;
+            _fileStorageService = fileStorageService;
         }
 
         /// <summary>
-        /// Create a new event
+        /// Create a new event. Attach an 'image' file to upload it to Cloudinary —
+        /// the URL will be saved automatically. Do NOT pass ImageUrl manually.
         /// </summary>
         [HttpPost]
-        public async Task<ActionResult<EventDetailDto>> CreateEvent([FromBody] CreateEventRequest request)
+        [Consumes("multipart/form-data")]
+        public async Task<ActionResult<EventDetailDto>> CreateEvent([FromForm] CreateEventRequest request, IFormFile? image)
         {
             try
             {
-                var eventDto = await _eventService.CreateEventAsync(request);
+                // Upload image to Cloudinary first (if provided), then pass URL to service
+                string? imageUrl = null;
+                if (image != null && image.Length > 0)
+                {
+                    imageUrl = await _fileStorageService.SaveFileAsync(image, "uniclub/events");
+                }
+
+                var eventDto = await _eventService.CreateEventAsync(request, imageUrl);
                 return CreatedAtAction(nameof(GetEventById), new { id = eventDto.EventId }, eventDto);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
             }
             catch (DomainException ex)
             {
@@ -41,16 +56,22 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>
-        /// Update an existing event
+        /// Update an existing event, with an optional new image uploaded to Cloudinary.
+        /// Send as multipart/form-data with event fields + optional 'image' file.
         /// </summary>
         [HttpPut("{id}")]
-        public async Task<ActionResult<EventDetailDto>> UpdateEvent(int id, [FromBody] UpdateEventRequest request)
+        [Consumes("multipart/form-data")]
+        public async Task<ActionResult<EventDetailDto>> UpdateEvent(int id, [FromForm] UpdateEventRequest request, IFormFile? image)
         {
             try
             {
                 if (id != request.EventId)
-                {
                     return BadRequest(new { error = "Event ID in URL does not match request body" });
+
+                // If an image was included, upload it and update ImageUrl
+                if (image != null && image.Length > 0)
+                {
+                    request.ImageUrl = await _fileStorageService.SaveFileAsync(image, "uniclub/events");
                 }
 
                 var eventDto = await _eventService.UpdateEventAsync(request);
@@ -59,6 +80,10 @@ namespace UNIC.Presentation.Controllers
             catch (NotFoundException ex)
             {
                 return NotFound(new { error = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
             }
             catch (DomainException ex)
             {
@@ -112,6 +137,64 @@ namespace UNIC.Presentation.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { error = "An error occurred while retrieving events", details = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Standalone image (re)upload for an event — useful to replace the image without editing other fields.
+        /// Uploads to Cloudinary and updates Event.ImageUrl immediately.
+        /// </summary>
+        [HttpPost("{id}/image")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadEventImage(int id, IFormFile image)
+        {
+            try
+            {
+                if (image == null || image.Length == 0)
+                    return BadRequest(new { error = "No image file provided." });
+
+                // Get event (ensure it exists)
+                var eventDto = await _eventService.GetEventByIdAsync(id);
+                if (eventDto == null)
+                    return NotFound(new { error = $"Event {id} not found." });
+
+                // Upload to Cloudinary
+                var imageUrl = await _fileStorageService.SaveFileAsync(image, "uniclub/events");
+
+                // Persist via UpdateEvent (sends imageUrl only by patching via UpdateEventRequest)
+                await _eventService.UpdateEventAsync(new UpdateEventRequest
+                {
+                    EventId = id,
+                    EventName = eventDto.EventName,
+                    Description = eventDto.Description,
+                    Location = eventDto.Location,
+                    StartDate = eventDto.StartDate,
+                    EndDate = eventDto.EndDate,
+                    ImageUrl = imageUrl
+                });
+
+                return Ok(new
+                {
+                    message = "Image uploaded successfully.",
+                    eventId = id,
+                    imageUrl
+                });
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (DomainException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "An error occurred while uploading the image.", details = ex.Message });
             }
         }
 
