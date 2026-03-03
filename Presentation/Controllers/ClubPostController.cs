@@ -231,7 +231,7 @@ namespace Presentation.Controllers
             try
             {
                 var url = await _fileStorageService.SaveFileAsync(upload, "clubposts");
-                
+
                 // CKEditor5 expects this specific response format
                 return Ok(new
                 {

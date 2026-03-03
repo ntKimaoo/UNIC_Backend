@@ -431,3 +431,6 @@ EmailTemplates/cache/
 
 # Migration scripts (temporary)
 *.migration.sql
+
+appsettings.*.json
+.env*
