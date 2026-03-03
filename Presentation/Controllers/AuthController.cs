@@ -196,8 +196,7 @@ namespace Presentation.Controllers
                 {
                     userId = userIdClaim,
                     email = email,
-                    fullName = name,
-                    studentId = studentId
+                    fullName = name
                 }
             });
         }

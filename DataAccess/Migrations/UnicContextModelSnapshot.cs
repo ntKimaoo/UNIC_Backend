@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace DataAccess.Migrations
+namespace UNIC.DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
     partial class UnicContextModelSnapshot : ModelSnapshot
@@ -1087,6 +1087,47 @@ namespace DataAccess.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("UserClubRoles", (string)null);
+                });
+
+            modelBuilder.Entity("DataAccess.Models.UserClubRole", b =>
+                {
+                    b.Property<int>("ClubMemberId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubMemberId"));
+
+                    b.Property<Guid?>("AssignedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ClubId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ClubRoleId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("JoinDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("ClubMemberId");
+
+                    b.HasIndex("AssignedBy");
+
+                    b.HasIndex("ClubId");
+
+                    b.HasIndex("ClubRoleId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserClubRoles");
                 });
 
             modelBuilder.Entity("DataAccess.Models.UserRole", b =>

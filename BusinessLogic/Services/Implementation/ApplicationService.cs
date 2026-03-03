@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using BusinessLogic.DTOs;
 using DataAccess.Models;
+using DataAccess.Repositories.Interface;
 using UNIC.BusinessLogic.Constants;
 using UNIC.BusinessLogic.DTOs;
 using UNIC.BusinessLogic.Services.Interface;
@@ -14,10 +15,12 @@ namespace UNIC.BusinessLogic.Services.Implementation
     public class ApplicationService : IApplicationService
     {
         private readonly IApplicationRepository _applicationRepository;
+        private readonly IUserRepository _userRepository;
 
-        public ApplicationService(IApplicationRepository applicationRepository)
+        public ApplicationService(IApplicationRepository applicationRepository, IUserRepository userRepository)
         {
             _applicationRepository = applicationRepository;
+            _userRepository = userRepository;
         }
 
         private ApplicationResponseDto MapToDto(Application application)
@@ -86,7 +89,7 @@ namespace UNIC.BusinessLogic.Services.Implementation
                 FormId = request.FormId,
                 UserId = request.UserId,
                 SubmissionDate = DateTime.UtcNow,
-                Status = string.IsNullOrWhiteSpace(request.Status) ? "PENDING" : request.Status,
+                Status = string.IsNullOrWhiteSpace(request.Status) ? ApplicationStatus.Pending : request.Status,
                 ReviewedAt = request.ReviewedAt
             };
 
@@ -126,6 +129,20 @@ namespace UNIC.BusinessLogic.Services.Implementation
             return await _applicationRepository.UpdateAsync(existing);
         }
 
+        public async Task<ApplicationResponseDto?> UpdateApplicationStatusAsync(int id, string status)
+        {
+            if (!ApplicationStatus.IsValid(status))
+                throw new ArgumentException($"Invalid status. Allowed: {string.Join(", ", ApplicationStatus.ValidStatuses)}.");
+
+            var existing = await _applicationRepository.GetByIdAsync(id);
+            if (existing == null) return null;
+
+            existing.Status = status;
+            existing.ReviewedAt = DateTime.UtcNow;
+            var updated = await _applicationRepository.UpdateAsync(existing);
+            return updated ? MapToDto(existing) : null;
+        }
+
         public async Task<IEnumerable<ApplicationResponseDto>> GetApplicationsByUserAsync(Guid userId)
         {
             var applications = await _applicationRepository.GetByUserIdAsync(userId);
@@ -151,9 +168,27 @@ namespace UNIC.BusinessLogic.Services.Implementation
             return MapToDto(application);
         }
 
+        public async Task<IEnumerable<ApplicationResponseDto>> GetApplicationsByCampaignAsync(int campaignId, string? status = null)
+        {
+            var applications = await _applicationRepository.GetByCampaignIdAsync(campaignId, status);
+            return applications.Select(MapToDto);
+        }
+
+        public async Task<IEnumerable<ApplicationResponseDto>> GetApplicationsByClubAsync(int clubId, string? status = null)
+        {
+            var applications = await _applicationRepository.GetByClubIdAsync(clubId, status);
+            return applications.Select(MapToDto);
+        }
+
         public async Task<IEnumerable<ApplicationFormResponseDto>> GetAllFormsAsync()
         {
             var forms = await _applicationRepository.GetAllFormsAsync();
+            return forms.Select(MapFormToDto);
+        }
+
+        public async Task<IEnumerable<ApplicationFormResponseDto>> GetFormsByCampaignAsync(int campaignId)
+        {
+            var forms = await _applicationRepository.GetFormsByCampaignIdAsync(campaignId);
             return forms.Select(MapFormToDto);
         }
 
@@ -285,6 +320,10 @@ namespace UNIC.BusinessLogic.Services.Implementation
 
         public async Task<ApplicationResponseDto> SubmitApplicationWithAnswersAsync(SubmitApplicationWithAnswersDto request)
         {
+            var user = await _userRepository.GetByIdAsync(request.UserId);
+            if (user == null)
+                throw new ArgumentException("Tài khoản không tồn tại. Vui lòng đăng nhập hoặc dùng UserId hợp lệ.");
+
             var form = await _applicationRepository.GetFormByIdAsync(request.FormId);
             if (form == null)
                 throw new ArgumentException("Form không tồn tại.");
@@ -319,7 +358,7 @@ namespace UNIC.BusinessLogic.Services.Implementation
                 FormId = request.FormId,
                 UserId = request.UserId,
                 SubmissionDate = DateTime.UtcNow,
-                Status = "PENDING"
+                Status = ApplicationStatus.Pending
             };
             var createdApp = await _applicationRepository.CreateAsync(application);
             if (request.Answers != null && request.Answers.Any())

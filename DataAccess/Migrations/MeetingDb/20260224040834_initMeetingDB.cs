@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace UNIC.DataAccess.Migrations.MeetingDb
 {
     /// <inheritdoc />
-    public partial class InitMeetingModules : Migration
+    public partial class initMeetingDB : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

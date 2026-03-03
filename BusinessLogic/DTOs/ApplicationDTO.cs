@@ -95,9 +95,6 @@ namespace UNIC.BusinessLogic.DTOs
         public string? AnswerText { get; set; }
     }
 
-    /// <summary>
-    /// Dùng khi nộp đơn kèm danh sách câu trả lời (một lần gửi application + nhiều answer).
-    /// </summary>
     public class SubmitApplicationWithAnswersDto
     {
         [Required]
@@ -106,9 +103,6 @@ namespace UNIC.BusinessLogic.DTOs
         [Required]
         public Guid UserId { get; set; }
 
-        /// <summary>
-        /// Danh sách câu trả lời: QuestionId + AnswerText.
-        /// </summary>
         public List<ApplicationAnswerItemDto> Answers { get; set; } = new();
     }
 
@@ -117,5 +111,12 @@ namespace UNIC.BusinessLogic.DTOs
         [Required]
         public int QuestionId { get; set; }
         public string? AnswerText { get; set; }
+    }
+
+    public class UpdateApplicationStatusDto
+    {
+        [Required(ErrorMessage = "Status is required")]
+        [StringLength(20)]
+        public string Status { get; set; } = null!;
     }
 }

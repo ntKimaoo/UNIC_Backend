@@ -7,6 +7,7 @@ using BusinessLogic.Services.Interface;
 using DataAccess.Context;
 using DataAccess.Models;
 using DataAccess.Repositories.Implementation;
+using DataAccess.Seed;
 using DataAccess.Repositories.Interface;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -162,21 +163,13 @@ builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
 // Register dynamic policy provider
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
-    options.AddPolicy("StaffOnly", policy => policy.RequireRole("Staff"));
-});
-builder.Services.Configure<AdminSettings>(
-    builder.Configuration.GetSection("AdminSettings"));
-
 // Configure file upload size limits
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
     options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10MB
 });
 
-builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
+//builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
 
 IEdmModel GetEdmModel()
 {
@@ -204,9 +197,26 @@ using (var scope = app.Services.CreateScope())
 
     db.Database.Migrate();
     meetingDb.Database.Migrate();
+
+    ApplicationDemoSeeder.SeedAsync(db).GetAwaiter().GetResult();
+
+    DataAccess.Context.DatabaseSeeder.SeedData(scope.ServiceProvider);
 }
 
 // Configure the HTTP request pipeline.
+// Luôn trả JSON khi API lỗi (tránh PARSING_ERROR ở FE - RTK Query cần JSON, không HTML).
+app.UseExceptionHandler(appError =>
+{
+    appError.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json";
+        var feature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        var ex = feature?.Error;
+        await context.Response.WriteAsJsonAsync(new { success = false, message = ex?.Message ?? "Internal server error" });
+    });
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

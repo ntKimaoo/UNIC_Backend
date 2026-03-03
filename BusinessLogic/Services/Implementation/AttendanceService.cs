@@ -148,6 +148,49 @@ namespace BusinessLogic.Services.Implementation
             await _unitOfWork.SaveChangesAsync();
         }
 
+        public async Task<CheckInByBarcodeResponse> CheckInByBarcodeAsync(int eventId, string barcode)
+        {
+            var barcodeTrimmed = barcode?.Trim();
+            if (string.IsNullOrWhiteSpace(barcodeTrimmed))
+            {
+                throw new DomainException("Mã barcode không hợp lệ.");
+            }
+
+            var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
+            if (eventEntity == null)
+            {
+                throw new NotFoundException("Event", eventId);
+            }
+
+            var user = await _unitOfWork.Users.GetByStudentIdAsync(barcodeTrimmed);
+            if (user == null)
+            {
+                throw new NotFoundException("User", barcodeTrimmed);
+            }
+
+            var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, user.UserId);
+            if (attendance == null)
+            {
+                throw new DomainException("Chưa đăng ký sự kiện. Sinh viên cần đăng ký trước khi điểm danh.");
+            }
+
+            var alreadyCheckedIn = attendance.AttendanceStatus == "PRESENT";
+            if (!alreadyCheckedIn)
+            {
+                attendance.AttendanceStatus = "PRESENT";
+                attendance.CheckInTime = DateTime.Now;
+                _unitOfWork.Attendances.Update(attendance);
+                await _unitOfWork.SaveChangesAsync();
+            }
+
+            return new CheckInByBarcodeResponse
+            {
+                Message = alreadyCheckedIn ? "Đã điểm danh trước đó." : "Đã điểm danh thành công.",
+                MemberName = user.FullName,
+                StudentId = user.StudentId
+            };
+        }
+
         public async Task EvaluateMemberAsync(EvaluateMemberRequest request)
         {
             // Check if event exists

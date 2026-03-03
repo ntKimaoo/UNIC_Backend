@@ -9,11 +9,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace UNIC.DataAccess.Migrations.MeetingDb
 {
     [DbContext(typeof(MeetingDbContext))]
-    [Migration("20260222023946_InitMeetingModules")]
-    partial class InitMeetingModules
+    [Migration("20260224040834_initMeetingDB")]
+    partial class initMeetingDB
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
