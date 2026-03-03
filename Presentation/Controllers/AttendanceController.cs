@@ -76,6 +76,31 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>
+        /// Check in to an event by barcode (StudentId from scanner).
+        /// </summary>
+        [HttpPost("{id}/checkin-by-barcode")]
+        public async Task<ActionResult<CheckInByBarcodeResponse>> CheckInByBarcode(int id, [FromBody] CheckInByBarcodeRequest request)
+        {
+            try
+            {
+                var response = await _attendanceService.CheckInByBarcodeAsync(id, request.Barcode);
+                return Ok(response);
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
+            catch (DomainException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "An error occurred while checking in by barcode", details = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Check in to an event
         /// </summary>
         [HttpPost("{id}/checkin")]

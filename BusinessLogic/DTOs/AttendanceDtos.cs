@@ -37,6 +37,26 @@ namespace BusinessLogic.DTOs
     }
 
     /// <summary>
+    /// DTO for check-in by barcode (scanner sends StudentId).
+    /// </summary>
+    public class CheckInByBarcodeRequest
+    {
+        [Required(ErrorMessage = "Barcode (StudentId) is required")]
+        [MaxLength(50)]
+        public string Barcode { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// Response after successful barcode check-in (for kiosk display).
+    /// </summary>
+    public class CheckInByBarcodeResponse
+    {
+        public string Message { get; set; } = null!;
+        public string MemberName { get; set; } = null!;
+        public string? StudentId { get; set; }
+    }
+
+    /// <summary>
     /// DTO for check-in QR code response
     /// </summary>
     public class CheckInCodeResponse
