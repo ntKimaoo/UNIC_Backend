@@ -28,6 +28,15 @@ namespace BusinessLogic.DTOs
     }
 
     /// <summary>
+    /// Request để gán/cập nhật danh sách policies của member
+    /// </summary>
+    public class MemberPolicyDto
+    {
+        [Required]
+        public List<int> PolicyIds { get; set; } = new();
+    }
+
+    /// <summary>
     /// Thông tin department mà user tham gia trong club
     /// </summary>
     public class DepartmentInfoDto

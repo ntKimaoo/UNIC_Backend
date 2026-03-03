@@ -72,7 +72,58 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.Policies
                 .Where(p => p.PolicyGroupId == groupId)
-                .ToListAsync(); 
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Policy>> GetMemberDirectPoliciesAsync(Guid userId)
+        {
+            return await _context.ClubMemberPolicies
+                .Where(cmp => cmp.UserId == userId)
+                .Include(cmp => cmp.Policy)
+                .Select(cmp => cmp.Policy)
+                .ToListAsync();
+        }
+
+        public async Task AssignPoliciesToMemberAsync(Guid userId, IEnumerable<int> policyIds)
+        {
+            var existingIds = await _context.ClubMemberPolicies
+                .Where(cmp => cmp.UserId == userId)
+                .Select(cmp => cmp.PolicyId)
+                .ToListAsync();
+
+            var toAdd = policyIds.Distinct()
+                .Where(id => !existingIds.Contains(id))
+                .Select(id => new ClubMemberPolicy { UserId = userId, PolicyId = id });
+
+            await _context.ClubMemberPolicies.AddRangeAsync(toAdd);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<bool> RevokePolicyFromMemberAsync(Guid userId, int policyId)
+        {
+            var entry = await _context.ClubMemberPolicies
+                .FirstOrDefaultAsync(cmp => cmp.UserId == userId && cmp.PolicyId == policyId);
+
+            if (entry == null) return false;
+
+            _context.ClubMemberPolicies.Remove(entry);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task SetMemberPoliciesAsync(Guid userId, IEnumerable<int> policyIds)
+        {
+            var existing = await _context.ClubMemberPolicies
+                .Where(cmp => cmp.UserId == userId)
+                .ToListAsync();
+
+            _context.ClubMemberPolicies.RemoveRange(existing);
+
+            var newEntries = policyIds.Distinct()
+                .Select(id => new ClubMemberPolicy { UserId = userId, PolicyId = id });
+
+            await _context.ClubMemberPolicies.AddRangeAsync(newEntries);
+            await _context.SaveChangesAsync();
         }
     }
 }
