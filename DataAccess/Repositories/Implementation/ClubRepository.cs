@@ -125,5 +125,15 @@ namespace DataAccess.Repositories.Implementation
             //return await _context.Users.Include(u => u.UserClubRoles)
             //    .CountAsync(cm => cm.ClubMembers. == clubId && !cm.IsDeleted);
         }
+        public async Task ChangeStatusClub(int clubId)
+        {
+            var club = await GetByIdAsync(clubId);
+            if (club != null)
+            {
+                club.IsActive = !club.IsActive;
+                club.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
+        }
     }
 }

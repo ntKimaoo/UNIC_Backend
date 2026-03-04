@@ -152,7 +152,10 @@ namespace BusinessLogic.Services.Implementation
         {
             return await _repository.SoftDeleteAsync(clubId);
         }
-
+        public async Task ChangeStatusClub(int clubId)
+        {
+            await _repository.ChangeStatusClub(clubId);
+        }
         private ClubResponseDto MapToResponseDto(Club club)
         {
             return new ClubResponseDto

@@ -15,5 +15,6 @@ namespace BusinessLogic.DTOs
         public string? StudentId { get; set; }
         public string? Major { get; set; }
         public string? Status { get; set; }
+        public string? Role { get; set; }
     }
 }

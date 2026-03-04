@@ -4,16 +4,19 @@ using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    partial class UnicContextModelSnapshot : ModelSnapshot
+    [Migration("20260224091204_edit-policy")]
+    partial class editpolicy
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -165,21 +168,11 @@ namespace UNIC.DataAccess.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.Property<DateTime?>("CheckInTime")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Comment")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<int>("EventId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("RegistrationDate")
                         .HasColumnType("datetime2");
-
-                    b.Property<int?>("Score")
-                        .HasColumnType("int");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
@@ -366,9 +359,6 @@ namespace UNIC.DataAccess.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubRoleId"));
 
-                    b.Property<int?>("ClubId")
-                        .HasColumnType("int");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -382,8 +372,6 @@ namespace UNIC.DataAccess.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.HasKey("ClubRoleId");
-
-                    b.HasIndex("ClubId");
 
                     b.ToTable("ClubRoles");
                 });
@@ -533,15 +521,8 @@ namespace UNIC.DataAccess.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EventId"));
 
-                    b.Property<string>("CheckInCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)");
-
                     b.Property<int?>("ClubId")
                         .HasColumnType("int");
-
-                    b.Property<DateTime?>("CodeExpiresAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -569,15 +550,6 @@ namespace UNIC.DataAccess.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
-
-                    b.Property<int?>("MaxAttendees")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("RegistrationEndDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("RegistrationStartDate")
-                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("StartDate")
                         .HasColumnType("datetime2");
@@ -727,14 +699,8 @@ namespace UNIC.DataAccess.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(15,2)");
 
-                    b.Property<Guid?>("ApprovedBy")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<int?>("CategoryId")
                         .HasColumnType("int");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -742,11 +708,6 @@ namespace UNIC.DataAccess.Migrations
 
                     b.Property<int>("FundId")
                         .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
 
                     b.Property<DateTime>("TransactionDate")
                         .HasColumnType("datetime2");
@@ -1067,7 +1028,7 @@ namespace UNIC.DataAccess.Migrations
                     b.Property<int>("ClubId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("ClubRoleId")
+                    b.Property<int>("ClubRoleId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("JoinDate")
@@ -1308,15 +1269,6 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DataAccess.Models.ClubRole", b =>
-                {
-                    b.HasOne("DataAccess.Models.Club", "Club")
-                        .WithMany("ClubRoles")
-                        .HasForeignKey("ClubId");
-
-                    b.Navigation("Club");
-                });
-
             modelBuilder.Entity("DataAccess.Models.Department", b =>
                 {
                     b.HasOne("DataAccess.Models.Club", "Club")
@@ -1507,7 +1459,8 @@ namespace UNIC.DataAccess.Migrations
                     b.HasOne("DataAccess.Models.ClubRole", "ClubRole")
                         .WithMany("ClubMembers")
                         .HasForeignKey("ClubRoleId")
-                        .OnDelete(DeleteBehavior.NoAction);
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
 
                     b.HasOne("DataAccess.Models.User", "User")
                         .WithMany("ClubMembers")
@@ -1606,8 +1559,6 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("ClubMembers");
 
                     b.Navigation("ClubPosts");
-
-                    b.Navigation("ClubRoles");
 
                     b.Navigation("Departments");
 

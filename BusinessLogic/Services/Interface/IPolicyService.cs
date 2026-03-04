@@ -20,6 +20,7 @@ namespace BusinessLogic.Services.Interface
         /// <summary>
         /// Get all available policies
         /// </summary>
-        Task<IEnumerable<Policy>> GetAllPoliciesAsync();
+        Task<IEnumerable<PolicyGroup>> GetAllPolicyGroupAsync();
+        Task<IEnumerable<Policy>> GetAllPoliciesByGroupAsync(int groupId);
     }
 }
