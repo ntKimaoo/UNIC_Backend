@@ -26,6 +26,7 @@ using UNIC.DataAccess.Repositories.Interface;
 using UNIC.Presentation.Hubs;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using UNIC.DataAccess.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -207,7 +208,7 @@ using (var scope = app.Services.CreateScope())
 
     ApplicationDemoSeeder.SeedAsync(db).GetAwaiter().GetResult();
 
-    DataAccess.Context.DatabaseSeeder.SeedData(scope.ServiceProvider);
+    DatabaseSeeder.SeedData(scope.ServiceProvider);
 }
 
 // Configure the HTTP request pipeline.

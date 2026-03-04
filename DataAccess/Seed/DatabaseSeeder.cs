@@ -1,3 +1,4 @@
+using DataAccess.Context;
 using DataAccess.Models;
 using DataAccess.Models.Meeting;
 using DataAccess.Models.Meeting.Enums;
@@ -7,7 +8,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Linq;
 
-namespace DataAccess.Context
+namespace UNIC.DataAccess.Seed
 {
     public static class DatabaseSeeder
     {
