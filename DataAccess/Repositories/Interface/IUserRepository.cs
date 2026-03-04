@@ -1,4 +1,4 @@
-﻿using DataAccess.Models;
+using DataAccess.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,5 +18,6 @@ namespace DataAccess.Repositories.Interface
         Task<bool> UpdateAsync(User user);
         Task<bool> DeleteAsync(Guid userId);
         Task<IEnumerable<User>> GetAllAsync();
+        Task<(IEnumerable<User> Items, int TotalCount)> GetPagedAsync(int pageNumber, int pageSize);
     }
 }

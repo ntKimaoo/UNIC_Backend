@@ -1,4 +1,4 @@
-﻿using DataAccess.Models;
+using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -94,6 +94,21 @@ namespace DataAccess.Repositories.Implementation
         public async Task<IEnumerable<User>> GetAllAsync()
         {
             return await _context.Users.ToListAsync();
+        }
+
+        public async Task<(IEnumerable<User> Items, int TotalCount)> GetPagedAsync(int pageNumber, int pageSize)
+        {
+            var query = _context.Users.OrderByDescending(u => u.CreatedAt);
+
+            var countTask = query.CountAsync();
+            var itemsTask = query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            await Task.WhenAll(countTask, itemsTask);
+
+            return (await itemsTask, await countTask);
         }
     }
 }

@@ -75,9 +75,6 @@ namespace UNIC.Presentation.Controllers
             }
         }
 
-        /// <summary>
-        /// Check in to an event by barcode (StudentId from scanner).
-        /// </summary>
         [HttpPost("{id}/checkin-by-barcode")]
         public async Task<ActionResult<CheckInByBarcodeResponse>> CheckInByBarcode(int id, [FromBody] CheckInByBarcodeRequest request)
         {

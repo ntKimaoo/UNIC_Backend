@@ -36,9 +36,7 @@ namespace BusinessLogic.DTOs
         public double? Longitude { get; set; }
     }
 
-    /// <summary>
-    /// DTO for check-in by barcode (scanner sends StudentId).
-    /// </summary>
+
     public class CheckInByBarcodeRequest
     {
         [Required(ErrorMessage = "Barcode (StudentId) is required")]
@@ -46,9 +44,7 @@ namespace BusinessLogic.DTOs
         public string Barcode { get; set; } = null!;
     }
 
-    /// <summary>
-    /// Response after successful barcode check-in (for kiosk display).
-    /// </summary>
+
     public class CheckInByBarcodeResponse
     {
         public string Message { get; set; } = null!;

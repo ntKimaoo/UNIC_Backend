@@ -1,4 +1,4 @@
-﻿using BusinessLogic.DTOs;
+using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
@@ -42,6 +42,23 @@ namespace BusinessLogic.Services.Implementation
         {
             var users = await _userRepository.GetAllAsync();
             return users.Select(MapToDto);
+        }
+
+        public async Task<PagedResultDto<UserResponseDto>> GetPagedUsersAsync(int pageNumber, int pageSize)
+        {
+            var (items, totalCount) = await _userRepository.GetPagedAsync(pageNumber, pageSize);
+            var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
+
+            return new PagedResultDto<UserResponseDto>
+            {
+                Items = items.Select(MapToDto),
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                HasPreviousPage = pageNumber > 1,
+                HasNextPage = pageNumber < totalPages
+            };
         }
 
         public async Task<UserResponseDto?> GetUserByIdAsync(Guid id)
