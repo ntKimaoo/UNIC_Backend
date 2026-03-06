@@ -21,6 +21,9 @@ namespace DataAccess.Repositories.Implementation
         public async Task<User?> GetByEmailAsync(string email)
         {
             return await _context.Users
+                .Include(u => u.UserRoles)
+                .Include(u => u.ClubMembers)
+                    .ThenInclude(cm => cm.ClubRole)
                 .FirstOrDefaultAsync(m => m.Email == email);
         }
 

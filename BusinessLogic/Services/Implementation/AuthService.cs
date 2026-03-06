@@ -1,20 +1,13 @@
-﻿using BusinessLogic.DTOs;
+using BusinessLogic.DTOs;
 using BusinessLogic.Services.Background;
-using BusinessLogic.Services.Implementation;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
-using DataAccess.Repositories.Implementation;
 using DataAccess.Repositories.Interface;
-using DocumentFormat.OpenXml.Math;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace API.Services;
+namespace BusinessLogic.Services.Implementation;
 
 public class AuthService : IAuthService
 {
@@ -402,7 +395,14 @@ public class AuthService : IAuthService
             Avatar = user.Avatar,
             StudentId = user.StudentId,
             Major = user.Major,
-            Status = user.Status
+            Status = user.Status,
+            Roles = user.UserRoles?.Select(ur => ur.RoleName).ToList() ?? new List<string>(),
+            ClubRoles = user.ClubMembers?.Where(cm => string.Equals(cm.Status, "Active", StringComparison.OrdinalIgnoreCase)).Select(cm => new UserClubRoleDto
+            {
+                ClubId = cm.ClubId,
+                RoleName = cm.ClubRole?.RoleName ?? "Unknown",
+                Level = cm.ClubRole?.Level ?? 3
+            }).ToList() ?? new List<UserClubRoleDto>()
         };
     }
 }

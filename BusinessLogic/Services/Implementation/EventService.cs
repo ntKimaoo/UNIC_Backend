@@ -20,6 +20,7 @@ namespace BusinessLogic.Services.Implementation
         private readonly IValidator<UpdateEventRequest> _updateValidator;
         private readonly IValidator<CreateSessionRequest> _sessionValidator;
         private readonly IValidator<OpenRegistrationRequest> _registrationValidator;
+        private readonly IEmailService _emailService;
 
         public EventService(
             IUnitOfWork unitOfWork,
@@ -27,7 +28,8 @@ namespace BusinessLogic.Services.Implementation
             IValidator<CreateEventRequest> createValidator,
             IValidator<UpdateEventRequest> updateValidator,
             IValidator<CreateSessionRequest> sessionValidator,
-            IValidator<OpenRegistrationRequest> registrationValidator)
+            IValidator<OpenRegistrationRequest> registrationValidator,
+            IEmailService emailService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -35,6 +37,7 @@ namespace BusinessLogic.Services.Implementation
             _updateValidator = updateValidator;
             _sessionValidator = sessionValidator;
             _registrationValidator = registrationValidator;
+            _emailService = emailService;
         }
 
         public async Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null)
@@ -195,6 +198,145 @@ namespace BusinessLogic.Services.Implementation
         {
             var events = await _unitOfWork.Events.GetAllAsync(pageNumber, pageSize);
             return _mapper.Map<IEnumerable<EventDetailDto>>(events);
+        }
+
+        public async Task RegisterForEventAsync(int eventId, string userId)
+        {
+            if (!Guid.TryParse(userId, out var userGuid))
+                throw new DomainException("Invalid user ID format");
+
+            var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
+            if (eventEntity == null)
+                throw new NotFoundException("Event", eventId);
+
+            if (eventEntity.Status != "REGISTRATION_OPEN" && eventEntity.Status != "OPEN_REGISTRATION")
+                throw new DomainException($"Cannot register. Event status is '{eventEntity.Status}'. It must be REGISTRATION_OPEN.");
+
+            if (eventEntity.RegistrationStartDate.HasValue && DateTime.Now < eventEntity.RegistrationStartDate.Value)
+                throw new DomainException("Registration has not started yet.");
+
+            if (eventEntity.RegistrationEndDate.HasValue && DateTime.Now > eventEntity.RegistrationEndDate.Value)
+                throw new DomainException("Registration has ended.");
+
+            if (eventEntity.MaxAttendees.HasValue)
+            {
+                var currentAttendees = await _unitOfWork.Attendances.GetAttendeesByEventAsync(eventId);
+                if (currentAttendees.Count() >= eventEntity.MaxAttendees.Value)
+                {
+                    throw new DomainException("Event has reached maximum capacity.");
+                }
+            }
+
+            var isRegistered = await _unitOfWork.Attendances.IsUserRegisteredAsync(eventId, userGuid);
+            if (isRegistered)
+                throw new DomainException("User is already registered for this event.");
+
+            var attendance = new Attendance
+            {
+                EventId = eventId,
+                UserId = userGuid,
+                RegistrationDate = DateTime.Now,
+                AttendanceStatus = "REGISTERED"
+            };
+
+            await _unitOfWork.Attendances.AddAsync(attendance);
+            await _unitOfWork.SaveChangesAsync();
+
+            var user = await _unitOfWork.Users.GetByIdAsync(userGuid);
+            if (user != null)
+            {
+                _ = _emailService.SendEventRegistrationSuccessAsync(user.Email, user.FullName, eventEntity.EventName, eventEntity.StartDate);
+            }
+        }
+
+        public async Task<(string checkInCode, DateTime expiresAt)> StartEventAsync(int eventId)
+        {
+            var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
+            if (eventEntity == null)
+                throw new NotFoundException("Event", eventId);
+
+            if (eventEntity.Status != "REGISTRATION_OPEN" && eventEntity.Status != "OPEN_REGISTRATION")
+                throw new DomainException($"Cannot start event from status '{eventEntity.Status}'.");
+
+            eventEntity.Status = "ONGOING";
+            string generatedCode = Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper();
+            eventEntity.CheckInCode = generatedCode;
+            DateTime expiry = DateTime.Now.AddHours(2);
+            eventEntity.CodeExpiresAt = expiry;
+
+            _unitOfWork.Events.Update(eventEntity);
+            await _unitOfWork.SaveChangesAsync();
+
+            var registeredAttendances = await _unitOfWork.Attendances.GetAttendeesByEventAsync(eventId);
+            var usersToEmail = registeredAttendances.Where(a => a.AttendanceStatus == "REGISTERED").ToList();
+
+            foreach (var att in usersToEmail)
+            {
+                var user = await _unitOfWork.Users.GetByIdAsync(att.UserId);
+                if (user != null)
+                {
+                    _ = _emailService.SendEventCheckInCodeAsync(user.Email, user.FullName, eventEntity.EventName, generatedCode);
+                }
+            }
+
+            return (generatedCode, expiry);
+        }
+
+        public async Task CheckInEventAsync(int eventId, string userId, string checkInCode)
+        {
+            if (!Guid.TryParse(userId, out var userGuid))
+                throw new DomainException("Invalid user ID format");
+
+            var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
+            if (eventEntity == null)
+                throw new NotFoundException("Event", eventId);
+
+            if (eventEntity.Status != "ONGOING")
+                throw new DomainException("Event is not currently ongoing.");
+
+            if (string.IsNullOrEmpty(eventEntity.CheckInCode) || !eventEntity.CheckInCode.Equals(checkInCode, StringComparison.OrdinalIgnoreCase))
+                throw new DomainException("Invalid check-in code.");
+
+            if (eventEntity.CodeExpiresAt.HasValue && DateTime.Now > eventEntity.CodeExpiresAt.Value)
+                throw new DomainException("Check-in code has expired.");
+
+            var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, userGuid);
+            if (attendance == null)
+                throw new DomainException("User is not registered for this event.");
+
+            if (attendance.AttendanceStatus == "CHECKED_IN" || attendance.AttendanceStatus == "PRESENT")
+                throw new DomainException("User has already checked in.");
+
+            attendance.AttendanceStatus = "PRESENT";
+            attendance.CheckInTime = DateTime.Now;
+
+            _unitOfWork.Attendances.Update(attendance);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        public async Task CompleteEventAsync(int eventId)
+        {
+            var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
+            if (eventEntity == null)
+                throw new NotFoundException("Event", eventId);
+
+            if (eventEntity.Status != "ONGOING")
+                throw new DomainException($"Cannot complete event from status '{eventEntity.Status}'.");
+
+            eventEntity.Status = "COMPLETED";
+
+            var allAttendances = await _unitOfWork.Attendances.GetAttendeesByEventAsync(eventId);
+            foreach (var attendance in allAttendances)
+            {
+                if (attendance.AttendanceStatus == "REGISTERED")
+                {
+                    attendance.AttendanceStatus = "ABSENT";
+                    _unitOfWork.Attendances.Update(attendance);
+                }
+            }
+
+            _unitOfWork.Events.Update(eventEntity);
+            await _unitOfWork.SaveChangesAsync();
         }
     }
 }

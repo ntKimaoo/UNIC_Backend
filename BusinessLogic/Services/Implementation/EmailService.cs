@@ -30,12 +30,12 @@ namespace BusinessLogic.Services.Implementation
             _smtpPassword = _configuration["Email:Password"] ?? "";
             _fromEmail = _configuration["Email:FromEmail"] ?? "";
             _fromName = _configuration["Email:FromName"] ?? "Member Management System";
-            _appBaseUrl = _configuration["AppSettings:BaseUrl"] ?? "https://localhost:7237";
+            _appBaseUrl = _configuration["AppSettings:BaseUrl"] ?? "http://localhost:5173";
         }
 
         public async Task<bool> SendVerificationEmailAsync(string toEmail, string verificationToken, string fullName)
         {
-            var verificationLink = $"{_appBaseUrl}/verify-email?token={verificationToken}&email={toEmail}";
+            var verificationLink = $"{_appBaseUrl}/auth/verify-email?token={Uri.EscapeDataString(verificationToken)}&email={Uri.EscapeDataString(toEmail)}";
 
             var subject = "Verify Your Email Address";
             var body = $@"
@@ -58,7 +58,7 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<bool> SendPasswordResetEmailAsync(string toEmail, string resetToken, string fullName)
         {
-            var resetLink = $"{_appBaseUrl}/reset-password?token={resetToken}&email={toEmail}";
+            var resetLink = $"{_appBaseUrl}/auth/reset-password?token={Uri.EscapeDataString(resetToken)}&email={Uri.EscapeDataString(toEmail)}";
 
             var subject = "Reset Your Password";
             var body = $@"
@@ -94,6 +94,46 @@ namespace BusinessLogic.Services.Implementation
             </html>
         ";
 
+            return await SendEmailAsync(toEmail, subject, body);
+        }
+
+        public async Task<bool> SendEventRegistrationSuccessAsync(string toEmail, string fullName, string eventName, DateTime? startDate)
+        {
+            var dateStr = startDate.HasValue ? startDate.Value.ToString("dd/MM/yyyy HH:mm") : "TBD";
+            var subject = $"Xác nhận vé sự kiện: {eventName}";
+            var body = $@"
+            <html>
+            <body style='font-family: Arial, sans-serif;'>
+                <h2>Chào {fullName}!</h2>
+                <p>Bạn đã đăng ký tham gia thành công sự kiện: <strong>{eventName}</strong>.</p>
+                <p>Thời gian bắt đầu dự kiến: <strong>{dateStr}</strong></p>
+                <br>
+                <p>Vui lòng theo dõi email để nhận mã Check-in khi sự kiện bắt đầu.</p>
+                <p>Trân trọng,</p>
+                <p>Ban Tổ Chức</p>
+            </body>
+            </html>
+        ";
+            return await SendEmailAsync(toEmail, subject, body);
+        }
+
+        public async Task<bool> SendEventCheckInCodeAsync(string toEmail, string fullName, string eventName, string checkInCode)
+        {
+            var subject = $"Mã Check-in sự kiện: {eventName}";
+            var body = $@"
+            <html>
+            <body style='font-family: Arial, sans-serif;'>
+                <h2>Chào {fullName}!</h2>
+                <p>Sự kiện <strong>{eventName}</strong> đã chính thức bắt đầu và đang mở điểm danh!</p>
+                <p>Đây là Mã Check-in bí mật của bạn:</p>
+                <div style='background-color: #fce4ec; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;'>
+                    <h1 style='color: #d81b60; margin: 0; font-family: monospace; letter-spacing: 5px;'>{checkInCode}</h1>
+                </div>
+                <p>Vui lòng nhập mã này vào hệ thống sự kiện để được đánh dấu Có Mặt.</p>
+                <p>Chúc bạn có trải nghiệm tuyệt vời!</p>
+            </body>
+            </html>
+        ";
             return await SendEmailAsync(toEmail, subject, body);
         }
 

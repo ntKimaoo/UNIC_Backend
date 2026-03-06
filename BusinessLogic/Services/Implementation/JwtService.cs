@@ -8,7 +8,9 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace BusinessLogic.Services.Implementation
@@ -28,13 +30,36 @@ namespace BusinessLogic.Services.Implementation
                 Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-            var claims = new[]
+            var claims = new List<Claim>
             {
-            new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email),
-            new Claim(ClaimTypes.Name, user.FullName),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-        };
+                new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email),
+                new Claim(ClaimTypes.Name, user.FullName),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            };
+
+            // Global Roles
+            if (user.UserRoles != null)
+            {
+                foreach (var role in user.UserRoles)
+                {
+                    claims.Add(new Claim(ClaimTypes.Role, role.RoleName));
+                }
+            }
+
+            // Club Specific Roles
+            if (user.ClubMembers != null)
+            {
+                var activeClubRoles = user.ClubMembers
+                    .Where(cm => string.Equals(cm.Status, "Active", StringComparison.OrdinalIgnoreCase) && cm.ClubRole != null)
+                    .Select(cm => new { cm.ClubId, cm.ClubRole.RoleName, cm.ClubRole.Level })
+                    .ToList();
+                
+                if (activeClubRoles.Any())
+                {
+                    claims.Add(new Claim("club_roles", JsonSerializer.Serialize(activeClubRoles)));
+                }
+            }
 
             var token = new JwtSecurityToken(
                 issuer: _configuration["Jwt:Issuer"],

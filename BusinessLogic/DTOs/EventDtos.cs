@@ -69,6 +69,8 @@ namespace BusinessLogic.DTOs
         public bool IsPublic { get; set; }
         public string Status { get; set; } = null!;
         public DateTime CreatedAt { get; set; }
+        public int? MaxAttendees { get; set; }
+        public int CurrentAttendees { get; set; }
         public List<SessionDto> Sessions { get; set; } = new List<SessionDto>();
     }
 
