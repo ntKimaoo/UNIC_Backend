@@ -10,7 +10,7 @@ public class MeetingDbContextFactory
     public MeetingDbContext CreateDbContext(string[] args)
     {
         var configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory()) // KHÔNG ghép Presentation
+            .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: true)
             .Build();
 

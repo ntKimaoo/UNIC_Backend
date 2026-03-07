@@ -64,9 +64,15 @@ namespace DataAccess.Repositories.Implementation
             return hasRolePolicy;
         }
 
-        public async Task<IEnumerable<Policy>> GetAllPoliciesAsync()
+        public async Task<IEnumerable<PolicyGroup>> GetAllPolicyGroupAsync()
         {
-            return await _context.Policies.ToListAsync();
+            return await _context.PolicyGroups.ToListAsync();
+        }
+        public async Task<IEnumerable<Policy>> GetAllPoliciesByGroupAsync(int groupId)
+        {
+            return await _context.Policies
+                .Where(p => p.PolicyGroupId == groupId)
+                .ToListAsync(); 
         }
     }
 }

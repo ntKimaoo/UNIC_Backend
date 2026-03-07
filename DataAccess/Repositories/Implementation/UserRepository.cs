@@ -57,6 +57,11 @@ namespace DataAccess.Repositories.Implementation
         public async Task<User> CreateAsync(User user)
         {
             await _context.Users.AddAsync(user);
+            await _context.UserRoles.AddAsync(new UserRole
+            {
+                UserId = user.UserId,
+                RoleName = "User"
+            });
             await _context.SaveChangesAsync();
             return user;
         }
