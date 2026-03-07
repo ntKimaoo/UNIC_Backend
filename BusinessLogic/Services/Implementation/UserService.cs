@@ -113,14 +113,15 @@ namespace BusinessLogic.Services.Implementation
                 throw new Exception("Student ID already exists.");
             }
 
-            user.FullName = request.FullName;
-            user.PhoneNumber = request.PhoneNumber;
-            user.DateOfBirth = request.DateOfBirth;
-            user.Gender = request.Gender;
-            user.Address = request.Address;
-            user.Avatar = request.Avatar;
-            user.Major = request.Major;
-            user.StudentId = request.StudentId;
+            // Only update fields that are explicitly provided (non-null)
+            if (request.FullName != null) user.FullName = request.FullName;
+            if (request.PhoneNumber != null) user.PhoneNumber = request.PhoneNumber;
+            if (request.DateOfBirth.HasValue) user.DateOfBirth = request.DateOfBirth;
+            if (request.Gender != null) user.Gender = request.Gender;
+            if (request.Address != null) user.Address = request.Address;
+            if (request.Avatar != null) user.Avatar = request.Avatar;
+            if (request.Major != null) user.Major = request.Major;
+            if (request.StudentId != null) user.StudentId = request.StudentId;
 
             if (!string.IsNullOrEmpty(request.Status))
             {

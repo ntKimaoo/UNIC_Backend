@@ -22,36 +22,9 @@ namespace UNIC.Presentation.Controllers
         /// <summary>
         /// Register a member for an event
         /// </summary>
-        [HttpPost("{id}/register")]
-        public async Task<IActionResult> RegisterMember(int id, [FromBody] EventRegistrationRequest request)
-        {
-            try
-            {
-                if (id != request.EventId)
-                {
-                    return BadRequest(new { error = "Event ID in URL does not match request body" });
-                }
-
-                await _attendanceService.RegisterMemberAsync(request);
-                return Ok(new { message = "Successfully registered for the event" });
-            }
-            catch (NotFoundException ex)
-            {
-                return NotFound(new { error = ex.Message });
-            }
-            catch (ConflictException ex)
-            {
-                return Conflict(new { error = ex.Message });
-            }
-            catch (DomainException ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = "An error occurred while registering for the event", details = ex.Message });
-            }
-        }
+        // [HttpPost("{id}/register")]
+        // public async Task<IActionResult> RegisterMember(int id, [FromBody] EventRegistrationRequest request)
+        // { ... commented out to resolve Swagger conflict with EventsController ... }
 
         /// <summary>
         /// Generate check-in code for an event (Manager only)
@@ -100,32 +73,9 @@ namespace UNIC.Presentation.Controllers
         /// <summary>
         /// Check in to an event
         /// </summary>
-        [HttpPost("{id}/checkin")]
-        public async Task<IActionResult> CheckIn(int id, [FromBody] CheckInRequest request)
-        {
-            try
-            {
-                if (id != request.EventId)
-                {
-                    return BadRequest(new { error = "Event ID in URL does not match request body" });
-                }
-
-                await _attendanceService.CheckInMemberAsync(request);
-                return Ok(new { message = "Successfully checked in to the event" });
-            }
-            catch (NotFoundException ex)
-            {
-                return NotFound(new { error = ex.Message });
-            }
-            catch (DomainException ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = "An error occurred while checking in", details = ex.Message });
-            }
-        }
+        // [HttpPost("{id}/checkin")]
+        // public async Task<IActionResult> CheckIn(int id, [FromBody] CheckInRequest request)
+        // { ... commented out to resolve Swagger conflict with EventsController ... }
 
         /// <summary>
         /// Evaluate a member's performance at an event

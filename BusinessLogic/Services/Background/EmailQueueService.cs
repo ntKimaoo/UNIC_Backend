@@ -47,10 +47,15 @@ namespace BusinessLogic.Services.Background
 
                     await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
                 }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error occurred while processing email queue.");
-                    await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+                    try { await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken); }
+                    catch (OperationCanceledException) { break; }
                 }
             }
 

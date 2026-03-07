@@ -1,5 +1,4 @@
 
-using API.Services;
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Background;
 using BusinessLogic.Services.Implementation;
@@ -135,7 +134,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
 //jwt
 var jwtSettings = builder.Configuration.GetSection("Jwt");
-var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]);
+var key = Encoding.UTF8.GetBytes(jwtSettings["Key"] ?? throw new InvalidOperationException("Jwt:Key is missing"));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthentication(options =>
 {

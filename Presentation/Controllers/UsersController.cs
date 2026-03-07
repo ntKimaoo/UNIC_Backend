@@ -9,10 +9,12 @@ namespace Presentation.Controllers
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly IFileStorageService _fileStorageService;
 
-        public UsersController(IUserService userService)
+        public UsersController(IUserService userService, IFileStorageService fileStorageService)
         {
             _userService = userService;
+            _fileStorageService = fileStorageService;
         }
 
         [HttpGet]
@@ -77,6 +79,31 @@ namespace Presentation.Controllers
                 }
 
                 return Ok(new { success = true, data = new { id } });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        // POST: api/users/{id}/avatar
+        [HttpPost("{id}/avatar")]
+        [Authorize]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadAvatar(Guid id, IFormFile avatar)
+        {
+            try
+            {
+                if (avatar == null || avatar.Length == 0)
+                    return BadRequest(new { success = false, message = "No file provided" });
+
+                var imageUrl = await _fileStorageService.SaveFileAsync(avatar, "uniclub/avatars");
+                var result = await _userService.UpdateUserAsync(id, new UpdateUserDto { Avatar = imageUrl });
+
+                if (!result)
+                    return NotFound(new { success = false, message = "User not found" });
+
+                return Ok(new { success = true, data = new { avatarUrl = imageUrl } });
             }
             catch (Exception ex)
             {
