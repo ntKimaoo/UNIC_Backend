@@ -25,6 +25,15 @@ namespace DataAccess.Repositories.Implementation
                 .FirstOrDefaultAsync(a => a.EventId == eventId && a.UserId == userId);
         }
 
+        public async Task<Attendance?> GetByCheckInTokenAsync(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token)) return null;
+            return await _context.Attendances
+                .Include(a => a.User)
+                .Include(a => a.Event)
+                .FirstOrDefaultAsync(a => a.CheckInToken == token);
+        }
+
         public async Task<bool> IsUserRegisteredAsync(int eventId, Guid userId)
         {
             return await _context.Attendances

@@ -10,7 +10,8 @@ namespace BusinessLogic.Services.Interface
         Task RegisterMemberAsync(EventRegistrationRequest request);
         Task<CheckInCodeResponse> GenerateCheckInCodeAsync(int eventId);
         Task CheckInMemberAsync(CheckInRequest request);
-        Task<CheckInByBarcodeResponse> CheckInByBarcodeAsync(int eventId, string barcode);
+        Task<CheckInQrResponse?> GetMyCheckInQrAsync(int eventId, Guid userId);
+        Task<CheckInByQrResponse> CheckInByQrTokenAsync(int eventId, string token);
         Task EvaluateMemberAsync(EvaluateMemberRequest request);
         Task<IEnumerable<AttendanceDetailDto>> GetEventAttendeesAsync(int eventId);
     }

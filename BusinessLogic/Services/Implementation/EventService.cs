@@ -200,7 +200,7 @@ namespace BusinessLogic.Services.Implementation
             return _mapper.Map<IEnumerable<EventDetailDto>>(events);
         }
 
-        public async Task RegisterForEventAsync(int eventId, string userId)
+        public async Task RegisterForEventAsync(int eventId, string userId, string? apiBaseUrl = null)
         {
             if (!Guid.TryParse(userId, out var userGuid))
                 throw new DomainException("Invalid user ID format");
@@ -216,7 +216,11 @@ namespace BusinessLogic.Services.Implementation
                 throw new DomainException("Registration has not started yet.");
 
             if (eventEntity.RegistrationEndDate.HasValue && DateTime.Now > eventEntity.RegistrationEndDate.Value)
-                throw new DomainException("Registration has ended.");
+            {
+                bool eventEnded = eventEntity.EndDate.HasValue && DateTime.Now > eventEntity.EndDate.Value;
+                if (eventEnded)
+                    throw new DomainException("Registration has ended.");
+            }
 
             if (eventEntity.MaxAttendees.HasValue)
             {
@@ -236,7 +240,8 @@ namespace BusinessLogic.Services.Implementation
                 EventId = eventId,
                 UserId = userGuid,
                 RegistrationDate = DateTime.Now,
-                AttendanceStatus = "REGISTERED"
+                AttendanceStatus = "REGISTERED",
+                CheckInToken = Guid.NewGuid().ToString("N")
             };
 
             await _unitOfWork.Attendances.AddAsync(attendance);
@@ -245,7 +250,7 @@ namespace BusinessLogic.Services.Implementation
             var user = await _unitOfWork.Users.GetByIdAsync(userGuid);
             if (user != null)
             {
-                _ = _emailService.SendEventRegistrationSuccessAsync(user.Email, user.FullName, eventEntity.EventName, eventEntity.StartDate);
+                _ = _emailService.SendEventRegistrationSuccessAsync(user.Email, user.FullName, eventEntity.EventName, eventEntity.StartDate, attendance.CheckInToken, apiBaseUrl);
             }
         }
 

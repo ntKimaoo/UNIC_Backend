@@ -125,6 +125,7 @@ builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventScheduleRepos
 // Business Services
 builder.Services.AddScoped<BusinessLogic.Services.Interface.IEventService, BusinessLogic.Services.Implementation.EventService>();
 builder.Services.AddScoped<BusinessLogic.Services.Interface.IAttendanceService, BusinessLogic.Services.Implementation.AttendanceService>();
+builder.Services.AddScoped<BusinessLogic.Services.Interface.IQRCodeGeneratorService, BusinessLogic.Services.Implementation.QRCodeGeneratorService>();
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<BusinessLogic.Validators.CreateEventRequestValidator>();

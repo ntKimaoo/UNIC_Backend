@@ -36,22 +36,6 @@ namespace BusinessLogic.DTOs
         public double? Longitude { get; set; }
     }
 
-
-    public class CheckInByBarcodeRequest
-    {
-        [Required(ErrorMessage = "Barcode (StudentId) is required")]
-        [MaxLength(50)]
-        public string Barcode { get; set; } = null!;
-    }
-
-
-    public class CheckInByBarcodeResponse
-    {
-        public string Message { get; set; } = null!;
-        public string MemberName { get; set; } = null!;
-        public string? StudentId { get; set; }
-    }
-
     /// <summary>
     /// DTO for check-in QR code response
     /// </summary>
@@ -61,6 +45,35 @@ namespace BusinessLogic.DTOs
         public string Code { get; set; } = null!;
         public DateTime ExpiresAt { get; set; }
         public string QrContent { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// Response for participant's personal QR code (content to encode in QR for event check-in).
+    /// </summary>
+    public class CheckInQrResponse
+    {
+        public int EventId { get; set; }
+        public string QrContent { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// Request when organizer scans a participant's QR code to check them in.
+    /// </summary>
+    public class CheckInByQrRequest
+    {
+        [Required(ErrorMessage = "Token (from QR) is required")]
+        [MaxLength(64)]
+        public string Token { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// Response after scanning QR to check in a participant.
+    /// </summary>
+    public class CheckInByQrResponse
+    {
+        public string Message { get; set; } = null!;
+        public string MemberName { get; set; } = null!;
+        public bool AlreadyCheckedIn { get; set; }
     }
 
     /// <summary>
@@ -98,4 +111,6 @@ namespace BusinessLogic.DTOs
         public int? Score { get; set; }
         public string? Comment { get; set; }
     }
+
+    
 }

@@ -1,18 +1,23 @@
-﻿using BusinessLogic.Services.Interface;
+using BusinessLogic.Services.Interface;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Mail;
+using System.Net.Mime;
 using System.Text;
 using System.Threading.Tasks;
+using QRCoder;
 
 namespace BusinessLogic.Services.Implementation
 {
     public class EmailService : IEmailService
     {
+        private const string QrContentId = "eventqrcode";
         private readonly IConfiguration _configuration;
+        private readonly IQRCodeGeneratorService _qrCodeGeneratorService;
         private readonly string _smtpServer;
         private readonly int _smtpPort;
         private readonly string _smtpUsername;
@@ -21,9 +26,10 @@ namespace BusinessLogic.Services.Implementation
         private readonly string _fromName;
         private readonly string _appBaseUrl;
 
-        public EmailService(IConfiguration configuration)
+        public EmailService(IConfiguration configuration, IQRCodeGeneratorService qrCodeGeneratorService)
         {
             _configuration = configuration;
+            _qrCodeGeneratorService = qrCodeGeneratorService;
             _smtpServer = _configuration["Email:SmtpServer"] ?? "smtp.gmail.com";
             _smtpPort = int.Parse(_configuration["Email:SmtpPort"] ?? "587");
             _smtpUsername = _configuration["Email:Username"] ?? "";
@@ -97,10 +103,24 @@ namespace BusinessLogic.Services.Implementation
             return await SendEmailAsync(toEmail, subject, body);
         }
 
-        public async Task<bool> SendEventRegistrationSuccessAsync(string toEmail, string fullName, string eventName, DateTime? startDate)
+        public async Task<bool> SendEventRegistrationSuccessAsync(string toEmail, string fullName, string eventName, DateTime? startDate, string? checkInQrToken = null, string? apiBaseUrl = null)
         {
             var dateStr = startDate.HasValue ? startDate.Value.ToString("dd/MM/yyyy HH:mm") : "TBD";
             var subject = $"Xác nhận vé sự kiện: {eventName}";
+            var qrHtml = "";
+            byte[]? qrPngBytes = null;
+            if (!string.IsNullOrWhiteSpace(checkInQrToken))
+            {
+                qrPngBytes = _qrCodeGeneratorService.GetQrCodePngBytes(checkInQrToken);
+                if (qrPngBytes != null && qrPngBytes.Length > 0)
+                {
+                    qrHtml = $@"
+                <p><strong>Mã QR điểm danh của bạn (vui lòng giữ kín):</strong></p>
+                <p>Khi đến sự kiện, hãy đưa mã QR này cho ban tổ chức quét để xác nhận tham dự.</p>
+                <p style='margin: 16px 0;'><img src='cid:{QrContentId}' alt='QR điểm danh' style='max-width: 200px; height: auto; border: 1px solid #ddd; border-radius: 8px;' /></p>
+                <br>";
+                }
+            }
             var body = $@"
             <html>
             <body style='font-family: Arial, sans-serif;'>
@@ -108,13 +128,28 @@ namespace BusinessLogic.Services.Implementation
                 <p>Bạn đã đăng ký tham gia thành công sự kiện: <strong>{eventName}</strong>.</p>
                 <p>Thời gian bắt đầu dự kiến: <strong>{dateStr}</strong></p>
                 <br>
-                <p>Vui lòng theo dõi email để nhận mã Check-in khi sự kiện bắt đầu.</p>
+                {qrHtml}
                 <p>Trân trọng,</p>
                 <p>Ban Tổ Chức</p>
             </body>
             </html>
         ";
-            return await SendEmailAsync(toEmail, subject, body);
+            return await SendEmailAsync(toEmail, subject, body, qrPngBytes != null ? QrContentId : null, qrPngBytes);
+        }
+
+        private static string? GenerateQrCodeBase64(string content)
+        {
+            try
+            {
+                using var qrGenerator = new QRCodeGenerator();
+                using var qrCodeData = qrGenerator.CreateQrCode(content, QRCodeGenerator.ECCLevel.Q);
+                var qrCode = new Base64QRCode(qrCodeData);
+                return qrCode.GetGraphic(4);
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         public async Task<bool> SendEventCheckInCodeAsync(string toEmail, string fullName, string eventName, string checkInCode)
@@ -137,7 +172,7 @@ namespace BusinessLogic.Services.Implementation
             return await SendEmailAsync(toEmail, subject, body);
         }
 
-        private async Task<bool> SendEmailAsync(string toEmail, string subject, string body)
+        private async Task<bool> SendEmailAsync(string toEmail, string subject, string body, string? inlineContentId = null, byte[]? inlineImageBytes = null)
         {
             try
             {
@@ -157,13 +192,34 @@ namespace BusinessLogic.Services.Implementation
 
                 mailMessage.To.Add(toEmail);
 
-                await smtpClient.SendMailAsync(mailMessage);
+                if (!string.IsNullOrEmpty(inlineContentId) && inlineImageBytes != null && inlineImageBytes.Length > 0)
+                {
+                    var stream = new MemoryStream(inlineImageBytes);
+                    try
+                    {
+                        var attachment = new Attachment(stream, "image/png");
+                        attachment.ContentDisposition!.DispositionType = DispositionTypeNames.Inline;
+                        attachment.ContentDisposition.Inline = true;
+                        attachment.ContentId = inlineContentId;
+                        attachment.ContentType.Name = "qrcode.png";
+                        mailMessage.Attachments.Add(attachment);
+                        await smtpClient.SendMailAsync(mailMessage);
+                    }
+                    finally
+                    {
+                        await stream.DisposeAsync();
+                    }
+                }
+                else
+                {
+                    await smtpClient.SendMailAsync(mailMessage);
+                }
                 return true;
             }
             catch (Exception ex)
             {
-                // Log the exception
-                Console.WriteLine($"Failed to send email: {ex.Message}");
+                Console.WriteLine($"[EmailService] Failed to send email: {ex.Message}");
+                Console.WriteLine($"[EmailService] Stack: {ex.StackTrace}");
                 return false;
             }
         }

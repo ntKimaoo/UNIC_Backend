@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DataAccess.Models
@@ -18,6 +18,10 @@ namespace DataAccess.Models
 
         [MaxLength(20)]
         public string AttendanceStatus { get; set; } = "REGISTERED";
+
+        /// <summary>Unique token for QR check-in (one per registration). Generated when user registers or first requests QR.</summary>
+        [MaxLength(64)]
+        public string? CheckInToken { get; set; }
 
         // Check-in fields
         public DateTime? CheckInTime { get; set; }

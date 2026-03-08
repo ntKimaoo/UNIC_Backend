@@ -15,11 +15,13 @@ namespace UNIC.Presentation.Controllers
     {
         private readonly IEventService _eventService;
         private readonly IFileStorageService _fileStorageService;
+        private readonly IQRCodeGeneratorService _qrCodeGeneratorService;
 
-        public EventsController(IEventService eventService, IFileStorageService fileStorageService)
+        public EventsController(IEventService eventService, IFileStorageService fileStorageService, IQRCodeGeneratorService qrCodeGeneratorService)
         {
             _eventService = eventService;
             _fileStorageService = fileStorageService;
+            _qrCodeGeneratorService = qrCodeGeneratorService;
         }
 
         private class ClubRoleClaimDto
@@ -307,6 +309,21 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>
+        /// Get QR code image for check-in token (used in email; no auth required so email clients can load the image).
+        /// </summary>
+        [HttpGet("qr/{token}")]
+        [AllowAnonymous]
+        public IActionResult GetQrCodeImage(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+                return BadRequest();
+            var pngBytes = _qrCodeGeneratorService.GetQrCodePngBytes(token);
+            if (pngBytes == null || pngBytes.Length == 0)
+                return NotFound();
+            return File(pngBytes, "image/png");
+        }
+
+        /// <summary>
         /// Register a user for an event
         /// </summary>
         [HttpPost("{id}/register")]
@@ -319,7 +336,7 @@ namespace UNIC.Presentation.Controllers
                 // For this demo/test purpose, if no request body specifies userId and Auth is missing,
                 // we'll assume the frontend passes userId in some way, but here according to our eventApi.ts:
                 // it calls /events/{eventId}/register without body. We would pull from User claims here.
-                
+
                 var userIdString = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
                 if (string.IsNullOrEmpty(userIdString))
                 {
@@ -328,7 +345,8 @@ namespace UNIC.Presentation.Controllers
                     return Unauthorized(new { error = "User is not logged in." });
                 }
 
-                await _eventService.RegisterForEventAsync(id, userIdString);
+                var apiBaseUrl = $"{Request.Scheme}://{Request.Host}";
+                await _eventService.RegisterForEventAsync(id, userIdString, apiBaseUrl);
                 return Ok(new { message = "Registration successful. Please check your email." });
             }
             catch (NotFoundException ex)

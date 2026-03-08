@@ -7,7 +7,7 @@ namespace Presentation.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
+    // [Authorize]
     public class ClubFundController : ControllerBase
     {
         private readonly IClubFundService _clubFundService;

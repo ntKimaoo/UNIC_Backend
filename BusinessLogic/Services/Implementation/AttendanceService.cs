@@ -73,13 +73,14 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("User", request.UserId);
             }
 
-            // Create attendance record
+            // Create attendance record (with unique QR check-in token)
             var attendance = new Attendance
             {
                 EventId = request.EventId,
                 UserId = request.UserId,
                 RegistrationDate = DateTime.Now,
-                AttendanceStatus = "REGISTERED"
+                AttendanceStatus = "REGISTERED",
+                CheckInToken = Guid.NewGuid().ToString("N")
             };
 
             await _unitOfWork.Attendances.AddAsync(attendance);
@@ -148,31 +149,38 @@ namespace BusinessLogic.Services.Implementation
             await _unitOfWork.SaveChangesAsync();
         }
 
-        public async Task<CheckInByBarcodeResponse> CheckInByBarcodeAsync(int eventId, string barcode)
+        public async Task<CheckInQrResponse?> GetMyCheckInQrAsync(int eventId, Guid userId)
         {
-            var barcodeTrimmed = barcode?.Trim();
-            if (string.IsNullOrWhiteSpace(barcodeTrimmed))
-            {
-                throw new DomainException("Mã barcode không hợp lệ.");
-            }
-
-            var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
-            if (eventEntity == null)
-            {
-                throw new NotFoundException("Event", eventId);
-            }
-
-            var user = await _unitOfWork.Users.GetByStudentIdAsync(barcodeTrimmed);
-            if (user == null)
-            {
-                throw new NotFoundException("User", barcodeTrimmed);
-            }
-
-            var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, user.UserId);
+            var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, userId);
             if (attendance == null)
+                return null;
+
+            if (string.IsNullOrEmpty(attendance.CheckInToken))
             {
-                throw new DomainException("Chưa đăng ký sự kiện. Sinh viên cần đăng ký trước khi điểm danh.");
+                attendance.CheckInToken = Guid.NewGuid().ToString("N");
+                _unitOfWork.Attendances.Update(attendance);
+                await _unitOfWork.SaveChangesAsync();
             }
+
+            return new CheckInQrResponse
+            {
+                EventId = eventId,
+                QrContent = attendance.CheckInToken
+            };
+        }
+
+        public async Task<CheckInByQrResponse> CheckInByQrTokenAsync(int eventId, string token)
+        {
+            var tokenTrimmed = NormalizeCheckInToken(token);
+            if (string.IsNullOrWhiteSpace(tokenTrimmed))
+                throw new DomainException("Mã QR không hợp lệ.");
+
+            var attendance = await _unitOfWork.Attendances.GetByCheckInTokenAsync(tokenTrimmed);
+            if (attendance == null)
+                throw new NotFoundException("Attendance", tokenTrimmed);
+
+            if (attendance.EventId != eventId)
+                throw new DomainException("Mã QR không thuộc sự kiện này.");
 
             var alreadyCheckedIn = attendance.AttendanceStatus == "PRESENT";
             if (!alreadyCheckedIn)
@@ -183,12 +191,31 @@ namespace BusinessLogic.Services.Implementation
                 await _unitOfWork.SaveChangesAsync();
             }
 
-            return new CheckInByBarcodeResponse
+            return new CheckInByQrResponse
             {
                 Message = alreadyCheckedIn ? "Đã điểm danh trước đó." : "Đã điểm danh thành công.",
-                MemberName = user.FullName,
-                StudentId = user.StudentId
+                MemberName = attendance.User?.FullName ?? "—",
+                AlreadyCheckedIn = alreadyCheckedIn
             };
+        }
+
+        /// <summary>
+        /// Trims token and, if it looks like a URL (e.g. .../qr/TOKEN), extracts the token part so scanning a QR that encodes the image URL still works.
+        /// </summary>
+        private static string? NormalizeCheckInToken(string? token)
+        {
+            var s = token?.Trim();
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            const string qrSegment = "/qr/";
+            var idx = s.IndexOf(qrSegment, StringComparison.OrdinalIgnoreCase);
+            if (idx >= 0)
+            {
+                s = s.Substring(idx + qrSegment.Length);
+                var query = s.IndexOf('?');
+                if (query >= 0) s = s.Substring(0, query);
+                s = s.Trim();
+            }
+            return string.IsNullOrWhiteSpace(s) ? null : s;
         }
 
         public async Task EvaluateMemberAsync(EvaluateMemberRequest request)
