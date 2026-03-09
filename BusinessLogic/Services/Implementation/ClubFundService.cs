@@ -1,4 +1,4 @@
-﻿using BusinessLogic.DTOs;
+using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
@@ -23,18 +23,26 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<FundTransaction> CreateRequestAsync(Guid userId, CreateFundRequestDto request)
         {
+            if (request.Amount <= 0)
+                throw new ArgumentException("Số tiền phải lớn hơn 0.", nameof(request.Amount));
+
+            var transactionType = request.TransactionType?.Trim().ToUpperInvariant();
+            if (transactionType != TYPE_INCOME && transactionType != TYPE_EXPENSE)
+                throw new ArgumentException("Loại giao dịch phải là INCOME hoặc EXPENSE.", nameof(request.TransactionType));
+
             var fund = await _fundRepository.GetFundByIdAsync(request.FundId);
-            if (fund == null) throw new Exception("Quỹ không tồn tại");
+            if (fund == null)
+                throw new InvalidOperationException("Quỹ không tồn tại.");
 
             var transaction = new FundTransaction
             {
                 FundId = request.FundId,
                 CategoryId = request.CategoryId,
-                TransactionType = request.TransactionType.ToUpper(),
+                TransactionType = transactionType,
                 Amount = request.Amount,
-                Description = request.Description,
+                Description = request.Description?.Trim(),
                 TransactionDate = DateTime.UtcNow,
-                Status = STATUS_PENDING, 
+                Status = STATUS_PENDING,
                 CreatedBy = userId
             };
 
@@ -45,22 +53,31 @@ namespace BusinessLogic.Services.Implementation
         public async Task<bool> ProcessRequestAsync(Guid managerId, ProcessFundRequestDto request)
         {
             var transaction = await _fundRepository.GetTransactionByIdAsync(request.TransactionId);
+            if (transaction == null)
+                throw new InvalidOperationException("Giao dịch không tồn tại.");
+            if (transaction.Status != STATUS_PENDING)
+                throw new InvalidOperationException("Giao dịch đã được xử lý trước đó.");
 
-            if (transaction == null) throw new Exception("Giao dịch không tồn tại");
-            if (transaction.Status != STATUS_PENDING) throw new Exception("Giao dịch đã được xử lý trước đó");
+            var action = request.Action?.Trim().ToUpperInvariant();
+            if (action != "APPROVE" && action != "REJECT")
+                throw new ArgumentException("Hành động phải là APPROVE hoặc REJECT.", nameof(request.Action));
 
             var fund = transaction.ClubFund;
-            transaction.ApprovedBy = managerId;
-            transaction.TransactionDate = DateTime.UtcNow; 
+            if (fund == null)
+                throw new InvalidOperationException("Không tìm thấy quỹ liên kết với giao dịch.");
 
-            if (request.Action.ToUpper() == "APPROVE")
+            transaction.ApprovedBy = managerId;
+            transaction.TransactionDate = DateTime.UtcNow;
+
+            if (action == "APPROVE")
             {
+                if (transaction.Amount <= 0)
+                    throw new InvalidOperationException("Số tiền giao dịch không hợp lệ.");
+
                 if (transaction.TransactionType == TYPE_EXPENSE)
                 {
                     if (fund.CurrentBalance < transaction.Amount)
-                    {
-                        throw new Exception("Số dư quỹ không đủ để duyệt chi tiêu này");
-                    }
+                        throw new InvalidOperationException("Số dư quỹ không đủ để duyệt chi tiêu này.");
                     fund.CurrentBalance -= transaction.Amount;
                 }
                 else if (transaction.TransactionType == TYPE_INCOME)
@@ -70,22 +87,63 @@ namespace BusinessLogic.Services.Implementation
                 }
 
                 transaction.Status = STATUS_APPROVED;
-
-                await _fundRepository.UpdateClubFundAsync(fund);
             }
             else
             {
                 transaction.Status = STATUS_REJECTED;
             }
 
-            await _fundRepository.UpdateTransactionAsync(transaction);
+            await _fundRepository.UpdateTransactionAndFundAsync(transaction, fund);
             return true;
         }
 
-        public async Task<IEnumerable<FundTransaction>> GetFundHistoryAsync(int fundId, string? status)
+        public async Task<FundResponseDto?> GetFundByIdAsync(int fundId)
         {
-            var normalizedStatus = status?.ToUpper();
-            return await _fundRepository.GetTransactionsByFundIdAsync(fundId, normalizedStatus);
+            var fund = await _fundRepository.GetFundByIdAsync(fundId);
+            return fund == null ? null : MapToFundDto(fund);
+        }
+
+        public async Task<IEnumerable<FundResponseDto>> GetFundsByClubIdAsync(int clubId)
+        {
+            var funds = await _fundRepository.GetFundsByClubIdAsync(clubId);
+            return funds.Select(MapToFundDto);
+        }
+
+        public async Task<IEnumerable<FundTransactionResponseDto>> GetFundHistoryAsync(int fundId, string? status)
+        {
+            var normalizedStatus = status?.ToUpperInvariant();
+            var list = await _fundRepository.GetTransactionsByFundIdAsync(fundId, normalizedStatus);
+            return list.Select(MapToTransactionDto);
+        }
+
+        private static FundResponseDto MapToFundDto(ClubFund fund)
+        {
+            return new FundResponseDto
+            {
+                FundId = fund.FundId,
+                ClubId = fund.ClubId,
+                FundName = fund.FundName,
+                TotalAmount = fund.TotalAmount,
+                CurrentBalance = fund.CurrentBalance,
+                CreatedAt = fund.CreatedAt
+            };
+        }
+
+        private static FundTransactionResponseDto MapToTransactionDto(FundTransaction t)
+        {
+            return new FundTransactionResponseDto
+            {
+                TransactionId = t.TransactionId,
+                FundId = t.FundId,
+                CategoryId = t.CategoryId,
+                TransactionType = t.TransactionType,
+                Status = t.Status ?? "PENDING",
+                Amount = t.Amount,
+                Description = t.Description,
+                TransactionDate = t.TransactionDate,
+                CreatedBy = t.CreatedBy,
+                ApprovedBy = t.ApprovedBy
+            };
         }
     }
 }

@@ -108,8 +108,8 @@ namespace UNIC.BusinessLogic.Test.Services
             _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(transaction);
 
             // Act & Assert
-            var ex = await Assert.ThrowsAsync<Exception>(() => _clubFundService.ProcessRequestAsync(Guid.NewGuid(), request));
-            Assert.Equal("Số dư quỹ không đủ để duyệt chi tiêu này", ex.Message);
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _clubFundService.ProcessRequestAsync(Guid.NewGuid(), request));
+            Assert.Equal("Số dư quỹ không đủ để duyệt chi tiêu này.", ex.Message);
         }
 
         [Fact]
@@ -125,8 +125,7 @@ namespace UNIC.BusinessLogic.Test.Services
             };
             
             _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(transaction);
-            _mockFundRepository.Setup(r => r.UpdateClubFundAsync(fund)).Returns(Task.CompletedTask);
-            _mockFundRepository.Setup(r => r.UpdateTransactionAsync(transaction)).Returns(Task.CompletedTask);
+            _mockFundRepository.Setup(r => r.UpdateTransactionAndFundAsync(It.IsAny<FundTransaction>(), It.IsAny<ClubFund>())).Returns(Task.CompletedTask);
 
             // Act
             var result = await _clubFundService.ProcessRequestAsync(managerId, request);
@@ -136,8 +135,7 @@ namespace UNIC.BusinessLogic.Test.Services
             Assert.Equal("APPROVED", transaction.Status);
             Assert.Equal(managerId, transaction.ApprovedBy);
             Assert.Equal(500, fund.CurrentBalance); // Deducted
-            _mockFundRepository.Verify(r => r.UpdateClubFundAsync(fund), Times.Once);
-            _mockFundRepository.Verify(r => r.UpdateTransactionAsync(transaction), Times.Once);
+            _mockFundRepository.Verify(r => r.UpdateTransactionAndFundAsync(transaction, fund), Times.Once);
         }
 
         [Fact]
@@ -153,8 +151,7 @@ namespace UNIC.BusinessLogic.Test.Services
             };
             
             _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(transaction);
-            _mockFundRepository.Setup(r => r.UpdateClubFundAsync(fund)).Returns(Task.CompletedTask);
-            _mockFundRepository.Setup(r => r.UpdateTransactionAsync(transaction)).Returns(Task.CompletedTask);
+            _mockFundRepository.Setup(r => r.UpdateTransactionAndFundAsync(It.IsAny<FundTransaction>(), It.IsAny<ClubFund>())).Returns(Task.CompletedTask);
 
             // Act
             var result = await _clubFundService.ProcessRequestAsync(managerId, request);
@@ -165,8 +162,7 @@ namespace UNIC.BusinessLogic.Test.Services
             Assert.Equal(managerId, transaction.ApprovedBy);
             Assert.Equal(1500, fund.CurrentBalance); // Added
             Assert.Equal(2000, fund.TotalAmount);    // Added
-            _mockFundRepository.Verify(r => r.UpdateClubFundAsync(fund), Times.Once);
-            _mockFundRepository.Verify(r => r.UpdateTransactionAsync(transaction), Times.Once);
+            _mockFundRepository.Verify(r => r.UpdateTransactionAndFundAsync(transaction, fund), Times.Once);
         }
 
         [Fact]
@@ -182,7 +178,7 @@ namespace UNIC.BusinessLogic.Test.Services
             };
             
             _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(transaction);
-            _mockFundRepository.Setup(r => r.UpdateTransactionAsync(transaction)).Returns(Task.CompletedTask);
+            _mockFundRepository.Setup(r => r.UpdateTransactionAndFundAsync(It.IsAny<FundTransaction>(), It.IsAny<ClubFund>())).Returns(Task.CompletedTask);
 
             // Act
             var result = await _clubFundService.ProcessRequestAsync(managerId, request);
@@ -192,8 +188,7 @@ namespace UNIC.BusinessLogic.Test.Services
             Assert.Equal("REJECTED", transaction.Status);
             Assert.Equal(managerId, transaction.ApprovedBy);
             Assert.Equal(1500, fund.CurrentBalance); // Unchanged
-            _mockFundRepository.Verify(r => r.UpdateClubFundAsync(It.IsAny<ClubFund>()), Times.Never);
-            _mockFundRepository.Verify(r => r.UpdateTransactionAsync(transaction), Times.Once);
+            _mockFundRepository.Verify(r => r.UpdateTransactionAndFundAsync(transaction, fund), Times.Once);
         }
 
         #endregion
@@ -201,17 +196,19 @@ namespace UNIC.BusinessLogic.Test.Services
         #region GetFundHistoryAsync
 
         [Fact]
-        public async Task GetFundHistoryAsync_ShouldReturnTransactions()
+        public async Task GetFundHistoryAsync_ShouldReturnTransactionDtos()
         {
             // Arrange
-            var transactions = new List<FundTransaction> { new FundTransaction() };
+            var transactions = new List<FundTransaction> { new FundTransaction { TransactionId = 1, Amount = 100 } };
             _mockFundRepository.Setup(r => r.GetTransactionsByFundIdAsync(1, "PENDING")).ReturnsAsync(transactions);
 
             // Act
-            var result = await _clubFundService.GetFundHistoryAsync(1, "pending");
+            var result = (await _clubFundService.GetFundHistoryAsync(1, "pending")).ToList();
 
             // Assert
-            Assert.Equal(transactions, result);
+            Assert.Single(result);
+            Assert.Equal(1, result[0].TransactionId);
+            Assert.Equal(100, result[0].Amount);
         }
 
         [Fact]
@@ -222,10 +219,10 @@ namespace UNIC.BusinessLogic.Test.Services
             _mockFundRepository.Setup(r => r.GetTransactionsByFundIdAsync(1, null)).ReturnsAsync(transactions);
 
             // Act
-            var result = await _clubFundService.GetFundHistoryAsync(1, null);
+            var result = (await _clubFundService.GetFundHistoryAsync(1, null)).ToList();
 
             // Assert
-            Assert.Equal(transactions, result);
+            Assert.Single(result);
         }
 
         #endregion

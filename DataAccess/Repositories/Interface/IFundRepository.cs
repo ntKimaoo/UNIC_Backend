@@ -1,4 +1,4 @@
-﻿using DataAccess.Models;
+using DataAccess.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,6 +14,8 @@ namespace UNIC.DataAccess.Repositories.Interface
         Task AddTransactionAsync(FundTransaction transaction);
         Task UpdateTransactionAsync(FundTransaction transaction);
         Task UpdateClubFundAsync(ClubFund fund);
+        Task UpdateTransactionAndFundAsync(FundTransaction transaction, ClubFund fund);
         Task<IEnumerable<FundTransaction>> GetTransactionsByFundIdAsync(int fundId, string? status = null);
+        Task<IEnumerable<ClubFund>> GetFundsByClubIdAsync(int clubId);
     }
 }

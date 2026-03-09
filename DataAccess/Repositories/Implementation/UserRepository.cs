@@ -89,7 +89,9 @@ namespace DataAccess.Repositories.Implementation
                 if (user == null)
                     return false;
 
-                _context.Users.Remove(user);
+                user.Status = "Inactive";
+                user.UpdatedAt = DateTime.UtcNow;
+                _context.Users.Update(user);
                 await _context.SaveChangesAsync();
                 return true;
             }
@@ -101,22 +103,24 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<IEnumerable<User>> GetAllAsync()
         {
-            return await _context.Users.ToListAsync();
+            return await _context.Users
+                .Where(u => u.Status == "Active")
+                .ToListAsync();
         }
 
         public async Task<(IEnumerable<User> Items, int TotalCount)> GetPagedAsync(int pageNumber, int pageSize)
         {
-            var query = _context.Users.OrderByDescending(u => u.CreatedAt);
+            var query = _context.Users
+                .Where(u => u.Status == "Active")
+                .OrderByDescending(u => u.CreatedAt);
 
-            var countTask = query.CountAsync();
-            var itemsTask = query
+            var totalCount = await query.CountAsync();
+            var items = await query
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
 
-            await Task.WhenAll(countTask, itemsTask);
-
-            return (await itemsTask, await countTask);
+            return (items, totalCount);
         }
     }
 }

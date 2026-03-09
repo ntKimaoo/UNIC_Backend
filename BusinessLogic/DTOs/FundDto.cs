@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace BusinessLogic.DTOs
 {
@@ -12,10 +12,10 @@ namespace BusinessLogic.DTOs
         public string TransactionType { get; set; } // "INCOME" or "EXPENSE"
 
         [Required]
-        [Range(0, double.MaxValue)]
+        [Range(0.01, double.MaxValue, ErrorMessage = "Số tiền phải lớn hơn 0")]
         public decimal Amount { get; set; }
 
-        public string Description { get; set; }
+        public string? Description { get; set; }
     }
 
     public class ProcessFundRequestDto
@@ -25,5 +25,29 @@ namespace BusinessLogic.DTOs
 
         [Required]
         public string Action { get; set; } // "APPROVE" or "REJECT"
+    }
+
+    public class FundResponseDto
+    {
+        public int FundId { get; set; }
+        public int ClubId { get; set; }
+        public string FundName { get; set; } = string.Empty;
+        public decimal TotalAmount { get; set; }
+        public decimal CurrentBalance { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class FundTransactionResponseDto
+    {
+        public int TransactionId { get; set; }
+        public int FundId { get; set; }
+        public int? CategoryId { get; set; }
+        public string TransactionType { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public string? Description { get; set; }
+        public DateTime TransactionDate { get; set; }
+        public Guid? CreatedBy { get; set; }
+        public Guid? ApprovedBy { get; set; }
     }
 }

@@ -119,7 +119,7 @@ namespace UNIC.Presentation.Test.Controllers
         {
             SetupUser(Guid.NewGuid());
             _mockService.Setup(s => s.GetFundHistoryAsync(1, null))
-                .ReturnsAsync(new List<FundTransaction> { new() });
+                .ReturnsAsync(new List<FundTransactionResponseDto> { new() });
 
             var result = await _controller.GetHistory(1, null);
 

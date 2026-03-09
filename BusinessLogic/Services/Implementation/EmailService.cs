@@ -121,6 +121,15 @@ namespace BusinessLogic.Services.Implementation
                 <br>";
                 }
             }
+            var verifyLinkHtml = "";
+            if (!string.IsNullOrWhiteSpace(checkInQrToken) && !string.IsNullOrWhiteSpace(apiBaseUrl))
+            {
+                var verifyUrl = $"{apiBaseUrl.TrimEnd('/')}/api/verify?email={Uri.EscapeDataString(toEmail)}&code={Uri.EscapeDataString(checkInQrToken)}";
+                verifyLinkHtml = $@"
+                <p><strong>Hoặc bấm link sau để xác nhận tham dự (không cần đăng nhập):</strong></p>
+                <p><a href='{verifyUrl}' style='color: #1976d2; word-break: break-all;'>{verifyUrl}</a></p>
+                <br>";
+            }
             var body = $@"
             <html>
             <body style='font-family: Arial, sans-serif;'>
@@ -129,6 +138,7 @@ namespace BusinessLogic.Services.Implementation
                 <p>Thời gian bắt đầu dự kiến: <strong>{dateStr}</strong></p>
                 <br>
                 {qrHtml}
+                {verifyLinkHtml}
                 <p>Trân trọng,</p>
                 <p>Ban Tổ Chức</p>
             </body>

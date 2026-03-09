@@ -1,4 +1,4 @@
-﻿using BusinessLogic.DTOs;
+using BusinessLogic.DTOs;
 using DataAccess.Models;
 
 namespace BusinessLogic.Services.Interface
@@ -7,6 +7,8 @@ namespace BusinessLogic.Services.Interface
     {
         Task<FundTransaction> CreateRequestAsync(Guid userId, CreateFundRequestDto request);
         Task<bool> ProcessRequestAsync(Guid managerId, ProcessFundRequestDto request);
-        Task<IEnumerable<FundTransaction>> GetFundHistoryAsync(int fundId, string? status);
+        Task<FundResponseDto?> GetFundByIdAsync(int fundId);
+        Task<IEnumerable<FundResponseDto>> GetFundsByClubIdAsync(int clubId);
+        Task<IEnumerable<FundTransactionResponseDto>> GetFundHistoryAsync(int fundId, string? status);
     }
 }
