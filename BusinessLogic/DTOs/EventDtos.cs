@@ -71,6 +71,8 @@ namespace BusinessLogic.DTOs
         public DateTime CreatedAt { get; set; }
         public int? MaxAttendees { get; set; }
         public int CurrentAttendees { get; set; }
+        public DateTime? RegistrationStartDate { get; set; }
+        public DateTime? RegistrationEndDate { get; set; }
         public List<SessionDto> Sessions { get; set; } = new List<SessionDto>();
     }
 

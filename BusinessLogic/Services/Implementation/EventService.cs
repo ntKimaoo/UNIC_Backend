@@ -157,10 +157,10 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("Event", request.EventId);
             }
 
-            // Check event status is PLANNED
-            if (eventEntity.Status != "PLANNED")
+            // Check event status is PLANNED or REGISTRATION_OPEN (allow editing dates)
+            if (eventEntity.Status != "PLANNED" && eventEntity.Status != "REGISTRATION_OPEN")
             {
-                throw new DomainException($"Cannot open registration for event with status '{eventEntity.Status}'. Event must be in PLANNED status.");
+                throw new DomainException($"Cannot open/update registration for event with status '{eventEntity.Status}'. Event must be in PLANNED or REGISTRATION_OPEN status.");
             }
 
             // Validate registration end date is before event start date
