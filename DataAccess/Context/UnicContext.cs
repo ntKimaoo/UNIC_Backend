@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using UNIC.DataAccess.Models;
@@ -49,6 +49,7 @@ public partial class UnicContext : DbContext
     public DbSet<ClubMemberPolicy> ClubMemberPolicies { get; set; }
     public DbSet<Policy> Policies { get; set; }
     public DbSet<ClubRolePolicy> ClubRolePolicies { get; set; }
+    public DbSet<PolicyGroup> PolicyGroups { get; set; }
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
 
@@ -269,6 +270,11 @@ public partial class UnicContext : DbContext
             .HasForeignKey(a => a.EventId)
             .OnDelete(DeleteBehavior.NoAction);
 
+        modelBuilder.Entity<Attendance>()
+            .HasIndex(a => a.CheckInToken)
+            .IsUnique()
+            .HasFilter("[CheckInToken] IS NOT NULL");
+
         // ClubFund - Club
         modelBuilder.Entity<ClubFund>()
             .HasOne(cf => cf.Club)
@@ -379,6 +385,14 @@ public partial class UnicContext : DbContext
             .HasOne<Policy>(p => p.Policy)
             .WithMany(crp => crp.ClubRolePolicies)
             .HasForeignKey(crp => crp.PolicyId);
+        modelBuilder.Entity<Policy>()
+            .HasOne<PolicyGroup>(pg => pg.PolicyGroup)
+            .WithMany(p => p.Policies)
+            .HasForeignKey(p => p.PolicyGroupId);
+        modelBuilder.Entity<ClubRole>()
+            .HasOne<Club>(c => c.Club)
+            .WithMany(cr => cr.ClubRoles)
+            .HasForeignKey(cr => cr.ClubId);
 
     }
 

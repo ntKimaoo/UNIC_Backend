@@ -1,0 +1,65 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+
+namespace BusinessLogic.DTOs
+{
+    /// <summary>
+    /// Request để thêm user vào club
+    /// </summary>
+    public class AddUserToClubDto
+    {
+        [Required]
+        public Guid UserId { get; set; }
+
+        /// <summary>
+        /// ClubRoleId để assign cho user (tùy chọn)
+        /// </summary>
+        public int? ClubRoleId { get; set; }
+    }
+
+    /// <summary>
+    /// Request để cập nhật role của member trong club
+    /// </summary>
+    public class UpdateMemberRoleDto
+    {
+        [Required]
+        public int ClubRoleId { get; set; }
+    }
+
+    /// <summary>
+    /// Thông tin department mà user tham gia trong club
+    /// </summary>
+    public class DepartmentInfoDto
+    {
+        public int DepartmentId { get; set; }
+        public string DepartmentName { get; set; }
+        public string? Description { get; set; }
+        public string? DeptRoleName { get; set; }
+        public DateTime AssignedAt { get; set; }
+    }
+
+    /// <summary>
+    /// Response thông tin một member trong club
+    /// </summary>
+    public class ClubMemberResponseDto
+    {
+        public int ClubMemberId { get; set; }
+        public Guid UserId { get; set; }
+        public string FullName { get; set; }
+        public string Email { get; set; }
+        public string? Avatar { get; set; }
+        public string? StudentId { get; set; }
+        public int ClubId { get; set; }
+        public int? ClubRoleId { get; set; }
+        public string? RoleName { get; set; }
+        public DateTime JoinDate { get; set; }
+        public string Status { get; set; }
+        public Guid? AssignedBy { get; set; }
+
+        /// <summary>
+        /// Danh sách departments trong club mà user thuộc về
+        /// </summary>
+        public List<DepartmentInfoDto> Departments { get; set; } = new();
+    }
+}

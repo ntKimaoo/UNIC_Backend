@@ -1,9 +1,7 @@
-﻿using BusinessLogic.DTOs;
+using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.OData.Query;
-using System.Linq;
 
 namespace Presentation.Controllers
 {
@@ -20,17 +18,18 @@ namespace Presentation.Controllers
             _fileStorageService = fileStorageService;
         }
 
-        // GET: api/users
         [HttpGet]
-        [EnableQuery]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
         {
-            var users = await _userService.GetAllUsersAsync();
-            if (!users.Any())
-            {
-                return NotFound(new { success = false, message = "No users found" });
-            }
-            return Ok(new { success = true, data = users });
+            if (page < 1)
+                return BadRequest(new { success = false, message = "Page must be >= 1" });
+            if (pageSize < 1 || pageSize > 100)
+                return BadRequest(new { success = false, message = "PageSize must be between 1 and 100" });
+
+            var pagedResult = await _userService.GetPagedUsersAsync(page, pageSize);
+            return Ok(new { success = true, data = pagedResult });
         }
 
         // GET: api/users/{id}

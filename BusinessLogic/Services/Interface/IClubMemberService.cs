@@ -1,0 +1,17 @@
+using BusinessLogic.DTOs;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace BusinessLogic.Services.Interface
+{
+    public interface IClubMemberService
+    {
+        Task<IEnumerable<ClubMemberResponseDto>> GetMembersByClubAsync(int clubId);
+        Task<ClubMemberResponseDto?> GetMemberByIdAsync(int clubMemberId);
+        Task<ClubMemberResponseDto> AddUserToClubAsync(int clubId, AddUserToClubDto dto, Guid? assignedBy);
+        Task<ClubMemberResponseDto?> UpdateMemberRoleAsync(int clubMemberId, UpdateMemberRoleDto dto);
+        Task<bool> RemoveMemberAsync(int clubMemberId);
+        Task<IEnumerable<ClubMemberResponseDto>> GetMyClubsAsync(Guid userId);
+    }
+}
