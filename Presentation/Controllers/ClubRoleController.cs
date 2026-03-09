@@ -136,5 +136,15 @@ namespace Presentation.Controllers
 
             return Ok(new { success = true, message = "Club role deleted successfully" });
         }
+
+        /// <summary>
+        /// Get all roles of a club
+        /// </summary>
+        [HttpGet("club/{id}")]
+        public async Task<IActionResult> GetByClubId(int id)
+        {
+            var roles = await _service.GetRolesByClubIdAsync(id);
+            return Ok(new { success = true, data = roles });
+        }
     }
 }

@@ -14,5 +14,6 @@ namespace BusinessLogic.Services.Interface
         Task<bool> DeleteAsync(int clubRoleId);
         Task<IEnumerable<Policy>> GetPoliciesByRoleAsync(int clubRoleId);
         Task UpdatePoliciesAsync(int clubRoleId, List<int> policyIds);
+        Task<IEnumerable<ClubRoleResponseDto>> GetRolesByClubIdAsync(int clubId);
     }
 }

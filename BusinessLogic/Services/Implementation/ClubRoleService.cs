@@ -116,5 +116,11 @@ namespace BusinessLogic.Services.Implementation
         {
                         return await _repository.GetPoliciesByRoleAsync(clubRoleId);
         }
+
+        public async Task<IEnumerable<ClubRoleResponseDto>> GetRolesByClubIdAsync(int clubId)
+        {
+            var roles = await _repository.GetRolesByClubIdAsync(clubId);
+            return roles.Select(MapToResponseDto);
+        }
     }
 }
