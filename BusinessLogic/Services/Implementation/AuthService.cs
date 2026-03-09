@@ -81,7 +81,6 @@ public class AuthService : IAuthService
         {
             AccessToken = accessToken,
             RefreshToken = refreshToken,
-            ExpiresAt = refreshTokenExpiration,
             User = MapToUserInfoDto(user)
         };
     }
@@ -403,7 +402,8 @@ public class AuthService : IAuthService
             Avatar = user.Avatar,
             StudentId = user.StudentId,
             Major = user.Major,
-            Status = user.Status
+            Status = user.Status,
+            Role = user.UserRoles.FirstOrDefault(u=>u.UserId==user.UserId)?.RoleName
         };
     }
 }

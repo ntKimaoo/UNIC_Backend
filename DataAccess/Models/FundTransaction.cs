@@ -17,6 +17,12 @@ namespace DataAccess.Models
         [MaxLength(20)]
         public string TransactionType { get; set; } // 'INCOME' or 'EXPENSE'
 
+        [MaxLength(20)]
+        public string Status { get; set; } = "PENDING"; // 'PENDING', 'APPROVED', 'REJECTED'
+
+        public Guid? CreatedBy { get; set; }  // Nguoi tao yeu cau
+        public Guid? ApprovedBy { get; set; } // Nguoi duyet
+
         [Required]
         [Column(TypeName = "decimal(15,2)")]
         public decimal Amount { get; set; }

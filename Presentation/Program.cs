@@ -4,8 +4,10 @@ using BusinessLogic.DTOs;
 using BusinessLogic.Services.Background;
 using BusinessLogic.Services.Implementation;
 using BusinessLogic.Services.Interface;
+using DataAccess.Context;
 using DataAccess.Models;
 using DataAccess.Repositories.Implementation;
+using DataAccess.Seed;
 using DataAccess.Repositories.Interface;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -17,13 +19,24 @@ using Microsoft.OData.ModelBuilder;
 using Presentation.Authorization;
 using System;
 using System.Text;
+using UNIC.BusinessLogic.Services.Implementation;
+using UNIC.BusinessLogic.Services.Interface;
+using UNIC.DataAccess.Repositories.Implementation;
+using UNIC.DataAccess.Repositories.Interface;
+using UNIC.Presentation.Hubs;
+using FluentValidation;
+using FluentValidation.AspNetCore;
+using UNIC.DataAccess.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
 //database
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<UnicContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDbContext<MeetingDbContext>(options =>
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("MeetingRoomConnection"));
+});
 
 //redis
 builder.Services.AddStackExchangeRedisCache(redisOptions=>
@@ -37,10 +50,10 @@ builder.Services.AddCors(options =>
         policy =>
         {
             policy
-                .WithOrigins("http://localhost:5173") // FE origin
                 .AllowAnyHeader()
                 .AllowAnyMethod()
-                .AllowCredentials();
+                .AllowCredentials()
+                .SetIsOriginAllowed(_ => true);
         });
 });
 
@@ -54,6 +67,9 @@ builder.Services.AddControllers()
         .SetMaxTop(100)
         .AddRouteComponents("api", GetEdmModel()));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IDepartmentRepository, DepartmentRepository>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -62,6 +78,33 @@ builder.Services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationT
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IRecruitmentCampaignRepository, RecruitmentCampaignRepository>();
 builder.Services.AddScoped<IRecruitmentCampaignService, RecruitmentCampaignService>();
+builder.Services.AddScoped<IClubPostRepository, ClubPostRepository>();
+builder.Services.AddScoped<IClubPostService, ClubPostService>();
+builder.Services.AddScoped<IFileStorageService, FileStorageService>();
+builder.Services.AddScoped<IApplicationService, ApplicationService>();
+builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
+builder.Services.AddScoped<IInterviewRepository, InterviewRepository>();
+builder.Services.AddScoped<IInterviewService, InterviewService>();
+
+// Register Cloudinary as a singleton
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var cloudName = config["Cloudinary:CloudName"];
+    var apiKey = config["Cloudinary:ApiKey"];
+    var apiSecret = config["Cloudinary:ApiSecret"];
+    return new CloudinaryDotNet.Account(cloudName, apiKey, apiSecret);
+});
+builder.Services.AddSingleton(sp =>
+{
+    var account = sp.GetRequiredService<CloudinaryDotNet.Account>();
+    return new CloudinaryDotNet.Cloudinary(account);
+});
+
+// Register Background Services
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IFundRepository, FundRepository>();
+builder.Services.AddScoped<IClubFundService, ClubFundService>();
 builder.Services.AddScoped<IClubRepository, ClubRepository>();
 builder.Services.AddScoped<IClubService, ClubService>();
 builder.Services.AddScoped<IClubRoleRepository, ClubRoleRepository>();
@@ -72,6 +115,25 @@ builder.Services.AddScoped<IPolicyRepository, PolicyRepository>();
 builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
+builder.Services.AddHostedService<ImageUploadQueueService>();
+
+// Unit of Work and Repositories
+builder.Services.AddScoped<DataAccess.Repositories.Interface.IUnitOfWork, DataAccess.Repositories.Implementation.UnitOfWork>();
+builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventRepository, DataAccess.Repositories.Implementation.EventRepository>();
+builder.Services.AddScoped<DataAccess.Repositories.Interface.IAttendanceRepository, DataAccess.Repositories.Implementation.AttendanceRepository>();
+builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventScheduleRepository, DataAccess.Repositories.Implementation.EventScheduleRepository>();
+
+// Business Services
+builder.Services.AddScoped<BusinessLogic.Services.Interface.IEventService, BusinessLogic.Services.Implementation.EventService>();
+builder.Services.AddScoped<BusinessLogic.Services.Interface.IAttendanceService, BusinessLogic.Services.Implementation.AttendanceService>();
+
+// FluentValidation
+builder.Services.AddValidatorsFromAssemblyContaining<BusinessLogic.Validators.CreateEventRequestValidator>();
+
+// AutoMapper
+builder.Services.AddAutoMapper(typeof(BusinessLogic.Mappings.EventMappingProfile).Assembly);
+
+builder.Services.AddControllers();
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
@@ -79,7 +141,8 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 }); ;
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
+//signalR
+builder.Services.AddSignalR();
 //jwt
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]);
@@ -108,13 +171,14 @@ builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
 // Register dynamic policy provider
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 
-builder.Services.AddAuthorization(options =>
+// Configure file upload size limits
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
-    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
-    options.AddPolicy("StaffOnly", policy => policy.RequireRole("Staff"));
+    options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10MB
 });
-builder.Services.Configure<AdminSettings>(
-    builder.Configuration.GetSection("AdminSettings"));
+
+//builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
+
 IEdmModel GetEdmModel()
 {
     var odataBuilder = new ODataConventionModelBuilder();
@@ -124,6 +188,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<UnicContext>();
+    var meetingDb = scope.ServiceProvider.GetRequiredService<MeetingDbContext>();
 
     var retry = 0;
     while (!db.Database.CanConnect())
@@ -139,16 +204,35 @@ using (var scope = app.Services.CreateScope())
     }
 
     db.Database.Migrate();
+    meetingDb.Database.Migrate();
+
+    ApplicationDemoSeeder.SeedAsync(db).GetAwaiter().GetResult();
+
+    DatabaseSeeder.SeedData(scope.ServiceProvider);
 }
 
 // Configure the HTTP request pipeline.
+// Luôn trả JSON khi API lỗi (tránh PARSING_ERROR ở FE - RTK Query cần JSON, không HTML).
+app.UseExceptionHandler(appError =>
+{
+    appError.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json";
+        var feature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        var ex = feature?.Error;
+        await context.Response.WriteAsJsonAsync(new { success = false, message = ex?.Message ?? "Internal server error" });
+    });
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 app.UseCors("AllowFE");
-
+app.UseStaticFiles(); // Enable serving files from wwwroot
+app.MapHub<WebRtcHub>("/webrtc");
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

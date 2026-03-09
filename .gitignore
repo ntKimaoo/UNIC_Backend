@@ -361,3 +361,79 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+<<<<<<<<< Temporary merge branch 1
+# VS Code files for those working on multiple tools
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Local History for Visual Studio Code
+.history/
+
+# Windows Installer files from build outputs
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# JetBrains Rider
+*.sln.iml
+.idea/
+
+# Visual Studio History (VSHistory) files
+.vshistory/
+
+##############################################
+# Custom - Application Specific
+##############################################
+
+# Sensitive configuration files (DO NOT commit passwords/secrets)
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Staging.json
+appsettings.*.json
+!appsettings.json
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+*.tlog
+
+# Temporary files
+schema_check.sql
+temp/
+tmp/
+
+# User uploads (if applicable)
+wwwroot/uploads/
+wwwroot/images/uploads/
+
+# Email templates cache
+EmailTemplates/cache/
+
+# Migration scripts (temporary)
+*.migration.sql
+=========
+# Ignore AppSettings (Sensitive Data)
+appsettings.json
+appsettings.Development.json
+>>>>>>>>> Temporary merge branch 2

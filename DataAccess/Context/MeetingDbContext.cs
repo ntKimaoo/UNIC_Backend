@@ -1,0 +1,121 @@
+using Microsoft.EntityFrameworkCore;
+using DataAccess.Models.Meeting;
+using DataAccess.Models.Meeting.Enums;
+
+namespace DataAccess.Context;
+
+public class MeetingDbContext : DbContext
+{
+    public MeetingDbContext(DbContextOptions<MeetingDbContext> options)
+        : base(options) { }
+
+    public DbSet<InterviewSchedule>   InterviewSchedules   { get; set; }
+    public DbSet<InterviewAssignment> InterviewAssignments { get; set; }
+    public DbSet<MeetingRoom>         MeetingRooms         { get; set; }
+    public DbSet<RoomParticipant>     RoomParticipants     { get; set; }
+    public DbSet<RoomEvent>           RoomEvents           { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        // ── InterviewSchedule ─────────────────────────────────────
+        modelBuilder.Entity<InterviewSchedule>(e =>
+        {
+            e.ToTable("InterviewSchedules");
+            e.HasKey(s => s.Id);
+
+            e.Property(s => s.Title).IsRequired().HasMaxLength(300);
+            e.Property(s => s.Status).HasConversion<string>().HasMaxLength(50);
+
+            // FK mềm – Guid columns, không tạo FK constraint thật
+            e.Property(s => s.ApplicationId).IsRequired();
+            e.Property(s => s.CandidateUserId).IsRequired();
+            e.Property(s => s.CampaignId).IsRequired();
+            e.Property(s => s.CreatedByUserId).IsRequired();
+
+            e.HasIndex(s => s.ApplicationId);
+            e.HasIndex(s => s.CandidateUserId);
+            e.HasIndex(s => s.CampaignId);
+            e.HasIndex(s => s.CreatedByUserId);
+        });
+
+        // ── InterviewAssignment ───────────────────────────────────
+        modelBuilder.Entity<InterviewAssignment>(e =>
+        {
+            e.ToTable("InterviewAssignments");
+            e.HasKey(a => a.Id);
+
+            // Unique: 1 interviewer chỉ được assign 1 lần vào 1 lịch
+            e.HasIndex(a => new { a.InterviewScheduleId, a.InterviewerUserId }).IsUnique();
+
+            e.Property(a => a.Role).HasConversion<string>().HasMaxLength(50);
+            e.Property(a => a.Result).HasConversion<string>().HasMaxLength(50);
+            e.Property(a => a.InterviewerUserId).IsRequired();
+            e.HasIndex(a => a.InterviewerUserId);
+
+            e.HasOne(a => a.InterviewSchedule)
+             .WithMany(s => s.Assignments)
+             .HasForeignKey(a => a.InterviewScheduleId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── MeetingRoom ───────────────────────────────────────────
+        modelBuilder.Entity<MeetingRoom>(e =>
+        {
+            e.ToTable("MeetingRooms");
+            e.HasKey(r => r.Id);
+
+            e.Property(r => r.RoomCode).IsRequired().HasMaxLength(20);
+            e.HasIndex(r => r.RoomCode).IsUnique();          // Lookup /room/{code}
+
+            e.Property(r => r.Status).HasConversion<string>().HasMaxLength(50);
+            e.Property(r => r.StunServerUri).HasMaxLength(500);
+            e.Property(r => r.TurnServerUri).HasMaxLength(500);
+            e.Property(r => r.TurnUsername).HasMaxLength(200);
+            e.Property(r => r.TurnCredential).HasMaxLength(200);
+
+            // 1-1 với InterviewSchedule
+            e.HasOne(r => r.InterviewSchedule)
+             .WithOne(s => s.MeetingRoom)
+             .HasForeignKey<MeetingRoom>(r => r.InterviewScheduleId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── RoomParticipant ───────────────────────────────────────
+        modelBuilder.Entity<RoomParticipant>(e =>
+        {
+            e.ToTable("RoomParticipants");
+            e.HasKey(p => p.Id);
+
+            e.Property(p => p.UserId).IsRequired();
+            e.Property(p => p.DisplayName).IsRequired().HasMaxLength(200);
+            e.Property(p => p.Role).HasMaxLength(50);
+            e.Property(p => p.PeerId).HasMaxLength(100);
+            e.Property(p => p.ConnectionState).HasConversion<string>().HasMaxLength(50);
+
+            e.HasIndex(p => p.UserId);
+
+            e.HasOne(p => p.MeetingRoom)
+             .WithMany(r => r.Participants)
+             .HasForeignKey(p => p.MeetingRoomId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── RoomEvent ─────────────────────────────────────────────
+        modelBuilder.Entity<RoomEvent>(e =>
+        {
+            e.ToTable("RoomEvents");
+            e.HasKey(ev => ev.Id);
+
+            e.Property(ev => ev.EventType).IsRequired().HasMaxLength(100);
+            e.Property(ev => ev.Payload).HasColumnType("nvarchar(max)");
+            e.HasIndex(ev => ev.OccurredAt);
+
+            e.HasOne(ev => ev.MeetingRoom)
+             .WithMany(r => r.Events)
+             .HasForeignKey(ev => ev.MeetingRoomId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+}

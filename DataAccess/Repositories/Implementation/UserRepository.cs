@@ -21,6 +21,7 @@ namespace DataAccess.Repositories.Implementation
         public async Task<User?> GetByEmailAsync(string email)
         {
             return await _context.Users
+                .Include(u => u.UserRoles)
                 .FirstOrDefaultAsync(m => m.Email == email);
         }
 
@@ -54,6 +55,11 @@ namespace DataAccess.Repositories.Implementation
         public async Task<User> CreateAsync(User user)
         {
             await _context.Users.AddAsync(user);
+            await _context.UserRoles.AddAsync(new UserRole
+            {
+                UserId = user.UserId,
+                RoleName = "User"
+            });
             await _context.SaveChangesAsync();
             return user;
         }
@@ -89,6 +95,11 @@ namespace DataAccess.Repositories.Implementation
             {
                 return false;
             }
+        }
+
+        public async Task<IEnumerable<User>> GetAllAsync()
+        {
+            return await _context.Users.ToListAsync();
         }
     }
 }

@@ -15,5 +15,6 @@ namespace DataAccess.Repositories.Interface
         Task<bool> DeleteAsync(int clubRoleId);
         Task SetPoliciesAsync(int clubRoleId, IEnumerable<int> policyIds);
         Task <IEnumerable<Policy>> GetPoliciesByRoleAsync(int clubRoleId);
+        Task<IEnumerable<ClubRole>> GetRolesByClubIdAsync(int clubId);
     }
 }

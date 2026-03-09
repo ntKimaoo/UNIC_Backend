@@ -1,0 +1,228 @@
+using DataAccess.Context;
+using DataAccess.Models.Meeting;
+using DataAccess.Models.Meeting.Enums;
+using DataAccess.Repositories.Interface;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace DataAccess.Repositories.Implementation
+{
+    public class InterviewRepository : IInterviewRepository
+    {
+        private readonly MeetingDbContext _context;
+
+        public InterviewRepository(MeetingDbContext context)
+        {
+            _context = context;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  InterviewSchedule
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<InterviewSchedule?> GetScheduleByIdAsync(int id)
+        {
+            return await _context.InterviewSchedules
+                .Include(s => s.Assignments)
+                .Include(s => s.MeetingRoom)
+                .FirstOrDefaultAsync(s => s.Id == id);
+        }
+
+        public async Task<IEnumerable<InterviewSchedule>> GetSchedulesAsync(
+            int? campaignId, string? status, DateTime? fromDate, DateTime? toDate)
+        {
+            var query = _context.InterviewSchedules
+                .Include(s => s.Assignments)
+                .Include(s => s.MeetingRoom)
+                .AsQueryable();
+
+            if (campaignId.HasValue)
+                query = query.Where(s => s.CampaignId == campaignId.Value);
+
+            if (!string.IsNullOrEmpty(status) && Enum.TryParse<InterviewStatus>(status, true, out var parsed))
+                query = query.Where(s => s.Status == parsed);
+
+            if (fromDate.HasValue)
+                query = query.Where(s => s.ScheduledAt >= fromDate.Value);
+
+            if (toDate.HasValue)
+                query = query.Where(s => s.ScheduledAt <= toDate.Value);
+
+            return await query
+                .OrderByDescending(s => s.ScheduledAt)
+                .ToListAsync();
+        }
+
+        public async Task<InterviewSchedule> CreateScheduleAsync(InterviewSchedule schedule)
+        {
+            await _context.InterviewSchedules.AddAsync(schedule);
+            await _context.SaveChangesAsync();
+            return schedule;
+        }
+
+        public async Task<bool> UpdateScheduleAsync(InterviewSchedule schedule)
+        {
+            try
+            {
+                _context.InterviewSchedules.Update(schedule);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public async Task<bool> DeleteScheduleAsync(int id)
+        {
+            var schedule = await _context.InterviewSchedules.FindAsync(id);
+            if (schedule == null) return false;
+
+            _context.InterviewSchedules.Remove(schedule);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  InterviewAssignment
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<InterviewAssignment?> GetAssignmentByIdAsync(int id)
+        {
+            return await _context.InterviewAssignments.FindAsync(id);
+        }
+
+        public async Task<IEnumerable<InterviewAssignment>> GetAssignmentsByScheduleIdAsync(int scheduleId)
+        {
+            return await _context.InterviewAssignments
+                .Where(a => a.InterviewScheduleId == scheduleId)
+                .OrderBy(a => a.AssignedAt)
+                .ToListAsync();
+        }
+
+        public async Task<InterviewAssignment> CreateAssignmentAsync(InterviewAssignment assignment)
+        {
+            await _context.InterviewAssignments.AddAsync(assignment);
+            await _context.SaveChangesAsync();
+            return assignment;
+        }
+
+        public async Task<bool> UpdateAssignmentAsync(InterviewAssignment assignment)
+        {
+            try
+            {
+                _context.InterviewAssignments.Update(assignment);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public async Task<bool> DeleteAssignmentAsync(int id)
+        {
+            var assignment = await _context.InterviewAssignments.FindAsync(id);
+            if (assignment == null) return false;
+
+            _context.InterviewAssignments.Remove(assignment);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  MeetingRoom
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<MeetingRoom?> GetRoomByScheduleIdAsync(int scheduleId)
+        {
+            return await _context.MeetingRooms
+                .Include(r => r.Participants)
+                .Include(r => r.Events)
+                .FirstOrDefaultAsync(r => r.InterviewScheduleId == scheduleId);
+        }
+
+        public async Task<MeetingRoom?> GetRoomByCodeAsync(string roomCode)
+        {
+            return await _context.MeetingRooms
+                .Include(r => r.Participants)
+                .Include(r => r.Events)
+                .FirstOrDefaultAsync(r => r.RoomCode == roomCode);
+        }
+
+        public async Task<MeetingRoom> CreateRoomAsync(MeetingRoom room)
+        {
+            await _context.MeetingRooms.AddAsync(room);
+            await _context.SaveChangesAsync();
+            return room;
+        }
+
+        public async Task<bool> UpdateRoomAsync(MeetingRoom room)
+        {
+            try
+            {
+                _context.MeetingRooms.Update(room);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch { return false; }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  RoomParticipant
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<RoomParticipant?> GetActiveParticipantAsync(int roomId, Guid userId)
+        {
+            return await _context.RoomParticipants
+                .Where(p => p.MeetingRoomId == roomId
+                         && p.UserId == userId
+                         && p.ConnectionState == ParticipantConnectionState.Joined)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<IEnumerable<RoomParticipant>> GetParticipantsByRoomIdAsync(int roomId)
+        {
+            return await _context.RoomParticipants
+                .Where(p => p.MeetingRoomId == roomId)
+                .OrderBy(p => p.JoinedAt)
+                .ToListAsync();
+        }
+
+        public async Task<RoomParticipant> CreateParticipantAsync(RoomParticipant participant)
+        {
+            await _context.RoomParticipants.AddAsync(participant);
+            await _context.SaveChangesAsync();
+            return participant;
+        }
+
+        public async Task<bool> UpdateParticipantAsync(RoomParticipant participant)
+        {
+            try
+            {
+                _context.RoomParticipants.Update(participant);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch { return false; }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  RoomEvent
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<IEnumerable<RoomEvent>> GetEventsByRoomIdAsync(int roomId)
+        {
+            return await _context.RoomEvents
+                .Where(e => e.MeetingRoomId == roomId)
+                .OrderBy(e => e.OccurredAt)
+                .ToListAsync();
+        }
+
+        public async Task<RoomEvent> CreateEventAsync(RoomEvent roomEvent)
+        {
+            await _context.RoomEvents.AddAsync(roomEvent);
+            await _context.SaveChangesAsync();
+            return roomEvent;
+        }
+    }
+}

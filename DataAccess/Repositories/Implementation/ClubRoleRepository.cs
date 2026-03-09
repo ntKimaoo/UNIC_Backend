@@ -109,5 +109,16 @@ namespace DataAccess.Repositories.Implementation
             .Any(crp => crp.ClubRoleId == groupId))
             .ToListAsync();
         }
+
+        public async Task<IEnumerable<ClubRole>> GetRolesByClubIdAsync(int clubId)
+        {
+            return await _context.ClubRoles
+                .Where(cr => cr.ClubId == clubId)
+                .Include(cr => cr.ClubMembers)
+                .Include(cr => cr.ClubRolePolicies!)
+                    .ThenInclude(crp => crp.Policy).ThenInclude(p => p.PolicyGroup)
+                .OrderBy(cr => cr.Level)
+                .ToListAsync();
+        }
     }
 }

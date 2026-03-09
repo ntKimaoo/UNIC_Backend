@@ -139,7 +139,7 @@ namespace Presentation.Controllers
         /// Lấy danh sách club mà user đã gia nhập kèm role đảm nhiệm
         /// GET /api/members/by-user?userId=...
         /// </summary>
-        [HttpGet("me/clubinfo")]
+        [HttpGet("api/me/clubinfo")]
         public async Task<IActionResult> GetClubsByUser([FromQuery] Guid userId)
         {
             if (userId == Guid.Empty)

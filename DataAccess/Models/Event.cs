@@ -30,6 +30,16 @@ namespace DataAccess.Models
         [MaxLength(20)]
         public string Status { get; set; } = "PLANNED";
 
+        // Registration fields
+        public DateTime? RegistrationStartDate { get; set; }
+        public DateTime? RegistrationEndDate { get; set; }
+        public int? MaxAttendees { get; set; }
+
+        // Check-in fields
+        [MaxLength(10)]
+        public string? CheckInCode { get; set; }
+        public DateTime? CodeExpiresAt { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         [ForeignKey("ClubId")]
