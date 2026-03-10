@@ -26,6 +26,7 @@ using UNIC.DataAccess.Repositories.Interface;
 using UNIC.Presentation.Hubs;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using UNIC.DataAccess.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -108,6 +109,8 @@ builder.Services.AddScoped<IClubRepository, ClubRepository>();
 builder.Services.AddScoped<IClubService, ClubService>();
 builder.Services.AddScoped<IClubRoleRepository, ClubRoleRepository>();
 builder.Services.AddScoped<IClubRoleService, ClubRoleService>();
+builder.Services.AddScoped<IClubMemberRepository, ClubMemberRepository>();
+builder.Services.AddScoped<IClubMemberService, ClubMemberService>();
 builder.Services.AddScoped<IPolicyRepository, PolicyRepository>();
 builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddHostedService<TokenCleanupService>();
@@ -131,6 +134,11 @@ builder.Services.AddValidatorsFromAssemblyContaining<BusinessLogic.Validators.Cr
 builder.Services.AddAutoMapper(typeof(BusinessLogic.Mappings.EventMappingProfile).Assembly);
 
 builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+}); ;
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 //signalR
@@ -200,7 +208,7 @@ using (var scope = app.Services.CreateScope())
 
     ApplicationDemoSeeder.SeedAsync(db).GetAwaiter().GetResult();
 
-    DataAccess.Context.DatabaseSeeder.SeedData(scope.ServiceProvider);
+    DatabaseSeeder.SeedData(scope.ServiceProvider);
 }
 
 // Configure the HTTP request pipeline.

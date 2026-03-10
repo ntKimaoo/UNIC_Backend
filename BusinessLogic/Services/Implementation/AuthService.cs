@@ -402,7 +402,8 @@ public class AuthService : IAuthService
             Avatar = user.Avatar,
             StudentId = user.StudentId,
             Major = user.Major,
-            Status = user.Status
+            Status = user.Status,
+            Role = user.UserRoles.FirstOrDefault(u=>u.UserId==user.UserId)?.RoleName
         };
     }
 }

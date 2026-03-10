@@ -12,10 +12,6 @@ namespace BusinessLogic.DTOs
         public string? Description { get; set; }
 
         public int Level { get; set; } = 0;
-
-        /// <summary>
-        /// Danh sách ID của các policy muốn gán cho role này
-        /// </summary>
         public List<int> policies { get; set; } = new();
     }
 
@@ -27,11 +23,6 @@ namespace BusinessLogic.DTOs
         public string? Description { get; set; }
 
         public int? Level { get; set; }
-
-        /// <summary>
-        /// Danh sách ID policy mới (ghi đè toàn bộ).
-        /// Nếu null thì không thay đổi policies.
-        /// </summary>
         public List<int>? PolicyIds { get; set; }
     }
 
@@ -50,5 +41,6 @@ namespace BusinessLogic.DTOs
         public int Id { get; set; }
         public string Title { get; set; }
         public string? Description { get; set; }
+        public int? PolicyGroupId { get; set; }
     }
 }

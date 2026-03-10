@@ -55,7 +55,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Applications", (string)null);
+                    b.ToTable("Applications");
                 });
 
             modelBuilder.Entity("DataAccess.Models.ApplicationAnswer", b =>
@@ -82,7 +82,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("QuestionId");
 
-                    b.ToTable("ApplicationAnswers", (string)null);
+                    b.ToTable("ApplicationAnswers");
                 });
 
             modelBuilder.Entity("DataAccess.Models.ApplicationForm", b =>
@@ -116,7 +116,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("CampaignId");
 
-                    b.ToTable("ApplicationForms", (string)null);
+                    b.ToTable("ApplicationForms");
                 });
 
             modelBuilder.Entity("DataAccess.Models.ApplicationQuestion", b =>
@@ -149,7 +149,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("FormId");
 
-                    b.ToTable("ApplicationQuestions", (string)null);
+                    b.ToTable("ApplicationQuestions");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Attendance", b =>
@@ -190,7 +190,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Attendances", (string)null);
+                    b.ToTable("Attendances");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Club", b =>
@@ -270,7 +270,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("ClubName");
 
-                    b.ToTable("Clubs", (string)null);
+                    b.ToTable("Clubs");
                 });
 
             modelBuilder.Entity("DataAccess.Models.ClubFund", b =>
@@ -355,7 +355,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("ClubPosts", (string)null);
+                    b.ToTable("ClubPosts");
                 });
 
             modelBuilder.Entity("DataAccess.Models.ClubRole", b =>
@@ -365,6 +365,9 @@ namespace UNIC.DataAccess.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubRoleId"));
+
+                    b.Property<int?>("ClubId")
+                        .HasColumnType("int");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -380,7 +383,9 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasKey("ClubRoleId");
 
-                    b.ToTable("ClubRoles", (string)null);
+                    b.HasIndex("ClubId");
+
+                    b.ToTable("ClubRoles");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Department", b =>
@@ -413,7 +418,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("ClubId");
 
-                    b.ToTable("Departments", (string)null);
+                    b.ToTable("Departments");
                 });
 
             modelBuilder.Entity("DataAccess.Models.DepartmentMember", b =>
@@ -449,7 +454,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserDepartmentRoles", (string)null);
+                    b.ToTable("UserDepartmentRoles");
                 });
 
             modelBuilder.Entity("DataAccess.Models.DepartmentRole", b =>
@@ -475,7 +480,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasKey("DeptRoleId");
 
-                    b.ToTable("DepartmentRoles", (string)null);
+                    b.ToTable("DepartmentRoles");
                 });
 
             modelBuilder.Entity("DataAccess.Models.EmailVerificationToken", b =>
@@ -517,7 +522,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex(new[] { "UserId" }, "IX_EmailVerificationTokens_UserId");
 
-                    b.ToTable("EmailVerificationTokens", (string)null);
+                    b.ToTable("EmailVerificationTokens");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Event", b =>
@@ -588,7 +593,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("StartDate");
 
-                    b.ToTable("Events", (string)null);
+                    b.ToTable("Events");
                 });
 
             modelBuilder.Entity("DataAccess.Models.EventBudget", b =>
@@ -623,7 +628,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("EventId");
 
-                    b.ToTable("EventBudgets", (string)null);
+                    b.ToTable("EventBudgets");
                 });
 
             modelBuilder.Entity("DataAccess.Models.EventImage", b =>
@@ -653,7 +658,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("EventId");
 
-                    b.ToTable("EventImages", (string)null);
+                    b.ToTable("EventImages");
                 });
 
             modelBuilder.Entity("DataAccess.Models.EventSchedule", b =>
@@ -686,7 +691,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("EventId");
 
-                    b.ToTable("EventSchedules", (string)null);
+                    b.ToTable("EventSchedules");
                 });
 
             modelBuilder.Entity("DataAccess.Models.FundCategory", b =>
@@ -708,7 +713,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasKey("CategoryId");
 
-                    b.ToTable("FundCategories", (string)null);
+                    b.ToTable("FundCategories");
                 });
 
             modelBuilder.Entity("DataAccess.Models.FundTransaction", b =>
@@ -757,7 +762,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("FundId");
 
-                    b.ToTable("FundTransactions", (string)null);
+                    b.ToTable("FundTransactions");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Notification", b =>
@@ -795,7 +800,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("UserId", "IsRead");
 
-                    b.ToTable("Notifications", (string)null);
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("DataAccess.Models.PasswordResetToken", b =>
@@ -837,7 +842,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex(new[] { "UserId" }, "IX_PasswordResetTokens_UserId");
 
-                    b.ToTable("PasswordResetTokens", (string)null);
+                    b.ToTable("PasswordResetTokens");
                 });
 
             modelBuilder.Entity("DataAccess.Models.RecruitmentCampaign", b =>
@@ -890,7 +895,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("ClubId");
 
-                    b.ToTable("RecruitmentCampaigns", (string)null);
+                    b.ToTable("RecruitmentCampaigns");
                 });
 
             modelBuilder.Entity("DataAccess.Models.RefreshToken", b =>
@@ -941,7 +946,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("RefreshTokens", (string)null);
+                    b.ToTable("RefreshTokens");
                 });
 
             modelBuilder.Entity("DataAccess.Models.ScheduleDetail", b =>
@@ -971,7 +976,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("ScheduleId");
 
-                    b.ToTable("ScheduleDetails", (string)null);
+                    b.ToTable("ScheduleDetails");
                 });
 
             modelBuilder.Entity("DataAccess.Models.User", b =>
@@ -1045,7 +1050,7 @@ namespace UNIC.DataAccess.Migrations
                     b.HasIndex(new[] { "Email" }, "UQ__Users__A9D105345C1FCA58")
                         .IsUnique();
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("DataAccess.Models.UserClubRole", b =>
@@ -1062,48 +1067,7 @@ namespace UNIC.DataAccess.Migrations
                     b.Property<int>("ClubId")
                         .HasColumnType("int");
 
-                    b.Property<int>("ClubRoleId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("JoinDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("ClubMemberId");
-
-                    b.HasIndex("AssignedBy");
-
-                    b.HasIndex("ClubId");
-
-                    b.HasIndex("ClubRoleId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("UserClubRoles", (string)null);
-                });
-
-            modelBuilder.Entity("DataAccess.Models.UserClubRole", b =>
-                {
-                    b.Property<int>("ClubMemberId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubMemberId"));
-
-                    b.Property<Guid?>("AssignedBy")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("ClubId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ClubRoleId")
+                    b.Property<int?>("ClubRoleId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("JoinDate")
@@ -1153,7 +1117,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserRoles", (string)null);
+                    b.ToTable("UserRoles");
                 });
 
             modelBuilder.Entity("UNIC.DataAccess.Models.ClubMemberPolicy", b =>
@@ -1168,7 +1132,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("PolicyId");
 
-                    b.ToTable("ClubMemberPolicies", (string)null);
+                    b.ToTable("ClubMemberPolicies");
                 });
 
             modelBuilder.Entity("UNIC.DataAccess.Models.ClubRolePolicy", b =>
@@ -1183,7 +1147,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("PolicyId");
 
-                    b.ToTable("ClubRolePolicies", (string)null);
+                    b.ToTable("ClubRolePolicies");
                 });
 
             modelBuilder.Entity("UNIC.DataAccess.Models.Policy", b =>
@@ -1212,7 +1176,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("PolicyGroupId");
 
-                    b.ToTable("Policies", (string)null);
+                    b.ToTable("Policies");
                 });
 
             modelBuilder.Entity("UNIC.DataAccess.Models.PolicyGroup", b =>
@@ -1233,7 +1197,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasKey("PolicyGroupId");
 
-                    b.ToTable("PolicyGroups", (string)null);
+                    b.ToTable("PolicyGroups");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Application", b =>
@@ -1342,6 +1306,15 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("Club");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.ClubRole", b =>
+                {
+                    b.HasOne("DataAccess.Models.Club", "Club")
+                        .WithMany("ClubRoles")
+                        .HasForeignKey("ClubId");
+
+                    b.Navigation("Club");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Department", b =>
@@ -1534,8 +1507,7 @@ namespace UNIC.DataAccess.Migrations
                     b.HasOne("DataAccess.Models.ClubRole", "ClubRole")
                         .WithMany("ClubMembers")
                         .HasForeignKey("ClubRoleId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("DataAccess.Models.User", "User")
                         .WithMany("ClubMembers")
@@ -1634,6 +1606,8 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("ClubMembers");
 
                     b.Navigation("ClubPosts");
+
+                    b.Navigation("ClubRoles");
 
                     b.Navigation("Departments");
 

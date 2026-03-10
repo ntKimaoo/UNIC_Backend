@@ -47,6 +47,7 @@ namespace DataAccess.Models
         public virtual ICollection<Event> Events { get; set; }
         public virtual ICollection<ClubFund> ClubFunds { get; set; }
         public virtual ICollection<RecruitmentCampaign> RecruitmentCampaigns { get; set; }
+        public virtual ICollection<ClubRole> ClubRoles { get; set; }
     }
 
 

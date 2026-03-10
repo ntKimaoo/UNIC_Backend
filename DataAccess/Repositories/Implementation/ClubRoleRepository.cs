@@ -22,7 +22,7 @@ namespace DataAccess.Repositories.Implementation
             return await _context.ClubRoles
                 .Include(cr => cr.ClubMembers)
                 .Include(cr => cr.ClubRolePolicies!)
-                    .ThenInclude(crp => crp.Policy)
+                    .ThenInclude(crp => crp.Policy).ThenInclude(p => p.PolicyGroup)
                 .FirstOrDefaultAsync(cr => cr.ClubRoleId == clubRoleId);
         }
 
@@ -31,7 +31,7 @@ namespace DataAccess.Repositories.Implementation
             return await _context.ClubRoles
                 .Include(cr => cr.ClubMembers)
                 .Include(cr => cr.ClubRolePolicies!)
-                    .ThenInclude(crp => crp.Policy)
+                    .ThenInclude(crp => crp.Policy).ThenInclude(p => p.PolicyGroup)
                 .OrderBy(cr => cr.Level)
                 .ToListAsync();
         }
@@ -91,14 +91,34 @@ namespace DataAccess.Repositories.Implementation
             _context.ClubRolePolicies.RemoveRange(existing);
 
             // Thêm policies mới
-            var newEntries = policyIds.Distinct().Select(pid => new ClubRolePolicy
+            foreach (var id in policyIds)
             {
-                ClubRoleId = clubRoleId,
-                PolicyId = pid
-            });
-
-            await _context.ClubRolePolicies.AddRangeAsync(newEntries);
+                await _context.ClubRolePolicies.AddAsync(
+               new ClubRolePolicy
+                {
+                    ClubRoleId = clubRoleId,
+                    PolicyId = id
+                });
+            }
             await _context.SaveChangesAsync();
+        }
+        public async Task<IEnumerable<Policy>> GetPoliciesByRoleAsync(int groupId)
+        {
+            return await _context.Policies
+            .Where(p => p.ClubRolePolicies
+            .Any(crp => crp.ClubRoleId == groupId))
+            .ToListAsync();
+        }
+
+        public async Task<IEnumerable<ClubRole>> GetRolesByClubIdAsync(int clubId)
+        {
+            return await _context.ClubRoles
+                .Where(cr => cr.ClubId == clubId)
+                .Include(cr => cr.ClubMembers)
+                .Include(cr => cr.ClubRolePolicies!)
+                    .ThenInclude(crp => crp.Policy).ThenInclude(p => p.PolicyGroup)
+                .OrderBy(cr => cr.Level)
+                .ToListAsync();
         }
     }
 }

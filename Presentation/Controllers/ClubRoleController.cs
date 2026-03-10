@@ -30,8 +30,17 @@ namespace Presentation.Controllers
         /// <summary>
         /// Get club role by ID
         /// </summary>
-        [HttpGet("{id}")]
+        [HttpGet("{id}/policies")]
         public async Task<IActionResult> GetById(int id)
+        {
+            var role = await _service.GetPoliciesByRoleAsync(id);
+            if (role == null)
+                return NotFound(new { success = false, message = "This role haven't set up any poliecies yet." });
+
+            return Ok(new { success = true, data = role });
+        }
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetPoliciesById(int id)
         {
             var role = await _service.GetByIdAsync(id);
             if (role == null)
@@ -95,7 +104,26 @@ namespace Presentation.Controllers
                 return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
             }
         }
+        [HttpPut("{id}/policies")]
+        public async Task<IActionResult> UpdatePolicies(int id, List<int> policyIds)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
 
+            try
+            {
+                await _service.UpdatePoliciesAsync(id, policyIds);
+                return Ok(new { success = true, message = "Club role updated successfully" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+            }
+        }
         /// <summary>
         /// Delete a club role
         /// </summary>
@@ -107,6 +135,16 @@ namespace Presentation.Controllers
                 return NotFound(new { success = false, message = "Club role not found" });
 
             return Ok(new { success = true, message = "Club role deleted successfully" });
+        }
+
+        /// <summary>
+        /// Get all roles of a club
+        /// </summary>
+        [HttpGet("club/{id}")]
+        public async Task<IActionResult> GetByClubId(int id)
+        {
+            var roles = await _service.GetRolesByClubIdAsync(id);
+            return Ok(new { success = true, data = roles });
         }
     }
 }

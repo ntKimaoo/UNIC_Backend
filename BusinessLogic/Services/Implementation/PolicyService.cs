@@ -26,9 +26,13 @@ namespace BusinessLogic.Services.Implementation
             return await _policyRepository.HasUserPolicyAsync(userId, policyTitle);
         }
 
-        public async Task<IEnumerable<Policy>> GetAllPoliciesAsync()
+        public async Task<IEnumerable<PolicyGroup>> GetAllPolicyGroupAsync()
         {
-            return await _policyRepository.GetAllPoliciesAsync();
+            return await _policyRepository.GetAllPolicyGroupAsync();
+        }
+        public async Task<IEnumerable<Policy>> GetAllPoliciesByGroupAsync(int groupId)
+        {
+            return await _policyRepository.GetAllPoliciesByGroupAsync(groupId);
         }
     }
 }

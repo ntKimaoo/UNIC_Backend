@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using UNIC.DataAccess.Models;
 
 namespace BusinessLogic.Services.Implementation
 {
@@ -82,7 +83,10 @@ namespace BusinessLogic.Services.Implementation
             var result = await _repository.GetByIdAsync(clubRoleId);
             return MapToResponseDto(result!);
         }
-
+        public async Task UpdatePoliciesAsync(int clubRoleId, List<int> policyIds)
+        {
+            await _repository.SetPoliciesAsync(clubRoleId, policyIds);
+        }
         public async Task<bool> DeleteAsync(int clubRoleId)
         {
             return await _repository.DeleteAsync(clubRoleId);
@@ -102,10 +106,21 @@ namespace BusinessLogic.Services.Implementation
                     {
                         Id = crp.Policy.Id,
                         Title = crp.Policy.Title,
-                        Description = crp.Policy.Description
+                        Description = crp.Policy.Description,
+                        PolicyGroupId=crp.Policy.PolicyGroupId,
                     })
                     .ToList() ?? new()
             };
+        }
+        public async Task<IEnumerable<Policy>> GetPoliciesByRoleAsync(int clubRoleId)
+        {
+                        return await _repository.GetPoliciesByRoleAsync(clubRoleId);
+        }
+
+        public async Task<IEnumerable<ClubRoleResponseDto>> GetRolesByClubIdAsync(int clubId)
+        {
+            var roles = await _repository.GetRolesByClubIdAsync(clubId);
+            return roles.Select(MapToResponseDto);
         }
     }
 }

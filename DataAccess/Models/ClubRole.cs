@@ -24,5 +24,7 @@ namespace DataAccess.Models
 
         public virtual ICollection<UserClubRole> ClubMembers { get; set; }
         public virtual IList<ClubRolePolicy>? ClubRolePolicies { get; set; }
+        public int? ClubId { get; set; }
+        public Club? Club { get; set; }
     }
 }
