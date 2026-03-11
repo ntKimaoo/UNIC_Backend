@@ -14,15 +14,15 @@ namespace BusinessLogic.Services.Interface
         Task<IEnumerable<Policy>> GetAllPoliciesByGroupAsync(int groupId);
 
         /// <summary>Lấy policies được gán trực tiếp (không qua role)</summary>
-        Task<IEnumerable<PolicyResponseDto>> GetMemberDirectPoliciesAsync(Guid userId);
+        Task<IEnumerable<PolicyResponseDto>> GetUserDirectPoliciesAsync(Guid userId);
 
         /// <summary>Gán thêm policies cho member (bỏ qua nếu đã có)</summary>
-        Task AssignPoliciesToMemberAsync(Guid userId, IEnumerable<int> policyIds);
+        Task AssignPoliciesToUserAsync(Guid userId, IEnumerable<int> policyIds);
 
         /// <summary>Thu hồi một policy khỏi member</summary>
-        Task<bool> RevokePolicyFromMemberAsync(Guid userId, int policyId);
+        Task<bool> RevokePolicyFromUserAsync(Guid userId, int policyId);
 
         /// <summary>Ghi đè toàn bộ policies trực tiếp của member</summary>
-        Task SetMemberPoliciesAsync(Guid userId, IEnumerable<int> policyIds);
+        Task SetUserPoliciesAsync(Guid userId, IEnumerable<int> policyIds);
     }
 }

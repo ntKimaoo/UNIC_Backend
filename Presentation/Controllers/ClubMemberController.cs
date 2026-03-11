@@ -162,7 +162,7 @@ namespace Presentation.Controllers
             if (member == null || member.ClubId != clubId)
                 return NotFound(new { success = false, message = "Member not found" });
 
-            var policies = await _policyService.GetMemberDirectPoliciesAsync(member.UserId);
+            var policies = await _policyService.GetUserDirectPoliciesAsync(member.UserId);
             return Ok(new { success = true, data = policies });
         }
 
@@ -181,9 +181,9 @@ namespace Presentation.Controllers
             if (member == null || member.ClubId != clubId)
                 return NotFound(new { success = false, message = "Member not found" });
 
-            await _policyService.AssignPoliciesToMemberAsync(member.UserId, dto.PolicyIds);
+            await _policyService.AssignPoliciesToUserAsync(member.UserId, dto.PolicyIds);
 
-            var updated = await _policyService.GetMemberDirectPoliciesAsync(member.UserId);
+            var updated = await _policyService.GetUserDirectPoliciesAsync(member.UserId);
             return Ok(new { success = true, message = "Policies assigned successfully", data = updated });
         }
 
@@ -202,9 +202,9 @@ namespace Presentation.Controllers
             if (member == null || member.ClubId != clubId)
                 return NotFound(new { success = false, message = "Member not found" });
 
-            await _policyService.SetMemberPoliciesAsync(member.UserId, dto.PolicyIds);
+            await _policyService.SetUserPoliciesAsync(member.UserId, dto.PolicyIds);
 
-            var updated = await _policyService.GetMemberDirectPoliciesAsync(member.UserId);
+            var updated = await _policyService.GetUserDirectPoliciesAsync(member.UserId);
             return Ok(new { success = true, message = "Policies updated successfully", data = updated });
         }
 
@@ -219,7 +219,7 @@ namespace Presentation.Controllers
             if (member == null || member.ClubId != clubId)
                 return NotFound(new { success = false, message = "Member not found" });
 
-            var revoked = await _policyService.RevokePolicyFromMemberAsync(member.UserId, policyId);
+            var revoked = await _policyService.RevokePolicyFromUserAsync(member.UserId, policyId);
             if (!revoked)
                 return NotFound(new { success = false, message = "Policy not assigned to this member" });
 

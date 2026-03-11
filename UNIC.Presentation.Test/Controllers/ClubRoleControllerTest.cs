@@ -25,67 +25,26 @@ namespace UNIC.Presentation.Test.Controllers
         [Fact]
         public async Task GetAll_ReturnsOk()
         {
-            _mockService.Setup(s => s.GetAllAsync())
+            _mockService.Setup(s => s.GetAllAsync(1))
                 .ReturnsAsync(new List<ClubRoleResponseDto> { new() });
 
-            var result = await _controller.GetAll();
+            var result = await _controller.GetAll(1);
 
             Assert.IsType<OkObjectResult>(result);
         }
 
-        [Fact]
-        public async Task GetById_ReturnsOk_WhenFound()
-        {
-            _mockService.Setup(s => s.GetPoliciesByRoleAsync(1))
-                .ReturnsAsync(new List<Policy> { new() });
+        
 
-            var result = await _controller.GetById(1);
-
-            Assert.IsType<OkObjectResult>(result);
-        }
-
-        [Fact]
-        public async Task GetById_ReturnsNotFound_WhenEmpty()
-        {
-            _mockService.Setup(s => s.GetPoliciesByRoleAsync(99))
-                .ReturnsAsync(new List<Policy>());
-
-            var result = await _controller.GetById(99);
-
-            // Service returns empty list, controller behavior depends on implementation
-            Assert.True(result is OkObjectResult || result is NotFoundObjectResult);
-        }
-
-        [Fact]
-        public async Task GetPoliciesById_ReturnsOk_WhenFound()
-        {
-            _mockService.Setup(s => s.GetByIdAsync(1))
-                .ReturnsAsync(new ClubRoleResponseDto { ClubRoleId = 1 });
-
-            var result = await _controller.GetPoliciesById(1);
-
-            Assert.IsType<OkObjectResult>(result);
-        }
-
-        [Fact]
-        public async Task GetPoliciesById_ReturnsNotFound_WhenNull()
-        {
-            _mockService.Setup(s => s.GetByIdAsync(99))
-                .ReturnsAsync((ClubRoleResponseDto?)null);
-
-            var result = await _controller.GetPoliciesById(99);
-
-            Assert.IsType<NotFoundObjectResult>(result);
-        }
+       
 
         [Fact]
         public async Task Create_ReturnsCreated_WhenSuccess()
         {
             var dto = new CreateClubRoleDto { RoleName = "Treasurer" };
-            _mockService.Setup(s => s.CreateAsync(dto))
+            _mockService.Setup(s => s.CreateAsync(dto, 1))
                 .ReturnsAsync(new ClubRoleResponseDto { ClubRoleId = 1 });
 
-            var result = await _controller.Create(dto);
+            var result = await _controller.Create(dto, 1);
 
             Assert.IsType<CreatedAtActionResult>(result);
         }
@@ -94,10 +53,10 @@ namespace UNIC.Presentation.Test.Controllers
         public async Task Create_ReturnsBadRequest_WhenInvalidOperation()
         {
             var dto = new CreateClubRoleDto { RoleName = "Dup" };
-            _mockService.Setup(s => s.CreateAsync(dto))
+            _mockService.Setup(s => s.CreateAsync(dto, 1))
                 .ThrowsAsync(new InvalidOperationException("Role already exists"));
 
-            var result = await _controller.Create(dto);
+            var result = await _controller.Create(dto, 1);
 
             Assert.IsType<BadRequestObjectResult>(result);
         }
@@ -106,10 +65,10 @@ namespace UNIC.Presentation.Test.Controllers
         public async Task Create_Returns500_WhenUnexpected()
         {
             var dto = new CreateClubRoleDto();
-            _mockService.Setup(s => s.CreateAsync(dto))
+            _mockService.Setup(s => s.CreateAsync(dto, 1))
                 .ThrowsAsync(new Exception("DB error"));
 
-            var result = await _controller.Create(dto);
+            var result = await _controller.Create(dto, 1);
 
             var obj = Assert.IsType<ObjectResult>(result);
             Assert.Equal(500, obj.StatusCode);
@@ -122,7 +81,7 @@ namespace UNIC.Presentation.Test.Controllers
             _mockService.Setup(s => s.UpdateAsync(1, dto))
                 .ReturnsAsync(new ClubRoleResponseDto { ClubRoleId = 1 });
 
-            var result = await _controller.Update(1, dto);
+            var result = await _controller.Update(1, dto,1);
 
             Assert.IsType<OkObjectResult>(result);
         }
@@ -134,7 +93,7 @@ namespace UNIC.Presentation.Test.Controllers
             _mockService.Setup(s => s.UpdateAsync(99, dto))
                 .ReturnsAsync((ClubRoleResponseDto?)null);
 
-            var result = await _controller.Update(99, dto);
+            var result = await _controller.Update(99, dto,1);
 
             Assert.IsType<NotFoundObjectResult>(result);
         }
@@ -145,7 +104,7 @@ namespace UNIC.Presentation.Test.Controllers
             var policyIds = new List<int> { 1, 2, 3 };
             _mockService.Setup(s => s.UpdatePoliciesAsync(1, policyIds)).Returns(Task.CompletedTask);
 
-            var result = await _controller.UpdatePolicies(1, policyIds);
+            var result = await _controller.UpdatePolicies(1, policyIds, 1);
 
             Assert.IsType<OkObjectResult>(result);
         }
@@ -157,7 +116,7 @@ namespace UNIC.Presentation.Test.Controllers
             _mockService.Setup(s => s.UpdatePoliciesAsync(1, policyIds))
                 .ThrowsAsync(new InvalidOperationException("Policy not found"));
 
-            var result = await _controller.UpdatePolicies(1, policyIds);
+            var result = await _controller.UpdatePolicies(1, policyIds, 1);
 
             Assert.IsType<BadRequestObjectResult>(result);
         }

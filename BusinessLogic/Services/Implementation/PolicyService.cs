@@ -30,9 +30,9 @@ namespace BusinessLogic.Services.Implementation
         public async Task<IEnumerable<Policy>> GetAllPoliciesByGroupAsync(int groupId)
             => await _policyRepository.GetAllPoliciesByGroupAsync(groupId);
 
-        public async Task<IEnumerable<PolicyResponseDto>> GetMemberDirectPoliciesAsync(Guid userId)
+        public async Task<IEnumerable<PolicyResponseDto>> GetUserDirectPoliciesAsync(Guid userId)
         {
-            var policies = await _policyRepository.GetMemberDirectPoliciesAsync(userId);
+            var policies = await _policyRepository.GetUserDirectPoliciesAsync(userId);
             return policies.Select(p => new PolicyResponseDto
             {
                 Id = p.Id,
@@ -41,13 +41,13 @@ namespace BusinessLogic.Services.Implementation
             });
         }
 
-        public async Task AssignPoliciesToMemberAsync(Guid userId, IEnumerable<int> policyIds)
-            => await _policyRepository.AssignPoliciesToMemberAsync(userId, policyIds);
+        public async Task AssignPoliciesToUserAsync(Guid userId, IEnumerable<int> policyIds)
+            => await _policyRepository.AssignPoliciesToUserAsync(userId, policyIds);
 
-        public async Task<bool> RevokePolicyFromMemberAsync(Guid userId, int policyId)
-            => await _policyRepository.RevokePolicyFromMemberAsync(userId, policyId);
+        public async Task<bool> RevokePolicyFromUserAsync(Guid userId, int policyId)
+            => await _policyRepository.RevokePolicyFromUserAsync(userId, policyId);
 
-        public async Task SetMemberPoliciesAsync(Guid userId, IEnumerable<int> policyIds)
-            => await _policyRepository.SetMemberPoliciesAsync(userId, policyIds);
+        public async Task SetUserPoliciesAsync(Guid userId, IEnumerable<int> policyIds)
+            => await _policyRepository.SetUserPoliciesAsync(userId, policyIds);
     }
 }

@@ -33,7 +33,7 @@ namespace UNIC.Repository.Test.Repository.Test
             var repository = new ClubRoleRepository(context);
 
             // Act
-            var result = await repository.GetByIdAsync(1);
+            var result = await repository.GetByIdAsync(1, 1);
 
             // Assert
             Assert.NotNull(result);
@@ -51,8 +51,8 @@ namespace UNIC.Repository.Test.Repository.Test
             var repository = new ClubRoleRepository(context);
 
             // Act
-            var exists = await repository.RoleNameExistsAsync("Member");
-            var notExists = await repository.RoleNameExistsAsync("NonExistent");
+            var exists = await repository.RoleNameExistsAsync("Member", 1);
+            var notExists = await repository.RoleNameExistsAsync("NonExistent", 1);
 
             // Assert
             Assert.True(exists);
