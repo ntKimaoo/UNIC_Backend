@@ -20,7 +20,7 @@ namespace UNIC.Presentation.Test.Controllers
         public ClubMemberControllerTest()
         {
             _mockService = new Mock<IClubMemberService>();
-            _controller = new ClubMemberController(_mockService.Object);
+            //_controller = new ClubMemberController(_mockService.Object);
             _controller.ControllerContext = new ControllerContext
             {
                 HttpContext = new DefaultHttpContext()

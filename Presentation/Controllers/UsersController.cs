@@ -2,6 +2,7 @@ using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
 
 namespace Presentation.Controllers
 {
@@ -122,6 +123,22 @@ namespace Presentation.Controllers
                 return NotFound(new { success = false, message = "User not found" });
             }
             return Ok(new { success = true, data = new { id } });
+        }
+        // Get: api/users/all-clubs
+        [HttpGet("{id}/all-clubs")]
+        public async Task<IActionResult> GetAllClub(Guid id)
+        {
+            var user = await _userService.GetUserByIdAsync(id);
+            if (user == null)
+            {
+                return NotFound(new { success = false, message = "User not found" });
+            }
+            var result = await _userService.GetAllClubsById(id);
+            if (result == null || !result.Any())
+            {
+                return NotFound(new { success = false, message = "You have not join any club!" });
+            }
+            return Ok(new { success = true, data = result });
         }
     }
 }

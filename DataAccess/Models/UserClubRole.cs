@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using UNIC.DataAccess.Models;
 
 namespace DataAccess.Models
 {
@@ -34,5 +35,6 @@ namespace DataAccess.Models
 
         [ForeignKey("AssignedBy")]
         public virtual User AssignedByUser { get; set; }
+        public virtual IList<ClubMemberPolicy>? ClubMemberPolicies { get; set; }
     }
 }

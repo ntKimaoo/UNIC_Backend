@@ -19,28 +19,29 @@ namespace BusinessLogic.Services.Implementation
             _repository = repository;
         }
 
-        public async Task<ClubRoleResponseDto?> GetByIdAsync(int clubRoleId)
+        public async Task<ClubRoleResponseDto?> GetByIdAsync(int clubRoleId, int clubId)
         {
-            var clubRole = await _repository.GetByIdAsync(clubRoleId);
+            var clubRole = await _repository.GetByIdAsync(clubRoleId,clubId);
             return clubRole == null ? null : MapToResponseDto(clubRole);
         }
 
-        public async Task<IEnumerable<ClubRoleResponseDto>> GetAllAsync()
+        public async Task<IEnumerable<ClubRoleResponseDto>> GetAllAsync(int clubId)
         {
-            var roles = await _repository.GetAllAsync();
+            var roles = await _repository.GetAllAsync(clubId);
             return roles.Select(MapToResponseDto);
         }
 
-        public async Task<ClubRoleResponseDto> CreateAsync(CreateClubRoleDto dto)
+        public async Task<ClubRoleResponseDto> CreateAsync(CreateClubRoleDto dto, int clubId)
         {
-            if (await _repository.RoleNameExistsAsync(dto.RoleName))
+            if (await _repository.RoleNameExistsAsync(dto.RoleName,clubId))
                 throw new InvalidOperationException($"Role name '{dto.RoleName}' already exists.");
 
             var clubRole = new ClubRole
             {
                 RoleName = dto.RoleName,
                 Description = dto.Description,
-                Level = dto.Level
+                Level = dto.Level,
+                ClubId=clubId
             };
 
             var created = await _repository.CreateAsync(clubRole);
@@ -50,19 +51,19 @@ namespace BusinessLogic.Services.Implementation
                 await _repository.SetPoliciesAsync(created.ClubRoleId, dto.policies);
 
             // Load lại để có policies trong response
-            var result = await _repository.GetByIdAsync(created.ClubRoleId);
+            var result = await _repository.GetByIdAsync(created.ClubRoleId,created.ClubId);
             return MapToResponseDto(result!);
         }
 
-        public async Task<ClubRoleResponseDto?> UpdateAsync(int clubRoleId, UpdateClubRoleDto dto)
+        public async Task<ClubRoleResponseDto?> UpdateAsync(int clubRoleId, UpdateClubRoleDto dto,int clubId)
         {
-            var clubRole = await _repository.GetByIdAsync(clubRoleId);
+            var clubRole = await _repository.GetByIdAsync(clubRoleId,clubId);
             if (clubRole == null)
                 return null;
 
             if (!string.IsNullOrEmpty(dto.RoleName) && dto.RoleName != clubRole.RoleName)
             {
-                if (await _repository.RoleNameExistsAsync(dto.RoleName))
+                if (await _repository.RoleNameExistsAsync(dto.RoleName,clubId))
                     throw new InvalidOperationException($"Role name '{dto.RoleName}' already exists.");
                 clubRole.RoleName = dto.RoleName;
             }
@@ -80,7 +81,7 @@ namespace BusinessLogic.Services.Implementation
                 await _repository.SetPoliciesAsync(clubRoleId, dto.PolicyIds);
 
             // Load lại để có policies mới trong response
-            var result = await _repository.GetByIdAsync(clubRoleId);
+            var result = await _repository.GetByIdAsync(clubRoleId, clubId);
             return MapToResponseDto(result!);
         }
         public async Task UpdatePoliciesAsync(int clubRoleId, List<int> policyIds)
@@ -109,18 +110,10 @@ namespace BusinessLogic.Services.Implementation
                         Description = crp.Policy.Description,
                         PolicyGroupId=crp.Policy.PolicyGroupId,
                     })
-                    .ToList() ?? new()
+                    .ToList() ?? new(),
+                clubId = clubRole.ClubId ?? 0
             };
         }
-        public async Task<IEnumerable<Policy>> GetPoliciesByRoleAsync(int clubRoleId)
-        {
-                        return await _repository.GetPoliciesByRoleAsync(clubRoleId);
-        }
-
-        public async Task<IEnumerable<ClubRoleResponseDto>> GetRolesByClubIdAsync(int clubId)
-        {
-            var roles = await _repository.GetRolesByClubIdAsync(clubId);
-            return roles.Select(MapToResponseDto);
-        }
+       
     }
 }

@@ -50,6 +50,8 @@ public partial class UnicContext : DbContext
     public DbSet<Policy> Policies { get; set; }
     public DbSet<ClubRolePolicy> ClubRolePolicies { get; set; }
     public DbSet<PolicyGroup> PolicyGroups { get; set; }
+    public DbSet<UserPolicy> UserPolicies { get; set; }
+    public DbSet<UserRolePolicy> UserRolePolicies { get; set; }
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
 
@@ -366,13 +368,17 @@ public partial class UnicContext : DbContext
             .HasIndex(a => a.Status);
         OnModelCreatingPartial(modelBuilder);
         modelBuilder.Entity<ClubMemberPolicy>()
-            .HasKey(cmp => new { cmp.UserId, cmp.PolicyId });
+            .HasKey(cmp => new { cmp.ClubMemberId, cmp.PolicyId });
         modelBuilder.Entity<ClubRolePolicy>()
             .HasKey(crp => new { crp.ClubRoleId, crp.PolicyId });
+        modelBuilder.Entity<UserPolicy>()
+            .HasKey(cmp => new { cmp.UserId, cmp.PolicyId });
+        modelBuilder.Entity<UserRolePolicy>()
+            .HasKey(cmp => new { cmp.RoleId, cmp.PolicyId });
         modelBuilder.Entity<ClubMemberPolicy>()
-            .HasOne<User>(u => u.User)
+            .HasOne<UserClubRole>(u => u.ClubMember)
             .WithMany(p => p.ClubMemberPolicies)
-            .HasForeignKey(crp => crp.UserId);
+            .HasForeignKey(crp => crp.ClubMemberId);
         modelBuilder.Entity<ClubMemberPolicy>()
             .HasOne<Policy>(p => p.Policy)
             .WithMany(cmp => cmp.ClubMemberPolicies)
@@ -385,6 +391,23 @@ public partial class UnicContext : DbContext
             .HasOne<Policy>(p => p.Policy)
             .WithMany(crp => crp.ClubRolePolicies)
             .HasForeignKey(crp => crp.PolicyId);
+        modelBuilder.Entity<UserPolicy>()
+            .HasOne<User>(cr => cr.User)
+            .WithMany(cmp => cmp.UserPolicies)
+            .HasForeignKey(crp => crp.UserId);
+        modelBuilder.Entity<UserPolicy>()
+            .HasOne<Policy>(p => p.Policy)
+            .WithMany(crp => crp.UserPolicies)
+            .HasForeignKey(crp => crp.PolicyId);
+        modelBuilder.Entity<UserRolePolicy>()
+            .HasOne<UserRole>(cr => cr.Role)
+            .WithMany(cmp => cmp.UserRolePolicies)
+            .HasForeignKey(crp => crp.RoleId);
+        modelBuilder.Entity<UserRolePolicy>()
+            .HasOne<Policy>(p => p.Policy)
+            .WithMany(crp => crp.UserRolePolicies)
+            .HasForeignKey(crp => crp.PolicyId);
+
         modelBuilder.Entity<Policy>()
             .HasOne<PolicyGroup>(pg => pg.PolicyGroup)
             .WithMany(p => p.Policies)

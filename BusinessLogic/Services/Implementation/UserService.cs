@@ -91,7 +91,7 @@ namespace BusinessLogic.Services.Implementation
                 DateOfBirth = request.DateOfBirth,
                 Gender = request.Gender,
                 Address = request.Address,
-                Status = "Active", 
+                Status = "Active",
                 JoinDate = DateOnly.FromDateTime(DateTime.UtcNow),
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -136,6 +136,10 @@ namespace BusinessLogic.Services.Implementation
         public async Task<bool> DeleteUserAsync(Guid id)
         {
             return await _userRepository.DeleteAsync(id);
+        }
+        public async Task<IEnumerable<Club>> GetAllClubsById(Guid UserId)
+        {
+            return await _userRepository.GetAllClubByUser(UserId);
         }
     }
 }

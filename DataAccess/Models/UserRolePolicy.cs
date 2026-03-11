@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 
 namespace UNIC.DataAccess.Models
 {
-    public class ClubMemberPolicy
+    public class UserRolePolicy
     {
-        public int ClubMemberId { get; set; }
-        public UserClubRole ClubMember { get; set; }
+        public int RoleId { get; set; }
+        public UserRole Role { get; set; }
         public int PolicyId { get; set; }
         public Policy Policy { get; set; }
     }
