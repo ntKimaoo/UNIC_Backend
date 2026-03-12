@@ -26,6 +26,13 @@ namespace DataAccess.Repositories.Implementation
             return await _context.ClubFunds.FindAsync(id);
         }
 
+        public async Task<ClubFund> AddFundAsync(ClubFund fund)
+        {
+            await _context.ClubFunds.AddAsync(fund);
+            await _context.SaveChangesAsync();
+            return fund;
+        }
+
         public async Task AddTransactionAsync(FundTransaction transaction)
         {
             await _context.FundTransactions.AddAsync(transaction);

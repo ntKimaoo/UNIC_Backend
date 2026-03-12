@@ -9,16 +9,47 @@ namespace BusinessLogic.Services.Implementation
     public class ClubFundService : IClubFundService
     {
         private readonly IFundRepository _fundRepository;
+        private readonly IClubMemberRepository _clubMemberRepository;
 
         private const string STATUS_PENDING = "PENDING";
         private const string STATUS_APPROVED = "APPROVED";
         private const string STATUS_REJECTED = "REJECTED";
         private const string TYPE_INCOME = "INCOME";
         private const string TYPE_EXPENSE = "EXPENSE";
+        private const string MEMBER_STATUS_ACTIVE = "ACTIVE";
 
-        public ClubFundService(IFundRepository fundRepository)
+        public ClubFundService(IFundRepository fundRepository, IClubMemberRepository clubMemberRepository)
         {
             _fundRepository = fundRepository;
+            _clubMemberRepository = clubMemberRepository;
+        }
+
+        public async Task<FundResponseDto> CreateFundAsync(Guid userId, CreateFundDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.FundName))
+                throw new ArgumentException("Tên quỹ không được để trống.", nameof(dto.FundName));
+            if (dto.InitialAmount < 0)
+                throw new ArgumentException("Số tiền ban đầu không được âm.", nameof(dto.InitialAmount));
+
+            var member = await _clubMemberRepository.GetMemberAsync(userId, dto.ClubId);
+            if (member == null)
+                throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
+            if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được tạo quỹ.");
+            if (!IsManagerOrViceManager(member.ClubRole?.RoleName))
+                throw new UnauthorizedAccessException("Chỉ Club Manager hoặc Vice Manager mới được tạo quỹ.");
+
+            var fund = new ClubFund
+            {
+                ClubId = dto.ClubId,
+                FundName = dto.FundName.Trim(),
+                TotalAmount = dto.InitialAmount,
+                CurrentBalance = dto.InitialAmount,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var created = await _fundRepository.AddFundAsync(fund);
+            return MapToFundDto(created);
         }
 
         public async Task<FundTransaction> CreateRequestAsync(Guid userId, CreateFundRequestDto request)
@@ -34,13 +65,19 @@ namespace BusinessLogic.Services.Implementation
             if (fund == null)
                 throw new InvalidOperationException("Quỹ không tồn tại.");
 
+            var member = await _clubMemberRepository.GetMemberAsync(userId, fund.ClubId);
+            if (member == null)
+                throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
+            if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được gửi yêu cầu.");
+
             var transaction = new FundTransaction
             {
                 FundId = request.FundId,
                 CategoryId = request.CategoryId,
                 TransactionType = transactionType,
                 Amount = request.Amount,
-                Description = request.Description?.Trim(),
+                Description = request.Description?.Trim() ?? string.Empty,
                 TransactionDate = DateTime.UtcNow,
                 Status = STATUS_PENDING,
                 CreatedBy = userId
@@ -65,6 +102,14 @@ namespace BusinessLogic.Services.Implementation
             var fund = transaction.ClubFund;
             if (fund == null)
                 throw new InvalidOperationException("Không tìm thấy quỹ liên kết với giao dịch.");
+
+            var approverMember = await _clubMemberRepository.GetMemberAsync(managerId, fund.ClubId);
+            if (approverMember == null)
+                throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
+            if (!string.Equals(approverMember.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được duyệt yêu cầu.");
+            if (!IsManagerOrViceManager(approverMember.ClubRole?.RoleName))
+                throw new UnauthorizedAccessException("Chỉ Club Manager hoặc Vice Manager mới được duyệt/từ chối yêu cầu quỹ.");
 
             transaction.ApprovedBy = managerId;
             transaction.TransactionDate = DateTime.UtcNow;
@@ -144,6 +189,16 @@ namespace BusinessLogic.Services.Implementation
                 CreatedBy = t.CreatedBy,
                 ApprovedBy = t.ApprovedBy
             };
+        }
+
+        private static bool IsManagerOrViceManager(string? roleName)
+        {
+            if (string.IsNullOrWhiteSpace(roleName)) return false;
+            var name = roleName.Trim();
+            return string.Equals(name, "Manager", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(name, "Club Manager", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(name, "Vice Manager", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(name, "Admin", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

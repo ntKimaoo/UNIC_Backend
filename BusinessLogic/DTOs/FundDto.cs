@@ -2,6 +2,19 @@ using System.ComponentModel.DataAnnotations;
 
 namespace BusinessLogic.DTOs
 {
+    public class CreateFundDto
+    {
+        [Required]
+        public int ClubId { get; set; }
+
+        [Required]
+        [MaxLength(100)]
+        public string FundName { get; set; } = string.Empty;
+
+        [Range(0, double.MaxValue, ErrorMessage = "Số tiền ban đầu không được âm")]
+        public decimal InitialAmount { get; set; } = 0;
+    }
+
     public class CreateFundRequestDto
     {
         [Required]

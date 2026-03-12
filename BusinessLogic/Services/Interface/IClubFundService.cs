@@ -5,6 +5,7 @@ namespace BusinessLogic.Services.Interface
 {
     public interface IClubFundService
     {
+        Task<FundResponseDto> CreateFundAsync(Guid userId, CreateFundDto dto);
         Task<FundTransaction> CreateRequestAsync(Guid userId, CreateFundRequestDto request);
         Task<bool> ProcessRequestAsync(Guid managerId, ProcessFundRequestDto request);
         Task<FundResponseDto?> GetFundByIdAsync(int fundId);

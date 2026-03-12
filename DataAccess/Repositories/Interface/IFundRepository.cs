@@ -11,6 +11,7 @@ namespace UNIC.DataAccess.Repositories.Interface
     {
         Task<FundTransaction?> GetTransactionByIdAsync(int id);
         Task<ClubFund?> GetFundByIdAsync(int id);
+        Task<ClubFund> AddFundAsync(ClubFund fund);
         Task AddTransactionAsync(FundTransaction transaction);
         Task UpdateTransactionAsync(FundTransaction transaction);
         Task UpdateClubFundAsync(ClubFund fund);
