@@ -13,5 +13,17 @@ namespace DataAccess.Repositories.Interface
         Task<bool> HasUserPolicyAsync(Guid userId, string policyTitle);
         Task<IEnumerable<PolicyGroup>> GetAllPolicyGroupAsync();
         Task<IEnumerable<Policy>> GetAllPoliciesByGroupAsync(int groupId);
+
+        /// <summary>Lấy policies được gán trực tiếp cho member (không qua role)</summary>
+        Task<IEnumerable<Policy>> GetUserDirectPoliciesAsync(Guid userId);
+
+        /// <summary>Gán danh sách policies cho member (bỏ qua nếu đã tồn tại)</summary>
+        Task AssignPoliciesToUserAsync(Guid userId, IEnumerable<int> policyIds);
+
+        /// <summary>Thu hồi một policy khỏi member</summary>
+        Task<bool> RevokePolicyFromUserAsync(Guid userId, int policyId);
+
+        /// <summary>Ghi đè toàn bộ policies của member (thay thế hết)</summary>
+        Task SetUserPoliciesAsync(Guid userId, IEnumerable<int> policyIds);
     }
 }

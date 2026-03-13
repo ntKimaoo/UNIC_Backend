@@ -1,4 +1,5 @@
 ﻿using BusinessLogic.DTOs;
+using DataAccess.Models;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -12,5 +13,6 @@ namespace BusinessLogic.Services.Interface
         Task<UserResponseDto> CreateUserAsync(CreateUserDto request);
         Task<bool> UpdateUserAsync(Guid id, UpdateUserDto request);
         Task<bool> DeleteUserAsync(Guid id);
+        Task<IEnumerable<Club>> GetAllClubsById(Guid UserId);
     }
 }

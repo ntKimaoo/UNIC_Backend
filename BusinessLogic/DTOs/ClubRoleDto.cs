@@ -34,6 +34,7 @@ namespace BusinessLogic.DTOs
         public int Level { get; set; }
         public int MemberCount { get; set; }
         public List<PolicyResponseDto> Policies { get; set; } = new();
+        public int clubId { get; set; }
     }
 
     public class PolicyResponseDto

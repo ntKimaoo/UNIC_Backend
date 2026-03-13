@@ -1,3 +1,4 @@
+using BusinessLogic.DTOs;
 using UNIC.DataAccess.Models;
 using System;
 using System.Collections.Generic;
@@ -7,20 +8,21 @@ namespace BusinessLogic.Services.Interface
 {
     public interface IPolicyService
     {
-        /// <summary>
-        /// Get all policies assigned to a user
-        /// </summary>
         Task<IEnumerable<Policy>> GetUserPoliciesAsync(Guid userId);
-
-        /// <summary>
-        /// Check if a user has a specific policy
-        /// </summary>
         Task<bool> HasUserPolicyAsync(Guid userId, string policyTitle);
-
-        /// <summary>
-        /// Get all available policies
-        /// </summary>
         Task<IEnumerable<PolicyGroup>> GetAllPolicyGroupAsync();
         Task<IEnumerable<Policy>> GetAllPoliciesByGroupAsync(int groupId);
+
+        /// <summary>Lấy policies được gán trực tiếp (không qua role)</summary>
+        Task<IEnumerable<PolicyResponseDto>> GetUserDirectPoliciesAsync(Guid userId);
+
+        /// <summary>Gán thêm policies cho member (bỏ qua nếu đã có)</summary>
+        Task AssignPoliciesToUserAsync(Guid userId, IEnumerable<int> policyIds);
+
+        /// <summary>Thu hồi một policy khỏi member</summary>
+        Task<bool> RevokePolicyFromUserAsync(Guid userId, int policyId);
+
+        /// <summary>Ghi đè toàn bộ policies trực tiếp của member</summary>
+        Task SetUserPoliciesAsync(Guid userId, IEnumerable<int> policyIds);
     }
 }

@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using UNIC.DataAccess.Models;
 
 namespace DataAccess.Models
 {
@@ -24,5 +25,6 @@ namespace DataAccess.Models
 
         [ForeignKey("UserId")]
         public virtual User User { get; set; }
+        public virtual IList<UserRolePolicy> UserRolePolicies { get; set; }
     }
 }

@@ -14,10 +14,12 @@ namespace Presentation.Controllers
     public class ClubMemberController : ControllerBase
     {
         private readonly IClubMemberService _service;
+        private readonly IPolicyService _policyService;
 
-        public ClubMemberController(IClubMemberService service)
+        public ClubMemberController(IClubMemberService service, IPolicyService policyService)
         {
             _service = service;
+            _policyService = policyService;
         }
 
         private Guid? GetCurrentUserId()
@@ -145,6 +147,83 @@ namespace Presentation.Controllers
 
             var clubs = await _service.GetMyClubsAsync(userId);
             return Ok(new { success = true, data = clubs });
+        }
+
+        // ─── Policy Endpoints ────────────────────────────────────────────────
+
+        /// <summary>
+        /// Lấy danh sách policies được gán trực tiếp cho member
+        /// GET /api/clubs/{clubId}/members/{memberId}/policies
+        /// </summary>
+        [HttpGet("api/clubs/{clubId}/members/{memberId}/policies")]
+        public async Task<IActionResult> GetMemberPolicies(int clubId, int memberId)
+        {
+            var member = await _service.GetMemberByIdAsync(memberId);
+            if (member == null || member.ClubId != clubId)
+                return NotFound(new { success = false, message = "Member not found" });
+
+            var policies = await _policyService.GetUserDirectPoliciesAsync(member.UserId);
+            return Ok(new { success = true, data = policies });
+        }
+
+        /// <summary>
+        /// Gán policies cho member (thêm, không ghi đè)
+        /// POST /api/clubs/{clubId}/members/{memberId}/policies
+        /// Body: { "policyIds": [1, 2, 3] }
+        /// </summary>
+        [HttpPost("api/clubs/{clubId}/members/{memberId}/policies")]
+        public async Task<IActionResult> AssignPolicies(int clubId, int memberId, [FromBody] MemberPolicyDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
+
+            var member = await _service.GetMemberByIdAsync(memberId);
+            if (member == null || member.ClubId != clubId)
+                return NotFound(new { success = false, message = "Member not found" });
+
+            await _policyService.AssignPoliciesToUserAsync(member.UserId, dto.PolicyIds);
+
+            var updated = await _policyService.GetUserDirectPoliciesAsync(member.UserId);
+            return Ok(new { success = true, message = "Policies assigned successfully", data = updated });
+        }
+
+        /// <summary>
+        /// Ghi đè toàn bộ policies của member
+        /// PUT /api/clubs/{clubId}/members/{memberId}/policies
+        /// Body: { "policyIds": [1, 2] }
+        /// </summary>
+        [HttpPut("api/clubs/{clubId}/members/{memberId}/policies")]
+        public async Task<IActionResult> SetPolicies(int clubId, int memberId, [FromBody] MemberPolicyDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
+
+            var member = await _service.GetMemberByIdAsync(memberId);
+            if (member == null || member.ClubId != clubId)
+                return NotFound(new { success = false, message = "Member not found" });
+
+            await _policyService.SetUserPoliciesAsync(member.UserId, dto.PolicyIds);
+
+            var updated = await _policyService.GetUserDirectPoliciesAsync(member.UserId);
+            return Ok(new { success = true, message = "Policies updated successfully", data = updated });
+        }
+
+        /// <summary>
+        /// Thu hồi một policy khỏi member
+        /// DELETE /api/clubs/{clubId}/members/{memberId}/policies/{policyId}
+        /// </summary>
+        [HttpDelete("api/clubs/{clubId}/members/{memberId}/policies/{policyId}")]
+        public async Task<IActionResult> RevokePolicy(int clubId, int memberId, int policyId)
+        {
+            var member = await _service.GetMemberByIdAsync(memberId);
+            if (member == null || member.ClubId != clubId)
+                return NotFound(new { success = false, message = "Member not found" });
+
+            var revoked = await _policyService.RevokePolicyFromUserAsync(member.UserId, policyId);
+            if (!revoked)
+                return NotFound(new { success = false, message = "Policy not assigned to this member" });
+
+            return Ok(new { success = true, message = "Policy revoked successfully" });
         }
     }
 }

@@ -101,5 +101,12 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.Users.ToListAsync();
         }
+        public async Task<IEnumerable<Club>> GetAllClubByUser(Guid userId)
+        {
+            return await _context.UserClubRoles
+                .Where(cm => cm.UserId == userId)
+                .Select(cm => cm.Club)
+                .ToListAsync();
+        }
     }
 }

@@ -18,5 +18,6 @@ namespace DataAccess.Repositories.Interface
         Task<bool> UpdateAsync(User user);
         Task<bool> DeleteAsync(Guid userId);
         Task<IEnumerable<User>> GetAllAsync();
+        Task<IEnumerable<Club>> GetAllClubByUser(Guid userId);
     }
 }
