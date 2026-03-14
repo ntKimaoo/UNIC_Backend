@@ -102,6 +102,33 @@ namespace Presentation.Controllers
             }
         }
 
+        [HttpPost("approve")]
+        public async Task<IActionResult> ApproveFund([FromBody] ApproveFundDto dto)
+        {
+            try
+            {
+                var managerId = GetCurrentUserId();
+                await _clubFundService.ApproveFundAsync(managerId, dto);
+                return Ok(new { success = true, message = "Xử lý duyệt quỹ thành công." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
         [HttpPost("process")]
         public async Task<IActionResult> ProcessRequest([FromBody] ProcessFundRequestDto request)
         {

@@ -40,6 +40,15 @@ namespace BusinessLogic.DTOs
         public string Action { get; set; } // "APPROVE" or "REJECT"
     }
 
+    public class ApproveFundDto
+    {
+        [Required]
+        public int FundId { get; set; }
+
+        [Required]
+        public string Action { get; set; } // "APPROVE" or "REJECT"
+    }
+
     public class FundResponseDto
     {
         public int FundId { get; set; }
@@ -48,6 +57,7 @@ namespace BusinessLogic.DTOs
         public decimal TotalAmount { get; set; }
         public decimal CurrentBalance { get; set; }
         public DateTime CreatedAt { get; set; }
+        public string Status { get; set; } = "PENDING";
     }
 
     public class FundTransactionResponseDto

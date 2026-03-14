@@ -11,5 +11,6 @@ namespace BusinessLogic.Services.Interface
         Task<FundResponseDto?> GetFundByIdAsync(int fundId);
         Task<IEnumerable<FundResponseDto>> GetFundsByClubIdAsync(int clubId);
         Task<IEnumerable<FundTransactionResponseDto>> GetFundHistoryAsync(int fundId, string? status);
+        Task<bool> ApproveFundAsync(Guid managerId, ApproveFundDto dto);
     }
 }

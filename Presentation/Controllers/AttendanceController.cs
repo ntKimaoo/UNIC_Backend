@@ -115,7 +115,11 @@ namespace UNIC.Presentation.Controllers
             }
             catch (NotFoundException)
             {
-                return NotFound(new { error = "Mã QR không hợp lệ hoặc đã hết hạn." });
+                return NotFound(new
+                {
+                    error = "Mã QR không hợp lệ hoặc đã hết hạn.",
+                    hint = "Nếu bạn vừa quét thành công (đã thấy PRESENT trên màn hình), có thể do quét liên tục. Hãy bỏ điện thoại ra khỏi mã QR sau khi quét một lần."
+                });
             }
             catch (DomainException ex)
             {

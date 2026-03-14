@@ -98,7 +98,7 @@ namespace DataAccess.Repositories.Implementation
                 .Include(m => m.User)
                     .ThenInclude(u => u.DepartmentMembers)
                     .ThenInclude(dm => dm.DepartmentRole)
-                .Where(m => m.UserId == userId)
+                .Where(m => m.UserId == userId && string.Equals(m.Status, "ACTIVE", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(m => m.JoinDate)
                 .ToListAsync();
         }

@@ -193,6 +193,7 @@ namespace BusinessLogic.Services.Implementation
 
             return new CheckInByQrResponse
             {
+                Success = true,
                 Message = alreadyCheckedIn ? "Đã điểm danh trước đó." : "Đã điểm danh thành công.",
                 MemberName = attendance.User?.FullName ?? "—",
                 AlreadyCheckedIn = alreadyCheckedIn
@@ -249,9 +250,6 @@ namespace BusinessLogic.Services.Implementation
             return NormalizeCheckInToken(s) ?? (string.IsNullOrWhiteSpace(s) ? null : s);
         }
 
-        /// <summary>
-        /// Trims token and, if it looks like a URL (e.g. .../qr/TOKEN), extracts the token part so scanning a QR that encodes the image URL still works.
-        /// </summary>
         private static string? NormalizeCheckInToken(string? token)
         {
             var s = token?.Trim();
@@ -264,6 +262,16 @@ namespace BusinessLogic.Services.Implementation
                 var query = s.IndexOf('?');
                 if (query >= 0) s = s.Substring(0, query);
                 s = s.Trim();
+            }
+            if (string.IsNullOrWhiteSpace(s))
+                return null;
+            if (s.Contains("code=", StringComparison.OrdinalIgnoreCase))
+            {
+                var codeIdx = s.IndexOf("code=", StringComparison.OrdinalIgnoreCase) + 5;
+                var end = s.IndexOf('&', codeIdx);
+                if (end < 0) end = s.Length;
+                s = s.Substring(codeIdx, end - codeIdx).Trim();
+                try { s = Uri.UnescapeDataString(s); } catch { }
             }
             return string.IsNullOrWhiteSpace(s) ? null : s;
         }
