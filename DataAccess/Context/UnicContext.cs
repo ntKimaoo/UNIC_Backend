@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using UNIC.DataAccess.Models;
@@ -28,8 +28,6 @@ public partial class UnicContext : DbContext
     public DbSet<ClubRole> ClubRoles { get; set; }
     public DbSet<UserClubRole> UserClubRoles { get; set; }
     public DbSet<Department> Departments { get; set; }
-    public DbSet<DepartmentRole> DepartmentRoles { get; set; }
-    public DbSet<DepartmentMember> UserDepartmentRoles { get; set; }
     public DbSet<ClubPost> ClubPosts { get; set; }
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<Event> Events { get; set; }
@@ -171,30 +169,11 @@ public partial class UnicContext : DbContext
             .HasForeignKey(ucr => ucr.ClubRoleId)
             .OnDelete(DeleteBehavior.NoAction);
 
-        // UserDepartmentRole - Self-referencing for AssignedBy
-        modelBuilder.Entity<DepartmentMember>()
-            .HasOne(udr => udr.AssignedByUser)
-            .WithMany()
-            .HasForeignKey(udr => udr.AssignedBy)
-            .OnDelete(DeleteBehavior.NoAction);
-
-        // UserDepartmentRole relationships
-        modelBuilder.Entity<DepartmentMember>()
-            .HasOne(udr => udr.User)
-            .WithMany(u => u.DepartmentMembers)
-            .HasForeignKey(udr => udr.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        modelBuilder.Entity<DepartmentMember>()
-            .HasOne(udr => udr.Department)
-            .WithMany(d => d.DepartmentMembers)
-            .HasForeignKey(udr => udr.DepartmentId)
-            .OnDelete(DeleteBehavior.NoAction);
-
-        modelBuilder.Entity<DepartmentMember>()
-            .HasOne(udr => udr.DepartmentRole)
-            .WithMany(dr => dr.DepartmentMembers)
-            .HasForeignKey(udr => udr.DeptRoleId)
+        // ClubRole - Department relationship
+        modelBuilder.Entity<ClubRole>()
+            .HasOne(cr => cr.Department)
+            .WithMany(d => d.ClubRoles)
+            .HasForeignKey(cr => cr.DepartmentId)
             .OnDelete(DeleteBehavior.NoAction);
 
         // Department - Club
@@ -203,6 +182,13 @@ public partial class UnicContext : DbContext
             .WithMany(c => c.Departments)
             .HasForeignKey(d => d.ClubId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Department - ManagerRole (ClubRole)
+        modelBuilder.Entity<Department>()
+            .HasOne(d => d.ManagerRole)
+            .WithMany(cr => cr.ManagedDepartments)
+            .HasForeignKey(d => d.ManagerRoleId)
+            .OnDelete(DeleteBehavior.NoAction);
 
         // ClubPost relationships
         modelBuilder.Entity<ClubPost>()

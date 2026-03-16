@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -22,9 +22,20 @@ namespace DataAccess.Models
 
         public int Level { get; set; } = 0;
 
-        public virtual ICollection<UserClubRole> ClubMembers { get; set; }
-        public virtual IList<ClubRolePolicy>? ClubRolePolicies { get; set; }
         public int? ClubId { get; set; }
-        public Club? Club { get; set; }
+        
+        public int? DepartmentId { get; set; }
+
+        [ForeignKey("ClubId")]
+        public virtual Club? Club { get; set; }
+
+        [ForeignKey("DepartmentId")]
+        public virtual Department? Department { get; set; }
+
+        public virtual ICollection<UserClubRole> ClubMembers { get; set; }
+        
+        public virtual ICollection<Department> ManagedDepartments { get; set; }
+        
+        public virtual IList<ClubRolePolicy>? ClubRolePolicies { get; set; }
     }
 }

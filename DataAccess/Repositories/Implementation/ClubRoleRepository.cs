@@ -23,13 +23,13 @@ namespace DataAccess.Repositories.Implementation
                 .Include(cr => cr.ClubMembers)
                 .Include(cr => cr.ClubRolePolicies!)
                     .ThenInclude(crp => crp.Policy).ThenInclude(p => p.PolicyGroup)
-                .FirstOrDefaultAsync(cr => cr.ClubRoleId == clubRoleId&&cr.ClubId==clubId);
+                .FirstOrDefaultAsync(cr => cr.ClubRoleId == clubRoleId && cr.ClubId == clubId);
         }
 
         public async Task<IEnumerable<ClubRole>> GetAllAsync(int clubId)
         {
             return await _context.ClubRoles
-                .Where(cr=>cr.ClubId==clubId)
+                .Where(cr => cr.ClubId == clubId)
                 .Include(cr => cr.ClubMembers)
                 .Include(cr => cr.ClubRolePolicies!)
                     .ThenInclude(crp => crp.Policy).ThenInclude(p => p.PolicyGroup)
