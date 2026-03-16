@@ -9,7 +9,7 @@ namespace BusinessLogic.DTOs
         [MaxLength(50)]
         public string RoleName { get; set; }
 
-        public string? Description { get; set; }
+        public string Description { get; set; }
 
         public int Level { get; set; } = 0;
         public List<int> policies { get; set; } = new();
@@ -20,7 +20,7 @@ namespace BusinessLogic.DTOs
         [MaxLength(50)]
         public string? RoleName { get; set; }
 
-        public string? Description { get; set; }
+        public string Description { get; set; }
 
         public int? Level { get; set; }
         public List<int>? PolicyIds { get; set; }
@@ -30,7 +30,7 @@ namespace BusinessLogic.DTOs
     {
         public int ClubRoleId { get; set; }
         public string RoleName { get; set; }
-        public string? Description { get; set; }
+        public string Description { get; set; }
         public int Level { get; set; }
         public int MemberCount { get; set; }
         public List<PolicyResponseDto> Policies { get; set; } = new();
@@ -41,7 +41,14 @@ namespace BusinessLogic.DTOs
     {
         public int Id { get; set; }
         public string Title { get; set; }
-        public string? Description { get; set; }
+        public string Description { get; set; }
         public int? PolicyGroupId { get; set; }
+    }
+
+    public class AssignClubRoleDto
+    {
+        public Guid UserId { get; set; }
+        public int ClubId { get; set; }
+        public int ClubRoleId { get; set; }
     }
 }

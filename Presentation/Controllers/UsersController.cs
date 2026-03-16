@@ -13,10 +13,12 @@ namespace Presentation.Controllers
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly IClubRoleService _clubRoleService;
 
-        public UsersController(IUserService userService)
+        public UsersController(IUserService userService, IClubRoleService clubRoleService)
         {
             _userService = userService;
+            _clubRoleService = clubRoleService;
         }
 
         // GET: api/users
@@ -113,6 +115,17 @@ namespace Presentation.Controllers
                 return NotFound(new { success = false, message = "You have not join any club!" });
             }
             return Ok(new { success = true, data = result });
+        }
+        [HttpGet("/api/Users/{userId}/managed-clubs")]
+        public async Task<IActionResult> GetManagedClubs(Guid userId)
+        {
+            var clubs = await _clubRoleService.GetManagedClubsAsync(userId);
+
+            return Ok(new
+            {
+                success = true,
+                data = clubs
+            });
         }
     }
 }

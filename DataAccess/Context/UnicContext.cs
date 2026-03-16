@@ -52,6 +52,7 @@ public partial class UnicContext : DbContext
     public DbSet<PolicyGroup> PolicyGroups { get; set; }
     public DbSet<UserPolicy> UserPolicies { get; set; }
     public DbSet<UserRolePolicy> UserRolePolicies { get; set; }
+    public DbSet<ClubCreationRequest> ClubCreationRequests { get; set; }
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
 
@@ -98,6 +99,18 @@ public partial class UnicContext : DbContext
                 .HasColumnName("StudentID");
             entity.Property(e => e.UpdatedAt).HasColumnType("datetime");
         });
+
+        modelBuilder.Entity<ClubCreationRequest>()
+            .HasOne(cr => cr.User)
+            .WithMany()
+            .HasForeignKey(cr => cr.UserId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<ClubCreationRequest>()
+            .HasOne(cr => cr.ReviewedByUser)
+            .WithMany()
+            .HasForeignKey(cr => cr.ReviewedBy)
+            .OnDelete(DeleteBehavior.NoAction);
 
         modelBuilder.Entity<PasswordResetToken>(entity =>
         {
@@ -411,7 +424,30 @@ public partial class UnicContext : DbContext
             .HasOne<Club>(c => c.Club)
             .WithMany(cr => cr.ClubRoles)
             .HasForeignKey(cr => cr.ClubId);
+        modelBuilder.Entity<ClubCreationRequest>(entity =>
+        {
+            entity.HasKey(e => e.RequestId);
 
+            entity.Property(e => e.ClubName)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.Description)
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.Reason)
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.Status)
+                .HasMaxLength(50)
+                .HasDefaultValue("Pending");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("(getutcdate())");
+
+            entity.Property(e => e.AdminComment)
+                .HasMaxLength(1000);
+        });
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);

@@ -1,4 +1,5 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.Services.Implementation;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -33,7 +34,7 @@ namespace Presentation.Controllers
         /// Get club role by ID
         /// </summary>
         [HttpGet("api/club/{clubId}/role/{id}")]
-        public async Task<IActionResult> GetById(int id,int clubId)
+        public async Task<IActionResult> GetById(int id, int clubId)
         {
             var role = await _service.GetByIdAsync(id, clubId);
             if (role == null)
@@ -41,19 +42,19 @@ namespace Presentation.Controllers
 
             return Ok(new { success = true, data = role });
         }
-       
+
         /// <summary>
         /// Create a new club role
         /// </summary>
         [HttpPost("api/club/{clubId}/role")]
-        public async Task<IActionResult> Create([FromBody] CreateClubRoleDto dto,int clubId)
+        public async Task<IActionResult> Create([FromBody] CreateClubRoleDto dto, int clubId)
         {
             if (!ModelState.IsValid)
                 return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
 
             try
             {
-                var role = await _service.CreateAsync(dto,clubId);
+                var role = await _service.CreateAsync(dto, clubId);
                 role.clubId = clubId;
                 return CreatedAtAction(nameof(GetById), new { clubId = clubId, id = role.ClubRoleId }, new
                 {
@@ -76,14 +77,14 @@ namespace Presentation.Controllers
         /// Update an existing club role
         /// </summary>
         [HttpPut("api/club/{clubId}/role/{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] UpdateClubRoleDto dto,int clubId)
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateClubRoleDto dto, int clubId)
         {
             if (!ModelState.IsValid)
                 return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
 
             try
             {
-                var role = await _service.UpdateAsync(id, dto,clubId);
+                var role = await _service.UpdateAsync(id, dto, clubId);
                 if (role == null)
                     return NotFound(new { success = false, message = "Club role not found" });
 
@@ -99,7 +100,7 @@ namespace Presentation.Controllers
             }
         }
         [HttpPut("api/club/{clubId}/role/{id}/policies")]
-        public async Task<IActionResult> UpdatePolicies(int id, List<int> policyIds,int clubId)
+        public async Task<IActionResult> UpdatePolicies(int id, List<int> policyIds, int clubId)
         {
             if (!ModelState.IsValid)
                 return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
@@ -129,6 +130,24 @@ namespace Presentation.Controllers
                 return NotFound(new { success = false, message = "Club role not found" });
 
             return Ok(new { success = true, message = "Club role deleted successfully" });
+        }
+        [HttpPost("api/assign")]
+        public async Task<IActionResult> AssignRole([FromBody] AssignClubRoleDto dto)
+        {
+            var result = await _service.AssignRoleAsync(dto);
+
+            if (!result)
+                return BadRequest("Cannot assign role");
+
+            return Ok(new { message = "Role assigned successfully" });
+        }
+        [HttpGet("api/club/{clubId}/user/{userId}/role")]
+        public async Task<IActionResult> GetUserClubRole(Guid userId, int clubId)
+        {
+            var role = await _service.GetUserClubRoleAsync(userId, clubId);
+            if (role == null)
+                return NotFound(new { success = false, message = "User club role not found" });
+            return Ok(new { success = true, data = role });
         }
     }
 }
