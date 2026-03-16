@@ -4,10 +4,11 @@ using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using Presentation.Authorization;
 
 namespace Presentation.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/clubs/{clubId:int}/funds")]
     [ApiController]
     [Authorize]
     public class ClubFundController : ControllerBase
@@ -25,6 +26,7 @@ namespace Presentation.Controllers
         }
 
         [HttpPost]
+        [RequireMemberPolicy("createfinance")]
         public async Task<IActionResult> CreateFund([FromBody] CreateFundDto dto)
         {
             try
@@ -56,6 +58,7 @@ namespace Presentation.Controllers
         }
 
         [HttpGet("{fundId}")]
+        [RequireMemberPolicy("viewfinance")]
         public async Task<IActionResult> GetFund(int fundId)
         {
             var fund = await _clubFundService.GetFundByIdAsync(fundId);
@@ -67,7 +70,8 @@ namespace Presentation.Controllers
             return Ok(new { success = true, data = fund });
         }
 
-        [HttpGet("club/{clubId}")]
+        [HttpGet]
+        [RequireMemberPolicy("viewfinance")]
         public async Task<IActionResult> GetFundsByClub(int clubId)
         {
             var userId = GetCurrentUserId();
@@ -77,11 +81,8 @@ namespace Presentation.Controllers
             return Ok(new { success = true, data = funds });
         }
 
-        /// <summary>
-        /// Tạo yêu cầu nộp tiền vào quỹ và nhận link/QR PayOS để thanh toán.
-        /// Sau khi thanh toán thành công (PayOS gọi webhook), quỹ sẽ được cập nhật tự động.
-        /// </summary>
         [HttpPost("contribute")]
+        [RequireMemberPolicy("createfinance")]
         public async Task<IActionResult> Contribute([FromBody] ContributeRequestDto request, CancellationToken cancellationToken)
         {
             try
@@ -109,6 +110,7 @@ namespace Presentation.Controllers
         }
 
         [HttpPost("request")]
+        [RequireMemberPolicy("createfinance")]
         public async Task<IActionResult> CreateRequest([FromBody] CreateFundRequestDto request)
         {
             try
@@ -136,6 +138,7 @@ namespace Presentation.Controllers
         }
 
         [HttpPost("approve")]
+        [RequireMemberPolicy("editfinance")]
         public async Task<IActionResult> ApproveFund([FromBody] ApproveFundDto dto)
         {
             try
@@ -163,6 +166,7 @@ namespace Presentation.Controllers
         }
 
         [HttpPost("process")]
+        [RequireMemberPolicy("editfinance")]
         public async Task<IActionResult> ProcessRequest([FromBody] ProcessFundRequestDto request)
         {
             try
@@ -189,10 +193,6 @@ namespace Presentation.Controllers
             }
         }
 
-        /// <summary>
-        /// Webhook PayOS gọi khi có thanh toán thành công. Không dùng JWT (AllowAnonymous).
-        /// Cấu hình URL này tại https://my.payos.vn (ví dụ: https://your-api.com/api/clubfund/payos-webhook).
-        /// </summary>
         [HttpPost("payos-webhook")]
         [AllowAnonymous]
         public async Task<IActionResult> PayOSWebhook(CancellationToken cancellationToken)
@@ -233,6 +233,7 @@ namespace Presentation.Controllers
         }
 
         [HttpGet("history/{fundId}")]
+        [RequireMemberPolicy("viewfinance")]
         public async Task<IActionResult> GetHistory(int fundId, [FromQuery] string? status)
         {
             try
