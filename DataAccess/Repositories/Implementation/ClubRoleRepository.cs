@@ -68,10 +68,16 @@ namespace DataAccess.Repositories.Implementation
         {
             try
             {
+                await _context.UserClubRoles
+                     .Where(cm => cm.ClubRoleId == clubRoleId)
+                     .ExecuteUpdateAsync(setters =>
+                         setters.SetProperty(cm => cm.ClubRoleId, (int?)null));
                 var clubRole = await _context.ClubRoles.FindAsync(clubRoleId);
                 if (clubRole == null)
                     return false;
-
+                await _context.ClubRolePolicies
+                    .Where(rp => rp.ClubRoleId == clubRoleId)
+                    .ExecuteDeleteAsync();
                 _context.ClubRoles.Remove(clubRole);
                 await _context.SaveChangesAsync();
                 return true;
