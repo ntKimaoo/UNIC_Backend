@@ -247,10 +247,46 @@ namespace Presentation.Controllers
                 var history = await _clubFundService.GetFundHistoryAsync(fundId, status);
                 return Ok(new { success = true, data = history });
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { success = false, message = ex.Message });
+            }
             catch (Exception ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
+        }
+
+        /// <summary>
+        /// Lookup fund location (clubId) by fundId for backward-compatible routing.
+        /// </summary>
+        /// <param name="fundId">Fund identifier.</param>
+        /// <returns>clubId and fundId if accessible.</returns>
+        [HttpGet("~/api/funds/{fundId}/location")]
+        [RequireMemberPolicy("viewfinance")]
+        public async Task<IActionResult> GetFundLocation(int fundId)
+        {
+            var fund = await _clubFundService.GetFundByIdAsync(fundId);
+            if (fund == null)
+            {
+                return NotFound(new { success = false, message = "Quỹ không tồn tại." });
+            }
+
+            var userId = GetCurrentUserId();
+            if (!await CanAccessClubAsync(userId, fund.ClubId))
+            {
+                return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
+            }
+
+            return Ok(new
+            {
+                success = true,
+                data = new
+                {
+                    fundId = fund.FundId,
+                    clubId = fund.ClubId
+                }
+            });
         }
 
         private async Task<bool> CanAccessClubAsync(Guid userId, int clubId)

@@ -241,7 +241,7 @@ namespace BusinessLogic.Services.Implementation
                 TransactionId = t.TransactionId,
                 FundId = t.FundId,
                 CategoryId = t.CategoryId,
-                TransactionType = t.TransactionType,
+                TransactionType = t.TransactionType ?? "INCOME",
                 Status = t.Status ?? "PENDING",
                 Amount = t.Amount,
                 Description = t.Description,
