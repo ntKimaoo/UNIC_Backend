@@ -103,5 +103,12 @@ namespace DataAccess.Repositories.Implementation
             }
             await _context.SaveChangesAsync();
         }
+
+        public async Task<IEnumerable<ClubRole>> GetByDepartmentIdAsync(int departmentId)
+        {
+            return await _context.ClubRoles
+                .Where(cr => cr.DepartmentId == departmentId)
+                .ToListAsync();
+        }
     }
 }

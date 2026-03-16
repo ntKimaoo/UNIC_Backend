@@ -101,5 +101,12 @@ namespace UNIC.DataAccess.Repositories.Implementation
 
             return await query.AnyAsync();
         }
+
+        public async Task<Department?> GetByManagerRoleIdAsync(int managerRoleId)
+        {
+            return await _context.Departments
+                .Include(d => d.ClubRoles)
+                .FirstOrDefaultAsync(d => d.ManagerRoleId == managerRoleId);
+        }
     }
 }

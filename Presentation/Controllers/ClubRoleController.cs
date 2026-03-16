@@ -123,7 +123,7 @@ namespace Presentation.Controllers
         /// Delete a club role
         /// </summary>
         [HttpDelete("api/club/{clubId}/role/{id}")]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> Delete(int clubId, int id)
         {
             var result = await _service.DeleteAsync(id);
             if (!result)

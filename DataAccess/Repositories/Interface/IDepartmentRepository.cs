@@ -15,6 +15,7 @@ namespace UNIC.DataAccess.Repositories.Interface
         Task<Department> CreateAsync(Department department);
         Task<bool> UpdateAsync(Department department);
         Task<bool> DeleteAsync(int departmentId);
+        Task<Department?> GetByManagerRoleIdAsync(int managerRoleId);
         Task<bool> ExistsAsync(int departmentId);
         Task<bool> DepartmentNameExistsInClubAsync(string departmentName, int clubId, int? excludeDepartmentId = null);
     }

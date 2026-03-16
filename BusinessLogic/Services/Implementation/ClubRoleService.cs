@@ -101,6 +101,27 @@ namespace BusinessLogic.Services.Implementation
         }
         public async Task<bool> DeleteAsync(int clubRoleId)
         {
+            // Check if this role is a department manager
+            var department = await _departmentRepository.GetByManagerRoleIdAsync(clubRoleId);
+            if (department != null)
+            {
+                // Step 1: Nullify the ManagerRoleId to break circular FK reference
+                department.ManagerRoleId = null;
+                await _departmentRepository.UpdateAsync(department);
+
+                // Step 2: Delete all roles belonging to this department
+                var departmentRoles = await _repository.GetByDepartmentIdAsync(department.DepartmentId);
+                foreach (var role in departmentRoles)
+                {
+                    await _repository.DeleteAsync(role.ClubRoleId);
+                }
+
+                // Step 3: Delete the department itself
+                await _departmentRepository.DeleteAsync(department.DepartmentId);
+                return true;
+            }
+
+            // Normal delete for non-manager roles
             return await _repository.DeleteAsync(clubRoleId);
         }
 
