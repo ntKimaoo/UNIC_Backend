@@ -102,6 +102,12 @@ builder.Services.AddSingleton(sp =>
 
 // Register Background Services
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.Configure<BusinessLogic.Options.PayOSOptions>(builder.Configuration.GetSection(BusinessLogic.Options.PayOSOptions.SectionName));
+builder.Services.AddHttpClient<IPayOSService, PayOSService>((sp, client) =>
+{
+    var opt = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<BusinessLogic.Options.PayOSOptions>>().Value;
+    client.BaseAddress = new Uri(opt.BaseUrl.TrimEnd('/') + "/");
+});
 builder.Services.AddScoped<IFundRepository, FundRepository>();
 builder.Services.AddScoped<IClubFundService, ClubFundService>();
 builder.Services.AddScoped<IClubRepository, ClubRepository>();

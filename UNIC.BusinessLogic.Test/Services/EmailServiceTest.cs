@@ -1,4 +1,5 @@
 using BusinessLogic.Services.Implementation;
+using BusinessLogic.Services.Interface;
 using Microsoft.Extensions.Configuration;
 using Moq;
 using System.Collections.Generic;
@@ -10,11 +11,13 @@ namespace UNIC.BusinessLogic.Test.Services
     public class EmailServiceTest
     {
         private readonly Mock<IConfiguration> _mockConfig;
+        private readonly Mock<IQRCodeGeneratorService> _mockQrService;
         private readonly EmailService _emailService;
 
         public EmailServiceTest()
         {
             _mockConfig = new Mock<IConfiguration>();
+            _mockQrService = new Mock<IQRCodeGeneratorService>();
 
             // Setup dummy configuration to force a connection failure 
             // and cover the catch block in SendEmailAsync (returns false).
@@ -26,7 +29,7 @@ namespace UNIC.BusinessLogic.Test.Services
             _mockConfig.Setup(c => c["Email:FromName"]).Returns("Test");
             _mockConfig.Setup(c => c["AppSettings:BaseUrl"]).Returns("http://localhost");
 
-            _emailService = new EmailService(_mockConfig.Object);
+            _emailService = new EmailService(_mockConfig.Object, _mockQrService.Object);
         }
 
         [Fact]

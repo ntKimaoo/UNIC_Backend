@@ -93,6 +93,11 @@ namespace BusinessLogic.Services.Implementation
             return memberships.Select(MapToResponseDto);
         }
 
+        public async Task<bool> IsMemberAsync(Guid userId, int clubId)
+        {
+            return await _memberRepository.IsMemberAsync(userId, clubId);
+        }
+
         private static ClubMemberResponseDto MapToResponseDto(UserClubRole m)
         {
             // Lấy departments của user thuộc cùng club này

@@ -10,6 +10,7 @@ namespace BusinessLogic.Services.Implementation
     {
         private readonly IFundRepository _fundRepository;
         private readonly IClubMemberRepository _clubMemberRepository;
+        private readonly IPayOSService _payOSService;
 
         private const string STATUS_PENDING = "PENDING";
         private const string STATUS_APPROVED = "APPROVED";
@@ -18,10 +19,11 @@ namespace BusinessLogic.Services.Implementation
         private const string TYPE_EXPENSE = "EXPENSE";
         private const string MEMBER_STATUS_ACTIVE = "ACTIVE";
 
-        public ClubFundService(IFundRepository fundRepository, IClubMemberRepository clubMemberRepository)
+        public ClubFundService(IFundRepository fundRepository, IClubMemberRepository clubMemberRepository, IPayOSService payOSService)
         {
             _fundRepository = fundRepository;
             _clubMemberRepository = clubMemberRepository;
+            _payOSService = payOSService;
         }
 
         public async Task<FundResponseDto> CreateFundAsync(Guid userId, CreateFundDto dto)
@@ -54,6 +56,57 @@ namespace BusinessLogic.Services.Implementation
 
             var created = await _fundRepository.AddFundAsync(fund);
             return MapToFundDto(created);
+        }
+
+        public async Task<ContributeResponseDto> CreateContributionAsync(Guid userId, ContributeRequestDto request, CancellationToken cancellationToken = default)
+        {
+            if (request.Amount <= 0)
+                throw new ArgumentException("Số tiền phải lớn hơn 0.", nameof(request.Amount));
+
+            var fund = await _fundRepository.GetFundByIdAsync(request.FundId);
+            if (fund == null)
+                throw new InvalidOperationException("Quỹ không tồn tại.");
+            if (!string.Equals(fund.Status, STATUS_APPROVED, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Chỉ có thể nộp tiền vào quỹ đã được duyệt.");
+
+            var member = await _clubMemberRepository.GetMemberAsync(userId, fund.ClubId);
+            if (member == null)
+                throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
+            if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được nộp tiền vào quỹ.");
+
+            var transaction = new FundTransaction
+            {
+                FundId = request.FundId,
+                CategoryId = request.CategoryId,
+                TransactionType = TYPE_INCOME,
+                Amount = request.Amount,
+                Description = request.Description?.Trim() ?? "Nộp quỹ",
+                TransactionDate = DateTime.UtcNow,
+                Status = STATUS_PENDING,
+                CreatedBy = userId
+            };
+
+            await _fundRepository.AddTransactionAsync(transaction);
+
+            var payOsResult = await _payOSService.CreatePaymentLinkAsync(
+                transaction.TransactionId,
+                transaction.Amount,
+                transaction.Description ?? "Nop quy",
+                cancellationToken);
+
+            transaction.PaymentLinkId = payOsResult.PaymentLinkId;
+            await _fundRepository.UpdateTransactionAsync(transaction);
+
+            return new ContributeResponseDto
+            {
+                TransactionId = transaction.TransactionId,
+                CheckoutUrl = payOsResult.CheckoutUrl,
+                QrCode = payOsResult.QrCode,
+                PaymentLinkId = payOsResult.PaymentLinkId,
+                Amount = transaction.Amount,
+                Message = "Quét QR hoặc mở link để thanh toán. Sau khi thanh toán thành công, quỹ sẽ được cập nhật tự động."
+            };
         }
 
         public async Task<FundTransaction> CreateRequestAsync(Guid userId, CreateFundRequestDto request)
@@ -194,7 +247,8 @@ namespace BusinessLogic.Services.Implementation
                 Description = t.Description,
                 TransactionDate = t.TransactionDate,
                 CreatedBy = t.CreatedBy,
-                ApprovedBy = t.ApprovedBy
+                ApprovedBy = t.ApprovedBy,
+                PaymentLinkId = t.PaymentLinkId
             };
         }
 
@@ -208,6 +262,27 @@ namespace BusinessLogic.Services.Implementation
         {
             if (clubRole == null) return false;
             return clubRole.Level == 1;
+        }
+
+        public async Task<bool> ProcessPayOSPaymentSuccessAsync(int orderCode)
+        {
+            var transaction = await _fundRepository.GetTransactionByIdAsync(orderCode);
+            if (transaction == null)
+                return false;
+            if (transaction.TransactionType != TYPE_INCOME || transaction.Status != STATUS_PENDING)
+                return false;
+
+            var fund = transaction.ClubFund;
+            if (fund == null)
+                return false;
+
+            transaction.Status = STATUS_APPROVED;
+            transaction.TransactionDate = DateTime.UtcNow;
+            fund.CurrentBalance += transaction.Amount;
+            fund.TotalAmount += transaction.Amount;
+
+            await _fundRepository.UpdateTransactionAndFundAsync(transaction, fund);
+            return true;
         }
 
         public async Task<bool> ApproveFundAsync(Guid managerId, ApproveFundDto dto)

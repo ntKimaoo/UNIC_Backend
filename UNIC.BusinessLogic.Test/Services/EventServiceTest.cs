@@ -2,6 +2,7 @@ using AutoMapper;
 using BusinessLogic.DTOs;
 using BusinessLogic.Exceptions;
 using BusinessLogic.Services.Implementation;
+using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using FluentValidation;
@@ -24,6 +25,7 @@ namespace UNIC.BusinessLogic.Test.Services
         private readonly Mock<IValidator<OpenRegistrationRequest>> _mockRegistrationVal;
         private readonly Mock<IEventRepository> _mockEventRepo;
         private readonly Mock<IEventScheduleRepository> _mockEventScheduleRepo;
+        private readonly Mock<IEmailService> _mockEmailService;
 
         private readonly EventService _eventService;
 
@@ -38,6 +40,7 @@ namespace UNIC.BusinessLogic.Test.Services
 
             _mockEventRepo = new Mock<IEventRepository>();
             _mockEventScheduleRepo = new Mock<IEventScheduleRepository>();
+            _mockEmailService = new Mock<IEmailService>();
 
             _mockUnitOfWork.Setup(u => u.Events).Returns(_mockEventRepo.Object);
             _mockUnitOfWork.Setup(u => u.EventSchedules).Returns(_mockEventScheduleRepo.Object);
@@ -48,7 +51,8 @@ namespace UNIC.BusinessLogic.Test.Services
                 _mockCreateVal.Object,
                 _mockUpdateVal.Object,
                 _mockSessionVal.Object,
-                _mockRegistrationVal.Object
+                _mockRegistrationVal.Object,
+                _mockEmailService.Object
             );
         }
 

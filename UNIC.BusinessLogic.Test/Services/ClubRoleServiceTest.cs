@@ -105,7 +105,7 @@ namespace UNIC.BusinessLogic.Test.Services
         public async Task UpdateAsync_ShouldReturnNull_WhenRoleNotFound()
         {
             _mockRoleRepo.Setup(r => r.GetByIdAsync(1, 1)).ReturnsAsync((ClubRole?)null);
-            var result = await _clubRoleService.UpdateAsync(1, new UpdateClubRoleDto());
+            var result = await _clubRoleService.UpdateAsync(1, new UpdateClubRoleDto(), 1);
             Assert.Null(result);
         }
 
@@ -118,7 +118,7 @@ namespace UNIC.BusinessLogic.Test.Services
             _mockRoleRepo.Setup(r => r.GetByIdAsync(1, 1)).ReturnsAsync(role);
             _mockRoleRepo.Setup(r => r.RoleNameExistsAsync("TakenRole", 1)).ReturnsAsync(true);
 
-            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _clubRoleService.UpdateAsync(1, dto));
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _clubRoleService.UpdateAsync(1, dto, 1));
             Assert.Contains("already exists", ex.Message);
         }
 
@@ -133,7 +133,7 @@ namespace UNIC.BusinessLogic.Test.Services
             _mockRoleRepo.Setup(r => r.UpdateAsync(role)).ReturnsAsync(true);
             _mockRoleRepo.Setup(r => r.SetPoliciesAsync(1, dto.PolicyIds)).Returns(Task.CompletedTask);
 
-            var result = await _clubRoleService.UpdateAsync(1, dto);
+            var result = await _clubRoleService.UpdateAsync(1, dto, 1);
 
             Assert.NotNull(result);
             Assert.Equal("NewRole", role.RoleName);

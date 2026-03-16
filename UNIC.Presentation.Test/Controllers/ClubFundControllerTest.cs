@@ -21,7 +21,9 @@ namespace UNIC.Presentation.Test.Controllers
         public ClubFundControllerTest()
         {
             _mockService = new Mock<IClubFundService>();
-            _controller = new ClubFundController(_mockService.Object);
+            var mockClubMemberService = new Mock<IClubMemberService>();
+            var mockPayOSService = new Mock<IPayOSService>();
+            _controller = new ClubFundController(_mockService.Object, mockClubMemberService.Object, mockPayOSService.Object);
         }
 
         private void SetupUser(Guid userId)

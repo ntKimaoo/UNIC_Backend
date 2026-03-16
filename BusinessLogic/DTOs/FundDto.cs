@@ -15,6 +15,30 @@ namespace BusinessLogic.DTOs
         public decimal InitialAmount { get; set; } = 0;
     }
 
+    public class ContributeRequestDto
+    {
+        [Required]
+        public int FundId { get; set; }
+        public int? CategoryId { get; set; }
+
+        [Required]
+        [Range(0.01, double.MaxValue, ErrorMessage = "Số tiền phải lớn hơn 0")]
+        public decimal Amount { get; set; }
+
+        [MaxLength(255)]
+        public string? Description { get; set; }
+    }
+
+    public class ContributeResponseDto
+    {
+        public int TransactionId { get; set; }
+        public string CheckoutUrl { get; set; } = string.Empty;
+        public string QrCode { get; set; } = string.Empty;
+        public string? PaymentLinkId { get; set; }
+        public decimal Amount { get; set; }
+        public string Message { get; set; } = "Quét QR hoặc mở link để thanh toán. Sau khi thanh toán thành công, quỹ sẽ được cập nhật tự động.";
+    }
+
     public class CreateFundRequestDto
     {
         [Required]
@@ -72,5 +96,6 @@ namespace BusinessLogic.DTOs
         public DateTime TransactionDate { get; set; }
         public Guid? CreatedBy { get; set; }
         public Guid? ApprovedBy { get; set; }
+        public string? PaymentLinkId { get; set; }
     }
 }
