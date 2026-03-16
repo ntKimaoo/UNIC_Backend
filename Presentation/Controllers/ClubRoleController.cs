@@ -2,6 +2,7 @@ using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Presentation.Authorization;
 using System;
 using System.Threading.Tasks;
 
@@ -21,6 +22,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Get all club roles
         /// </summary>
+        [RequireMemberPolicy("ViewRole")]
         [HttpGet("api/club/{clubId}/role")]
         public async Task<IActionResult> GetAll(int clubId)
         {
