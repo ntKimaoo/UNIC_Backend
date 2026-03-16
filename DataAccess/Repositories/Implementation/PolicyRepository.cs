@@ -63,29 +63,16 @@ namespace DataAccess.Repositories.Implementation
         {
             // Check direct user policy assignment
             var hasDirectPolicy = await _context.UserPolicies
-                .AnyAsync(cmp => cmp.UserId == userId && cmp.Policy.Title == policyTitle);
+                .AnyAsync(cmp => cmp.UserId == userId && cmp.Policy.Name.ToLower().Trim() == policyTitle);
 
             if (hasDirectPolicy)
                 return true;
 
-            // Check club role-based policy assignment
-            var hasClubRolePolicy = await _context.UserClubRoles
-                .Where(ucr => ucr.UserId == userId)
-                .SelectMany(ucr => ucr.ClubRole.ClubRolePolicies)
-                .AnyAsync(crp => crp.Policy.Title == policyTitle);
-
-            if (hasClubRolePolicy) return true;
-            // Check user role-based policy assignment
-            var hasUserRolePolicy = await _context.UserRoles
-                .Where(ucr => ucr.UserId == userId)
-                .SelectMany(ucr => ucr.UserRolePolicies)
-                .AnyAsync(crp => crp.Policy.Title == policyTitle);
-            if (hasUserRolePolicy) return true;
             // Check club member-based policy assignment
             var hasClubMemberPolicy = await _context.UserClubRoles
                 .Where(ucr => ucr.UserId == userId)
                 .SelectMany(ucr => ucr.ClubMemberPolicies)
-                .AnyAsync(crp => crp.Policy.Title == policyTitle);
+                .AnyAsync(crp => crp.Policy.Name.ToLower().Trim() == policyTitle);
             return hasClubMemberPolicy;
         }
 
@@ -149,6 +136,27 @@ namespace DataAccess.Repositories.Implementation
 
             await _context.UserPolicies.AddRangeAsync(newEntries);
             await _context.SaveChangesAsync();
+        }
+
+        public async Task<bool> HasMemberPolicyInClubAsync(Guid userId, int clubId, string policyTitle)
+        {
+            var normalizedTitle = policyTitle.ToLower().Trim();
+
+            // Check policy from club role (within this specific club)
+            var hasRolePolicy = await _context.UserClubRoles
+                .Where(ucr => ucr.UserId == userId && ucr.ClubId == clubId)
+                .SelectMany(ucr => ucr.ClubRole!.ClubRolePolicies)
+                .AnyAsync(crp => crp.Policy.Name == normalizedTitle);
+
+            if (hasRolePolicy) return true;
+
+            // Check direct club member policy (within this specific club)
+            var hasMemberPolicy = await _context.UserClubRoles
+                .Where(ucr => ucr.UserId == userId && ucr.ClubId == clubId)
+                .SelectMany(ucr => ucr.ClubMemberPolicies!)
+                .AnyAsync(cmp => cmp.Policy.Name == normalizedTitle);
+
+            return hasMemberPolicy;
         }
     }
 }

@@ -2,6 +2,7 @@ using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Presentation.Authorization;
 using System;
 using System.Threading.Tasks;
 
@@ -21,7 +22,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Get all club roles
         /// </summary>
-        [Authorize]
+        [RequireMemberPolicy("ViewRole")]
         [HttpGet("api/club/{clubId}/role")]
         public async Task<IActionResult> GetAll(int clubId)
         {
@@ -32,6 +33,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Get club role by ID
         /// </summary>
+        [RequireMemberPolicy("ViewRole")]
         [HttpGet("api/club/{clubId}/role/{id}")]
         public async Task<IActionResult> GetById(int id,int clubId)
         {
@@ -41,10 +43,11 @@ namespace Presentation.Controllers
 
             return Ok(new { success = true, data = role });
         }
-       
+
         /// <summary>
         /// Create a new club role
         /// </summary>
+        [RequireMemberPolicy("CreateRole")]
         [HttpPost("api/club/{clubId}/role")]
         public async Task<IActionResult> Create([FromBody] CreateClubRoleDto dto,int clubId)
         {
@@ -76,6 +79,7 @@ namespace Presentation.Controllers
         /// Update an existing club role
         /// </summary>
         [HttpPut("api/club/{clubId}/role/{id}")]
+        [RequireMemberPolicy("EditRole")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateClubRoleDto dto,int clubId)
         {
             if (!ModelState.IsValid)
@@ -99,6 +103,7 @@ namespace Presentation.Controllers
             }
         }
         [HttpPut("api/club/{clubId}/role/{id}/policies")]
+        [RequireMemberPolicy("EditRole")]
         public async Task<IActionResult> UpdatePolicies(int id, List<int> policyIds,int clubId)
         {
             if (!ModelState.IsValid)
@@ -122,7 +127,8 @@ namespace Presentation.Controllers
         /// Delete a club role
         /// </summary>
         [HttpDelete("api/club/{clubId}/role/{id}")]
-        public async Task<IActionResult> Delete(int id)
+        [RequireMemberPolicy("DeleteRole")]
+        public async Task<IActionResult> Delete(int clubId, int id)
         {
             var result = await _service.DeleteAsync(id);
             if (!result)

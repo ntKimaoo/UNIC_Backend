@@ -100,18 +100,7 @@ namespace BusinessLogic.Services.Implementation
 
         private static ClubMemberResponseDto MapToResponseDto(UserClubRole m)
         {
-            // Lấy departments của user thuộc cùng club này
-            var departments = m.User?.DepartmentMembers?
-                .Where(dm => dm.Department?.ClubId == m.ClubId)
-                .Select(dm => new DepartmentInfoDto
-                {
-                    DepartmentId = dm.DepartmentId,
-                    DepartmentName = dm.Department?.DepartmentName ?? "",
-                    Description = dm.Department?.Description,
-                    DeptRoleName = dm.DepartmentRole?.RoleName,
-                    AssignedAt = dm.AssignedAt
-                })
-                .ToList() ?? new();
+           
 
             return new ClubMemberResponseDto
             {
@@ -127,7 +116,6 @@ namespace BusinessLogic.Services.Implementation
                 JoinDate = m.JoinDate,
                 Status = m.Status,
                 AssignedBy = m.AssignedBy,
-                Departments = departments
             };
         }
     }

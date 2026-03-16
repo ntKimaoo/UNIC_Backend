@@ -7,16 +7,21 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using UNIC.DataAccess.Models;
+using UNIC.DataAccess.Repositories.Interface;
 
 namespace BusinessLogic.Services.Implementation
 {
     public class ClubRoleService : IClubRoleService
     {
         private readonly IClubRoleRepository _repository;
+        private readonly IDepartmentRepository _departmentRepository;
 
-        public ClubRoleService(IClubRoleRepository repository)
+        public ClubRoleService(
+            IClubRoleRepository repository,
+            IDepartmentRepository departmentRepository)
         {
             _repository = repository;
+            _departmentRepository = departmentRepository;
         }
 
         public async Task<ClubRoleResponseDto?> GetByIdAsync(int clubRoleId, int clubId)
@@ -41,7 +46,8 @@ namespace BusinessLogic.Services.Implementation
                 RoleName = dto.RoleName,
                 Description = dto.Description,
                 Level = dto.Level,
-                ClubId=clubId
+                ClubId = clubId,
+                DepartmentId = dto.DepartmentId
             };
 
             var created = await _repository.CreateAsync(clubRole);
@@ -74,6 +80,11 @@ namespace BusinessLogic.Services.Implementation
             if (dto.Level.HasValue)
                 clubRole.Level = dto.Level.Value;
 
+            if (dto.DepartmentId.HasValue)
+                clubRole.DepartmentId = dto.DepartmentId;
+            else
+                clubRole.DepartmentId = null;
+
             await _repository.UpdateAsync(clubRole);
 
             // Cập nhật policies nếu được cung cấp
@@ -90,8 +101,83 @@ namespace BusinessLogic.Services.Implementation
         }
         public async Task<bool> DeleteAsync(int clubRoleId)
         {
+            // Check if this role is a department manager
+            var department = await _departmentRepository.GetByManagerRoleIdAsync(clubRoleId);
+            if (department != null)
+            {
+                // Step 1: Nullify the ManagerRoleId to break circular FK reference
+                department.ManagerRoleId = null;
+                await _departmentRepository.UpdateAsync(department);
+
+                // Step 2: Delete all roles belonging to this department
+                var departmentRoles = await _repository.GetByDepartmentIdAsync(department.DepartmentId);
+                foreach (var role in departmentRoles)
+                {
+                    await _repository.DeleteAsync(role.ClubRoleId);
+                }
+
+                // Step 3: Delete the department itself
+                await _departmentRepository.DeleteAsync(department.DepartmentId);
+                return true;
+            }
+
+            // Normal delete for non-manager roles
             return await _repository.DeleteAsync(clubRoleId);
         }
+
+        public async Task<ClubStructureResponseDto> GetClubStructureAsync(int clubId)
+        {
+            var allRoles = (await _repository.GetAllAsync(clubId)).ToList();
+            var departments = (await _departmentRepository.GetByClubIdAsync(clubId)).ToList();
+
+            // Roles with no department → standalone
+            var standaloneRoles = allRoles
+                .Where(r => r.DepartmentId == null)
+                .Select(MapToStructureRoleDto)
+                .ToList();
+
+            // Group remaining roles by department
+            var departmentDtos = departments.Select(dept =>
+            {
+                var deptRoles = allRoles.Where(r => r.DepartmentId == dept.DepartmentId).ToList();
+                var managerRole = deptRoles.FirstOrDefault(r => r.ClubRoleId == dept.ManagerRoleId);
+                var otherRoles  = deptRoles.Where(r => r.ClubRoleId != dept.ManagerRoleId).ToList();
+
+                return new ClubStructureDepartmentDto
+                {
+                    DepartmentId   = dept.DepartmentId,
+                    DepartmentName = dept.DepartmentName,
+                    Description    = dept.Description,
+                    Manager        = managerRole != null ? MapToStructureRoleDto(managerRole) : null,
+                    Roles          = otherRoles.Select(MapToStructureRoleDto).ToList()
+                };
+            }).ToList();
+
+            return new ClubStructureResponseDto
+            {
+                StandaloneRoles = standaloneRoles,
+                Departments     = departmentDtos
+            };
+        }
+
+        private static ClubStructureRoleDto MapToStructureRoleDto(ClubRole clubRole) =>
+            new ClubStructureRoleDto
+            {
+                ClubRoleId   = clubRole.ClubRoleId,
+                RoleName     = clubRole.RoleName,
+                Description  = clubRole.Description,
+                Level        = clubRole.Level,
+                MemberCount  = clubRole.ClubMembers?.Count ?? 0,
+                Policies     = clubRole.ClubRolePolicies?
+                    .Select(crp => new PolicyResponseDto
+                    {
+                        Id            = crp.Policy.Id,
+                        Title         = crp.Policy.Title,
+                        Description   = crp.Policy.Description,
+                        PolicyGroupId = crp.Policy.PolicyGroupId
+                    })
+                    .ToList() ?? new()
+            };
 
         private static ClubRoleResponseDto MapToResponseDto(ClubRole clubRole)
         {
@@ -108,10 +194,11 @@ namespace BusinessLogic.Services.Implementation
                         Id = crp.Policy.Id,
                         Title = crp.Policy.Title,
                         Description = crp.Policy.Description,
-                        PolicyGroupId=crp.Policy.PolicyGroupId,
+                        PolicyGroupId = crp.Policy.PolicyGroupId,
                     })
                     .ToList() ?? new(),
-                clubId = clubRole.ClubId ?? 0
+                clubId = clubRole.ClubId ?? 0,
+                DepartmentId = clubRole.DepartmentId
             };
         }
        
