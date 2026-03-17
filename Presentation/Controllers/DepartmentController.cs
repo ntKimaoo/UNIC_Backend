@@ -18,9 +18,9 @@ namespace UNIC.Presentation.Controllers
 
         [HttpGet]
         [EnableQuery]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] int clubId)
         {
-            var departments = await _departmentService.GetAllDepartmentsAsync();
+            var departments = await _departmentService.GetAllDepartmentsAsync(clubId);
             if (!departments.Any())
             {
                 return NotFound(new { success = false, message = "No departments found" });
@@ -29,9 +29,9 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetDepartmentById(int id)
+        public async Task<IActionResult> GetDepartmentById(int id, [FromQuery] int clubId)
         {
-            var department = await _departmentService.GetDepartmentByIdAsync(id);
+            var department = await _departmentService.GetDepartmentByIdAsync(id, clubId);
             if (department == null)
             {
                 return NotFound(new { success = false, message = "Department not found" });
@@ -40,9 +40,9 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateDepartment(int id, [FromBody] DepartmentResponseDto department)
+        public async Task<IActionResult> UpdateDepartment(int id, [FromBody] DepartmentResponseDto department, [FromQuery] int clubId)
         {
-            var result = await _departmentService.UpdateDepartmentAsync(id, department);
+            var result = await _departmentService.UpdateDepartmentAsync(id, department, clubId);
             if (!result)
             {
                 return NotFound(new { success = false, message = "Department not found" });
@@ -65,9 +65,9 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteDepartment(int id)
+        public async Task<IActionResult> DeleteDepartment(int id, [FromQuery] int clubId)
         {
-            var result = await _departmentService.DeleteDepartmentAsync(id);
+            var result = await _departmentService.DeleteDepartmentAsync(id, clubId);
             if (!result)
             {
                 return NotFound(new { success = false, message = "Department not found" });

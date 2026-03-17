@@ -27,80 +27,61 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpGet]
-        [EnableQuery]
-        public async Task<IActionResult> GetAllApplications()
+        public async Task<IActionResult> GetAllApplications([FromQuery] int clubId)
         {
-            var applications = await _applicationService.GetAllApplicationsAsync();
-            if (!applications.Any())
-            {
-                return NotFound(new { success = false, message = "No applications found" });
-            }
+            var applications = await _applicationService.GetAllApplicationsAsync(clubId);
             return Ok(new { success = true, data = applications });
         }
 
         [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetApplicationById(int id)
+        public async Task<IActionResult> GetApplicationById(int id, [FromQuery] int clubId)
         {
-            var application = await _applicationService.GetApplicationByIdAsync(id);
+            var application = await _applicationService.GetApplicationByIdAsync(id, clubId);
             if (application == null)
-            {
-                return NotFound(new { success = false, message = "Application not found" });
-            }
+                return NotFound(new { success = false });
+
             return Ok(new { success = true, data = application });
         }
 
         [HttpGet("user/{userId:guid}")]
-        public async Task<IActionResult> GetApplicationsByUser(Guid userId)
+        public async Task<IActionResult> GetApplicationsByUser(Guid userId, [FromQuery] int clubId)
         {
-            var applications = await _applicationService.GetApplicationsByUserAsync(userId);
-            if (!applications.Any())
-            {
-                return NotFound(new { success = false, message = "No applications found for user" });
-            }
+            var applications = await _applicationService.GetApplicationsByUserAsync(userId, clubId);
             return Ok(new { success = true, data = applications });
         }
 
         [HttpGet("form/{formId:int}")]
-        public async Task<IActionResult> GetApplicationsByForm(int formId)
+        public async Task<IActionResult> GetApplicationsByForm(int formId, [FromQuery] int clubId)
         {
-            var applications = await _applicationService.GetApplicationsByFormAsync(formId);
-            if (!applications.Any())
-            {
-                return NotFound(new { success = false, message = "No applications found for form" });
-            }
+            var applications = await _applicationService.GetApplicationsByFormAsync(formId, clubId);
             return Ok(new { success = true, data = applications });
         }
 
         [HttpGet("status/{status}")]
-        public async Task<IActionResult> GetApplicationsByStatus(string status)
+        public async Task<IActionResult> GetApplicationsByStatus(string status, [FromQuery] int clubId)
         {
-            var applications = await _applicationService.GetApplicationsByStatusAsync(status);
-            if (!applications.Any())
-            {
-                return NotFound(new { success = false, message = "No applications found for status" });
-            }
+            var applications = await _applicationService.GetApplicationsByStatusAsync(status, clubId);
             return Ok(new { success = true, data = applications });
         }
 
         [HttpGet("user/{userId:guid}/form/{formId:int}")]
-        public async Task<IActionResult> GetApplicationByUserAndForm(Guid userId, int formId)
+        public async Task<IActionResult> GetApplicationByUserAndForm(Guid userId, int formId, [FromQuery] int clubId)
         {
-            var application = await _applicationService.GetApplicationByUserAndFormAsync(userId, formId);
+            var application = await _applicationService.GetApplicationByUserAndFormAsync(userId, formId, clubId);
             if (application == null)
-            {
-                return NotFound(new { success = false, message = "Application not found for user and form" });
-            }
+                return NotFound(new { success = false });
+
             return Ok(new { success = true, data = application });
         }
 
-        [HttpGet("campaign/{campaignId:int}/applications")]
-        public async Task<IActionResult> GetApplicationsByCampaign(int campaignId, [FromQuery] string? status = null)
+        [HttpGet("campaign/{campaignId:int}")]
+        public async Task<IActionResult> GetApplicationsByCampaign(int campaignId, [FromQuery] int clubId, [FromQuery] string? status = null)
         {
-            var applications = await _applicationService.GetApplicationsByCampaignAsync(campaignId, status);
+            var applications = await _applicationService.GetApplicationsByCampaignAsync(campaignId, clubId, status);
             return Ok(new { success = true, data = applications });
         }
 
-        [HttpGet("club/{clubId:int}/applications")]
+        [HttpGet("club/{clubId:int}")]
         public async Task<IActionResult> GetApplicationsByClub(int clubId, [FromQuery] string? status = null)
         {
             var applications = await _applicationService.GetApplicationsByClubAsync(clubId, status);
@@ -111,36 +92,28 @@ namespace UNIC.Presentation.Controllers
         public async Task<IActionResult> CreateApplication([FromBody] CreateApplicationDto request)
         {
             var created = await _applicationService.CreateApplicationAsync(request);
-            return CreatedAtAction(
-                nameof(GetApplicationById),
-                new { id = created.ApplicationId },
-                new { success = true, data = created }
-            );
+            return Ok(new { success = true, data = created });
         }
 
         [HttpPut("{id:int}")]
-        public async Task<IActionResult> UpdateApplication(int id, [FromBody] ApplicationResponseDto application)
+        public async Task<IActionResult> UpdateApplication(int id, [FromQuery] int clubId, [FromBody] ApplicationResponseDto application)
         {
-            var result = await _applicationService.UpdateApplicationAsync(id, application);
+            var result = await _applicationService.UpdateApplicationAsync(id, clubId, application);
             if (!result)
-            {
-                return NotFound(new { success = false, message = "Application not found" });
-            }
+                return NotFound(new { success = false });
 
-            application.ApplicationId = id;
-            return Ok(new { success = true, data = application });
+            return Ok(new { success = true });
         }
 
         [HttpPatch("{id:int}/status")]
-        public async Task<IActionResult> UpdateApplicationStatus(int id, [FromBody] UpdateApplicationStatusDto request)
+        public async Task<IActionResult> UpdateApplicationStatus(int id, [FromQuery] int clubId, [FromBody] UpdateApplicationStatusDto request)
         {
             try
             {
-                var updated = await _applicationService.UpdateApplicationStatusAsync(id, request.Status);
+                var updated = await _applicationService.UpdateApplicationStatusAsync(id, clubId, request.Status);
                 if (updated == null)
-                {
-                    return NotFound(new { success = false, message = "Application not found" });
-                }
+                    return NotFound(new { success = false });
+
                 return Ok(new { success = true, data = updated });
             }
             catch (ArgumentException ex)
@@ -150,47 +123,38 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpDelete("{id:int}")]
-        public async Task<IActionResult> DeleteApplication(int id)
+        public async Task<IActionResult> DeleteApplication(int id, [FromQuery] int clubId)
         {
-            var result = await _applicationService.DeleteApplicationAsync(id);
+            var result = await _applicationService.DeleteApplicationAsync(id, clubId);
             if (!result)
-            {
-                return NotFound(new { success = false, message = "Application not found" });
-            }
-            return Ok(new { success = true, data = new { id } });
+                return NotFound(new { success = false });
+
+            return Ok(new { success = true });
         }
 
+        // ================= FORM =================
+
         [HttpGet("forms")]
-        [EnableQuery]
-        public async Task<IActionResult> GetAllForms()
+        public async Task<IActionResult> GetAllForms([FromQuery] int clubId)
         {
-            var forms = await _applicationService.GetAllFormsAsync();
-            if (!forms.Any())
-            {
-                return NotFound(new { success = false, message = "No forms found" });
-            }
+            var forms = await _applicationService.GetAllFormsAsync(clubId);
             return Ok(new { success = true, data = forms });
         }
 
         [HttpGet("forms/campaign/{campaignId:int}")]
-        public async Task<IActionResult> GetFormsByCampaign(int campaignId)
+        public async Task<IActionResult> GetFormsByCampaign(int campaignId, [FromQuery] int clubId)
         {
-            var forms = await _applicationService.GetFormsByCampaignAsync(campaignId);
-            if (!forms.Any())
-            {
-                return NotFound(new { success = false, message = "No forms found for this campaign" });
-            }
+            var forms = await _applicationService.GetFormsByCampaignAsync(campaignId, clubId);
             return Ok(new { success = true, data = forms });
         }
 
         [HttpGet("forms/{id:int}")]
-        public async Task<IActionResult> GetFormById(int id)
+        public async Task<IActionResult> GetFormById(int id, [FromQuery] int clubId)
         {
-            var form = await _applicationService.GetFormByIdAsync(id);
+            var form = await _applicationService.GetFormByIdAsync(id, clubId);
             if (form == null)
-            {
-                return NotFound(new { success = false, message = "Form not found" });
-            }
+                return NotFound(new { success = false });
+
             return Ok(new { success = true, data = form });
         }
 
@@ -198,56 +162,45 @@ namespace UNIC.Presentation.Controllers
         public async Task<IActionResult> CreateForm([FromBody] CreateApplicationFormDto request)
         {
             var created = await _applicationService.CreateFormAsync(request);
-            return CreatedAtAction(
-                nameof(GetFormById),
-                new { id = created.FormId },
-                new { success = true, data = created }
-            );
+            return Ok(new { success = true, data = created });
         }
 
         [HttpPut("forms/{id:int}")]
-        public async Task<IActionResult> UpdateForm(int id, [FromBody] ApplicationFormResponseDto form)
+        public async Task<IActionResult> UpdateForm(int id, [FromQuery] int clubId, [FromBody] ApplicationFormResponseDto form)
         {
-            var result = await _applicationService.UpdateFormAsync(id, form);
+            var result = await _applicationService.UpdateFormAsync(id, clubId, form);
             if (!result)
-            {
-                return NotFound(new { success = false, message = "Form not found" });
-            }
+                return NotFound(new { success = false });
 
-            form.FormId = id;
-            return Ok(new { success = true, data = form });
+            return Ok(new { success = true });
         }
 
         [HttpDelete("forms/{id:int}")]
-        public async Task<IActionResult> DeleteForm(int id)
+        public async Task<IActionResult> DeleteForm(int id, [FromQuery] int clubId)
         {
-            var result = await _applicationService.DeleteFormAsync(id);
+            var result = await _applicationService.DeleteFormAsync(id, clubId);
             if (!result)
-            {
-                return NotFound(new { success = false, message = "Form not found" });
-            }
-            return Ok(new { success = true, data = new { id } });
+                return NotFound(new { success = false });
+
+            return Ok(new { success = true });
         }
 
+        // ================= QUESTION =================
+
         [HttpGet("forms/{formId:int}/questions")]
-        public async Task<IActionResult> GetQuestionsByForm(int formId)
+        public async Task<IActionResult> GetQuestionsByForm(int formId, [FromQuery] int clubId)
         {
-            var questions = await _applicationService.GetQuestionsByFormAsync(formId);
-            if (!questions.Any())
-            {
-                return NotFound(new { success = false, message = "No questions found for form" });
-            }
+            var questions = await _applicationService.GetQuestionsByFormAsync(formId, clubId);
             return Ok(new { success = true, data = questions });
         }
 
         [HttpGet("questions/{id:int}")]
-        public async Task<IActionResult> GetQuestionById(int id)
+        public async Task<IActionResult> GetQuestionById(int id, [FromQuery] int clubId)
         {
-            var question = await _applicationService.GetQuestionByIdAsync(id);
+            var question = await _applicationService.GetQuestionByIdAsync(id, clubId);
             if (question == null)
-            {
-                return NotFound(new { success = false, message = "Question not found" });
-            }
+                return NotFound(new { success = false });
+
             return Ok(new { success = true, data = question });
         }
 
@@ -255,74 +208,57 @@ namespace UNIC.Presentation.Controllers
         public async Task<IActionResult> CreateQuestion([FromBody] CreateApplicationQuestionDto request)
         {
             var created = await _applicationService.CreateQuestionAsync(request);
-            return CreatedAtAction(
-                nameof(GetQuestionById),
-                new { id = created.QuestionId },
-                new { success = true, data = created }
-            );
+            return Ok(new { success = true, data = created });
         }
 
         [HttpPut("questions/{id:int}")]
-        public async Task<IActionResult> UpdateQuestion(int id, [FromBody] ApplicationQuestionResponseDto question)
+        public async Task<IActionResult> UpdateQuestion(int id, [FromQuery] int clubId, [FromBody] ApplicationQuestionResponseDto question)
         {
-            var result = await _applicationService.UpdateQuestionAsync(id, question);
+            var result = await _applicationService.UpdateQuestionAsync(id, clubId, question);
             if (!result)
-            {
-                return NotFound(new { success = false, message = "Question not found" });
-            }
+                return NotFound(new { success = false });
 
-            question.QuestionId = id;
-            return Ok(new { success = true, data = question });
+            return Ok(new { success = true });
         }
 
         [HttpDelete("questions/{id:int}")]
-        public async Task<IActionResult> DeleteQuestion(int id)
+        public async Task<IActionResult> DeleteQuestion(int id, [FromQuery] int clubId)
         {
-            var result = await _applicationService.DeleteQuestionAsync(id);
+            var result = await _applicationService.DeleteQuestionAsync(id, clubId);
             if (!result)
-            {
-                return NotFound(new { success = false, message = "Question not found" });
-            }
-            return Ok(new { success = true, data = new { id } });
+                return NotFound(new { success = false });
+
+            return Ok(new { success = true });
         }
 
+        // ================= ANSWER =================
+
         [HttpGet("{applicationId:int}/answers")]
-        public async Task<IActionResult> GetAnswersByApplication(int applicationId)
+        public async Task<IActionResult> GetAnswersByApplication(int applicationId, [FromQuery] int clubId)
         {
-            var answers = await _applicationService.GetAnswersByApplicationAsync(applicationId);
-            if (!answers.Any())
-            {
-                return NotFound(new { success = false, message = "No answers found for this application" });
-            }
+            var answers = await _applicationService.GetAnswersByApplicationAsync(applicationId, clubId);
             return Ok(new { success = true, data = answers });
         }
 
         [HttpGet("answers/{id:int}")]
-        public async Task<IActionResult> GetAnswerById(int id)
+        public async Task<IActionResult> GetAnswerById(int id, [FromQuery] int clubId)
         {
-            var answer = await _applicationService.GetAnswerByIdAsync(id);
+            var answer = await _applicationService.GetAnswerByIdAsync(id, clubId);
             if (answer == null)
-            {
-                return NotFound(new { success = false, message = "Answer not found" });
-            }
+                return NotFound(new { success = false });
+
             return Ok(new { success = true, data = answer });
         }
 
         [HttpPost("{applicationId:int}/answers")]
-        public async Task<IActionResult> CreateAnswer(int applicationId, [FromBody] CreateApplicationAnswerDto request)
+        public async Task<IActionResult> CreateAnswer(int applicationId, [FromBody] CreateApplicationAnswerDto request, [FromQuery] int clubId)
         {
-            if (request.ApplicationId != applicationId)
-            {
-                request.ApplicationId = applicationId;
-            }
+            request.ApplicationId = applicationId;
+
             try
             {
-                var created = await _applicationService.CreateAnswerAsync(request);
-                return CreatedAtAction(
-                    nameof(GetAnswerById),
-                    new { id = created.AnswerId },
-                    new { success = true, data = created }
-                );
+                var created = await _applicationService.CreateAnswerAsync(request, clubId);
+                return Ok(new { success = true, data = created });
             }
             catch (ArgumentException ex)
             {
@@ -331,53 +267,37 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPost("submit")]
-        [Produces("application/json")]
-        public async Task<IActionResult> SubmitApplicationWithAnswers([FromBody] SubmitApplicationWithAnswersDto request)
+        public async Task<IActionResult> SubmitApplication([FromQuery] int clubId, [FromBody] SubmitApplicationWithAnswersDto request)
         {
             try
             {
-                var created = await _applicationService.SubmitApplicationWithAnswersAsync(request);
-                return CreatedAtAction(
-                    nameof(GetApplicationById),
-                    new { id = created.ApplicationId },
-                    new { success = true, data = created }
-                );
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { success = false, message = ex.Message });
-            }
-            catch (ArgumentException ex)
-            {
-                return BadRequest(new { success = false, message = ex.Message });
+                var created = await _applicationService.SubmitApplicationWithAnswersAsync(clubId, request);
+                return Ok(new { success = true, data = created });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = "Đã xảy ra lỗi khi xử lý đơn. Vui lòng thử lại.", detail = ex.Message });
+                return BadRequest(new { success = false, message = ex.Message });
             }
         }
 
         [HttpPut("answers/{id:int}")]
-        public async Task<IActionResult> UpdateAnswer(int id, [FromBody] ApplicationAnswerResponseDto answer)
+        public async Task<IActionResult> UpdateAnswer(int id, [FromQuery] int clubId, [FromBody] ApplicationAnswerResponseDto answer)
         {
-            var result = await _applicationService.UpdateAnswerAsync(id, answer);
+            var result = await _applicationService.UpdateAnswerAsync(id, clubId, answer);
             if (!result)
-            {
-                return NotFound(new { success = false, message = "Answer not found" });
-            }
-            answer.AnswerId = id;
-            return Ok(new { success = true, data = answer });
+                return NotFound(new { success = false });
+
+            return Ok(new { success = true });
         }
 
         [HttpDelete("answers/{id:int}")]
-        public async Task<IActionResult> DeleteAnswer(int id)
+        public async Task<IActionResult> DeleteAnswer(int id, [FromQuery] int clubId)
         {
-            var result = await _applicationService.DeleteAnswerAsync(id);
+            var result = await _applicationService.DeleteAnswerAsync(id, clubId);
             if (!result)
-            {
-                return NotFound(new { success = false, message = "Answer not found" });
-            }
-            return Ok(new { success = true, data = new { id } });
+                return NotFound(new { success = false });
+
+            return Ok(new { success = true });
         }
     }
 }

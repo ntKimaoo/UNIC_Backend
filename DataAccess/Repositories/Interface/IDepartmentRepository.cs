@@ -9,10 +9,10 @@ namespace UNIC.DataAccess.Repositories.Interface
 {
     public interface IDepartmentRepository
     {
-        Task<IEnumerable<Department>> GetAllAsync();
-        Task<Department?> GetByIdAsync(int departmentId);
+        Task<IEnumerable<Department>> GetAllAsync(int clubId);
+        Task<Department?> GetByIdAsync(int departmentId, int clubId);
         Task<Department> CreateAsync(Department department);
-        Task<bool> UpdateAsync(Department department);
-        Task<bool> DeleteAsync(int departmentId);
+        Task<bool> UpdateAsync(Department department, int clubId);
+        Task<bool> DeleteAsync(int departmentId, int clubId);
     }
 }

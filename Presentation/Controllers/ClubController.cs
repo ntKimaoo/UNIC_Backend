@@ -89,6 +89,7 @@ namespace Presentation.Controllers
         /// Create a new club
         /// </summary>
         [HttpPost]
+        //[RequirePolicy("CreateClub")]
         public async Task<IActionResult> Create([FromBody] CreateClubDto dto)
         {
             if (!ModelState.IsValid)
