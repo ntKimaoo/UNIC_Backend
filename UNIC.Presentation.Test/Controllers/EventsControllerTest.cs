@@ -15,14 +15,14 @@ namespace UNIC.Presentation.Test.Controllers
     public class EventsControllerTest
     {
         private readonly Mock<IEventService> _mockEventService;
-        private readonly Mock<IFileStorageService> _mockFileStorage;
+        private readonly Mock<IQRCodeGeneratorService> _mockQrService;
         private readonly EventsController _controller;
 
         public EventsControllerTest()
         {
             _mockEventService = new Mock<IEventService>();
-            _mockFileStorage = new Mock<IFileStorageService>();
-            _controller = new EventsController(_mockEventService.Object, _mockFileStorage.Object);
+            _mockQrService = new Mock<IQRCodeGeneratorService>();
+            _controller = new EventsController(_mockEventService.Object, _mockQrService.Object);
         }
 
         // Helper to unwrap ActionResult<T> → the inner IActionResult
@@ -97,161 +97,36 @@ namespace UNIC.Presentation.Test.Controllers
 
         #endregion
 
-        #region CreateEvent
+        #region GetQrCodeImage
 
         [Fact]
-        public async Task CreateEvent_ReturnsCreated_WithNoImage()
+        public void GetQrCodeImage_ReturnsBadRequest_WhenTokenEmpty()
         {
-            var request = new CreateEventRequest { EventName = "Test", ClubId = 1, Description = "desc", StartDate = DateTime.Now, EndDate = DateTime.Now.AddDays(1) };
-            _mockEventService.Setup(s => s.CreateEventAsync(request, null))
-                .ReturnsAsync(new EventDetailDto { EventId = 5 });
+            var result = _controller.GetQrCodeImage("");
 
-            var result = await _controller.CreateEvent(request, null);
-
-            Assert.IsType<CreatedAtActionResult>(Unwrap(result));
+            Assert.IsType<BadRequestResult>(result);
         }
 
         [Fact]
-        public async Task CreateEvent_ReturnsCreated_WithImage()
+        public void GetQrCodeImage_ReturnsNotFound_WhenNoPngBytes()
         {
-            var request = new CreateEventRequest { EventName = "Test", ClubId = 1, Description = "desc", StartDate = DateTime.Now, EndDate = DateTime.Now.AddDays(1) };
-            var mockFile = new Mock<IFormFile>();
-            mockFile.Setup(f => f.Length).Returns(100);
-            _mockFileStorage.Setup(s => s.SaveFileAsync(mockFile.Object, "uniclub/events"))
-                .ReturnsAsync("https://cdn.example.com/img.jpg");
-            _mockEventService.Setup(s => s.CreateEventAsync(request, "https://cdn.example.com/img.jpg"))
-                .ReturnsAsync(new EventDetailDto { EventId = 5 });
+            _mockQrService.Setup(s => s.GetQrCodePngBytes("abc"))
+                .Returns(Array.Empty<byte>());
 
-            var result = await _controller.CreateEvent(request, mockFile.Object);
+            var result = _controller.GetQrCodeImage("abc");
 
-            Assert.IsType<CreatedAtActionResult>(Unwrap(result));
+            Assert.IsType<NotFoundResult>(result);
         }
 
         [Fact]
-        public async Task CreateEvent_ReturnsBadRequest_WhenInvalidOperation()
+        public void GetQrCodeImage_ReturnsFile_WhenSuccess()
         {
-            var request = new CreateEventRequest { Description = "x", EventName = "x", StartDate = DateTime.Now, EndDate = DateTime.Now };
-            _mockEventService.Setup(s => s.CreateEventAsync(request, null))
-                .ThrowsAsync(new InvalidOperationException("Club not found"));
+            _mockQrService.Setup(s => s.GetQrCodePngBytes("abc"))
+                .Returns(new byte[] { 1, 2, 3 });
 
-            var result = await _controller.CreateEvent(request, null);
+            var result = _controller.GetQrCodeImage("abc");
 
-            Assert.IsType<BadRequestObjectResult>(Unwrap(result));
-        }
-
-        [Fact]
-        public async Task CreateEvent_Returns500_WhenUnexpected()
-        {
-            var request = new CreateEventRequest { Description = "x", EventName = "x", StartDate = DateTime.Now, EndDate = DateTime.Now };
-            _mockEventService.Setup(s => s.CreateEventAsync(request, null))
-                .ThrowsAsync(new Exception("Unexpected"));
-
-            var result = await _controller.CreateEvent(request, null);
-
-            var obj = Assert.IsType<ObjectResult>(Unwrap(result));
-            Assert.Equal(500, obj.StatusCode);
-        }
-
-        #endregion
-
-        #region UpdateEvent
-
-        [Fact]
-        public async Task UpdateEvent_ReturnsOk_WhenSuccess()
-        {
-            var request = new UpdateEventRequest { EventId = 1, EventName = "Updated", Description = "d" };
-            _mockEventService.Setup(s => s.UpdateEventAsync(request))
-                .ReturnsAsync(new EventDetailDto { EventId = 1 });
-
-            var result = await _controller.UpdateEvent(1, request, null);
-
-            Assert.IsType<OkObjectResult>(Unwrap(result));
-        }
-
-        [Fact]
-        public async Task UpdateEvent_ReturnsBadRequest_WhenIdMismatch()
-        {
-            var request = new UpdateEventRequest { EventId = 2, EventName = "x", Description = "x" };
-
-            var result = await _controller.UpdateEvent(1, request, null);
-
-            Assert.IsType<BadRequestObjectResult>(Unwrap(result));
-        }
-
-        [Fact]
-        public async Task UpdateEvent_ReturnsNotFound_WhenNotFound()
-        {
-            var request = new UpdateEventRequest { EventId = 1, EventName = "x", Description = "x" };
-            _mockEventService.Setup(s => s.UpdateEventAsync(request))
-                .ThrowsAsync(new NotFoundException("Event not found"));
-
-            var result = await _controller.UpdateEvent(1, request, null);
-
-            Assert.IsType<NotFoundObjectResult>(Unwrap(result));
-        }
-
-        #endregion
-
-        #region CreateSession
-
-        [Fact]
-        public async Task CreateSession_ReturnsCreated_WhenSuccess()
-        {
-            var request = new CreateSessionRequest { EventId = 1, SessionName = "S1", StartTime = DateTime.Now, EndTime = DateTime.Now.AddHours(2) };
-            _mockEventService.Setup(s => s.CreateSessionAsync(request))
-                .ReturnsAsync(new SessionDto { ScheduleId = 1 });
-
-            var result = await _controller.CreateSession(1, request);
-
-            Assert.IsType<CreatedAtActionResult>(Unwrap(result));
-        }
-
-        [Fact]
-        public async Task CreateSession_ReturnsBadRequest_WhenIdMismatch()
-        {
-            var request = new CreateSessionRequest { EventId = 2, SessionName = "x", StartTime = DateTime.Now, EndTime = DateTime.Now.AddHours(1) };
-
-            var result = await _controller.CreateSession(1, request);
-
-            Assert.IsType<BadRequestObjectResult>(Unwrap(result));
-        }
-
-        [Fact]
-        public async Task CreateSession_ReturnsNotFound_WhenEventNotFound()
-        {
-            var request = new CreateSessionRequest { EventId = 1, SessionName = "x", StartTime = DateTime.Now, EndTime = DateTime.Now.AddHours(1) };
-            _mockEventService.Setup(s => s.CreateSessionAsync(request))
-                .ThrowsAsync(new NotFoundException("Event not found"));
-
-            var result = await _controller.CreateSession(1, request);
-
-            Assert.IsType<NotFoundObjectResult>(Unwrap(result));
-        }
-
-        #endregion
-
-        #region OpenRegistration
-
-        [Fact]
-        public async Task OpenRegistration_ReturnsOk_WhenSuccess()
-        {
-            var request = new OpenRegistrationRequest { EventId = 1, RegistrationStartDate = DateTime.Now, RegistrationEndDate = DateTime.Now.AddDays(7) };
-            _mockEventService.Setup(s => s.OpenRegistrationAsync(request))
-                .ReturnsAsync(new EventDetailDto { EventId = 1 });
-
-            var result = await _controller.OpenRegistration(1, request);
-
-            Assert.IsType<OkObjectResult>(Unwrap(result));
-        }
-
-        [Fact]
-        public async Task OpenRegistration_ReturnsBadRequest_WhenIdMismatch()
-        {
-            var request = new OpenRegistrationRequest { EventId = 2, RegistrationStartDate = DateTime.Now, RegistrationEndDate = DateTime.Now.AddDays(7) };
-
-            var result = await _controller.OpenRegistration(1, request);
-
-            Assert.IsType<BadRequestObjectResult>(Unwrap(result));
+            Assert.IsType<FileContentResult>(result);
         }
 
         #endregion

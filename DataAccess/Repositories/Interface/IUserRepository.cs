@@ -19,5 +19,6 @@ namespace DataAccess.Repositories.Interface
         Task<bool> DeleteAsync(Guid userId);
         Task<IEnumerable<User>> GetAllAsync();
         Task<(IEnumerable<User> Items, int TotalCount)> GetPagedAsync(int pageNumber, int pageSize);
+        Task<IEnumerable<Club>> GetAllClubByUser(Guid userId);
     }
 }

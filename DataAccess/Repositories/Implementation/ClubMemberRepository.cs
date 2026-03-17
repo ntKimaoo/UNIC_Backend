@@ -93,11 +93,6 @@ namespace DataAccess.Repositories.Implementation
                 .Include(m => m.Club)
                 .Include(m => m.ClubRole)
                 .Include(m => m.User)
-                    .ThenInclude(u => u.DepartmentMembers)
-                    .ThenInclude(dm => dm.Department)
-                .Include(m => m.User)
-                    .ThenInclude(u => u.DepartmentMembers)
-                    .ThenInclude(dm => dm.DepartmentRole)
                 .Where(m => m.UserId == userId)
                 .OrderBy(m => m.JoinDate)
                 .ToListAsync();

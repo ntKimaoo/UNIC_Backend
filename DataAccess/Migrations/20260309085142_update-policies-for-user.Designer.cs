@@ -4,16 +4,19 @@ using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    partial class UnicContextModelSnapshot : ModelSnapshot
+    [Migration("20260309085142_update-policies-for-user")]
+    partial class updatepoliciesforuser
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -168,10 +171,6 @@ namespace UNIC.DataAccess.Migrations
                     b.Property<DateTime?>("CheckInTime")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("CheckInToken")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
                     b.Property<string>("Comment")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -189,10 +188,6 @@ namespace UNIC.DataAccess.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("AttendId");
-
-                    b.HasIndex("CheckInToken")
-                        .IsUnique()
-                        .HasFilter("[CheckInToken] IS NOT NULL");
 
                     b.HasIndex("EventId");
 
@@ -377,9 +372,6 @@ namespace UNIC.DataAccess.Migrations
                     b.Property<int?>("ClubId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("DepartmentId")
-                        .HasColumnType("int");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -395,8 +387,6 @@ namespace UNIC.DataAccess.Migrations
                     b.HasKey("ClubRoleId");
 
                     b.HasIndex("ClubId");
-
-                    b.HasIndex("DepartmentId");
 
                     b.ToTable("ClubRoles");
                 });
@@ -421,10 +411,8 @@ namespace UNIC.DataAccess.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("Description")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("ManagerRoleId")
-                        .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -433,9 +421,69 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("ClubId");
 
-                    b.HasIndex("ManagerRoleId");
-
                     b.ToTable("Departments");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.DepartmentMember", b =>
+                {
+                    b.Property<int>("DeptMemberId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DeptMemberId"));
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("AssignedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("DepartmentId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DeptRoleId")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("DeptMemberId");
+
+                    b.HasIndex("AssignedBy");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.HasIndex("DeptRoleId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserDepartmentRoles");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.DepartmentRole", b =>
+                {
+                    b.Property<int>("DeptRoleId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("DeptRoleId"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Permissions")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RoleName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("DeptRoleId");
+
+                    b.ToTable("DepartmentRoles");
                 });
 
             modelBuilder.Entity("DataAccess.Models.EmailVerificationToken", b =>
@@ -1299,14 +1347,7 @@ namespace UNIC.DataAccess.Migrations
                         .WithMany("ClubRoles")
                         .HasForeignKey("ClubId");
 
-                    b.HasOne("DataAccess.Models.Department", "Department")
-                        .WithMany("ClubRoles")
-                        .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
                     b.Navigation("Club");
-
-                    b.Navigation("Department");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Department", b =>
@@ -1317,14 +1358,41 @@ namespace UNIC.DataAccess.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("DataAccess.Models.ClubRole", "ManagerRole")
-                        .WithMany("ManagedDepartments")
-                        .HasForeignKey("ManagerRoleId")
+                    b.Navigation("Club");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.DepartmentMember", b =>
+                {
+                    b.HasOne("DataAccess.Models.User", "AssignedByUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedBy")
                         .OnDelete(DeleteBehavior.NoAction);
 
-                    b.Navigation("Club");
+                    b.HasOne("DataAccess.Models.Department", "Department")
+                        .WithMany("DepartmentMembers")
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
 
-                    b.Navigation("ManagerRole");
+                    b.HasOne("DataAccess.Models.DepartmentRole", "DepartmentRole")
+                        .WithMany("DepartmentMembers")
+                        .HasForeignKey("DeptRoleId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("DataAccess.Models.User", "User")
+                        .WithMany("DepartmentMembers")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AssignedByUser");
+
+                    b.Navigation("Department");
+
+                    b.Navigation("DepartmentRole");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("DataAccess.Models.EmailVerificationToken", b =>
@@ -1629,13 +1697,16 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("ClubMembers");
 
                     b.Navigation("ClubRolePolicies");
-
-                    b.Navigation("ManagedDepartments");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Department", b =>
                 {
-                    b.Navigation("ClubRoles");
+                    b.Navigation("DepartmentMembers");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.DepartmentRole", b =>
+                {
+                    b.Navigation("DepartmentMembers");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Event", b =>
@@ -1673,6 +1744,8 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("ClubMembers");
 
                     b.Navigation("ClubPosts");
+
+                    b.Navigation("DepartmentMembers");
 
                     b.Navigation("EmailVerificationTokens");
 

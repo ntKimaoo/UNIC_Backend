@@ -7,12 +7,12 @@ namespace BusinessLogic.Services.Interface
 {
     public interface IClubRoleService
     {
-        Task<ClubRoleResponseDto?> GetByIdAsync(int clubRoleId);
-        Task<IEnumerable<ClubRoleResponseDto>> GetAllAsync();
-        Task<ClubRoleResponseDto> CreateAsync(CreateClubRoleDto dto);
-        Task<ClubRoleResponseDto?> UpdateAsync(int clubRoleId, UpdateClubRoleDto dto);
+        Task<ClubRoleResponseDto?> GetByIdAsync(int clubRoleId,int clubId);
+        Task<IEnumerable<ClubRoleResponseDto>> GetAllAsync(int clubId);
+        Task<ClubRoleResponseDto> CreateAsync(CreateClubRoleDto dto,int clubId);
+        Task<ClubRoleResponseDto?> UpdateAsync(int clubRoleId, UpdateClubRoleDto dto,int clubId);
         Task<bool> DeleteAsync(int clubRoleId);
-        Task<IEnumerable<Policy>> GetPoliciesByRoleAsync(int clubRoleId);
         Task UpdatePoliciesAsync(int clubRoleId, List<int> policyIds);
+        Task<ClubStructureResponseDto> GetClubStructureAsync(int clubId);
     }
 }

@@ -47,7 +47,7 @@ namespace UNIC.Repository.Test.Repository.Test
             var userId = Guid.NewGuid();
             var policy = new Policy { Id = 1, Title = "Direct_Policy" };
             context.Policies.Add(policy);
-            context.ClubMemberPolicies.Add(new ClubMemberPolicy { UserId = userId, PolicyId = 1 });
+            context.UserPolicies.Add(new UserPolicy { UserId = userId, PolicyId = 1 });
             await context.SaveChangesAsync();
 
             var repository = new PolicyRepository(context);

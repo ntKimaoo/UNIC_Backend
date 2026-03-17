@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UNIC.DataAccess.Models;
 
@@ -43,10 +43,9 @@ public class User
     public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public virtual ICollection<UserRole> UserRoles { get; set; }
     public virtual ICollection<UserClubRole> ClubMembers { get; set; }
-    public virtual ICollection<DepartmentMember> DepartmentMembers { get; set; }
-    public virtual ICollection<ClubPost> ClubPosts { get; set; }    
+    public virtual ICollection<ClubPost> ClubPosts { get; set; }
     public virtual ICollection<Notification> Notifications { get; set; }
     public virtual ICollection<Attendance> Attendances { get; set; }
     public virtual ICollection<Application> Applications { get; set; }
-    public virtual IList<ClubMemberPolicy>? ClubMemberPolicies { get; set; }
+    public virtual IList<UserPolicy>? UserPolicies { get; set; }
 }

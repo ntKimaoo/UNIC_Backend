@@ -1,4 +1,4 @@
-﻿using DataAccess.Models;
+using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -15,6 +15,7 @@ namespace UNIC.DataAccess.Repositories.Implementation
         public DepartmentRepository(UnicContext context) { 
             _context = context;
         }
+
         public async Task<Department> CreateAsync(Department department)
         {
             await _context.Departments.AddAsync(department);
@@ -42,12 +43,28 @@ namespace UNIC.DataAccess.Repositories.Implementation
 
         public async Task<IEnumerable<Department>> GetAllAsync()
         {
-            return await _context.Departments.ToListAsync();
+            return await _context.Departments
+                .Include(d => d.Club)
+                .Include(d => d.ManagerRole)
+                .OrderByDescending(d => d.CreatedAt)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Department>> GetByClubIdAsync(int clubId)
+        {
+            return await _context.Departments
+                .Include(d => d.Club)
+                .Include(d => d.ManagerRole)
+                .Where(d => d.ClubId == clubId)
+                .OrderByDescending(d => d.CreatedAt)
+                .ToListAsync();
         }
 
         public async Task<Department?> GetByIdAsync(int departmentId)
         {
             return await _context.Departments
+                .Include(d => d.Club)
+                .Include(d => d.ManagerRole)
                 .FirstOrDefaultAsync(m => m.DepartmentId == departmentId);
         }
 
@@ -64,6 +81,32 @@ namespace UNIC.DataAccess.Repositories.Implementation
             {
                 return false;
             }
+        }
+
+        public async Task<bool> ExistsAsync(int departmentId)
+        {
+            return await _context.Departments
+                .AnyAsync(d => d.DepartmentId == departmentId);
+        }
+
+        public async Task<bool> DepartmentNameExistsInClubAsync(string departmentName, int clubId, int? excludeDepartmentId = null)
+        {
+            var query = _context.Departments
+                .Where(d => d.DepartmentName == departmentName && d.ClubId == clubId);
+
+            if (excludeDepartmentId.HasValue)
+            {
+                query = query.Where(d => d.DepartmentId != excludeDepartmentId.Value);
+            }
+
+            return await query.AnyAsync();
+        }
+
+        public async Task<Department?> GetByManagerRoleIdAsync(int managerRoleId)
+        {
+            return await _context.Departments
+                .Include(d => d.ClubRoles)
+                .FirstOrDefaultAsync(d => d.ManagerRoleId == managerRoleId);
         }
     }
 }

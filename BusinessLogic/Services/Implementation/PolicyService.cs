@@ -1,8 +1,10 @@
+using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using DataAccess.Repositories.Interface;
 using UNIC.DataAccess.Models;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace BusinessLogic.Services.Implementation
@@ -17,22 +19,38 @@ namespace BusinessLogic.Services.Implementation
         }
 
         public async Task<IEnumerable<Policy>> GetUserPoliciesAsync(Guid userId)
-        {
-            return await _policyRepository.GetUserPoliciesAsync(userId);
-        }
+            => await _policyRepository.GetUserPoliciesAsync(userId);
 
         public async Task<bool> HasUserPolicyAsync(Guid userId, string policyTitle)
-        {
-            return await _policyRepository.HasUserPolicyAsync(userId, policyTitle);
-        }
+            => await _policyRepository.HasUserPolicyAsync(userId, policyTitle);
 
         public async Task<IEnumerable<PolicyGroup>> GetAllPolicyGroupAsync()
-        {
-            return await _policyRepository.GetAllPolicyGroupAsync();
-        }
+            => await _policyRepository.GetAllPolicyGroupAsync();
+
         public async Task<IEnumerable<Policy>> GetAllPoliciesByGroupAsync(int groupId)
+            => await _policyRepository.GetAllPoliciesByGroupAsync(groupId);
+
+        public async Task<IEnumerable<PolicyResponseDto>> GetUserDirectPoliciesAsync(Guid userId)
         {
-            return await _policyRepository.GetAllPoliciesByGroupAsync(groupId);
+            var policies = await _policyRepository.GetUserDirectPoliciesAsync(userId);
+            return policies.Select(p => new PolicyResponseDto
+            {
+                Id = p.Id,
+                Title = p.Title,
+                Description = p.Description
+            });
         }
+
+        public async Task AssignPoliciesToUserAsync(Guid userId, IEnumerable<int> policyIds)
+            => await _policyRepository.AssignPoliciesToUserAsync(userId, policyIds);
+
+        public async Task<bool> RevokePolicyFromUserAsync(Guid userId, int policyId)
+            => await _policyRepository.RevokePolicyFromUserAsync(userId, policyId);
+
+        public async Task SetUserPoliciesAsync(Guid userId, IEnumerable<int> policyIds)
+            => await _policyRepository.SetUserPoliciesAsync(userId, policyIds);
+
+        public async Task<bool> HasMemberPolicyInClubAsync(Guid userId, int clubId, string policyTitle)
+            => await _policyRepository.HasMemberPolicyInClubAsync(userId, clubId, policyTitle);
     }
-}
+}
