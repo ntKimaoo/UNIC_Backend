@@ -13,5 +13,6 @@ namespace DataAccess.Repositories.Interface
         Task<IEnumerable<Attendance>> GetAttendeesByEventAsync(int eventId);
         Task AddAsync(Attendance attendance);
         void Update(Attendance attendance);
+        Task<Attendance?> GetOldestWaitlistedAttendeeAsync(int eventId);
     }
 }

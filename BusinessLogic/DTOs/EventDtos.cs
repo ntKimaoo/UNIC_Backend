@@ -26,6 +26,12 @@ namespace BusinessLogic.DTOs
         public DateTime EndDate { get; set; }
 
         public int? ClubId { get; set; }
+        
+        public bool RequiresApproval { get; set; }
+
+        public bool IsPublic { get; set; } = true;
+
+        public bool IsOnline { get; set; } = false;
     }
 
     /// <summary>
@@ -51,6 +57,10 @@ namespace BusinessLogic.DTOs
         public DateTime? EndDate { get; set; }
 
         public string? ImageUrl { get; set; }
+        
+        public bool RequiresApproval { get; set; }
+
+        public bool IsOnline { get; set; } = false;
     }
 
     /// <summary>
@@ -67,10 +77,12 @@ namespace BusinessLogic.DTOs
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         public bool IsPublic { get; set; }
+        public string? MeetLink { get; set; }
         public string Status { get; set; } = null!;
         public DateTime CreatedAt { get; set; }
         public int? MaxAttendees { get; set; }
         public int CurrentAttendees { get; set; }
+        public bool RequiresApproval { get; set; }
         public DateTime? RegistrationStartDate { get; set; }
         public DateTime? RegistrationEndDate { get; set; }
         public List<SessionDto> Sessions { get; set; } = new List<SessionDto>();

@@ -14,5 +14,8 @@ namespace BusinessLogic.Services.Interface
         Task<CheckInByQrResponse> CheckInByQrTokenAsync(int eventId, string token);
         Task EvaluateMemberAsync(EvaluateMemberRequest request);
         Task<IEnumerable<AttendanceDetailDto>> GetEventAttendeesAsync(int eventId);
+        Task ApproveRegistrationAsync(int eventId, Guid userId);
+        Task RejectRegistrationAsync(int eventId, Guid userId);
+        Task CancelRegistrationAsync(int eventId, Guid userId);
     }
 }
