@@ -26,15 +26,15 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { userId = ApplicationDemoSeeder.TestUserId });
         }
 
-        [HttpGet]
-        public async Task<IActionResult> GetAllApplications([FromQuery] int clubId)
+        [HttpGet("{clubId:int}")]
+        public async Task<IActionResult> GetAllApplications(int clubId)
         {
             var applications = await _applicationService.GetAllApplicationsAsync(clubId);
             return Ok(new { success = true, data = applications });
         }
 
-        [HttpGet("{id:int}")]
-        public async Task<IActionResult> GetApplicationById(int id, [FromQuery] int clubId)
+        [HttpGet("{clubId:int}/{id:int}")]
+        public async Task<IActionResult> GetApplicationById(int id, int clubId)
         {
             var application = await _applicationService.GetApplicationByIdAsync(id, clubId);
             if (application == null)
@@ -43,29 +43,29 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = application });
         }
 
-        [HttpGet("user/{userId:guid}")]
-        public async Task<IActionResult> GetApplicationsByUser(Guid userId, [FromQuery] int clubId)
+        [HttpGet("{clubId:int}/user/{userId:guid}")]
+        public async Task<IActionResult> GetApplicationsByUser(Guid userId, int clubId)
         {
             var applications = await _applicationService.GetApplicationsByUserAsync(userId, clubId);
             return Ok(new { success = true, data = applications });
         }
 
-        [HttpGet("form/{formId:int}")]
-        public async Task<IActionResult> GetApplicationsByForm(int formId, [FromQuery] int clubId)
+        [HttpGet("{clubId:int}/form/{formId:int}")]
+        public async Task<IActionResult> GetApplicationsByForm(int formId, int clubId)
         {
             var applications = await _applicationService.GetApplicationsByFormAsync(formId, clubId);
             return Ok(new { success = true, data = applications });
         }
 
-        [HttpGet("status/{status}")]
-        public async Task<IActionResult> GetApplicationsByStatus(string status, [FromQuery] int clubId)
+        [HttpGet("{clubId:int}/status/{status}")]
+        public async Task<IActionResult> GetApplicationsByStatus(string status, int clubId)
         {
             var applications = await _applicationService.GetApplicationsByStatusAsync(status, clubId);
             return Ok(new { success = true, data = applications });
         }
 
-        [HttpGet("user/{userId:guid}/form/{formId:int}")]
-        public async Task<IActionResult> GetApplicationByUserAndForm(Guid userId, int formId, [FromQuery] int clubId)
+        [HttpGet("{clubId:int}/user/{userId:guid}/form/{formId:int}")]
+        public async Task<IActionResult> GetApplicationByUserAndForm(Guid userId, int formId, int clubId)
         {
             var application = await _applicationService.GetApplicationByUserAndFormAsync(userId, formId, clubId);
             if (application == null)
@@ -74,8 +74,8 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = application });
         }
 
-        [HttpGet("campaign/{campaignId:int}")]
-        public async Task<IActionResult> GetApplicationsByCampaign(int campaignId, [FromQuery] int clubId, [FromQuery] string? status = null)
+        [HttpGet("{clubId:int}/campaign/{campaignId:int}")]
+        public async Task<IActionResult> GetApplicationsByCampaign(int campaignId, int clubId, [FromQuery] string? status = null)
         {
             var applications = await _applicationService.GetApplicationsByCampaignAsync(campaignId, clubId, status);
             return Ok(new { success = true, data = applications });
@@ -95,8 +95,8 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = created });
         }
 
-        [HttpPut("{id:int}")]
-        public async Task<IActionResult> UpdateApplication(int id, [FromQuery] int clubId, [FromBody] ApplicationResponseDto application)
+        [HttpPut("{clubId:int}/{id:int}")]
+        public async Task<IActionResult> UpdateApplication(int id, int clubId, [FromBody] ApplicationResponseDto application)
         {
             var result = await _applicationService.UpdateApplicationAsync(id, clubId, application);
             if (!result)
@@ -105,8 +105,8 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true });
         }
 
-        [HttpPatch("{id:int}/status")]
-        public async Task<IActionResult> UpdateApplicationStatus(int id, [FromQuery] int clubId, [FromBody] UpdateApplicationStatusDto request)
+        [HttpPatch("{clubId:int}/{id:int}/status")]
+        public async Task<IActionResult> UpdateApplicationStatus(int id, int clubId, [FromBody] UpdateApplicationStatusDto request)
         {
             try
             {
@@ -122,8 +122,8 @@ namespace UNIC.Presentation.Controllers
             }
         }
 
-        [HttpDelete("{id:int}")]
-        public async Task<IActionResult> DeleteApplication(int id, [FromQuery] int clubId)
+        [HttpDelete("{clubId:int}/{id:int}")]
+        public async Task<IActionResult> DeleteApplication(int id, int clubId)
         {
             var result = await _applicationService.DeleteApplicationAsync(id, clubId);
             if (!result)
@@ -134,22 +134,22 @@ namespace UNIC.Presentation.Controllers
 
         // ================= FORM =================
 
-        [HttpGet("forms")]
-        public async Task<IActionResult> GetAllForms([FromQuery] int clubId)
+        [HttpGet("{clubId:int}/forms")]
+        public async Task<IActionResult> GetAllForms(int clubId)
         {
             var forms = await _applicationService.GetAllFormsAsync(clubId);
             return Ok(new { success = true, data = forms });
         }
 
-        [HttpGet("forms/campaign/{campaignId:int}")]
-        public async Task<IActionResult> GetFormsByCampaign(int campaignId, [FromQuery] int clubId)
+        [HttpGet("{clubId:int}/forms/campaign/{campaignId:int}")]
+        public async Task<IActionResult> GetFormsByCampaign(int campaignId, int clubId)
         {
             var forms = await _applicationService.GetFormsByCampaignAsync(campaignId, clubId);
             return Ok(new { success = true, data = forms });
         }
 
-        [HttpGet("forms/{id:int}")]
-        public async Task<IActionResult> GetFormById(int id, [FromQuery] int clubId)
+        [HttpGet("{clubId:int}/forms/{id:int}")]
+        public async Task<IActionResult> GetFormById(int id, int clubId)
         {
             var form = await _applicationService.GetFormByIdAsync(id, clubId);
             if (form == null)
@@ -165,8 +165,8 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = created });
         }
 
-        [HttpPut("forms/{id:int}")]
-        public async Task<IActionResult> UpdateForm(int id, [FromQuery] int clubId, [FromBody] ApplicationFormResponseDto form)
+        [HttpPut("{clubId:int}/forms/{id:int}")]
+        public async Task<IActionResult> UpdateForm(int id, int clubId, [FromBody] ApplicationFormResponseDto form)
         {
             var result = await _applicationService.UpdateFormAsync(id, clubId, form);
             if (!result)
@@ -175,8 +175,8 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true });
         }
 
-        [HttpDelete("forms/{id:int}")]
-        public async Task<IActionResult> DeleteForm(int id, [FromQuery] int clubId)
+        [HttpDelete("{clubId:int}/forms/{id:int}")]
+        public async Task<IActionResult> DeleteForm(int id, int clubId)
         {
             var result = await _applicationService.DeleteFormAsync(id, clubId);
             if (!result)
@@ -187,15 +187,15 @@ namespace UNIC.Presentation.Controllers
 
         // ================= QUESTION =================
 
-        [HttpGet("forms/{formId:int}/questions")]
-        public async Task<IActionResult> GetQuestionsByForm(int formId, [FromQuery] int clubId)
+        [HttpGet("{clubId:int}/forms/{formId:int}/questions")]
+        public async Task<IActionResult> GetQuestionsByForm(int formId, int clubId)
         {
             var questions = await _applicationService.GetQuestionsByFormAsync(formId, clubId);
             return Ok(new { success = true, data = questions });
         }
 
-        [HttpGet("questions/{id:int}")]
-        public async Task<IActionResult> GetQuestionById(int id, [FromQuery] int clubId)
+        [HttpGet("{clubId:int}/questions/{id:int}")]
+        public async Task<IActionResult> GetQuestionById(int id, int clubId)
         {
             var question = await _applicationService.GetQuestionByIdAsync(id, clubId);
             if (question == null)
@@ -211,8 +211,8 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = created });
         }
 
-        [HttpPut("questions/{id:int}")]
-        public async Task<IActionResult> UpdateQuestion(int id, [FromQuery] int clubId, [FromBody] ApplicationQuestionResponseDto question)
+        [HttpPut("{clubId:int}/questions/{id:int}")]
+        public async Task<IActionResult> UpdateQuestion(int id, int clubId, [FromBody] ApplicationQuestionResponseDto question)
         {
             var result = await _applicationService.UpdateQuestionAsync(id, clubId, question);
             if (!result)
@@ -221,8 +221,8 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true });
         }
 
-        [HttpDelete("questions/{id:int}")]
-        public async Task<IActionResult> DeleteQuestion(int id, [FromQuery] int clubId)
+        [HttpDelete("{clubId:int}/questions/{id:int}")]
+        public async Task<IActionResult> DeleteQuestion(int id, int clubId)
         {
             var result = await _applicationService.DeleteQuestionAsync(id, clubId);
             if (!result)
@@ -233,15 +233,15 @@ namespace UNIC.Presentation.Controllers
 
         // ================= ANSWER =================
 
-        [HttpGet("{applicationId:int}/answers")]
-        public async Task<IActionResult> GetAnswersByApplication(int applicationId, [FromQuery] int clubId)
+        [HttpGet("{clubId:int}/{applicationId:int}/answers")]
+        public async Task<IActionResult> GetAnswersByApplication(int applicationId, int clubId)
         {
             var answers = await _applicationService.GetAnswersByApplicationAsync(applicationId, clubId);
             return Ok(new { success = true, data = answers });
         }
 
-        [HttpGet("answers/{id:int}")]
-        public async Task<IActionResult> GetAnswerById(int id, [FromQuery] int clubId)
+        [HttpGet("{clubId:int}/answers/{id:int}")]
+        public async Task<IActionResult> GetAnswerById(int id, int clubId)
         {
             var answer = await _applicationService.GetAnswerByIdAsync(id, clubId);
             if (answer == null)
@@ -250,8 +250,8 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = answer });
         }
 
-        [HttpPost("{applicationId:int}/answers")]
-        public async Task<IActionResult> CreateAnswer(int applicationId, [FromBody] CreateApplicationAnswerDto request, [FromQuery] int clubId)
+        [HttpPost("{clubId:int}/{applicationId:int}/answers")]
+        public async Task<IActionResult> CreateAnswer(int applicationId, [FromBody] CreateApplicationAnswerDto request, int clubId)
         {
             request.ApplicationId = applicationId;
 
@@ -266,8 +266,8 @@ namespace UNIC.Presentation.Controllers
             }
         }
 
-        [HttpPost("submit")]
-        public async Task<IActionResult> SubmitApplication([FromQuery] int clubId, [FromBody] SubmitApplicationWithAnswersDto request)
+        [HttpPost("{clubId:int}/submit")]
+        public async Task<IActionResult> SubmitApplication(int clubId, [FromBody] SubmitApplicationWithAnswersDto request)
         {
             try
             {
@@ -280,8 +280,8 @@ namespace UNIC.Presentation.Controllers
             }
         }
 
-        [HttpPut("answers/{id:int}")]
-        public async Task<IActionResult> UpdateAnswer(int id, [FromQuery] int clubId, [FromBody] ApplicationAnswerResponseDto answer)
+        [HttpPut("{clubId:int}/answers/{id:int}")]
+        public async Task<IActionResult> UpdateAnswer(int id, int clubId, [FromBody] ApplicationAnswerResponseDto answer)
         {
             var result = await _applicationService.UpdateAnswerAsync(id, clubId, answer);
             if (!result)
@@ -290,8 +290,8 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true });
         }
 
-        [HttpDelete("answers/{id:int}")]
-        public async Task<IActionResult> DeleteAnswer(int id, [FromQuery] int clubId)
+        [HttpDelete("{clubId:int}/answers/{id:int}")]
+        public async Task<IActionResult> DeleteAnswer(int id, int clubId)
         {
             var result = await _applicationService.DeleteAnswerAsync(id, clubId);
             if (!result)

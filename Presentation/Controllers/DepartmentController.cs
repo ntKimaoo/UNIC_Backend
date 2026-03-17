@@ -11,14 +11,15 @@ namespace UNIC.Presentation.Controllers
     public class DepartmentController : ControllerBase
     {
         private readonly IDepartmentService _departmentService;
+
         public DepartmentController(IDepartmentService departmentService)
         {
             _departmentService = departmentService;
         }
 
-        [HttpGet]
+        [HttpGet("{clubId:int}")]
         [EnableQuery]
-        public async Task<IActionResult> GetAll([FromQuery] int clubId)
+        public async Task<IActionResult> GetAll(int clubId)
         {
             var departments = await _departmentService.GetAllDepartmentsAsync(clubId);
             if (!departments.Any())
@@ -28,8 +29,8 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = departments });
         }
 
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetDepartmentById(int id, [FromQuery] int clubId)
+        [HttpGet("{clubId:int}/{id:int}")]
+        public async Task<IActionResult> GetDepartmentById(int id, int clubId)
         {
             var department = await _departmentService.GetDepartmentByIdAsync(id, clubId);
             if (department == null)
@@ -39,16 +40,14 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = department });
         }
 
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateDepartment(int id, [FromBody] DepartmentResponseDto department, [FromQuery] int clubId)
+        [HttpPut("{clubId:int}/{id:int}")]
+        public async Task<IActionResult> UpdateDepartment(int id, int clubId, [FromBody] DepartmentResponseDto department)
         {
             var result = await _departmentService.UpdateDepartmentAsync(id, department, clubId);
             if (!result)
             {
                 return NotFound(new { success = false, message = "Department not found" });
             }
-
-            // Ensure returned DTO reflects the id used for update
             department.DepartmentId = id;
             return Ok(new { success = true, data = department });
         }
@@ -64,8 +63,8 @@ namespace UNIC.Presentation.Controllers
             );
         }
 
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteDepartment(int id, [FromQuery] int clubId)
+        [HttpDelete("{clubId:int}/{id:int}")]
+        public async Task<IActionResult> DeleteDepartment(int id, int clubId)
         {
             var result = await _departmentService.DeleteDepartmentAsync(id, clubId);
             if (!result)
