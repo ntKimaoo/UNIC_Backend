@@ -1,5 +1,6 @@
-﻿using BusinessLogic.DTOs;
+using BusinessLogic.DTOs;
 using DataAccess.Models;
+using DataAccess.Repositories.Interface;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,9 +15,17 @@ namespace UNIC.BusinessLogic.Services.Implementation
     public class DepartmentService : IDepartmentService
     {
         private readonly IDepartmentRepository _departmentRepository;
-        public DepartmentService(IDepartmentRepository departmentService)
+        private readonly IClubRepository _clubRepository;
+        private readonly IClubRoleRepository _clubRoleRepository;
+
+        public DepartmentService(
+            IDepartmentRepository departmentRepository,
+            IClubRepository clubRepository,
+            IClubRoleRepository clubRoleRepository)
         {
-            _departmentRepository = departmentService;
+            _departmentRepository = departmentRepository;
+            _clubRepository = clubRepository;
+            _clubRoleRepository = clubRoleRepository;
         }
 
         private DepartmentResponseDto MapToDto(Department department)
@@ -24,39 +33,97 @@ namespace UNIC.BusinessLogic.Services.Implementation
             return new DepartmentResponseDto
             {
                 DepartmentId = department.DepartmentId,
+                ClubId = department.ClubId,
                 Name = department.DepartmentName,
-                Description = department.Description
+                Description = department.Description,
+                ManagerRoleId = department.ManagerRoleId,
+                ManagerRole = department.ManagerRole != null ? new DepartmentManagerRoleDto
+                {
+                    ClubRoleId = department.ManagerRole.ClubRoleId,
+                    RoleName = department.ManagerRole.RoleName,
+                    Description = department.ManagerRole.Description,
+                    Level = department.ManagerRole.Level
+                } : null,
+                CreatedAt = department.CreatedAt,
+                UpdatedAt = department.UpdatedAt
             };
         }
 
-        public async Task<DepartmentResponseDto> CreateDepartmentAsync(CreateDepartmentDto request)
+        public async Task<DepartmentResponseDto> CreateDepartmentAsync(int clubId, CreateDepartmentDto request)
         {
+            // Verify club exists
+            var clubExists = await _clubRepository.ExistsAsync(clubId);
+            if (!clubExists)
+            {
+                throw new InvalidOperationException("Club not found");
+            }
+
+            // Check if department name already exists in this club
+            var nameExists = await _departmentRepository.DepartmentNameExistsInClubAsync(request.Name, clubId);
+            if (nameExists)
+            {
+                throw new InvalidOperationException("Department name already exists in this club");
+            }
+
+            // Step 1: Create the department (ManagerRoleId will be set after role creation)
             var department = new Department
             {
                 DepartmentName = request.Name,
                 Description = request.Description,
-                ClubId = request.ClubId,
+                ClubId = clubId,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
+
             var createdDepartment = await _departmentRepository.CreateAsync(department);
+
+            // Step 2: Automatically create the Department Manager role for this department
+            var managerRole = new ClubRole
+            {
+                RoleName = $"{request.Name} 's Manager",
+                Description = $"Manager role for {request.Name} department",
+                ClubId = clubId,
+                DepartmentId = createdDepartment.DepartmentId,
+                Level = request.ManagerRoleLevel
+            };
+
+            var createdRole = await _clubRoleRepository.CreateAsync(managerRole);
+
+            // Step 3: Link the manager role back to the department
+            createdDepartment.ManagerRoleId = createdRole.ClubRoleId;
+            createdDepartment.ManagerRole = createdRole;
+            createdDepartment.UpdatedAt = DateTime.UtcNow;
+            await _departmentRepository.UpdateAsync(createdDepartment);
+
             return MapToDto(createdDepartment);
         }
 
-        public async Task<bool> DeleteDepartmentAsync(int id, int clubId)
+        public async Task<bool> DeleteDepartmentAsync(int clubId, int id)
         {
-            return await _departmentRepository.DeleteAsync(id, clubId);
+            var department = await _departmentRepository.GetByIdAsync(id);
+            if (department == null || department.ClubId != clubId)
+            {
+                return false;
+            }
+
+            return await _departmentRepository.DeleteAsync(id);
         }
 
-        public async Task<IEnumerable<DepartmentResponseDto>> GetAllDepartmentsAsync(int clubId)
+        public async Task<IEnumerable<DepartmentResponseDto>> GetAllDepartmentsAsync()
         {
-            var departments = await _departmentRepository.GetAllAsync(clubId);
+            var departments = await _departmentRepository.GetAllAsync();
             return departments.Select(MapToDto);
         }
 
-        public async Task<DepartmentResponseDto?> GetDepartmentByIdAsync(int id, int clubId)
+        public async Task<IEnumerable<DepartmentResponseDto>> GetDepartmentsByClubIdAsync(int clubId)
         {
-            var department = await _departmentRepository.GetByIdAsync(id, clubId);
+            var departments = await _departmentRepository.GetByClubIdAsync(clubId);
+            return departments.Select(MapToDto);
+        }
+
+        public async Task<DepartmentResponseDto?> GetDepartmentByIdAsync(int id)
+        {
+            var department = await _departmentRepository.GetByIdAsync(id);
             if (department == null)
             {
                 return null;
@@ -64,21 +131,46 @@ namespace UNIC.BusinessLogic.Services.Implementation
             return MapToDto(department);
         }
 
-        public async Task<bool> UpdateDepartmentAsync(int id, DepartmentResponseDto department, int clubId)
+        public async Task<DepartmentResponseDto?> UpdateDepartmentAsync(int clubId, int id, UpdateDepartmentDto request)
         {
-            var existingDepartment = await _departmentRepository.GetByIdAsync(id, clubId);
-            if (existingDepartment == null)
+            var existingDepartment = await _departmentRepository.GetByIdAsync(id);
+            if (existingDepartment == null || existingDepartment.ClubId != clubId)
             {
-                return false;
+                return null;
             }
-            if (department.DepartmentId != existingDepartment.DepartmentId)
+
+            // Update only provided fields
+            if (!string.IsNullOrEmpty(request.Name))
             {
-                return false;
+                // Check if new name already exists (excluding current department)
+                var nameExists = await _departmentRepository.DepartmentNameExistsInClubAsync(
+                    request.Name, clubId, id);
+                if (nameExists)
+                {
+                    throw new InvalidOperationException("Department name already exists in this club");
+                }
+                existingDepartment.DepartmentName = request.Name;
             }
-            existingDepartment.DepartmentName = department.Name;
-            existingDepartment.Description = department.Description;
-            await _departmentRepository.UpdateAsync(existingDepartment, clubId);
-            return true;
+
+            if (request.Description != null)
+            {
+                existingDepartment.Description = request.Description;
+            }
+
+            if (request.ManagerRoleId.HasValue)
+            {
+                existingDepartment.ManagerRoleId = request.ManagerRoleId;
+            }
+
+            existingDepartment.UpdatedAt = DateTime.UtcNow;
+
+            var updated = await _departmentRepository.UpdateAsync(existingDepartment);
+            if (!updated)
+            {
+                return null;
+            }
+
+            return MapToDto(existingDepartment);
         }
     }
 }

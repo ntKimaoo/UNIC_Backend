@@ -12,10 +12,12 @@ namespace Presentation.Controllers
     public class ClubController : ControllerBase
     {
         private readonly IClubService _service;
+        private readonly IClubRoleService _clubRoleService;
 
-        public ClubController(IClubService service)
+        public ClubController(IClubService service, IClubRoleService clubRoleService)
         {
             _service = service;
+            _clubRoleService = clubRoleService;
         }
 
         /// <summary>
@@ -266,6 +268,30 @@ namespace Presentation.Controllers
                 message = "Club deleted permanently"
             });
         }
-        
+
+        /// <summary>
+        /// Get the organizational structure of a club:
+        /// standalone roles (no department) and departments with their manager and member roles
+        /// </summary>
+        [HttpGet("{clubId}/club-structure")]
+        public async Task<IActionResult> GetClubStructure(int clubId)
+        {
+            var club = await _service.GetByIdAsync(clubId);
+            if (club == null)
+            {
+                return NotFound(new
+                {
+                    success = false,
+                    message = "Club not found"
+                });
+            }
+
+            var structure = await _clubRoleService.GetClubStructureAsync(clubId);
+            return Ok(new
+            {
+                success = true,
+                data = structure
+            });
+        }
     }
 }

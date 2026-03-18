@@ -24,5 +24,8 @@ namespace BusinessLogic.Services.Interface
 
         /// <summary>Ghi đè toàn bộ policies trực tiếp của member</summary>
         Task SetUserPoliciesAsync(Guid userId, IEnumerable<int> policyIds);
+
+        /// <summary>Kiểm tra user có policy trong một club cụ thể không</summary>
+        Task<bool> HasMemberPolicyInClubAsync(Guid userId, int clubId, string policyTitle);
     }
 }

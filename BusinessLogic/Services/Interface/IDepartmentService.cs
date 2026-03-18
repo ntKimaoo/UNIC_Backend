@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,10 +9,11 @@ namespace UNIC.BusinessLogic.Services.Interface
 {
     public interface IDepartmentService
     {
-        Task<IEnumerable<DepartmentResponseDto>> GetAllDepartmentsAsync(int clubId);
-        Task<DepartmentResponseDto?> GetDepartmentByIdAsync(int id, int clubId);
-        Task<DepartmentResponseDto> CreateDepartmentAsync(CreateDepartmentDto request);
-        Task<bool> UpdateDepartmentAsync(int id, DepartmentResponseDto department, int clubId);
-        Task<bool> DeleteDepartmentAsync(int id, int clubId);
+        Task<IEnumerable<DepartmentResponseDto>> GetAllDepartmentsAsync();
+        Task<IEnumerable<DepartmentResponseDto>> GetDepartmentsByClubIdAsync(int clubId);
+        Task<DepartmentResponseDto?> GetDepartmentByIdAsync(int id);
+        Task<DepartmentResponseDto> CreateDepartmentAsync(int clubId, CreateDepartmentDto request);
+        Task<DepartmentResponseDto?> UpdateDepartmentAsync(int clubId, int id, UpdateDepartmentDto request);
+        Task<bool> DeleteDepartmentAsync(int clubId, int id);
     }
 }

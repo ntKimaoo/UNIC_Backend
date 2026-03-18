@@ -23,13 +23,13 @@ namespace DataAccess.Repositories.Implementation
                 .Include(cr => cr.ClubMembers)
                 .Include(cr => cr.ClubRolePolicies!)
                     .ThenInclude(crp => crp.Policy).ThenInclude(p => p.PolicyGroup)
-                .FirstOrDefaultAsync(cr => cr.ClubRoleId == clubRoleId&&cr.ClubId==clubId);
+                .FirstOrDefaultAsync(cr => cr.ClubRoleId == clubRoleId && cr.ClubId == clubId);
         }
 
         public async Task<IEnumerable<ClubRole>> GetAllAsync(int clubId)
         {
             return await _context.ClubRoles
-                .Where(cr=>cr.ClubId==clubId)
+                .Where(cr => cr.ClubId == clubId)
                 .Include(cr => cr.ClubMembers)
                 .Include(cr => cr.ClubRolePolicies!)
                     .ThenInclude(crp => crp.Policy).ThenInclude(p => p.PolicyGroup)
@@ -68,10 +68,16 @@ namespace DataAccess.Repositories.Implementation
         {
             try
             {
+                await _context.UserClubRoles
+                     .Where(cm => cm.ClubRoleId == clubRoleId)
+                     .ExecuteUpdateAsync(setters =>
+                         setters.SetProperty(cm => cm.ClubRoleId, (int?)null));
                 var clubRole = await _context.ClubRoles.FindAsync(clubRoleId);
                 if (clubRole == null)
                     return false;
-
+                await _context.ClubRolePolicies
+                    .Where(rp => rp.ClubRoleId == clubRoleId)
+                    .ExecuteDeleteAsync();
                 _context.ClubRoles.Remove(clubRole);
                 await _context.SaveChangesAsync();
                 return true;
@@ -125,6 +131,13 @@ namespace DataAccess.Repositories.Implementation
             return await _context.UserClubRoles
                 .Where(u => u.UserId == userId && u.ClubRole.Level == 0)
                 .Select(u => u.Club)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<ClubRole>> GetByDepartmentIdAsync(int departmentId)
+        {
+            return await _context.ClubRoles
+                .Where(cr => cr.DepartmentId == departmentId)
                 .ToListAsync();
         }
     }

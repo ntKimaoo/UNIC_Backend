@@ -1,4 +1,4 @@
-﻿using DataAccess.Models;
+using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -15,51 +15,98 @@ namespace UNIC.DataAccess.Repositories.Implementation
         public DepartmentRepository(UnicContext context) { 
             _context = context;
         }
-        public async Task<IEnumerable<Department>> GetAllAsync(int clubId)
-        {
-            return await _context.Departments
-                .Where(d => d.ClubId == clubId)
-                .ToListAsync();
-        }
-
-        public async Task<Department?> GetByIdAsync(int departmentId, int clubId)
-        {
-            return await _context.Departments
-                .FirstOrDefaultAsync(d => d.DepartmentId == departmentId && d.ClubId == clubId);
-        }
 
         public async Task<Department> CreateAsync(Department department)
         {
-            department.CreatedAt = DateTime.UtcNow;
-            _context.Departments.Add(department);
+            await _context.Departments.AddAsync(department);
             await _context.SaveChangesAsync();
             return department;
         }
 
-        public async Task<bool> UpdateAsync(Department department, int clubId)
+        public async Task<bool> DeleteAsync(int departmentId)
         {
-            var existing = await _context.Departments
-                .FirstOrDefaultAsync(d => d.DepartmentId == department.DepartmentId && d.ClubId == clubId);
+            try
+            {
+                var department = await GetByIdAsync(departmentId);
+                if (department == null)
+                    return false;
 
-            if (existing == null) return false;
-
-            existing.DepartmentName = department.DepartmentName;
-            existing.Description = department.Description;
-
-            await _context.SaveChangesAsync();
-            return true;
+                _context.Departments.Remove(department);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
-        public async Task<bool> DeleteAsync(int departmentId, int clubId)
+        public async Task<IEnumerable<Department>> GetAllAsync()
         {
-            var existing = await _context.Departments
-                .FirstOrDefaultAsync(d => d.DepartmentId == departmentId && d.ClubId == clubId);
+            return await _context.Departments
+                .Include(d => d.Club)
+                .Include(d => d.ManagerRole)
+                .OrderByDescending(d => d.CreatedAt)
+                .ToListAsync();
+        }
 
-            if (existing == null) return false;
+        public async Task<IEnumerable<Department>> GetByClubIdAsync(int clubId)
+        {
+            return await _context.Departments
+                .Include(d => d.Club)
+                .Include(d => d.ManagerRole)
+                .Where(d => d.ClubId == clubId)
+                .OrderByDescending(d => d.CreatedAt)
+                .ToListAsync();
+        }
 
-            _context.Departments.Remove(existing);
-            await _context.SaveChangesAsync();
-            return true;
+        public async Task<Department?> GetByIdAsync(int departmentId)
+        {
+            return await _context.Departments
+                .Include(d => d.Club)
+                .Include(d => d.ManagerRole)
+                .FirstOrDefaultAsync(m => m.DepartmentId == departmentId);
+        }
+
+        public async Task<bool> UpdateAsync(Department department)
+        {
+            try
+            {
+                department.UpdatedAt = DateTime.UtcNow;
+                _context.Departments.Update(department);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task<bool> ExistsAsync(int departmentId)
+        {
+            return await _context.Departments
+                .AnyAsync(d => d.DepartmentId == departmentId);
+        }
+
+        public async Task<bool> DepartmentNameExistsInClubAsync(string departmentName, int clubId, int? excludeDepartmentId = null)
+        {
+            var query = _context.Departments
+                .Where(d => d.DepartmentName == departmentName && d.ClubId == clubId);
+
+            if (excludeDepartmentId.HasValue)
+            {
+                query = query.Where(d => d.DepartmentId != excludeDepartmentId.Value);
+            }
+
+            return await query.AnyAsync();
+        }
+
+        public async Task<Department?> GetByManagerRoleIdAsync(int managerRoleId)
+        {
+            return await _context.Departments
+                .Include(d => d.ClubRoles)
+                .FirstOrDefaultAsync(d => d.ManagerRoleId == managerRoleId);
         }
     }
 }

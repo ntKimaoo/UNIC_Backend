@@ -17,5 +17,6 @@ namespace BusinessLogic.Services.Interface
         Task<bool> AssignRoleAsync(AssignClubRoleDto dto);
         Task<UserClubRole?> GetUserClubRoleAsync(Guid userId, int clubId);
         Task<List<ClubResponseDto>> GetManagedClubsAsync(Guid userId);
+        Task<ClubStructureResponseDto> GetClubStructureAsync(int clubId);
     }
 }

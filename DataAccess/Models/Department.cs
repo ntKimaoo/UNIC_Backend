@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -18,15 +18,21 @@ namespace DataAccess.Models
 
         [Required]
         [MaxLength(100)]
-        public string DepartmentName { get; set; } 
+        public string DepartmentName { get; set; } = null!;
 
-        public string Description { get; set; }
+        public string? Description { get; set; }
+
+        public int? ManagerRoleId { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
+        
         [ForeignKey("ClubId")]
-        public virtual Club Club { get; set; }
+        public virtual Club Club { get; set; } = null!;
 
-        public virtual ICollection<DepartmentMember> DepartmentMembers { get; set; }
+        [ForeignKey("ManagerRoleId")]
+        public virtual ClubRole? ManagerRole { get; set; }
+
+        public virtual ICollection<ClubRole> ClubRoles { get; set; } = new List<ClubRole>();
     }
 }

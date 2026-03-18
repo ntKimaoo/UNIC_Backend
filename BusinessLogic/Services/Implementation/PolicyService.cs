@@ -49,5 +49,8 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task SetUserPoliciesAsync(Guid userId, IEnumerable<int> policyIds)
             => await _policyRepository.SetUserPoliciesAsync(userId, policyIds);
+
+        public async Task<bool> HasMemberPolicyInClubAsync(Guid userId, int clubId, string policyTitle)
+            => await _policyRepository.HasMemberPolicyInClubAsync(userId, clubId, policyTitle);
     }
-}
+}
