@@ -40,7 +40,8 @@ namespace BusinessLogic.Services.Implementation
             {
                 RoleName = dto.RoleName,
                 Description = dto.Description,
-                Level = dto.Level
+                Level = dto.Level,
+                ClubId = dto.ClubId
             };
 
             var created = await _repository.CreateAsync(clubRole);

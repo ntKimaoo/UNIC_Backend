@@ -12,6 +12,7 @@ namespace BusinessLogic.DTOs
         public string? Description { get; set; }
 
         public int Level { get; set; } = 0;
+        public int ClubId { get; set; }
         public List<int> policies { get; set; } = new();
     }
 
