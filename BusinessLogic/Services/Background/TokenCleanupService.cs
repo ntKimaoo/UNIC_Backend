@@ -35,10 +35,16 @@ namespace BusinessLogic.Services.Background
                     await CleanupExpiredTokensAsync();
                     await Task.Delay(_cleanupInterval, stoppingToken);
                 }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    // Graceful shutdown — exit the loop
+                    break;
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error occurred while cleaning up expired tokens.");
-                    await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                    try { await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken); }
+                    catch (OperationCanceledException) { break; }
                 }
             }
 

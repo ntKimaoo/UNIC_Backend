@@ -1,4 +1,4 @@
-﻿using DataAccess.Models;
+using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using Microsoft.EntityFrameworkCore;
 using UNIC.DataAccess.Repositories.Interface;
@@ -26,6 +26,13 @@ namespace DataAccess.Repositories.Implementation
             return await _context.ClubFunds.FindAsync(id);
         }
 
+        public async Task<ClubFund> AddFundAsync(ClubFund fund)
+        {
+            await _context.ClubFunds.AddAsync(fund);
+            await _context.SaveChangesAsync();
+            return fund;
+        }
+
         public async Task AddTransactionAsync(FundTransaction transaction)
         {
             await _context.FundTransactions.AddAsync(transaction);
@@ -43,6 +50,22 @@ namespace DataAccess.Repositories.Implementation
             _context.ClubFunds.Update(fund);
             await _context.SaveChangesAsync();
         }
+
+        public async Task UpdateTransactionAndFundAsync(FundTransaction transaction, ClubFund fund)
+        {
+            _context.FundTransactions.Update(transaction);
+            _context.ClubFunds.Update(fund);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<IEnumerable<ClubFund>> GetFundsByClubIdAsync(int clubId)
+        {
+            return await _context.ClubFunds
+                .Where(cf => cf.ClubId == clubId)
+                .OrderBy(cf => cf.FundName)
+                .ToListAsync();
+        }
+
         public async Task<IEnumerable<FundTransaction>> GetTransactionsByFundIdAsync(int fundId, string? status = null)
         {
             var query = _context.FundTransactions

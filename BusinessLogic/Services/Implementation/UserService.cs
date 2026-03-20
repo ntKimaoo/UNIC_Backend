@@ -1,4 +1,4 @@
-﻿using BusinessLogic.DTOs;
+using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
@@ -44,6 +44,23 @@ namespace BusinessLogic.Services.Implementation
             return users.Select(MapToDto);
         }
 
+        public async Task<PagedResultDto<UserResponseDto>> GetPagedUsersAsync(int pageNumber, int pageSize)
+        {
+            var (items, totalCount) = await _userRepository.GetPagedAsync(pageNumber, pageSize);
+            var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
+
+            return new PagedResultDto<UserResponseDto>
+            {
+                Items = items.Select(MapToDto),
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                HasPreviousPage = pageNumber > 1,
+                HasNextPage = pageNumber < totalPages
+            };
+        }
+
         public async Task<UserResponseDto?> GetUserByIdAsync(Guid id)
         {
             var user = await _userRepository.GetByIdAsync(id);
@@ -74,7 +91,7 @@ namespace BusinessLogic.Services.Implementation
                 DateOfBirth = request.DateOfBirth,
                 Gender = request.Gender,
                 Address = request.Address,
-                Status = "Active", 
+                Status = "Active",
                 JoinDate = DateOnly.FromDateTime(DateTime.UtcNow),
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -96,14 +113,15 @@ namespace BusinessLogic.Services.Implementation
                 throw new Exception("Student ID already exists.");
             }
 
-            user.FullName = request.FullName;
-            user.PhoneNumber = request.PhoneNumber;
-            user.DateOfBirth = request.DateOfBirth;
-            user.Gender = request.Gender;
-            user.Address = request.Address;
-            user.Avatar = request.Avatar;
-            user.Major = request.Major;
-            user.StudentId = request.StudentId;
+            // Only update fields that are explicitly provided (non-null)
+            if (request.FullName != null) user.FullName = request.FullName;
+            if (request.PhoneNumber != null) user.PhoneNumber = request.PhoneNumber;
+            if (request.DateOfBirth.HasValue) user.DateOfBirth = request.DateOfBirth;
+            if (request.Gender != null) user.Gender = request.Gender;
+            if (request.Address != null) user.Address = request.Address;
+            if (request.Avatar != null) user.Avatar = request.Avatar;
+            if (request.Major != null) user.Major = request.Major;
+            if (request.StudentId != null) user.StudentId = request.StudentId;
 
             if (!string.IsNullOrEmpty(request.Status))
             {
@@ -118,6 +136,10 @@ namespace BusinessLogic.Services.Implementation
         public async Task<bool> DeleteUserAsync(Guid id)
         {
             return await _userRepository.DeleteAsync(id);
+        }
+        public async Task<IEnumerable<Club>> GetAllClubsById(Guid UserId)
+        {
+            return await _userRepository.GetAllClubByUser(UserId);
         }
     }
 }

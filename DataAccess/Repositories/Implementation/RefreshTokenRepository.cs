@@ -1,4 +1,4 @@
-﻿using DataAccess.Models;
+using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -28,6 +28,10 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.RefreshTokens
                 .Include(rt => rt.User)
+                    .ThenInclude(u => u.UserRoles)
+                .Include(rt => rt.User)
+                    .ThenInclude(u => u.ClubMembers)
+                    .ThenInclude(cm => cm.ClubRole)
                 .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash);
         }
 

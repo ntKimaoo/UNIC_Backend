@@ -14,7 +14,8 @@ namespace BusinessLogic.Mappings
         {
             // Event -> EventDetailDto
             CreateMap<Event, EventDetailDto>()
-                .ForMember(dest => dest.Sessions, opt => opt.MapFrom(src => src.EventSchedules));
+                .ForMember(dest => dest.Sessions, opt => opt.MapFrom(src => src.EventSchedules))
+                .ForMember(dest => dest.CurrentAttendees, opt => opt.MapFrom(src => src.Attendances != null ? src.Attendances.Count : 0));
 
             // EventSchedule -> SessionDto
             CreateMap<EventSchedule, SessionDto>()

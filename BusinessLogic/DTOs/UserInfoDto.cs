@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,6 +15,14 @@ namespace BusinessLogic.DTOs
         public string? StudentId { get; set; }
         public string? Major { get; set; }
         public string? Status { get; set; }
-        public string? Role { get; set; }
+        public List<string> Roles { get; set; } = new List<string>();
+        public List<UserClubRoleDto> ClubRoles { get; set; } = new List<UserClubRoleDto>();
+    }
+
+    public class UserClubRoleDto
+    {
+        public int ClubId { get; set; }
+        public string RoleName { get; set; } = null!;
+        public int Level { get; set; }
     }
 }

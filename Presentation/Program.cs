@@ -1,5 +1,4 @@
 
-using API.Services;
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Background;
 using BusinessLogic.Services.Implementation;
@@ -103,6 +102,12 @@ builder.Services.AddSingleton(sp =>
 
 // Register Background Services
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.Configure<BusinessLogic.Options.PayOSOptions>(builder.Configuration.GetSection(BusinessLogic.Options.PayOSOptions.SectionName));
+builder.Services.AddHttpClient<IPayOSService, PayOSService>((sp, client) =>
+{
+    var opt = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<BusinessLogic.Options.PayOSOptions>>().Value;
+    client.BaseAddress = new Uri(opt.BaseUrl.TrimEnd('/') + "/");
+});
 builder.Services.AddScoped<IFundRepository, FundRepository>();
 builder.Services.AddScoped<IClubFundService, ClubFundService>();
 builder.Services.AddScoped<IClubRepository, ClubRepository>();
@@ -126,6 +131,7 @@ builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventScheduleRepos
 // Business Services
 builder.Services.AddScoped<BusinessLogic.Services.Interface.IEventService, BusinessLogic.Services.Implementation.EventService>();
 builder.Services.AddScoped<BusinessLogic.Services.Interface.IAttendanceService, BusinessLogic.Services.Implementation.AttendanceService>();
+builder.Services.AddScoped<BusinessLogic.Services.Interface.IQRCodeGeneratorService, BusinessLogic.Services.Implementation.QRCodeGeneratorService>();
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<BusinessLogic.Validators.CreateEventRequestValidator>();
@@ -145,7 +151,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
 //jwt
 var jwtSettings = builder.Configuration.GetSection("Jwt");
-var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]);
+var key = Encoding.UTF8.GetBytes(jwtSettings["Key"] ?? throw new InvalidOperationException("Jwt:Key is missing"));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthentication(options =>
 {
@@ -167,6 +173,9 @@ builder.Services.AddAuthentication(options =>
 });
 // Register authorization handler
 builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
+
+// Register club-scoped authorization handler
+builder.Services.AddScoped<IAuthorizationHandler, ClubMemberAuthorizationHandler>();
 
 // Register dynamic policy provider
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();

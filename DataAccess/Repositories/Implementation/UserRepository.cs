@@ -1,4 +1,4 @@
-﻿using DataAccess.Models;
+using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -22,6 +22,8 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.Users
                 .Include(u => u.UserRoles)
+                .Include(u => u.ClubMembers)
+                    .ThenInclude(cm => cm.ClubRole)
                 .FirstOrDefaultAsync(m => m.Email == email);
         }
 
@@ -87,7 +89,9 @@ namespace DataAccess.Repositories.Implementation
                 if (user == null)
                     return false;
 
-                _context.Users.Remove(user);
+                user.Status = "Inactive";
+                user.UpdatedAt = DateTime.UtcNow;
+                _context.Users.Update(user);
                 await _context.SaveChangesAsync();
                 return true;
             }
@@ -99,7 +103,31 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<IEnumerable<User>> GetAllAsync()
         {
-            return await _context.Users.ToListAsync();
+            return await _context.Users
+                .Where(u => u.Status == "Active")
+                .ToListAsync();
+        }
+
+        public async Task<(IEnumerable<User> Items, int TotalCount)> GetPagedAsync(int pageNumber, int pageSize)
+        {
+            var query = _context.Users
+                .Where(u => u.Status == "Active")
+                .OrderByDescending(u => u.CreatedAt);
+
+            var totalCount = await query.CountAsync();
+            var items = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+        public async Task<IEnumerable<Club>> GetAllClubByUser(Guid userId)
+        {
+            return await _context.UserClubRoles
+                .Where(cm => cm.UserId == userId)
+                .Select(cm => cm.Club)
+                .ToListAsync();
         }
     }
 }

@@ -9,8 +9,8 @@ namespace UNIC.DataAccess.Models
 {
     public class ClubMemberPolicy
     {
-        public Guid UserId { get; set; }
-        public User User { get; set; }
+        public int ClubMemberId { get; set; }
+        public UserClubRole ClubMember { get; set; }
         public int PolicyId { get; set; }
         public Policy Policy { get; set; }
     }

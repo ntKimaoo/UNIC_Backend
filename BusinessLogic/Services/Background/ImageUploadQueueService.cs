@@ -47,10 +47,15 @@ namespace BusinessLogic.Services.Background
                         await Task.Delay(1000, stoppingToken);
                     }
                 }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error occurred while processing image upload queue.");
-                    await Task.Delay(5000, stoppingToken);
+                    try { await Task.Delay(5000, stoppingToken); }
+                    catch (OperationCanceledException) { break; }
                 }
             }
 

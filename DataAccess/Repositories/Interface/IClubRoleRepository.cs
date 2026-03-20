@@ -7,14 +7,13 @@ namespace DataAccess.Repositories.Interface
 {
     public interface IClubRoleRepository
     {
-        Task<ClubRole?> GetByIdAsync(int clubRoleId);
-        Task<IEnumerable<ClubRole>> GetAllAsync();
-        Task<bool> RoleNameExistsAsync(string roleName);
+        Task<ClubRole?> GetByIdAsync(int clubRoleId,int? clubId);
+        Task<IEnumerable<ClubRole>> GetAllAsync(int clubId);
+        Task<bool> RoleNameExistsAsync(string roleName,int? clubId);
         Task<ClubRole> CreateAsync(ClubRole clubRole);
         Task<bool> UpdateAsync(ClubRole clubRole);
         Task<bool> DeleteAsync(int clubRoleId);
+        Task<IEnumerable<ClubRole>> GetByDepartmentIdAsync(int departmentId);
         Task SetPoliciesAsync(int clubRoleId, IEnumerable<int> policyIds);
-        Task <IEnumerable<Policy>> GetPoliciesByRoleAsync(int clubRoleId);
-        Task<IEnumerable<ClubRole>> GetRolesByClubIdAsync(int clubId);
     }
 }

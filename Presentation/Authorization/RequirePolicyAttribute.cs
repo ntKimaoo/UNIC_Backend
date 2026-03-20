@@ -4,16 +4,39 @@ using System;
 namespace Presentation.Authorization
 {
     /// <summary>
-    /// Attribute to require a specific policy for accessing an endpoint
-    /// Usage: [RequirePolicy("ViewClubs")]
+    /// Requires the authenticated user to have a specific policy globally.
+    /// Usage: [RequireUserPolicy("ViewClubs")]
     /// </summary>
     [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = false)]
-    public class RequirePolicyAttribute : AuthorizeAttribute
+    public class RequireUserPolicyAttribute : AuthorizeAttribute
     {
-        public RequirePolicyAttribute(string policyTitle)
+        public RequireUserPolicyAttribute(string policyTitle)
         {
-            // Set the Policy property to use our dynamic policy provider
             Policy = $"Policy_{policyTitle}";
+        }
+    }
+
+    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = false)]
+    public class RequireClubPolicyAttribute : AuthorizeAttribute
+    {
+        public RequireClubPolicyAttribute(string policyTitle)
+        {
+            Policy = $"Policy_{policyTitle}";
+        }
+    }
+
+    /// <summary>
+    /// Requires the authenticated user to have a specific policy within the club
+    /// identified by the {clubId} route parameter.
+    /// Usage: [RequireMemberPolicy("viewrole")]
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = false)]
+    public class RequireMemberPolicyAttribute : AuthorizeAttribute
+    {
+        public RequireMemberPolicyAttribute(string policyTitle)
+        {
+            // ClubPolicy_ prefix signals DynamicPolicyProvider to use ClubMemberRequirement
+            Policy = $"ClubPolicy_{policyTitle}";
         }
     }
 }

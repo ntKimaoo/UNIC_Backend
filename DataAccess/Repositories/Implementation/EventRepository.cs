@@ -29,6 +29,7 @@ namespace DataAccess.Repositories.Implementation
                 .Include(e => e.EventSchedules)
                 .Include(e => e.EventImages)
                 .Include(e => e.Club)
+                .Include(e => e.Attendances)
                 .FirstOrDefaultAsync(e => e.EventId == eventId);
         }
 
@@ -43,6 +44,8 @@ namespace DataAccess.Repositories.Implementation
         public async Task<IEnumerable<Event>> GetAllAsync(int pageNumber = 1, int pageSize = 10)
         {
             return await _context.Events
+                .Include(e => e.Attendances)
+                .Include(e => e.EventSchedules)
                 .OrderByDescending(e => e.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)

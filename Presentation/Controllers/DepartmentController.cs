@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
 using UNIC.BusinessLogic.DTOs;
@@ -6,73 +6,173 @@ using UNIC.BusinessLogic.Services.Interface;
 
 namespace UNIC.Presentation.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/club/{clubId}/[controller]")]
     [ApiController]
     public class DepartmentController : ControllerBase
     {
         private readonly IDepartmentService _departmentService;
+        
         public DepartmentController(IDepartmentService departmentService)
         {
             _departmentService = departmentService;
         }
 
+        /// <summary>
+        /// Get all departments for a specific club
+        /// </summary>
         [HttpGet]
         [EnableQuery]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetDepartmentsByClub(int clubId)
         {
-            var departments = await _departmentService.GetAllDepartmentsAsync();
+            var departments = await _departmentService.GetDepartmentsByClubIdAsync(clubId);
             if (!departments.Any())
             {
-                return NotFound(new { success = false, message = "No departments found" });
+                return NotFound(new 
+                { 
+                    success = false, 
+                    message = "No departments found for this club" 
+                });
             }
             return Ok(new { success = true, data = departments });
         }
 
+        /// <summary>
+        /// Get a specific department by ID within a club
+        /// </summary>
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetDepartmentById(int id)
+        public async Task<IActionResult> GetDepartmentById(int clubId, int id)
         {
             var department = await _departmentService.GetDepartmentByIdAsync(id);
-            if (department == null)
+            if (department == null || department.ClubId != clubId)
             {
-                return NotFound(new { success = false, message = "Department not found" });
+                return NotFound(new 
+                { 
+                    success = false, 
+                    message = "Department not found in this club" 
+                });
             }
             return Ok(new { success = true, data = department });
         }
 
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateDepartment(int id, [FromBody] DepartmentResponseDto department)
-        {
-            var result = await _departmentService.UpdateDepartmentAsync(id, department);
-            if (!result)
-            {
-                return NotFound(new { success = false, message = "Department not found" });
-            }
-
-            // Ensure returned DTO reflects the id used for update
-            department.DepartmentId = id;
-            return Ok(new { success = true, data = department });
-        }
-
+        /// <summary>
+        /// Create a new department for a club
+        /// </summary>
         [HttpPost]
-        public async Task<IActionResult> CreateDepartment([FromBody] CreateDepartmentDto request)
+        public async Task<IActionResult> CreateDepartment(int clubId, [FromBody] CreateDepartmentDto request)
         {
-            var createdDepartment = await _departmentService.CreateDepartmentAsync(request);
-            return CreatedAtAction(
-                nameof(GetDepartmentById),
-                new { id = createdDepartment.DepartmentId },
-                new { success = true, data = createdDepartment }
-            );
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Invalid data",
+                    errors = ModelState
+                });
+            }
+
+            try
+            {
+                var createdDepartment = await _departmentService.CreateDepartmentAsync(clubId, request);
+                return CreatedAtAction(
+                    nameof(GetDepartmentById),
+                    new { clubId = clubId, id = createdDepartment.DepartmentId },
+                    new { success = true, data = createdDepartment }
+                );
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "An error occurred while creating the department",
+                    error = ex.Message
+                });
+            }
         }
 
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteDepartment(int id)
+        /// <summary>
+        /// Update a department in a club
+        /// </summary>
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateDepartment(int clubId, int id, [FromBody] UpdateDepartmentDto request)
         {
-            var result = await _departmentService.DeleteDepartmentAsync(id);
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Invalid data",
+                    errors = ModelState
+                });
+            }
+
+            try
+            {
+                var updatedDepartment = await _departmentService.UpdateDepartmentAsync(clubId, id, request);
+                if (updatedDepartment == null)
+                {
+                    return NotFound(new 
+                    { 
+                        success = false, 
+                        message = "Department not found in this club" 
+                    });
+                }
+
+                return Ok(new 
+                { 
+                    success = true, 
+                    message = "Department updated successfully",
+                    data = updatedDepartment 
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "An error occurred while updating the department",
+                    error = ex.Message
+                });
+            }
+        }
+
+        /// <summary>
+        /// Delete a department from a club
+        /// </summary>
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteDepartment(int clubId, int id)
+        {
+            var result = await _departmentService.DeleteDepartmentAsync(clubId, id);
             if (!result)
             {
-                return NotFound(new { success = false, message = "Department not found" });
+                return NotFound(new 
+                { 
+                    success = false, 
+                    message = "Department not found in this club" 
+                });
             }
-            return Ok(new { success = true, data = new { id } });
+            return Ok(new 
+            { 
+                success = true, 
+                message = "Department deleted successfully",
+                data = new { id } 
+            });
         }
     }
 }
