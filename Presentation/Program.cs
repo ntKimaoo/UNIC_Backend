@@ -39,12 +39,6 @@ builder.Services.AddDbContext<MeetingDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MeetingRoomConnection"));
 });
 
-//redis
-builder.Services.AddStackExchangeRedisCache(redisOptions=>
-{
-    redisOptions.Configuration = builder.Configuration.GetConnectionString("RedisConnection");
-});
-
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFE",
@@ -125,6 +119,7 @@ builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
 builder.Services.AddHostedService<ImageUploadQueueService>();
+builder.Services.AddHostedService<BusinessLogic.Services.Background.EventReminderService>();
 
 // Unit of Work and Repositories
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IUnitOfWork, DataAccess.Repositories.Implementation.UnitOfWork>();
