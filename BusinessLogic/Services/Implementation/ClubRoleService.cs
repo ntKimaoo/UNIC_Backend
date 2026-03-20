@@ -1,6 +1,7 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
+using DataAccess.Repositories.Implementation;
 using DataAccess.Repositories.Interface;
 using System;
 using System.Collections.Generic;
@@ -201,6 +202,43 @@ namespace BusinessLogic.Services.Implementation
                 DepartmentId = clubRole.DepartmentId
             };
         }
-       
+        public async Task<bool> AssignRoleAsync(AssignClubRoleDto dto)
+        {
+            var exist = await _repository
+                .GetUserClubRoleAsync(dto.UserId, dto.ClubId);
+
+            if (exist != null)
+            {
+                exist.ClubRoleId = dto.ClubRoleId;
+                return await _repository.UpdateUserClubRoleAsync(exist);
+            }
+
+            var member = new UserClubRole
+            {
+                UserId = dto.UserId,
+                ClubId = dto.ClubId,
+                ClubRoleId = dto.ClubRoleId,
+                JoinDate = DateTime.UtcNow,
+                Status = "ACTIVE"
+            };
+
+            return await _repository.AddUserClubRoleAsync(member);
+        }
+
+        public Task<UserClubRole?> GetUserClubRoleAsync(Guid userId, int clubId)
+        {
+            return _repository.GetUserClubRoleAsync(userId, clubId);
+        }
+        public async Task<List<ClubResponseDto>> GetManagedClubsAsync(Guid userId)
+        {
+            var clubs = await _repository.GetManagedClubsAsync(userId);
+
+            return clubs.Select(c => new ClubResponseDto
+            {
+                ClubId = c.ClubId,
+                ClubName = c.ClubName,
+                Description = c.Description
+            }).ToList();
+        }
     }
 }

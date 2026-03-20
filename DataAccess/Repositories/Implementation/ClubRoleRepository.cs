@@ -109,6 +109,30 @@ namespace DataAccess.Repositories.Implementation
             }
             await _context.SaveChangesAsync();
         }
+        public async Task<UserClubRole?> GetUserClubRoleAsync(Guid userId, int clubId)
+        {
+            return await _context.UserClubRoles.Include(p => p.ClubRole)
+                .FirstOrDefaultAsync(x => x.UserId == userId && x.ClubId == clubId);
+        }
+
+        public async Task<bool> AddUserClubRoleAsync(UserClubRole member)
+        {
+            await _context.UserClubRoles.AddAsync(member);
+            return await _context.SaveChangesAsync() > 0;
+        }
+
+        public async Task<bool> UpdateUserClubRoleAsync(UserClubRole member)
+        {
+            _context.UserClubRoles.Update(member);
+            return await _context.SaveChangesAsync() > 0;
+        }
+        public async Task<List<Club>> GetManagedClubsAsync(Guid userId)
+        {
+            return await _context.UserClubRoles
+                .Where(u => u.UserId == userId && u.ClubRole.Level == 0)
+                .Select(u => u.Club)
+                .ToListAsync();
+        }
 
         public async Task<IEnumerable<ClubRole>> GetByDepartmentIdAsync(int departmentId)
         {
