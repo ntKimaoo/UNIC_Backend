@@ -49,46 +49,48 @@ namespace UNIC.BusinessLogic.Test.Services
             };
         }
 
-        #region GetFundsByClubIdAsync
+        #region GetFundsByClubIdPagedAsync
 
         [Fact]
-        public async Task GetFundsByClubIdAsync_ShouldReturnFunds_WhenClubHasFunds()
+        public async Task GetFundsByClubIdPagedAsync_ShouldReturnFunds_WhenClubHasFunds()
         {
-            // Arrange
             var clubId = 5;
             var funds = new List<ClubFund>
             {
                 new ClubFund { FundId = 1, ClubId = clubId, FundName = "Quỹ A", CurrentBalance = 1000, TotalAmount = 1000, Status = "APPROVED" },
                 new ClubFund { FundId = 2, ClubId = clubId, FundName = "Quỹ B", CurrentBalance = 500, TotalAmount = 500, Status = "PENDING" }
             };
-            _mockFundRepository.Setup(r => r.GetFundsByClubIdAsync(clubId)).ReturnsAsync(funds);
+            _mockFundRepository.Setup(r => r.GetFundsByClubIdPagedAsync(clubId, 1, 10)).ReturnsAsync((funds, 2));
 
-            // Act
-            var result = (await _clubFundService.GetFundsByClubIdAsync(clubId)).ToList();
+            var result = await _clubFundService.GetFundsByClubIdPagedAsync(clubId, 1, 10);
+            var list = result.Items.ToList();
 
-            // Assert
-            Assert.Equal(2, result.Count);
-            Assert.Equal(1, result[0].FundId);
-            Assert.Equal(clubId, result[0].ClubId);
-            Assert.Equal("Quỹ A", result[0].FundName);
-            Assert.Equal(1000, result[0].CurrentBalance);
-            Assert.Equal("APPROVED", result[0].Status);
-            Assert.Equal(2, result[1].FundId);
-            Assert.Equal(500, result[1].CurrentBalance);
+            Assert.Equal(2, list.Count);
+            Assert.Equal(2, result.TotalCount);
+            Assert.Equal(1, result.TotalPages);
+            Assert.False(result.HasPreviousPage);
+            Assert.False(result.HasNextPage);
+            Assert.Equal(1, list[0].FundId);
+            Assert.Equal(clubId, list[0].ClubId);
+            Assert.Equal("Quỹ A", list[0].FundName);
+            Assert.Equal(1000, list[0].CurrentBalance);
+            Assert.Equal("APPROVED", list[0].Status);
+            Assert.Equal(2, list[1].FundId);
+            Assert.Equal(500, list[1].CurrentBalance);
         }
 
         [Fact]
-        public async Task GetFundsByClubIdAsync_ShouldReturnEmpty_WhenClubHasNoFunds()
+        public async Task GetFundsByClubIdPagedAsync_ShouldReturnEmpty_WhenClubHasNoFunds()
         {
-            // Arrange
             var clubId = 99;
-            _mockFundRepository.Setup(r => r.GetFundsByClubIdAsync(clubId)).ReturnsAsync(new List<ClubFund>());
+            _mockFundRepository.Setup(r => r.GetFundsByClubIdPagedAsync(clubId, 1, 10))
+                .ReturnsAsync((new List<ClubFund>(), 0));
 
-            // Act
-            var result = (await _clubFundService.GetFundsByClubIdAsync(clubId)).ToList();
+            var result = await _clubFundService.GetFundsByClubIdPagedAsync(clubId, 1, 10);
 
-            // Assert
-            Assert.Empty(result);
+            Assert.Empty(result.Items);
+            Assert.Equal(0, result.TotalCount);
+            Assert.Equal(0, result.TotalPages);
         }
 
         #endregion
@@ -343,12 +345,11 @@ namespace UNIC.BusinessLogic.Test.Services
 
         #endregion
 
-        #region GetFundHistoryAsync
+        #region GetFundHistoryPagedAsync
 
         [Fact]
-        public async Task GetFundHistoryAsync_ShouldReturnTransactionDtos()
+        public async Task GetFundHistoryPagedAsync_ShouldReturnTransactionDtos()
         {
-            // Arrange
             var utc = DateTime.UtcNow;
             var transactions = new List<FundTransaction>
             {
@@ -365,25 +366,25 @@ namespace UNIC.BusinessLogic.Test.Services
                     Creator = new User { UserId = Guid.NewGuid(), FullName = "Người nộp", Email = "a@b.c" }
                 }
             };
-            _mockFundRepository.Setup(r => r.GetTransactionsByFundIdAsync(1, "PENDING", true, null)).ReturnsAsync(transactions);
+            _mockFundRepository.Setup(r => r.GetTransactionsByFundIdPagedAsync(1, "PENDING", true, null, 1, 10))
+                .ReturnsAsync((transactions, 1));
 
-            // Act
-            var result = (await _clubFundService.GetFundHistoryAsync(1, "pending", null, null)).ToList();
+            var result = await _clubFundService.GetFundHistoryPagedAsync(1, "pending", null, null, 1, 10);
+            var list = result.Items.ToList();
 
-            // Assert
-            Assert.Single(result);
-            Assert.Equal(1, result[0].TransactionId);
-            Assert.Equal(100, result[0].Amount);
-            Assert.Equal("Người nộp", result[0].MemberName);
-            Assert.Equal("Người nộp", result[0].ContributorName);
-            Assert.NotNull(result[0].CreatedAt);
-            Assert.NotNull(result[0].UpdatedAt);
+            Assert.Single(list);
+            Assert.Equal(1, list[0].TransactionId);
+            Assert.Equal(100, list[0].Amount);
+            Assert.Equal("Người nộp", list[0].MemberName);
+            Assert.Equal("Người nộp", list[0].ContributorName);
+            Assert.NotNull(list[0].CreatedAt);
+            Assert.NotNull(list[0].UpdatedAt);
+            Assert.Equal(1, result.TotalCount);
         }
 
         [Fact]
-        public async Task GetFundHistoryAsync_ShouldHandleNullStatus()
+        public async Task GetFundHistoryPagedAsync_ShouldHandleNullStatus()
         {
-            // Arrange
             var utc = DateTime.UtcNow;
             var transactions = new List<FundTransaction>
             {
@@ -396,17 +397,16 @@ namespace UNIC.BusinessLogic.Test.Services
                     UpdatedAt = utc
                 }
             };
-            _mockFundRepository.Setup(r => r.GetTransactionsByFundIdAsync(1, "APPROVED", true, null)).ReturnsAsync(transactions);
+            _mockFundRepository.Setup(r => r.GetTransactionsByFundIdPagedAsync(1, "APPROVED", true, null, 1, 10))
+                .ReturnsAsync((transactions, 1));
 
-            // Act
-            var result = (await _clubFundService.GetFundHistoryAsync(1, null, null, null)).ToList();
+            var result = await _clubFundService.GetFundHistoryPagedAsync(1, null, null, null, 1, 10);
 
-            // Assert
-            Assert.Single(result);
+            Assert.Single(result.Items);
         }
 
         [Fact]
-        public async Task GetFundHistoryAsync_WithStatusAll_PassesNullFilterToRepository()
+        public async Task GetFundHistoryPagedAsync_WithStatusAll_PassesNullFilterToRepository()
         {
             var utc = DateTime.UtcNow;
             var transactions = new List<FundTransaction>
@@ -424,12 +424,13 @@ namespace UNIC.BusinessLogic.Test.Services
                     IsMemberContribution = true
                 }
             };
-            _mockFundRepository.Setup(r => r.GetTransactionsByFundIdAsync(1, null, true, null)).ReturnsAsync(transactions);
+            _mockFundRepository.Setup(r => r.GetTransactionsByFundIdPagedAsync(1, null, true, null, 1, 10))
+                .ReturnsAsync((transactions, 1));
 
-            var result = (await _clubFundService.GetFundHistoryAsync(1, "ALL", null, null)).ToList();
+            var result = await _clubFundService.GetFundHistoryPagedAsync(1, "ALL", null, null, 1, 10);
 
-            Assert.Single(result);
-            _mockFundRepository.Verify(r => r.GetTransactionsByFundIdAsync(1, null, true, null), Times.Once);
+            Assert.Single(result.Items);
+            _mockFundRepository.Verify(r => r.GetTransactionsByFundIdPagedAsync(1, null, true, null, 1, 10), Times.Once);
         }
 
         #endregion

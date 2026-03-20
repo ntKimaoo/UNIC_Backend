@@ -21,6 +21,14 @@ namespace UNIC.DataAccess.Repositories.Interface
             string? status = null,
             bool memberContributionsOnly = false,
             Guid? createdByUserId = null);
+        Task<(IEnumerable<FundTransaction> Items, int TotalCount)> GetTransactionsByFundIdPagedAsync(
+            int fundId,
+            string? status,
+            bool memberContributionsOnly,
+            Guid? createdByUserId,
+            int pageNumber,
+            int pageSize);
         Task<IEnumerable<ClubFund>> GetFundsByClubIdAsync(int clubId);
+        Task<(IEnumerable<ClubFund> Items, int TotalCount)> GetFundsByClubIdPagedAsync(int clubId, int pageNumber, int pageSize);
     }
 }

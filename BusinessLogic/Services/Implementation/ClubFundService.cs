@@ -203,13 +203,14 @@ namespace BusinessLogic.Services.Implementation
             return fund == null ? null : MapToFundDto(fund);
         }
 
-        public async Task<IEnumerable<FundResponseDto>> GetFundsByClubIdAsync(int clubId)
+        public async Task<PagedResultDto<FundResponseDto>> GetFundsByClubIdPagedAsync(int clubId, int pageNumber, int pageSize)
         {
-            var funds = await _fundRepository.GetFundsByClubIdAsync(clubId);
-            return funds.Select(MapToFundDto);
+            var (items, totalCount) = await _fundRepository.GetFundsByClubIdPagedAsync(clubId, pageNumber, pageSize);
+            return ToPagedResult(items.Select(MapToFundDto), pageNumber, pageSize, totalCount);
         }
 
-        public async Task<IEnumerable<FundTransactionResponseDto>> GetFundHistoryAsync(int fundId, string? status, string? scope, Guid? currentUserId)
+        public async Task<PagedResultDto<FundTransactionResponseDto>> GetFundHistoryPagedAsync(
+            int fundId, string? status, string? scope, Guid? currentUserId, int pageNumber, int pageSize)
         {
             var trimmed = status?.Trim();
             string? normalizedStatus;
@@ -223,12 +224,30 @@ namespace BusinessLogic.Services.Implementation
             var normalizedScope = scope?.Trim().ToLowerInvariant();
             Guid? filterUser = normalizedScope == "mine" ? currentUserId : null;
 
-            var list = await _fundRepository.GetTransactionsByFundIdAsync(
+            var (items, totalCount) = await _fundRepository.GetTransactionsByFundIdPagedAsync(
                 fundId,
                 normalizedStatus,
                 memberContributionsOnly: true,
-                filterUser);
-            return list.Select(MapToTransactionDto);
+                filterUser,
+                pageNumber,
+                pageSize);
+
+            return ToPagedResult(items.Select(MapToTransactionDto), pageNumber, pageSize, totalCount);
+        }
+
+        private static PagedResultDto<T> ToPagedResult<T>(IEnumerable<T> items, int pageNumber, int pageSize, int totalCount)
+        {
+            var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
+            return new PagedResultDto<T>
+            {
+                Items = items,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                HasPreviousPage = pageNumber > 1,
+                HasNextPage = pageNumber < totalPages
+            };
         }
 
         private static FundResponseDto MapToFundDto(ClubFund fund)

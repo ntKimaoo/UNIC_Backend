@@ -96,15 +96,24 @@ namespace Presentation.Controllers
             return Ok(new { success = true, data = fund });
         }
 
+        /// <param name="page">Trang, từ 1.</param>
+        /// <param name="pageSize">1–100, mặc định 10.</param>
         [HttpGet]
         [RequireMemberPolicy("viewfinance")]
-        public async Task<IActionResult> GetFundsByClub(int clubId)
+        public async Task<IActionResult> GetFundsByClub(
+            int clubId,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
         {
+            if (page < 1)
+                return BadRequest(new { success = false, message = "Page phải >= 1." });
+            if (pageSize < 1 || pageSize > 100)
+                return BadRequest(new { success = false, message = "PageSize từ 1 đến 100." });
             var userId = GetCurrentUserId();
             if (!await CanAccessClubAsync(userId, clubId))
                 return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
-            var funds = await _clubFundService.GetFundsByClubIdAsync(clubId);
-            return Ok(new { success = true, data = funds });
+            var paged = await _clubFundService.GetFundsByClubIdPagedAsync(clubId, page, pageSize);
+            return Ok(new { success = true, data = paged });
         }
 
         [HttpPost("contribute")]
@@ -280,21 +289,32 @@ namespace Presentation.Controllers
             }
         }
 
+        /// <param name="page">Trang, bắt đầu từ 1.</param>
+        /// <param name="pageSize">Số bản ghi mỗi trang (1–100).</param>
         /// <param name="status">Mặc định (bỏ trống): APPROVED — chỉ các lần nộp đã thanh toán thành công. PENDING / REJECTED / ALL (mọi trạng thái).</param>
         /// <param name="scope">mine = chỉ các lần nộp của tôi.</param>
         [HttpGet("history/{fundId}")]
         [RequireMemberPolicy("viewfinance")]
-        public async Task<IActionResult> GetHistory(int fundId, [FromQuery] string? status, [FromQuery] string? scope)
+        public async Task<IActionResult> GetHistory(
+            int fundId,
+            [FromQuery] string? status,
+            [FromQuery] string? scope,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
         {
             try
             {
+                if (page < 1)
+                    return BadRequest(new { success = false, message = "Page phải >= 1." });
+                if (pageSize < 1 || pageSize > 100)
+                    return BadRequest(new { success = false, message = "PageSize từ 1 đến 100." });
                 var fund = await _clubFundService.GetFundByIdAsync(fundId);
                 if (fund == null)
                     return NotFound(new { success = false, message = "Quỹ không tồn tại." });
                 var userId = GetCurrentUserId();
                 if (!await CanAccessClubAsync(userId, fund.ClubId))
                     return StatusCode(403, new { success = false, message = "Bạn không có quyền xem lịch sử quỹ của câu lạc bộ này." });
-                var history = await _clubFundService.GetFundHistoryAsync(fundId, status, scope, userId);
+                var history = await _clubFundService.GetFundHistoryPagedAsync(fundId, status, scope, userId, page, pageSize);
                 return Ok(new { success = true, data = history });
             }
             catch (UnauthorizedAccessException ex)

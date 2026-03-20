@@ -47,10 +47,21 @@ namespace UNIC.Presentation.Test.Controllers
         public async Task GetHistory_ReturnsOk_WhenSuccess()
         {
             SetupUser(Guid.NewGuid());
-            _mockService.Setup(s => s.GetFundHistoryAsync(1, null, null, It.IsAny<Guid>()))
-                .ReturnsAsync(new List<FundTransactionResponseDto> { new() });
+            _mockService.Setup(s => s.GetFundHistoryPagedAsync(1, null, null, It.IsAny<Guid>(), 1, 10))
+                .ReturnsAsync(new PagedResultDto<FundTransactionResponseDto>
+                {
+                    Items = new List<FundTransactionResponseDto> { new() },
+                    PageNumber = 1,
+                    PageSize = 10,
+                    TotalCount = 1,
+                    TotalPages = 1,
+                    HasPreviousPage = false,
+                    HasNextPage = false
+                });
+            _mockService.Setup(s => s.GetFundByIdAsync(1))
+                .ReturnsAsync(new FundResponseDto { FundId = 1, ClubId = 1 });
 
-            var result = await _controller.GetHistory(1, null, null);
+            var result = await _controller.GetHistory(1, null, null, 1, 10);
 
             Assert.IsType<OkObjectResult>(result);
         }
@@ -59,10 +70,12 @@ namespace UNIC.Presentation.Test.Controllers
         public async Task GetHistory_ReturnsBadRequest_WhenServiceThrows()
         {
             SetupUser(Guid.NewGuid());
-            _mockService.Setup(s => s.GetFundHistoryAsync(99, null, null, It.IsAny<Guid>()))
+            _mockService.Setup(s => s.GetFundByIdAsync(99))
+                .ReturnsAsync(new FundResponseDto { FundId = 99, ClubId = 1 });
+            _mockService.Setup(s => s.GetFundHistoryPagedAsync(99, null, null, It.IsAny<Guid>(), 1, 10))
                 .ThrowsAsync(new Exception("Fund not found"));
 
-            var result = await _controller.GetHistory(99, null, null);
+            var result = await _controller.GetHistory(99, null, null, 1, 10);
 
             Assert.IsType<BadRequestObjectResult>(result);
         }

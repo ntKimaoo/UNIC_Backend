@@ -67,11 +67,62 @@ namespace DataAccess.Repositories.Implementation
                 .ToListAsync();
         }
 
+        public async Task<(IEnumerable<ClubFund> Items, int TotalCount)> GetFundsByClubIdPagedAsync(
+            int clubId, int pageNumber, int pageSize)
+        {
+            var query = _context.ClubFunds
+                .Where(cf => cf.ClubId == clubId)
+                .OrderBy(cf => cf.FundName);
+
+            var totalCount = await query.CountAsync();
+            var items = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+
         public async Task<IEnumerable<FundTransaction>> GetTransactionsByFundIdAsync(
             int fundId,
             string? status = null,
             bool memberContributionsOnly = false,
             Guid? createdByUserId = null)
+        {
+            var query = BuildFundTransactionQuery(fundId, status, memberContributionsOnly, createdByUserId);
+            return await query
+                .OrderByDescending(t => t.UpdatedAt)
+                .ThenByDescending(t => t.TransactionId)
+                .ToListAsync();
+        }
+
+        public async Task<(IEnumerable<FundTransaction> Items, int TotalCount)> GetTransactionsByFundIdPagedAsync(
+            int fundId,
+            string? status,
+            bool memberContributionsOnly,
+            Guid? createdByUserId,
+            int pageNumber,
+            int pageSize)
+        {
+            var query = BuildFundTransactionQuery(fundId, status, memberContributionsOnly, createdByUserId);
+            query = query
+                .OrderByDescending(t => t.UpdatedAt)
+                .ThenByDescending(t => t.TransactionId);
+
+            var totalCount = await query.CountAsync();
+            var items = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+
+        private IQueryable<FundTransaction> BuildFundTransactionQuery(
+            int fundId,
+            string? status,
+            bool memberContributionsOnly,
+            Guid? createdByUserId)
         {
             var query = _context.FundTransactions
                 .Include(t => t.Creator)
@@ -95,10 +146,7 @@ namespace DataAccess.Repositories.Implementation
                 query = query.Where(t => t.CreatedBy == createdByUserId.Value);
             }
 
-            return await query
-                .OrderByDescending(t => t.UpdatedAt)
-                .ThenByDescending(t => t.TransactionId)
-                .ToListAsync();
+            return query;
         }
     }
 }
