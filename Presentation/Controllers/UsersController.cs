@@ -14,8 +14,7 @@ namespace Presentation.Controllers
         private readonly IClubRoleService _clubRoleService;
         private readonly IFileStorageService _fileStorageService;
 
-        public UsersController(IUserService userService, IClubRoleService clubRoleService)
-        public UsersController(IUserService userService, IFileStorageService fileStorageService)
+        public UsersController(IUserService userService, IClubRoleService clubRoleService, IFileStorageService fileStorageService)
         {
             _userService = userService;
             _clubRoleService = clubRoleService;
