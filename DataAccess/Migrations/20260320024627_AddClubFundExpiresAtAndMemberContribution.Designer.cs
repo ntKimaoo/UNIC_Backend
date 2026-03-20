@@ -4,16 +4,19 @@ using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    partial class UnicContextModelSnapshot : ModelSnapshot
+    [Migration("20260320024627_AddClubFundExpiresAtAndMemberContribution")]
+    partial class AddClubFundExpiresAtAndMemberContribution
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -679,6 +682,56 @@ namespace UNIC.DataAccess.Migrations
                     b.ToTable("FundCategories");
                 });
 
+            modelBuilder.Entity("DataAccess.Models.FundCollection", b =>
+                {
+                    b.Property<int>("CollectionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CollectionId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FundId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal?>("SuggestedAmount")
+                        .HasColumnType("decimal(15,2)");
+
+                    b.Property<decimal?>("TargetAmount")
+                        .HasColumnType("decimal(15,2)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.HasKey("CollectionId");
+
+                    b.HasIndex("FundId");
+
+                    b.ToTable("FundCollections");
+                });
+
             modelBuilder.Entity("DataAccess.Models.FundTransaction", b =>
                 {
                     b.Property<int>("TransactionId")
@@ -696,8 +749,8 @@ namespace UNIC.DataAccess.Migrations
                     b.Property<int?>("CategoryId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
+                    b.Property<int?>("CollectionId")
+                        .HasColumnType("int");
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uniqueidentifier");
@@ -729,14 +782,11 @@ namespace UNIC.DataAccess.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
                     b.HasKey("TransactionId");
 
                     b.HasIndex("CategoryId");
 
-                    b.HasIndex("CreatedBy");
+                    b.HasIndex("CollectionId");
 
                     b.HasIndex("FundId");
 
@@ -1405,6 +1455,17 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("Event");
                 });
 
+            modelBuilder.Entity("DataAccess.Models.FundCollection", b =>
+                {
+                    b.HasOne("DataAccess.Models.ClubFund", "ClubFund")
+                        .WithMany()
+                        .HasForeignKey("FundId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("ClubFund");
+                });
+
             modelBuilder.Entity("DataAccess.Models.FundTransaction", b =>
                 {
                     b.HasOne("DataAccess.Models.FundCategory", "FundCategory")
@@ -1412,10 +1473,10 @@ namespace UNIC.DataAccess.Migrations
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("DataAccess.Models.User", "Creator")
-                        .WithMany()
-                        .HasForeignKey("CreatedBy")
-                        .OnDelete(DeleteBehavior.NoAction);
+                    b.HasOne("DataAccess.Models.FundCollection", "FundCollection")
+                        .WithMany("FundTransactions")
+                        .HasForeignKey("CollectionId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("DataAccess.Models.ClubFund", "ClubFund")
                         .WithMany("FundTransactions")
@@ -1425,9 +1486,9 @@ namespace UNIC.DataAccess.Migrations
 
                     b.Navigation("ClubFund");
 
-                    b.Navigation("Creator");
-
                     b.Navigation("FundCategory");
+
+                    b.Navigation("FundCollection");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Notification", b =>
@@ -1685,6 +1746,11 @@ namespace UNIC.DataAccess.Migrations
                 });
 
             modelBuilder.Entity("DataAccess.Models.FundCategory", b =>
+                {
+                    b.Navigation("FundTransactions");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.FundCollection", b =>
                 {
                     b.Navigation("FundTransactions");
                 });

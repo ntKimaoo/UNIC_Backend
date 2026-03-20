@@ -4,16 +4,19 @@ using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    partial class UnicContextModelSnapshot : ModelSnapshot
+    [Migration("20260320031655_RemoveFundCollections")]
+    partial class RemoveFundCollections
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -696,9 +699,6 @@ namespace UNIC.DataAccess.Migrations
                     b.Property<int?>("CategoryId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uniqueidentifier");
 
@@ -729,14 +729,9 @@ namespace UNIC.DataAccess.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
                     b.HasKey("TransactionId");
 
                     b.HasIndex("CategoryId");
-
-                    b.HasIndex("CreatedBy");
 
                     b.HasIndex("FundId");
 
@@ -1412,11 +1407,6 @@ namespace UNIC.DataAccess.Migrations
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("DataAccess.Models.User", "Creator")
-                        .WithMany()
-                        .HasForeignKey("CreatedBy")
-                        .OnDelete(DeleteBehavior.NoAction);
-
                     b.HasOne("DataAccess.Models.ClubFund", "ClubFund")
                         .WithMany("FundTransactions")
                         .HasForeignKey("FundId")
@@ -1424,8 +1414,6 @@ namespace UNIC.DataAccess.Migrations
                         .IsRequired();
 
                     b.Navigation("ClubFund");
-
-                    b.Navigation("Creator");
 
                     b.Navigation("FundCategory");
                 });

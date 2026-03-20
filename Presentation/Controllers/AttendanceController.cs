@@ -131,16 +131,6 @@ namespace UNIC.Presentation.Controllers
             }
         }
 
-        /// <summary>
-        /// Check in to an event
-        /// </summary>
-        // [HttpPost("{id}/checkin")]
-        // public async Task<IActionResult> CheckIn(int id, [FromBody] CheckInRequest request)
-        // { ... commented out to resolve Swagger conflict with EventsController ... }
-
-        /// <summary>
-        /// Evaluate a member's performance at an event
-        /// </summary>
         [HttpPost("{id}/evaluate")]
         // [Authorize(Roles = "Manager,Admin")] // Uncomment when authentication is fully set up
         public async Task<IActionResult> EvaluateMember(int id, [FromBody] EvaluateMemberRequest request)

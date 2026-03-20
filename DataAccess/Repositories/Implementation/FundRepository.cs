@@ -18,6 +18,7 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.FundTransactions
                 .Include(t => t.ClubFund)
+                .Include(t => t.Creator)
                 .FirstOrDefaultAsync(t => t.TransactionId == id);
         }
 
@@ -66,18 +67,37 @@ namespace DataAccess.Repositories.Implementation
                 .ToListAsync();
         }
 
-        public async Task<IEnumerable<FundTransaction>> GetTransactionsByFundIdAsync(int fundId, string? status = null)
+        public async Task<IEnumerable<FundTransaction>> GetTransactionsByFundIdAsync(
+            int fundId,
+            string? status = null,
+            bool memberContributionsOnly = false,
+            Guid? createdByUserId = null)
         {
             var query = _context.FundTransactions
+                .Include(t => t.Creator)
                 .Where(t => t.FundId == fundId);
 
             if (!string.IsNullOrEmpty(status))
             {
-                query = query.Where(t => t.Status == status);
+                var st = status.ToUpperInvariant();
+                query = query.Where(t => t.Status != null && t.Status.ToUpper() == st);
+            }
+
+            if (memberContributionsOnly)
+            {
+                query = query.Where(t =>
+                    t.TransactionType != null &&
+                    t.TransactionType.ToUpper() == "INCOME");
+            }
+
+            if (createdByUserId.HasValue)
+            {
+                query = query.Where(t => t.CreatedBy == createdByUserId.Value);
             }
 
             return await query
-                .OrderByDescending(t => t.TransactionDate)
+                .OrderByDescending(t => t.UpdatedAt)
+                .ThenByDescending(t => t.TransactionId)
                 .ToListAsync();
         }
     }

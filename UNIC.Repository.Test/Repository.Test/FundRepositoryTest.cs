@@ -57,13 +57,17 @@ namespace UNIC.Repository.Test.Repository.Test
             // Arrange
             var context = GetInMemoryContext();
             var repository = new FundRepository(context);
+            var utc = DateTime.UtcNow;
             var transaction = new FundTransaction
             {
                 FundId = 1,
                 TransactionType = "INCOME",
                 Amount = 500,
                 Description = "Donation",
-                Status = "APPROVED"
+                Status = "APPROVED",
+                TransactionDate = utc,
+                CreatedAt = utc,
+                UpdatedAt = utc
             };
 
             // Act
@@ -80,11 +84,12 @@ namespace UNIC.Repository.Test.Repository.Test
         {
             // Arrange
             var context = GetInMemoryContext();
+            var t0 = DateTime.UtcNow;
             context.FundTransactions.AddRange(new List<FundTransaction>
             {
-                new FundTransaction { FundId = 1, TransactionType = "INCOME", Amount = 100, Description = "T1" },
-                new FundTransaction { FundId = 1, TransactionType = "EXPENSE", Amount = 50, Description = "T2" },
-                new FundTransaction { FundId = 2, TransactionType = "INCOME", Amount = 200, Description = "T3" }
+                new FundTransaction { FundId = 1, TransactionType = "INCOME", Amount = 100, Description = "T1", TransactionDate = t0, CreatedAt = t0, UpdatedAt = t0 },
+                new FundTransaction { FundId = 1, TransactionType = "EXPENSE", Amount = 50, Description = "T2", TransactionDate = t0, CreatedAt = t0, UpdatedAt = t0 },
+                new FundTransaction { FundId = 2, TransactionType = "INCOME", Amount = 200, Description = "T3", TransactionDate = t0, CreatedAt = t0, UpdatedAt = t0 }
             });
             await context.SaveChangesAsync();
 

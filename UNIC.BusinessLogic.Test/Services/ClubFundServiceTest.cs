@@ -1,8 +1,10 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.Options;
 using BusinessLogic.Services.Implementation;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
+using Microsoft.Extensions.Options;
 using Moq;
 using System;
 using System.Collections.Generic;
@@ -24,7 +26,9 @@ namespace UNIC.BusinessLogic.Test.Services
             _mockFundRepository = new Mock<IFundRepository>();
             _mockClubMemberRepository = new Mock<IClubMemberRepository>();
             var mockPayOSService = new Mock<IPayOSService>();
-            _clubFundService = new ClubFundService(_mockFundRepository.Object, _mockClubMemberRepository.Object, mockPayOSService.Object);
+            var mockPolicyService = new Mock<IPolicyService>();
+            var payOsOptions = Options.Create(new PayOSOptions { LinkExpirationMinutes = 60 });
+            _clubFundService = new ClubFundService(_mockFundRepository.Object, _mockClubMemberRepository.Object, mockPayOSService.Object, mockPolicyService.Object, payOsOptions);
         }
 
         private static UserClubRole CreateActiveMember(string? roleName = "Manager")
@@ -214,209 +218,127 @@ namespace UNIC.BusinessLogic.Test.Services
 
         #endregion
 
-        #region CreateRequestAsync
+        #region GetContributionPaymentStatusAsync
 
         [Fact]
-        public async Task CreateRequestAsync_ShouldThrowException_WhenFundNotFound()
+        public async Task GetContributionPaymentStatusAsync_ReturnsPaid_WhenApproved()
         {
-            // Arrange
-            var request = new CreateFundRequestDto 
-            { 
-                FundId = 1, 
+            var userId = Guid.NewGuid();
+            var txn = new FundTransaction
+            {
+                TransactionId = 10,
+                FundId = 1,
                 TransactionType = "INCOME",
-                Amount = 100 
+                Status = "APPROVED",
+                Amount = 50_000,
+                CreatedBy = userId,
+                IsMemberContribution = true,
+                TransactionDate = DateTime.UtcNow,
+                ClubFund = new ClubFund { FundId = 1, ClubId = 7 }
             };
-            _mockFundRepository.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync((ClubFund?)null);
+            _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(10)).ReturnsAsync(txn);
 
-            // Act & Assert
-            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _clubFundService.CreateRequestAsync(Guid.NewGuid(), request));
-            Assert.Equal("Quỹ không tồn tại.", ex.Message);
-        }
+            var result = await _clubFundService.GetContributionPaymentStatusAsync(userId, 7, 10);
 
-        [Fact]
-        public async Task CreateRequestAsync_ShouldReturnTransaction_WhenValid()
-        {
-            // Arrange
-            var userId = Guid.NewGuid();
-            var request = new CreateFundRequestDto 
-            { 
-                FundId = 1, CategoryId = 2, TransactionType = "income", Amount = 1000, Description = "Test fund" 
-            };
-            var fund = new ClubFund { FundId = 1, ClubId = 10, Status = "APPROVED" };
-            _mockFundRepository.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(fund);
-            _mockFundRepository.Setup(r => r.AddTransactionAsync(It.IsAny<FundTransaction>())).Returns(Task.CompletedTask);
-            _mockClubMemberRepository.Setup(r => r.GetMemberAsync(userId, 10)).ReturnsAsync(CreateActiveMember("Club Member"));
-
-            // Act
-            var result = await _clubFundService.CreateRequestAsync(userId, request);
-
-            // Assert
             Assert.NotNull(result);
-            Assert.Equal(1, result.FundId);
-            Assert.Equal(2, result.CategoryId);
-            Assert.Equal("INCOME", result.TransactionType);
-            Assert.Equal(1000, result.Amount);
-            Assert.Equal("PENDING", result.Status);
-            Assert.Equal(userId, result.CreatedBy);
-            _mockFundRepository.Verify(r => r.AddTransactionAsync(It.IsAny<FundTransaction>()), Times.Once);
+            Assert.Equal(7, result!.ClubId);
+            Assert.True(result.IsPaid);
+            Assert.False(result.IsPaymentLinkExpired);
+            Assert.Null(result.PaymentLinkExpiresAtUtc);
         }
 
         [Fact]
-        public async Task CreateRequestAsync_ShouldThrowUnauthorized_WhenUserNotMemberOfClub()
+        public async Task GetContributionPaymentStatusByOrderCodeAsync_ReturnsSameAsStatus_WhenSameUser()
         {
             var userId = Guid.NewGuid();
-            var request = new CreateFundRequestDto { FundId = 1, TransactionType = "INCOME", Amount = 100 };
-            var fund = new ClubFund { FundId = 1, ClubId = 10, Status = "APPROVED" };
-            _mockFundRepository.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(fund);
-            _mockClubMemberRepository.Setup(r => r.GetMemberAsync(userId, 10)).ReturnsAsync((UserClubRole?)null);
-
-            var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _clubFundService.CreateRequestAsync(userId, request));
-            Assert.Contains("không phải thành viên", ex.Message);
-        }
-
-        [Fact]
-        public async Task ProcessRequestAsync_ShouldThrowUnauthorized_WhenUserIsNotManagerOrViceManager()
-        {
-            var managerId = Guid.NewGuid();
-            var request = new ProcessFundRequestDto { TransactionId = 1, Action = "APPROVE" };
-            var fund = new ClubFund { ClubId = 5, CurrentBalance = 2000 };
-            var transaction = new FundTransaction { TransactionId = 1, Status = "PENDING", TransactionType = "EXPENSE", Amount = 100, ClubFund = fund };
-            _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(transaction);
-            _mockClubMemberRepository.Setup(r => r.GetMemberAsync(managerId, 5)).ReturnsAsync(CreateActiveMember("Club Member"));
-
-            var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _clubFundService.ProcessRequestAsync(managerId, request));
-            Assert.Contains("Club Manager hoặc Vice Manager", ex.Message);
-        }
-
-        #endregion
-
-        #region ProcessRequestAsync
-
-        [Fact]
-        public async Task ProcessRequestAsync_ShouldThrowException_WhenTransactionNotFound()
-        {
-            // Arrange
-            var request = new ProcessFundRequestDto { TransactionId = 1 };
-            _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync((FundTransaction?)null);
-
-            // Act & Assert
-            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _clubFundService.ProcessRequestAsync(Guid.NewGuid(), request));
-            Assert.Equal("Giao dịch không tồn tại.", ex.Message);
-        }
-
-        [Fact]
-        public async Task ProcessRequestAsync_ShouldThrowException_WhenTransactionNotPending()
-        {
-            // Arrange
-            var request = new ProcessFundRequestDto { TransactionId = 1 };
-            var transaction = new FundTransaction { TransactionId = 1, Status = "APPROVED" };
-            _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(transaction);
-
-            // Act & Assert
-            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _clubFundService.ProcessRequestAsync(Guid.NewGuid(), request));
-            Assert.Equal("Giao dịch đã được xử lý trước đó.", ex.Message);
-        }
-
-        [Fact]
-        public async Task ProcessRequestAsync_ShouldThrowException_WhenApproveExpenseAndInsufficientBalance()
-        {
-            // Arrange
-            var managerId = Guid.NewGuid();
-            var request = new ProcessFundRequestDto { TransactionId = 1, Action = "approve" };
-            var fund = new ClubFund { ClubId = 5, CurrentBalance = 500 }; // Balance 500
-            var transaction = new FundTransaction 
-            { 
-                TransactionId = 1, Status = "PENDING", TransactionType = "EXPENSE", Amount = 1000, ClubFund = fund 
-            }; // Wants 1000
-            _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(transaction);
-            _mockClubMemberRepository.Setup(r => r.GetMemberAsync(managerId, 5))
-                .ReturnsAsync(CreateActiveMemberWithLevel("Manager", 1));
-
-            // Act & Assert
-            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => _clubFundService.ProcessRequestAsync(managerId, request));
-            Assert.Equal("Số dư quỹ không đủ để duyệt chi tiêu này.", ex.Message);
-        }
-
-        [Fact]
-        public async Task ProcessRequestAsync_ShouldApproveExpenseAndDeductBalance_WhenValid()
-        {
-            // Arrange
-            var managerId = Guid.NewGuid();
-            var request = new ProcessFundRequestDto { TransactionId = 1, Action = "APPROVE" };
-            var fund = new ClubFund { ClubId = 5, CurrentBalance = 1500 }; 
-            var transaction = new FundTransaction 
-            { 
-                TransactionId = 1, Status = "PENDING", TransactionType = "EXPENSE", Amount = 1000, ClubFund = fund 
+            var txn = new FundTransaction
+            {
+                TransactionId = 18,
+                FundId = 3,
+                TransactionType = "INCOME",
+                Status = "APPROVED",
+                Amount = 20_000,
+                CreatedBy = userId,
+                IsMemberContribution = true,
+                TransactionDate = DateTime.UtcNow,
+                ClubFund = new ClubFund { FundId = 3, ClubId = 12 }
             };
-            _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(transaction);
-            _mockFundRepository.Setup(r => r.UpdateTransactionAndFundAsync(It.IsAny<FundTransaction>(), It.IsAny<ClubFund>())).Returns(Task.CompletedTask);
-            _mockClubMemberRepository.Setup(r => r.GetMemberAsync(managerId, 5))
-                .ReturnsAsync(CreateActiveMemberWithLevel("Vice Manager", 2));
+            _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(18)).ReturnsAsync(txn);
 
-            // Act
-            var result = await _clubFundService.ProcessRequestAsync(managerId, request);
+            var result = await _clubFundService.GetContributionPaymentStatusByOrderCodeAsync(userId, 18);
 
-            // Assert
-            Assert.True(result);
-            Assert.Equal("APPROVED", transaction.Status);
-            Assert.Equal(managerId, transaction.ApprovedBy);
-            Assert.Equal(500, fund.CurrentBalance); // Deducted
-            _mockFundRepository.Verify(r => r.UpdateTransactionAndFundAsync(transaction, fund), Times.Once);
+            Assert.NotNull(result);
+            Assert.Equal(12, result!.ClubId);
+            Assert.Equal(18, result.TransactionId);
+            Assert.Equal(3, result.FundId);
+            Assert.True(result.IsPaid);
         }
 
         [Fact]
-        public async Task ProcessRequestAsync_ShouldApproveIncomeAndAddBalance_WhenValid()
+        public async Task GetContributionPaymentStatusByOrderCodeAsync_ReturnsNull_WhenWrongUser()
         {
-            // Arrange
-            var managerId = Guid.NewGuid();
-            var request = new ProcessFundRequestDto { TransactionId = 1, Action = "approve" };
-            var fund = new ClubFund { ClubId = 5, CurrentBalance = 500, TotalAmount = 1000 }; 
-            var transaction = new FundTransaction 
-            { 
-                TransactionId = 1, Status = "PENDING", TransactionType = "INCOME", Amount = 1000, ClubFund = fund 
+            var userId = Guid.NewGuid();
+            var txn = new FundTransaction
+            {
+                TransactionId = 18,
+                TransactionType = "INCOME",
+                CreatedBy = Guid.NewGuid(),
+                IsMemberContribution = true,
+                ClubFund = new ClubFund { ClubId = 1 }
             };
-            _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(transaction);
-            _mockFundRepository.Setup(r => r.UpdateTransactionAndFundAsync(It.IsAny<FundTransaction>(), It.IsAny<ClubFund>())).Returns(Task.CompletedTask);
-            _mockClubMemberRepository.Setup(r => r.GetMemberAsync(managerId, 5))
-                .ReturnsAsync(CreateActiveMemberWithLevel("Manager", 1));
+            _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(18)).ReturnsAsync(txn);
 
-            // Act
-            var result = await _clubFundService.ProcessRequestAsync(managerId, request);
+            var result = await _clubFundService.GetContributionPaymentStatusByOrderCodeAsync(userId, 18);
 
-            // Assert
-            Assert.True(result);
-            Assert.Equal("APPROVED", transaction.Status);
-            Assert.Equal(managerId, transaction.ApprovedBy);
-            Assert.Equal(1500, fund.CurrentBalance); // Added
-            Assert.Equal(2000, fund.TotalAmount);    // Added
-            _mockFundRepository.Verify(r => r.UpdateTransactionAndFundAsync(transaction, fund), Times.Once);
+            Assert.Null(result);
         }
 
         [Fact]
-        public async Task ProcessRequestAsync_ShouldRejectAndNotChangeBalance_WhenRejectAction()
+        public async Task GetContributionPaymentStatusAsync_ReturnsNull_WhenWrongUser()
         {
-            // Arrange
-            var managerId = Guid.NewGuid();
-            var request = new ProcessFundRequestDto { TransactionId = 1, Action = "REJECT" };
-            var fund = new ClubFund { ClubId = 5, CurrentBalance = 1500 }; 
-            var transaction = new FundTransaction 
-            { 
-                TransactionId = 1, Status = "PENDING", TransactionType = "EXPENSE", Amount = 1000, ClubFund = fund 
+            var userId = Guid.NewGuid();
+            var txn = new FundTransaction
+            {
+                TransactionId = 10,
+                FundId = 1,
+                TransactionType = "INCOME",
+                Status = "PENDING",
+                CreatedBy = Guid.NewGuid(),
+                IsMemberContribution = true,
+                ClubFund = new ClubFund { ClubId = 7 }
             };
-            _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(transaction);
-            _mockFundRepository.Setup(r => r.UpdateTransactionAndFundAsync(It.IsAny<FundTransaction>(), It.IsAny<ClubFund>())).Returns(Task.CompletedTask);
-            _mockClubMemberRepository.Setup(r => r.GetMemberAsync(managerId, 5))
-                .ReturnsAsync(CreateActiveMemberWithLevel("Manager", 1));
+            _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(10)).ReturnsAsync(txn);
 
-            // Act
-            var result = await _clubFundService.ProcessRequestAsync(managerId, request);
+            var result = await _clubFundService.GetContributionPaymentStatusAsync(userId, 7, 10);
 
-            // Assert
-            Assert.True(result);
-            Assert.Equal("REJECTED", transaction.Status);
-            Assert.Equal(managerId, transaction.ApprovedBy);
-            Assert.Equal(1500, fund.CurrentBalance); // Unchanged
-            _mockFundRepository.Verify(r => r.UpdateTransactionAndFundAsync(transaction, fund), Times.Once);
+            Assert.Null(result);
+        }
+
+        [Fact]
+        public async Task GetContributionPaymentStatusAsync_ReturnsExpired_WhenPendingAndPastExpiry()
+        {
+            var userId = Guid.NewGuid();
+            var txn = new FundTransaction
+            {
+                TransactionId = 11,
+                FundId = 1,
+                TransactionType = "INCOME",
+                Status = "PENDING",
+                Amount = 10_000,
+                CreatedBy = userId,
+                IsMemberContribution = true,
+                TransactionDate = DateTime.UtcNow.AddHours(-2),
+                ClubFund = new ClubFund { ClubId = 7 }
+            };
+            _mockFundRepository.Setup(r => r.GetTransactionByIdAsync(11)).ReturnsAsync(txn);
+
+            var result = await _clubFundService.GetContributionPaymentStatusAsync(userId, 7, 11);
+
+            Assert.NotNull(result);
+            Assert.Equal(7, result!.ClubId);
+            Assert.False(result.IsPaid);
+            Assert.True(result.IsPaymentLinkExpired);
+            Assert.NotNull(result.PaymentLinkExpiresAtUtc);
         }
 
         #endregion
@@ -427,30 +349,87 @@ namespace UNIC.BusinessLogic.Test.Services
         public async Task GetFundHistoryAsync_ShouldReturnTransactionDtos()
         {
             // Arrange
-            var transactions = new List<FundTransaction> { new FundTransaction { TransactionId = 1, Amount = 100 } };
-            _mockFundRepository.Setup(r => r.GetTransactionsByFundIdAsync(1, "PENDING")).ReturnsAsync(transactions);
+            var utc = DateTime.UtcNow;
+            var transactions = new List<FundTransaction>
+            {
+                new FundTransaction
+                {
+                    TransactionId = 1,
+                    FundId = 1,
+                    Amount = 100,
+                    Description = "x",
+                    TransactionType = "INCOME",
+                    TransactionDate = utc,
+                    CreatedAt = utc,
+                    UpdatedAt = utc,
+                    Creator = new User { UserId = Guid.NewGuid(), FullName = "Người nộp", Email = "a@b.c" }
+                }
+            };
+            _mockFundRepository.Setup(r => r.GetTransactionsByFundIdAsync(1, "PENDING", true, null)).ReturnsAsync(transactions);
 
             // Act
-            var result = (await _clubFundService.GetFundHistoryAsync(1, "pending")).ToList();
+            var result = (await _clubFundService.GetFundHistoryAsync(1, "pending", null, null)).ToList();
 
             // Assert
             Assert.Single(result);
             Assert.Equal(1, result[0].TransactionId);
             Assert.Equal(100, result[0].Amount);
+            Assert.Equal("Người nộp", result[0].MemberName);
+            Assert.Equal("Người nộp", result[0].ContributorName);
+            Assert.NotNull(result[0].CreatedAt);
+            Assert.NotNull(result[0].UpdatedAt);
         }
 
         [Fact]
         public async Task GetFundHistoryAsync_ShouldHandleNullStatus()
         {
             // Arrange
-            var transactions = new List<FundTransaction> { new FundTransaction() };
-            _mockFundRepository.Setup(r => r.GetTransactionsByFundIdAsync(1, null)).ReturnsAsync(transactions);
+            var utc = DateTime.UtcNow;
+            var transactions = new List<FundTransaction>
+            {
+                new FundTransaction
+                {
+                    Description = "x",
+                    TransactionType = "INCOME",
+                    TransactionDate = utc,
+                    CreatedAt = utc,
+                    UpdatedAt = utc
+                }
+            };
+            _mockFundRepository.Setup(r => r.GetTransactionsByFundIdAsync(1, "APPROVED", true, null)).ReturnsAsync(transactions);
 
             // Act
-            var result = (await _clubFundService.GetFundHistoryAsync(1, null)).ToList();
+            var result = (await _clubFundService.GetFundHistoryAsync(1, null, null, null)).ToList();
 
             // Assert
             Assert.Single(result);
+        }
+
+        [Fact]
+        public async Task GetFundHistoryAsync_WithStatusAll_PassesNullFilterToRepository()
+        {
+            var utc = DateTime.UtcNow;
+            var transactions = new List<FundTransaction>
+            {
+                new FundTransaction
+                {
+                    TransactionId = 1,
+                    FundId = 1,
+                    Amount = 50,
+                    Status = "PENDING",
+                    TransactionType = "INCOME",
+                    TransactionDate = utc,
+                    CreatedAt = utc,
+                    UpdatedAt = utc,
+                    IsMemberContribution = true
+                }
+            };
+            _mockFundRepository.Setup(r => r.GetTransactionsByFundIdAsync(1, null, true, null)).ReturnsAsync(transactions);
+
+            var result = (await _clubFundService.GetFundHistoryAsync(1, "ALL", null, null)).ToList();
+
+            Assert.Single(result);
+            _mockFundRepository.Verify(r => r.GetTransactionsByFundIdAsync(1, null, true, null), Times.Once);
         }
 
         #endregion
