@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Presentation.Controllers
 {
     [ApiController]
-    [Route("api")]
+    [Route("api/club/{clubId}/recruitment-campaign")]
     public class RecruitmentCampaignController : ControllerBase
     {
         private readonly IRecruitmentCampaignService _service;
@@ -17,12 +17,12 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
-        /// Get all recruitment campaigns
+        /// Get all recruitment campaigns for a specific club
         /// </summary>
-        [HttpGet("recruitment-campaign")]
-        public async Task<IActionResult> GetAll()
+        [HttpGet]
+        public async Task<IActionResult> GetAll(int clubId)
         {
-            var campaigns = await _service.GetAllAsync();
+            var campaigns = await _service.GetByClubIdAsync(clubId);
             return Ok(new
             {
                 success = true,
@@ -33,8 +33,8 @@ namespace Presentation.Controllers
         /// <summary>
         /// Get recruitment campaign by ID
         /// </summary>
-        [HttpGet("recruitment-campaign/{id}")]
-        public async Task<IActionResult> GetById(int id)
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int clubId, int id)
         {
             var campaign = await _service.GetByIdAsync(id);
             if (campaign == null)
@@ -54,24 +54,10 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
-        /// Get recruitment campaigns by club ID
-        /// </summary>
-        [HttpGet("recruitment-campaign/club/{clubId}")]
-        public async Task<IActionResult> GetByClubId(int clubId)
-        {
-            var campaigns = await _service.GetByClubIdAsync(clubId);
-            return Ok(new
-            {
-                success = true,
-                data = campaigns
-            });
-        }
-
-        /// <summary>
         /// Create a new recruitment campaign
         /// </summary>
-        [HttpPost("recruitment-campaign")]
-        public async Task<IActionResult> Create([FromBody] CreateRecruitmentCampaignDto dto)
+        [HttpPost]
+        public async Task<IActionResult> Create(int clubId, [FromBody] CreateRecruitmentCampaignDto dto)
         {
             if (!ModelState.IsValid)
             {
@@ -88,7 +74,7 @@ namespace Presentation.Controllers
                 var campaign = await _service.CreateAsync(dto);
                 return CreatedAtAction(
                     nameof(GetById),
-                    new { id = campaign.CampaignId },
+                    new { clubId = clubId, id = campaign.CampaignId },
                     new
                     {
                         success = true,
@@ -109,8 +95,8 @@ namespace Presentation.Controllers
         /// <summary>
         /// Update an existing recruitment campaign
         /// </summary>
-        [HttpPut("recruitment-campaign/{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] UpdateRecruitmentCampaignDto dto)
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int clubId, int id, [FromBody] UpdateRecruitmentCampaignDto dto)
         {
             if (!ModelState.IsValid)
             {
@@ -154,8 +140,8 @@ namespace Presentation.Controllers
         /// <summary>
         /// Delete a recruitment campaign
         /// </summary>
-        [HttpDelete("recruitment-campaign/{id}")]
-        public async Task<IActionResult> Delete(int id)
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int clubId, int id)
         {
             var result = await _service.DeleteAsync(id);
             if (!result)
@@ -175,3 +161,4 @@ namespace Presentation.Controllers
         }
     }
 }
+
