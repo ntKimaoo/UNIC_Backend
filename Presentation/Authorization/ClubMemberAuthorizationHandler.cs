@@ -7,10 +7,6 @@ using System.Threading.Tasks;
 
 namespace Presentation.Authorization
 {
-    /// <summary>
-    /// Authorization handler that checks if the authenticated user has a required
-    /// policy within the club identified by the {clubId} route parameter.
-    /// </summary>
     public class ClubMemberAuthorizationHandler : AuthorizationHandler<ClubMemberRequirement>
     {
         private readonly IPolicyService _policyService;
@@ -28,8 +24,8 @@ namespace Presentation.Authorization
             AuthorizationHandlerContext context,
             ClubMemberRequirement requirement)
         {
-            // 1. Resolve user ID from claims
-            var userIdClaim = context.User.FindFirst(ClaimTypes.NameIdentifier)
+            var userIdClaim = context.User.FindFirst("UserId")
+                ?? context.User.FindFirst(ClaimTypes.NameIdentifier)
                 ?? context.User.FindFirst("sub")
                 ?? context.User.FindFirst("userId");
 
@@ -39,7 +35,6 @@ namespace Presentation.Authorization
                 return;
             }
 
-            // 2. Read {clubId} from the route
             var httpContext = _httpContextAccessor.HttpContext;
             if (httpContext == null)
             {
@@ -51,12 +46,10 @@ namespace Presentation.Authorization
             if (!routeValues.TryGetValue("clubId", out var clubIdObj)
                 || !int.TryParse(clubIdObj?.ToString(), out var clubId))
             {
-                // No {clubId} in this route — fail gracefully
                 context.Fail();
                 return;
             }
 
-            // 3. Club-scoped policy check
             var hasPolicy = await _policyService.HasMemberPolicyInClubAsync(
                 userId, clubId, requirement.PolicyTitle);
 

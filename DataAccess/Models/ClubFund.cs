@@ -26,6 +26,10 @@ namespace DataAccess.Models
         [MaxLength(20)]
         public string Status { get; set; } = "PENDING";
 
+        /// <summary>Ngày cuối cùng (theo lịch UTC) quỹ còn nhận nộp tiền từ thành viên. Null = không giới hạn.</summary>
+        [Column(TypeName = "date")]
+        public DateTime? ExpiresAt { get; set; }
+
         [ForeignKey("ClubId")]
         public virtual Club Club { get; set; }
 
