@@ -1,5 +1,5 @@
-using API.Services;
 using BusinessLogic.DTOs;
+using BusinessLogic.Services.Implementation;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
@@ -9,7 +9,7 @@ using System;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace UNIC.BusinessLogic.Test.Services
+namespace UNIC.ServiceTest.Services
 {
     public class AuthServiceTest
     {
@@ -314,7 +314,6 @@ namespace UNIC.BusinessLogic.Test.Services
             Assert.NotNull(result);
             Assert.Equal(createdUser.Email, result.Email);
             _mockEmailVerifRepo.Verify(repo => repo.CreateAsync(It.IsAny<EmailVerificationToken>()), Times.Once);
-            // EmailQueueService is static, checking if method ran without error is enough for simple unit test
         }
 
         [Fact]

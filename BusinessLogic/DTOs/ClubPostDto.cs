@@ -21,7 +21,7 @@ namespace BusinessLogic.DTOs
         public string? Content { get; set; }
 
         [MaxLength(20)]
-        public string Status { get; set; } = "PUBLISHED";
+        public string? Status { get; set; }
     }
 
     public class UpdateClubPostDto

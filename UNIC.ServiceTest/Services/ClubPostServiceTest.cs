@@ -11,7 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace UNIC.BusinessLogic.Test.Services
+namespace UNIC.ServiceTest.Services
 {
     public class ClubPostServiceTest
     {
@@ -133,8 +133,6 @@ namespace UNIC.BusinessLogic.Test.Services
             Assert.NotNull(result);
             Assert.Equal("PENDING", result.Status);
             _mockPostRepo.Verify(r => r.CreateAsync(It.Is<ClubPost>(p => p.Status == "PENDING")), Times.Once);
-            // Note: EnqueueTask is static, so we can't easily verify it with Moq without wrappers. 
-            // The fact that it doesn't throw and sets status to PENDING confirms branch coverage.
         }
 
         #endregion
