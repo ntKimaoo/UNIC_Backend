@@ -10,7 +10,7 @@ namespace BusinessLogic.Services.Background
     {
         private readonly ILogger<ClubRoleNotificationService> _logger;
         private readonly IServiceProvider _serviceProvider;
-        private readonly TimeSpan _checkInterval = TimeSpan.FromHours(1);
+        private readonly TimeSpan _checkInterval = TimeSpan.FromMinutes(5);
 
         private const int MinRoleThreshold = 2;
         private const string NotificationType = "CLUB_ROLE_WARNING";
@@ -43,7 +43,14 @@ namespace BusinessLogic.Services.Background
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error in ClubRole Notification Service. Retrying in 5 minutes.");
-                    await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
                 }
             }
 
@@ -57,23 +64,24 @@ namespace BusinessLogic.Services.Background
             var notificationRepo = scope.ServiceProvider.GetRequiredService<INotificationRepository>();
             var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
 
-            var clubIds = await clubRoleRepo.GetClubIdsWithFewRolesAsync(MinRoleThreshold);
+            var clubIds = (await clubRoleRepo.GetClubIdsWithFewRolesAsync(MinRoleThreshold)).ToList();
             if (!clubIds.Any()) return;
 
             var managerIds = await clubRoleRepo.GetManagerIdsForClubsAsync(clubIds);
 
-            foreach (var managerId in managerIds)
+            var tasks = managerIds.Select(async managerId =>
             {
                 var alreadyNotified = await notificationRepo.HasRecentNotificationAsync(
                     managerId, NotificationType, TimeSpan.FromHours(24));
-
-                if (alreadyNotified) continue;
+                if (alreadyNotified) return;
 
                 await notificationService.SendNotificationAsync(
                     managerId, NotificationTitle, NotificationMessage, NotificationType);
 
                 _logger.LogInformation("Notification sent to manager {UserId}", managerId);
-            }
+            });
+
+            await Task.WhenAll(tasks);
         }
     }
 }

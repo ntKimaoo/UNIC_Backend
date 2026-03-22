@@ -20,7 +20,7 @@ namespace Presentation.Controllers
         public async Task<IActionResult> GetByUserId(Guid userId)
         {
             var notifications = await _notificationService.GetByUserIdAsync(userId);
-            return Ok(notifications);
+            return Ok(new { success = true, data = notifications });
         }
 
         [HttpPatch("{notificationId}/read")]
