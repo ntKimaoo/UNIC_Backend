@@ -9,7 +9,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace UNIC.BusinessLogic.Test.Services
+namespace UNIC.ServiceTest.Services
 {
     public class UserServiceTest
     {

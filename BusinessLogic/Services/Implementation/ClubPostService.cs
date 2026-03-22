@@ -69,7 +69,7 @@ namespace BusinessLogic.Services.Implementation
                 ImageUrl = dto.ImageUrl ?? "", 
                 Caption = dto.Caption ?? "",
                 Content = dto.Content ?? "",
-                Status = dto.Status ?? status,
+                Status = !string.IsNullOrEmpty(dto.Status) ? dto.Status : status,
                 PostDate = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
