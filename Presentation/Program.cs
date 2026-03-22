@@ -1,4 +1,3 @@
-
 using BusinessLogic.DTOs;
 using BusinessLogic.Services;
 using BusinessLogic.Services.Background;
@@ -30,6 +29,8 @@ using UNIC.DataAccess.Repositories.Interface;
 using UNIC.DataAccess.Seed;
 using UNIC.Presentation.Helpers;
 using UNIC.Presentation.Hubs;
+using BusinessLogic.Hubs;
+using Presentation.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -121,6 +122,10 @@ builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
 builder.Services.AddHostedService<ImageUploadQueueService>();
+builder.Services.AddHostedService<ClubRoleNotificationService>();
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+builder.Services.AddScoped<INotificationHubContext, NotificationHubContext>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventReminderService>();
 
 // Unit of Work and Repositories
@@ -261,6 +266,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowFE");
 app.UseStaticFiles(); // Enable serving files from wwwroot
 app.MapHub<WebRtcHub>("/webrtc");
+app.MapHub<NotificationHub>("/notifications");
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
