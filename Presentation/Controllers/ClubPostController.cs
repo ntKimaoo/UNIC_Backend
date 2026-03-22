@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace Presentation.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/club/{clubId}/posts")]
     public class ClubPostController : ControllerBase
     {
         private readonly IClubPostService _clubPostService;
@@ -23,13 +23,13 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
-        /// Get all club posts
+        /// Get all club posts for a specific club
         /// </summary>
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(int clubId)
         {
-            var posts = await _clubPostService.GetAllAsync();
+            var posts = await _clubPostService.GetByClubIdAsync(clubId);
             return Ok(new
             {
                 success = true,
@@ -43,7 +43,7 @@ namespace Presentation.Controllers
         [HttpGet("{id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> GetById(int id)
+        public async Task<IActionResult> GetById(int clubId, int id)
         {
             var post = await _clubPostService.GetByIdAsync(id);
             if (post == null)
@@ -63,26 +63,11 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
-        /// Get club posts by club ID
-        /// </summary>
-        [HttpGet("club/{clubId}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetByClubId(int clubId)
-        {
-            var posts = await _clubPostService.GetByClubIdAsync(clubId);
-            return Ok(new
-            {
-                success = true,
-                data = posts
-            });
-        }
-
-        /// <summary>
         /// Get club posts by user ID
         /// </summary>
         [HttpGet("user/{userId}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetByUserId(Guid userId)
+        public async Task<IActionResult> GetByUserId(int clubId, Guid userId)
         {
             var posts = await _clubPostService.GetByUserIdAsync(userId);
             return Ok(new
@@ -99,7 +84,7 @@ namespace Presentation.Controllers
         [Consumes("multipart/form-data")]
         [ProducesResponseType(StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Create([FromForm] CreateClubPostDto dto, IFormFile? imageFile)
+        public async Task<IActionResult> Create(int clubId, [FromForm] CreateClubPostDto dto, IFormFile? imageFile)
         {
             if (!ModelState.IsValid)
             {
@@ -116,7 +101,7 @@ namespace Presentation.Controllers
                 var post = await _clubPostService.CreateAsync(dto, imageFile);
                 return CreatedAtAction(
                     nameof(GetById),
-                    new { id = post.PostId },
+                    new { clubId = clubId, id = post.PostId },
                     new
                     {
                         success = true,
@@ -142,7 +127,7 @@ namespace Presentation.Controllers
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Update(int id, [FromForm] UpdateClubPostDto dto, IFormFile? imageFile)
+        public async Task<IActionResult> Update(int clubId, int id, [FromForm] UpdateClubPostDto dto, IFormFile? imageFile)
         {
             if (!ModelState.IsValid)
             {
@@ -190,7 +175,7 @@ namespace Presentation.Controllers
         [HttpDelete("{id}")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> Delete(int clubId, int id)
         {
             var result = await _clubPostService.DeleteAsync(id);
             if (!result)
@@ -215,7 +200,7 @@ namespace Presentation.Controllers
         [HttpPost("upload-editor-image")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> UploadEditorImage(IFormFile upload)
+        public async Task<IActionResult> UploadEditorImage(int clubId, IFormFile upload)
         {
             if (upload == null || upload.Length == 0)
             {
@@ -231,7 +216,7 @@ namespace Presentation.Controllers
             try
             {
                 var url = await _fileStorageService.SaveFileAsync(upload, "clubposts");
-                
+
                 // CKEditor5 expects this specific response format
                 return Ok(new
                 {

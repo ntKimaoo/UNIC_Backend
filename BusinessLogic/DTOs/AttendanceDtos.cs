@@ -48,6 +48,45 @@ namespace BusinessLogic.DTOs
     }
 
     /// <summary>
+    /// Response for participant's personal QR code (content to encode in QR for event check-in).
+    /// </summary>
+    public class CheckInQrResponse
+    {
+        public int EventId { get; set; }
+        public string QrContent { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// Request when organizer scans a participant's QR code to check them in.
+    /// </summary>
+    public class CheckInByQrRequest
+    {
+        [Required(ErrorMessage = "Token (from QR) is required")]
+        [MaxLength(64)]
+        public string Token { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// Response after scanning QR to check in a participant.
+    /// </summary>
+    public class CheckInByQrResponse
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = null!;
+        public string MemberName { get; set; } = null!;
+        public bool AlreadyCheckedIn { get; set; }
+    }
+
+    public class VerifyByLinkResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = null!;
+        public bool AlreadyCheckedIn { get; set; }
+        public string? MemberName { get; set; }
+        public string? EventName { get; set; }
+    }
+
+    /// <summary>
     /// DTO for evaluating member performance at an event
     /// </summary>
     public class EvaluateMemberRequest
@@ -82,4 +121,6 @@ namespace BusinessLogic.DTOs
         public int? Score { get; set; }
         public string? Comment { get; set; }
     }
+
+    
 }

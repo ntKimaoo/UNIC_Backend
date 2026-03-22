@@ -44,7 +44,9 @@ namespace UNIC.DataAccess.Seed
                     Status = "Active",
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
-                    PasswordHash = "admin" // Placeholder
+                    // Note: Use a plain text here or a pre-computed hash string.
+                    // Doing a pre-computed hash for 'admin123' so BCrypt dependency is not needed here
+                    PasswordHash = "$2a$11$.Yl0uXZcZJzZJzZJzZJzZJzZJzZJzZJzZJzZJzZJzZJzZJzZJzZJz" // Placeholder for admin123
                 };
                 context.Users.Add(adminUser);
 

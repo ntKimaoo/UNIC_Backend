@@ -13,5 +13,6 @@ namespace BusinessLogic.Services.Interface
         Task<ClubMemberResponseDto?> UpdateMemberRoleAsync(int clubMemberId, UpdateMemberRoleDto dto);
         Task<bool> RemoveMemberAsync(int clubMemberId);
         Task<IEnumerable<ClubMemberResponseDto>> GetMyClubsAsync(Guid userId);
+        Task<bool> IsMemberAsync(Guid userId, int clubId);
     }
 }

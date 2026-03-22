@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DataAccess.Models
@@ -30,6 +30,9 @@ namespace DataAccess.Models
         public string Description { get; set; }
 
         public DateTime TransactionDate { get; set; } = DateTime.Now;
+
+        [MaxLength(100)]
+        public string? PaymentLinkId { get; set; }
 
         [ForeignKey("FundId")]
         public virtual ClubFund ClubFund { get; set; }

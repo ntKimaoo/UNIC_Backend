@@ -4,6 +4,7 @@ using BusinessLogic.Exceptions;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
+using DataAccess.Enums;
 using FluentValidation;
 using System;
 using System.Collections.Generic;
@@ -20,6 +21,8 @@ namespace BusinessLogic.Services.Implementation
         private readonly IValidator<UpdateEventRequest> _updateValidator;
         private readonly IValidator<CreateSessionRequest> _sessionValidator;
         private readonly IValidator<OpenRegistrationRequest> _registrationValidator;
+        private readonly IEmailService _emailService;
+        private readonly IAttendanceService _attendanceService;
 
         public EventService(
             IUnitOfWork unitOfWork,
@@ -27,7 +30,9 @@ namespace BusinessLogic.Services.Implementation
             IValidator<CreateEventRequest> createValidator,
             IValidator<UpdateEventRequest> updateValidator,
             IValidator<CreateSessionRequest> sessionValidator,
-            IValidator<OpenRegistrationRequest> registrationValidator)
+            IValidator<OpenRegistrationRequest> registrationValidator,
+            IEmailService emailService,
+            IAttendanceService attendanceService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -35,6 +40,8 @@ namespace BusinessLogic.Services.Implementation
             _updateValidator = updateValidator;
             _sessionValidator = sessionValidator;
             _registrationValidator = registrationValidator;
+            _emailService = emailService;
+            _attendanceService = attendanceService;
         }
 
         public async Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null)
@@ -53,6 +60,12 @@ namespace BusinessLogic.Services.Implementation
             eventEntity.CheckInCode = Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper();
             // Set ImageUrl from Cloudinary upload (null if no image provided)
             eventEntity.ImageUrl = imageUrl;
+
+            if (!eventEntity.IsPublic)
+            {
+                // Generate a WebRTC room code for private events
+                eventEntity.Location = $"/webrtc/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+            }
 
             // Add to repository
             await _unitOfWork.Events.AddAsync(eventEntity);
@@ -86,7 +99,26 @@ namespace BusinessLogic.Services.Implementation
             // Map updates
             existingEvent.EventName = request.EventName;
             existingEvent.Description = request.Description;
-            existingEvent.Location = request.Location;
+            
+            // Handle Type switch (Offline <-> Online)
+            if (request.IsOnline)
+            {
+                // If switching to or staying Online, ensure we have a WebRTC link
+                if (string.IsNullOrEmpty(existingEvent.Location) || !existingEvent.Location.StartsWith("/webrtc/"))
+                {
+                    existingEvent.Location = $"/webrtc/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+                }
+            }
+            else
+            {
+                // If staying or switching to Offline, ensure they provided a physical location
+                if (string.IsNullOrWhiteSpace(request.Location))
+                {
+                    throw new DomainException("Location is required for offline events.");
+                }
+                existingEvent.Location = request.Location;
+            }
+            
             existingEvent.StartDate = request.StartDate;
             existingEvent.EndDate = request.EndDate;
             // Only update ImageUrl if a new one was provided (preserve existing if no new image)
@@ -154,10 +186,10 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("Event", request.EventId);
             }
 
-            // Check event status is PLANNED
-            if (eventEntity.Status != "PLANNED")
+            // Check event status is PLANNED or REGISTRATION_OPEN (allow editing dates)
+            if (eventEntity.Status != "PLANNED" && eventEntity.Status != "REGISTRATION_OPEN")
             {
-                throw new DomainException($"Cannot open registration for event with status '{eventEntity.Status}'. Event must be in PLANNED status.");
+                throw new DomainException($"Cannot open/update registration for event with status '{eventEntity.Status}'. Event must be in PLANNED or REGISTRATION_OPEN status.");
             }
 
             // Validate registration end date is before event start date
@@ -188,13 +220,166 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("Event", eventId);
             }
 
+            // Lazily correct stale status based on current time
+            await AutoSyncStatusAsync(eventEntity);
+
             return _mapper.Map<EventDetailDto>(eventEntity);
         }
 
         public async Task<IEnumerable<EventDetailDto>> GetAllEventsAsync(int pageNumber = 1, int pageSize = 10)
         {
             var events = await _unitOfWork.Events.GetAllAsync(pageNumber, pageSize);
+
+            // Lazily correct stale statuses for all returned events
+            bool anyChanged = false;
+            foreach (var ev in events)
+            {
+                bool changed = await AutoSyncStatusAsync(ev, saveImmediately: false);
+                if (changed) anyChanged = true;
+            }
+            if (anyChanged) await _unitOfWork.SaveChangesAsync();
+
             return _mapper.Map<IEnumerable<EventDetailDto>>(events);
+        }
+
+        public async Task RegisterForEventAsync(int eventId, string userId, string? apiBaseUrl = null)
+        {
+            if (!Guid.TryParse(userId, out var userGuid))
+                throw new DomainException("Invalid user ID format");
+
+            await _attendanceService.RegisterMemberAsync(new EventRegistrationRequest 
+            { 
+                EventId = eventId, 
+                UserId = userGuid 
+            });
+        }
+
+        public async Task<(string checkInCode, DateTime expiresAt)> StartEventAsync(int eventId)
+        {
+            var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
+            if (eventEntity == null)
+                throw new NotFoundException("Event", eventId);
+
+            if (eventEntity.Status != "REGISTRATION_OPEN" && eventEntity.Status != "OPEN_REGISTRATION")
+                throw new DomainException($"Cannot start event from status '{eventEntity.Status}'.");
+
+            eventEntity.Status = "ONGOING";
+            string generatedCode = Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper();
+            eventEntity.CheckInCode = generatedCode;
+            DateTime expiry = DateTime.Now.AddHours(2);
+            eventEntity.CodeExpiresAt = expiry;
+
+            _unitOfWork.Events.Update(eventEntity);
+            await _unitOfWork.SaveChangesAsync();
+
+            var registeredAttendances = await _unitOfWork.Attendances.GetAttendeesByEventAsync(eventId);
+            var usersToEmail = registeredAttendances.Where(a => a.AttendanceStatus == nameof(AttendanceStatus.REGISTERED)).ToList();
+
+            foreach (var att in usersToEmail)
+            {
+                var user = await _unitOfWork.Users.GetByIdAsync(att.UserId);
+                if (user != null)
+                {
+                    _ = _emailService.SendEventCheckInCodeAsync(user.Email, user.FullName, eventEntity.EventName, generatedCode);
+                }
+            }
+
+            return (generatedCode, expiry);
+        }
+
+        public async Task CheckInEventAsync(int eventId, string userId, string checkInCode)
+        {
+            if (!Guid.TryParse(userId, out var userGuid))
+                throw new DomainException("Invalid user ID format");
+
+            var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
+            if (eventEntity == null)
+                throw new NotFoundException("Event", eventId);
+
+            if (eventEntity.Status != "ONGOING")
+                throw new DomainException("Event is not currently ongoing.");
+
+            if (string.IsNullOrEmpty(eventEntity.CheckInCode) || !eventEntity.CheckInCode.Equals(checkInCode, StringComparison.OrdinalIgnoreCase))
+                throw new DomainException("Invalid check-in code.");
+
+            if (eventEntity.CodeExpiresAt.HasValue && DateTime.Now > eventEntity.CodeExpiresAt.Value)
+                throw new DomainException("Check-in code has expired.");
+
+            var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, userGuid);
+            if (attendance == null)
+                throw new DomainException("User is not registered for this event.");
+
+            if (attendance.AttendanceStatus == nameof(AttendanceStatus.PRESENT)
+                || attendance.AttendanceStatus == nameof(AttendanceStatus.CHECKED_IN))
+                throw new DomainException("User has already checked in.");
+
+            attendance.AttendanceStatus = nameof(AttendanceStatus.PRESENT);
+            attendance.CheckInTime = DateTime.Now;
+
+            _unitOfWork.Attendances.Update(attendance);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        public async Task CompleteEventAsync(int eventId)
+        {
+            var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
+            if (eventEntity == null)
+                throw new NotFoundException("Event", eventId);
+
+            if (eventEntity.Status != "ONGOING")
+                throw new DomainException($"Cannot complete event from status '{eventEntity.Status}'.");
+
+            eventEntity.Status = "COMPLETED";
+
+            var allAttendances = await _unitOfWork.Attendances.GetAttendeesByEventAsync(eventId);
+            foreach (var attendance in allAttendances)
+            {
+                if (attendance.AttendanceStatus == nameof(AttendanceStatus.REGISTERED))
+                {
+                    attendance.AttendanceStatus = nameof(AttendanceStatus.ABSENT);
+                    _unitOfWork.Attendances.Update(attendance);
+                }
+            }
+
+            _unitOfWork.Events.Update(eventEntity);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Lazily corrects stale event status based on current time.
+        /// Rules:
+        ///   1. REGISTRATION_OPEN + registrationEndDate passed  → REGISTRATION_CLOSED
+        ///   2. Any non-terminal status + endDate passed        → ENDED
+        /// </summary>
+        private async Task<bool> AutoSyncStatusAsync(Event eventEntity, bool saveImmediately = true)
+        {
+            var now = DateTime.Now;
+            var originalStatus = eventEntity.Status;
+
+            // Rule 2 first (higher priority): if event's own end time has passed, mark ENDED
+            var terminalStatuses = new[] { "ENDED", "CANCELED", "ONGOING" };
+            if (!terminalStatuses.Contains(eventEntity.Status)
+                && eventEntity.EndDate.HasValue
+                && eventEntity.EndDate.Value <= now)
+            {
+                eventEntity.Status = "ENDED";
+            }
+            // Rule 1: registration period closed but event hasn't started yet
+            else if (eventEntity.Status == "REGISTRATION_OPEN"
+                && eventEntity.RegistrationEndDate.HasValue
+                && eventEntity.RegistrationEndDate.Value <= now)
+            {
+                eventEntity.Status = "REGISTRATION_CLOSED";
+            }
+
+            if (eventEntity.Status == originalStatus)
+                return false; // nothing changed
+
+            _unitOfWork.Events.Update(eventEntity);
+            if (saveImmediately)
+                await _unitOfWork.SaveChangesAsync();
+
+            return true;
         }
     }
 }

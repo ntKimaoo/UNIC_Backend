@@ -1,0 +1,237 @@
+using BusinessLogic.DTOs;
+using BusinessLogic.Exceptions;
+using BusinessLogic.Services.Interface;
+using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
+using System.Text.Json;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using System.Collections.Generic;
+using System.Linq;
+using System;
+
+namespace UNIC.Presentation.Controllers
+{
+    /// <summary>
+    /// Club-scoped event management endpoints.
+    /// Route: /api/club/{clubId}/events
+    /// All actions require Manager permission for the given club.
+    /// </summary>
+    [ApiController]
+    [Route("api/club/{clubId}/events")]
+    [Authorize]
+    public class ClubEventsController : ControllerBase
+    {
+        private readonly IEventService _eventService;
+        private readonly IFileStorageService _fileStorageService;
+
+        public ClubEventsController(IEventService eventService, IFileStorageService fileStorageService)
+        {
+            _eventService = eventService;
+            _fileStorageService = fileStorageService;
+        }
+
+        private class ClubRoleClaimDto
+        {
+            public int ClubId { get; set; }
+            public string RoleName { get; set; } = string.Empty;
+            public int Level { get; set; }
+        }
+
+        private bool IsClubManager(int clubId)
+        {
+            if (User.IsInRole("Admin")) return true;
+            var clubRolesClaim = User.FindFirst("club_roles")?.Value;
+            if (string.IsNullOrEmpty(clubRolesClaim)) return false;
+            try
+            {
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var roles = JsonSerializer.Deserialize<List<ClubRoleClaimDto>>(clubRolesClaim, options);
+                return roles != null && roles.Any(r => r.ClubId == clubId && (r.RoleName.Equals("Manager", StringComparison.OrdinalIgnoreCase) || r.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase)));
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Create a new event for a club
+        /// </summary>
+        [HttpPost]
+        [Consumes("multipart/form-data")]
+        public async Task<ActionResult<EventDetailDto>> CreateEvent(int clubId, [FromForm] CreateEventRequest request, IFormFile? image)
+        {
+            try
+            {
+                if (!IsClubManager(clubId))
+                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions for this club." });
+
+                // Override ClubId from route
+                request.ClubId = clubId;
+
+                string? imageUrl = null;
+                if (image != null && image.Length > 0)
+                {
+                    imageUrl = await _fileStorageService.SaveFileAsync(image, "uniclub/events");
+                }
+
+                var eventDto = await _eventService.CreateEventAsync(request, imageUrl);
+                return CreatedAtAction("GetEventById", "Events", new { id = eventDto.EventId }, eventDto);
+            }
+            catch (DomainException ex) { return BadRequest(new { error = ex.Message }); }
+            catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { error = "An error occurred", details = ex.Message }); }
+        }
+
+        /// <summary>
+        /// Update an event within a club
+        /// </summary>
+        [HttpPut("{id}")]
+        [Consumes("multipart/form-data")]
+        public async Task<ActionResult<EventDetailDto>> UpdateEvent(int clubId, int id, [FromForm] UpdateEventRequest request, IFormFile? image)
+        {
+            try
+            {
+                if (!IsClubManager(clubId))
+                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
+
+                if (id != request.EventId) return BadRequest(new { error = "Event ID mismatch" });
+
+                // Verify the event belongs to this club
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                if (existingEvent.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                if (image != null && image.Length > 0)
+                {
+                    request.ImageUrl = await _fileStorageService.SaveFileAsync(image, "uniclub/events");
+                }
+
+                var eventDto = await _eventService.UpdateEventAsync(request);
+                return Ok(eventDto);
+            }
+            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+        }
+
+        /// <summary>
+        /// Upload image for an event within a club
+        /// </summary>
+        [HttpPost("{id}/image")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadEventImage(int clubId, int id, IFormFile image)
+        {
+            try
+            {
+                if (!IsClubManager(clubId))
+                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
+
+                if (image == null || image.Length == 0) return BadRequest(new { error = "No image file provided." });
+
+                var eventDto = await _eventService.GetEventByIdAsync(id);
+                if (eventDto.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                var imageUrl = await _fileStorageService.SaveFileAsync(image, "uniclub/events");
+                await _eventService.UpdateEventAsync(new UpdateEventRequest
+                {
+                    EventId = id,
+                    EventName = eventDto.EventName,
+                    Description = eventDto.Description,
+                    Location = eventDto.Location,
+                    StartDate = eventDto.StartDate,
+                    EndDate = eventDto.EndDate,
+                    ImageUrl = imageUrl
+                });
+                return Ok(new { message = "Image uploaded successfully.", imageUrl });
+            }
+            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+        }
+
+        /// <summary>
+        /// Create a session for an event within a club
+        /// </summary>
+        [HttpPost("{id}/sessions")]
+        public async Task<ActionResult<SessionDto>> CreateSession(int clubId, int id, [FromBody] CreateSessionRequest request)
+        {
+            try
+            {
+                if (!IsClubManager(clubId))
+                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
+
+                if (id != request.EventId) return BadRequest(new { error = "Event ID mismatch" });
+
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                if (existingEvent.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                var sessionDto = await _eventService.CreateSessionAsync(request);
+                return CreatedAtAction("GetEventById", "Events", new { id = request.EventId }, sessionDto);
+            }
+            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+        }
+
+        /// <summary>
+        /// Open registration for an event within a club
+        /// </summary>
+        [HttpPatch("{id}/open-registration")]
+        public async Task<ActionResult<EventDetailDto>> OpenRegistration(int clubId, int id, [FromBody] OpenRegistrationRequest request)
+        {
+            try
+            {
+                if (!IsClubManager(clubId))
+                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
+
+                if (id != request.EventId) return BadRequest(new { error = "Event ID mismatch" });
+
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                if (existingEvent.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                var eventDto = await _eventService.OpenRegistrationAsync(request);
+                return Ok(eventDto);
+            }
+            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+        }
+
+        /// <summary>
+        /// Start an event (generates check-in code)
+        /// </summary>
+        [HttpPut("{id}/start")]
+        public async Task<IActionResult> StartEvent(int clubId, int id)
+        {
+            try
+            {
+                if (!IsClubManager(clubId))
+                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
+
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                if (existingEvent.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                var result = await _eventService.StartEventAsync(id);
+                return Ok(new { checkInCode = result.checkInCode, expiresAt = result.expiresAt });
+            }
+            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+        }
+
+        /// <summary>
+        /// Complete an event
+        /// </summary>
+        [HttpPut("{id}/complete")]
+        public async Task<IActionResult> CompleteEvent(int clubId, int id)
+        {
+            try
+            {
+                if (!IsClubManager(clubId))
+                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
+
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                if (existingEvent.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                await _eventService.CompleteEventAsync(id);
+                return Ok(new { message = "Event completed." });
+            }
+            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+        }
+    }
+}
