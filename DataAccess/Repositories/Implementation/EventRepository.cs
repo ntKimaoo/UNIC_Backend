@@ -1,5 +1,6 @@
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
+using DataAccess.Enums;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -29,6 +30,7 @@ namespace DataAccess.Repositories.Implementation
                 .Include(e => e.EventSchedules)
                 .Include(e => e.EventImages)
                 .Include(e => e.Club)
+                .Include(e => e.Attendances)
                 .FirstOrDefaultAsync(e => e.EventId == eventId);
         }
 
@@ -43,16 +45,26 @@ namespace DataAccess.Repositories.Implementation
         public async Task<IEnumerable<Event>> GetAllAsync(int pageNumber = 1, int pageSize = 10)
         {
             return await _context.Events
+                .Include(e => e.Attendances)
+                .Include(e => e.EventSchedules)
                 .OrderByDescending(e => e.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
         }
 
+        public async Task<IEnumerable<Event>> GetUpcomingEventsAsync()
+        {
+            var now = DateTime.Now;
+            return await _context.Events
+                .Where(e => e.StartDate > now && e.Status != "CANCELED")
+                .ToListAsync();
+        }
+
         public async Task<int> GetAttendeeCountAsync(int eventId)
         {
             return await _context.Attendances
-                .Where(a => a.EventId == eventId && a.AttendanceStatus != "CANCELLED")
+                .Where(a => a.EventId == eventId && a.AttendanceStatus != nameof(AttendanceStatus.CANCELLED))
                 .CountAsync();
         }
 

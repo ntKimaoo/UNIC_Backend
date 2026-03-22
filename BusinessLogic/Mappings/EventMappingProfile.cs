@@ -14,7 +14,11 @@ namespace BusinessLogic.Mappings
         {
             // Event -> EventDetailDto
             CreateMap<Event, EventDetailDto>()
-                .ForMember(dest => dest.Sessions, opt => opt.MapFrom(src => src.EventSchedules));
+                .ForMember(dest => dest.Sessions, opt => opt.MapFrom(src => src.EventSchedules))
+                .ForMember(dest => dest.CurrentAttendees, opt => opt.MapFrom(src => src.Attendances != null ? src.Attendances.Count : 0))
+                .ForMember(dest => dest.RequiresApproval, opt => opt.MapFrom(src => false))
+                .ForMember(dest => dest.MeetLink, opt => opt.MapFrom(src => src.IsPublic ? null : src.Location))
+                .ForMember(dest => dest.Location, opt => opt.MapFrom(src => src.IsPublic ? src.Location : "Online (WebRTC)"));
 
             // EventSchedule -> SessionDto
             CreateMap<EventSchedule, SessionDto>()
@@ -29,13 +33,16 @@ namespace BusinessLogic.Mappings
             CreateMap<CreateEventRequest, Event>()
                 .ForMember(dest => dest.EventId, opt => opt.Ignore())
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => "PLANNED"))
-                .ForMember(dest => dest.IsPublic, opt => opt.MapFrom(src => true))
+                .ForMember(dest => dest.IsPublic, opt => opt.MapFrom(src => src.IsPublic))
                 .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.Now))
                 .ForMember(dest => dest.Club, opt => opt.Ignore())
                 .ForMember(dest => dest.EventSchedules, opt => opt.Ignore())
                 .ForMember(dest => dest.EventImages, opt => opt.Ignore())
                 .ForMember(dest => dest.EventBudgets, opt => opt.Ignore())
-                .ForMember(dest => dest.Attendances, opt => opt.Ignore());
+                .ForMember(dest => dest.Attendances, opt => opt.Ignore())
+                .IgnoreAllPropertiesWithAnInaccessibleSetter();
+                // .ForMember(dest => dest.RequiresApproval, opt => opt.Ignore())
+                // .ForMember(dest => dest.CurrentAttendeesCount, opt => opt.Ignore());
 
             // UpdateEventRequest -> Event
             CreateMap<UpdateEventRequest, Event>()

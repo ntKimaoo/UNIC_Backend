@@ -41,12 +41,6 @@ builder.Services.AddDbContext<MeetingDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("MeetingRoomConnection"));
 });
 
-//redis
-builder.Services.AddStackExchangeRedisCache(redisOptions=>
-{
-    redisOptions.Configuration = builder.Configuration.GetConnectionString("RedisConnection");
-});
-
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFE",
@@ -108,6 +102,12 @@ builder.Services.AddSingleton(sp =>
 
 // Register Background Services
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.Configure<BusinessLogic.Options.PayOSOptions>(builder.Configuration.GetSection(BusinessLogic.Options.PayOSOptions.SectionName));
+builder.Services.AddHttpClient<IPayOSService, PayOSService>((sp, client) =>
+{
+    var opt = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<BusinessLogic.Options.PayOSOptions>>().Value;
+    client.BaseAddress = new Uri(opt.BaseUrl.TrimEnd('/') + "/");
+});
 builder.Services.AddScoped<IFundRepository, FundRepository>();
 builder.Services.AddScoped<IClubFundService, ClubFundService>();
 builder.Services.AddScoped<IClubRepository, ClubRepository>();
@@ -125,6 +125,7 @@ builder.Services.AddHostedService<ClubRoleNotificationService>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<INotificationHubContext, NotificationHubContext>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddHostedService<BusinessLogic.Services.Background.EventReminderService>();
 
 // Unit of Work and Repositories
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IUnitOfWork, DataAccess.Repositories.Implementation.UnitOfWork>();
@@ -135,6 +136,7 @@ builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventScheduleRepos
 // Business Services
 builder.Services.AddScoped<BusinessLogic.Services.Interface.IEventService, BusinessLogic.Services.Implementation.EventService>();
 builder.Services.AddScoped<BusinessLogic.Services.Interface.IAttendanceService, BusinessLogic.Services.Implementation.AttendanceService>();
+builder.Services.AddScoped<BusinessLogic.Services.Interface.IQRCodeGeneratorService, BusinessLogic.Services.Implementation.QRCodeGeneratorService>();
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<BusinessLogic.Validators.CreateEventRequestValidator>();
@@ -154,7 +156,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
 //jwt
 var jwtSettings = builder.Configuration.GetSection("Jwt");
-var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]);
+var key = Encoding.UTF8.GetBytes(jwtSettings["Key"] ?? throw new InvalidOperationException("Jwt:Key is missing"));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthentication(options =>
 {

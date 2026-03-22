@@ -1,9 +1,7 @@
-﻿using BusinessLogic.DTOs;
+using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.OData.Query;
-using Microsoft.IdentityModel.Tokens;
 using System.Linq;
 
 namespace Presentation.Controllers
@@ -14,24 +12,27 @@ namespace Presentation.Controllers
     {
         private readonly IUserService _userService;
         private readonly IClubRoleService _clubRoleService;
+        private readonly IFileStorageService _fileStorageService;
 
-        public UsersController(IUserService userService, IClubRoleService clubRoleService)
+        public UsersController(IUserService userService, IClubRoleService clubRoleService, IFileStorageService fileStorageService)
         {
             _userService = userService;
             _clubRoleService = clubRoleService;
+            _fileStorageService = fileStorageService;
         }
 
-        // GET: api/users
         [HttpGet]
-        [EnableQuery]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
         {
-            var users = await _userService.GetAllUsersAsync();
-            if (!users.Any())
-            {
-                return NotFound(new { success = false, message = "No users found" });
-            }
-            return Ok(new { success = true, data = users });
+            if (page < 1)
+                return BadRequest(new { success = false, message = "Page must be >= 1" });
+            if (pageSize < 1 || pageSize > 100)
+                return BadRequest(new { success = false, message = "PageSize must be between 1 and 100" });
+
+            var pagedResult = await _userService.GetPagedUsersAsync(page, pageSize);
+            return Ok(new { success = true, data = pagedResult });
         }
 
         // GET: api/users/{id}
@@ -89,6 +90,31 @@ namespace Presentation.Controllers
             }
         }
 
+        // POST: api/users/{id}/avatar
+        [HttpPost("{id}/avatar")]
+        [Authorize]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadAvatar(Guid id, IFormFile avatar)
+        {
+            try
+            {
+                if (avatar == null || avatar.Length == 0)
+                    return BadRequest(new { success = false, message = "No file provided" });
+
+                var imageUrl = await _fileStorageService.SaveFileAsync(avatar, "uniclub/avatars");
+                var result = await _userService.UpdateUserAsync(id, new UpdateUserDto { Avatar = imageUrl });
+
+                if (!result)
+                    return NotFound(new { success = false, message = "User not found" });
+
+                return Ok(new { success = true, data = new { avatarUrl = imageUrl } });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
         // DELETE: api/users/{id}
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
@@ -110,7 +136,7 @@ namespace Presentation.Controllers
                 return NotFound(new { success = false, message = "User not found" });
             }
             var result = await _userService.GetAllClubsById(id);
-            if (result.IsNullOrEmpty())
+            if (result == null || !result.Any())
             {
                 return NotFound(new { success = false, message = "You have not join any club!" });
             }

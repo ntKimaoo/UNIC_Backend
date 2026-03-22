@@ -271,6 +271,11 @@ public partial class UnicContext : DbContext
             .HasForeignKey(a => a.EventId)
             .OnDelete(DeleteBehavior.NoAction);
 
+        modelBuilder.Entity<Attendance>()
+            .HasIndex(a => a.CheckInToken)
+            .IsUnique()
+            .HasFilter("[CheckInToken] IS NOT NULL");
+
         // ClubFund - Club
         modelBuilder.Entity<ClubFund>()
             .HasOne(cf => cf.Club)

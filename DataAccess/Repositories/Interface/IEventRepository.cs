@@ -11,6 +11,7 @@ namespace DataAccess.Repositories.Interface
         Task<Event?> GetByIdWithDetailsAsync(int eventId);
         Task<Event?> GetByIdWithAttendeesAsync(int eventId);
         Task<IEnumerable<Event>> GetAllAsync(int pageNumber = 1, int pageSize = 10);
+        Task<IEnumerable<Event>> GetUpcomingEventsAsync();
         Task<int> GetAttendeeCountAsync(int eventId);
         Task AddAsync(Event @event);
         void Update(Event @event);

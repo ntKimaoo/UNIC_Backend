@@ -1,5 +1,6 @@
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
+using DataAccess.Enums;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -25,6 +26,15 @@ namespace DataAccess.Repositories.Implementation
                 .FirstOrDefaultAsync(a => a.EventId == eventId && a.UserId == userId);
         }
 
+        public async Task<Attendance?> GetByCheckInTokenAsync(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token)) return null;
+            return await _context.Attendances
+                .Include(a => a.User)
+                .Include(a => a.Event)
+                .FirstOrDefaultAsync(a => a.CheckInToken == token);
+        }
+
         public async Task<bool> IsUserRegisteredAsync(int eventId, Guid userId)
         {
             return await _context.Attendances
@@ -48,6 +58,15 @@ namespace DataAccess.Repositories.Implementation
         public void Update(Attendance attendance)
         {
             _context.Attendances.Update(attendance);
+        }
+
+        public async Task<Attendance?> GetOldestWaitlistedAttendeeAsync(int eventId)
+        {
+            return await _context.Attendances
+                .Include(a => a.User)
+                .Where(a => a.EventId == eventId && a.AttendanceStatus == nameof(AttendanceStatus.WAITLIST))
+                .OrderBy(a => a.RegistrationDate)
+                .FirstOrDefaultAsync();
         }
     }
 }

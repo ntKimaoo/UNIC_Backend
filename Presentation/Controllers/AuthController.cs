@@ -1,4 +1,4 @@
-﻿using BusinessLogic.DTOs;
+using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -189,6 +189,23 @@ namespace Presentation.Controllers
                 return Unauthorized(new { message = "Invalid token" });
             }
 
+            var roles = User.FindAll(ClaimTypes.Role)?.Select(c => c.Value).ToList() ?? new List<string>();
+            var clubRolesClaim = User.FindFirst("club_roles")?.Value;
+            var clubRoles = new List<BusinessLogic.DTOs.UserClubRoleDto>();
+
+            if (!string.IsNullOrEmpty(clubRolesClaim))
+            {
+                try
+                {
+                    var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    clubRoles = System.Text.Json.JsonSerializer.Deserialize<List<BusinessLogic.DTOs.UserClubRoleDto>>(clubRolesClaim, options) ?? new List<BusinessLogic.DTOs.UserClubRoleDto>();
+                }
+                catch
+                {
+                    // Ignore parse error, return empty
+                }
+            }
+
             return Ok(new
             {
                 success = true,
@@ -196,7 +213,9 @@ namespace Presentation.Controllers
                 {
                     userId = userIdClaim,
                     email = email,
-                    fullName = name
+                    fullName = name,
+                    roles = roles,
+                    clubRoles = clubRoles
                 }
             });
         }

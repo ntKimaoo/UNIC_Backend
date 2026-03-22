@@ -14,10 +14,12 @@ namespace UNIC.Presentation.Hubs
         private static Dictionary<string, Dictionary<string, RoomUser>> _rooms = new();
         private static readonly object _lock = new object();
         private readonly ILogger<WebRtcHub> _logger;
+        private readonly IServiceProvider _serviceProvider;
 
-        public WebRtcHub(ILogger<WebRtcHub> logger)
+        public WebRtcHub(ILogger<WebRtcHub> logger, IServiceProvider serviceProvider)
         {
             _logger = logger;
+            _serviceProvider = serviceProvider;
         }
 
         public async Task JoinRoom(string roomId, Guid userId, string fullName)
@@ -63,6 +65,52 @@ namespace UNIC.Presentation.Hubs
                 roomId, string.Join(", ", existingUsers.Select(u => $"{u.FullName} ({u.UserId})")));
 
             await Clients.Caller.SendAsync("ExistingUsers", existingUsers);
+
+            // AUTO CHECK-IN LOGIC
+            await PerformAutoCheckInAsync(roomId, userId);
+        }
+
+        private async Task PerformAutoCheckInAsync(string roomId, Guid userId)
+        {
+            try
+            {
+                // Format the room ID to match Location in DB (e.g. "/webrtc/1a2b3c4d5e" or just the code)
+                // In DB, it's stored as "/webrtc/{Code}". roomId from frontend might be just the code or the full path.
+                string dbLocation = roomId.StartsWith("/webrtc/") ? roomId : $"/webrtc/{roomId}";
+
+                using var scope = _serviceProvider.CreateScope();
+                var unitOfWork = scope.ServiceProvider.GetRequiredService<global::DataAccess.Repositories.Interface.IUnitOfWork>();
+                
+                var now = DateTime.Now;
+                
+                // Find an active event with this MeetLink that is happening around now (e.g., within -2 hours and +12 hours)
+                var events = await unitOfWork.Events.GetUpcomingEventsAsync();
+                var targetEvent = events.FirstOrDefault(e => 
+                    e.Location == dbLocation && 
+                    e.StartDate.HasValue && 
+                    e.StartDate.Value <= now.AddHours(12) && 
+                    e.StartDate.Value >= now.AddHours(-2));
+
+                if (targetEvent != null)
+                {
+                    var attendance = await unitOfWork.Attendances.GetByEventAndUserAsync(targetEvent.EventId, userId);
+                    if (attendance != null && 
+                        (attendance.AttendanceStatus == nameof(global::DataAccess.Enums.AttendanceStatus.REGISTERED) || 
+                         attendance.AttendanceStatus == nameof(global::DataAccess.Enums.AttendanceStatus.PENDING)))
+                    {
+                        attendance.AttendanceStatus = nameof(global::DataAccess.Enums.AttendanceStatus.PRESENT);
+                        attendance.CheckInTime = DateTime.Now;
+                        unitOfWork.Attendances.Update(attendance);
+                        await unitOfWork.SaveChangesAsync();
+                        
+                        _logger.LogInformation($"Auto checked-in user {userId} for event {targetEvent.EventId} via WebRTC");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during WebRTC auto check-in.");
+            }
         }
 
         public async Task SendSignal(string roomId, string toConnectionId, object signal)

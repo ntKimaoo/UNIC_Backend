@@ -1,4 +1,4 @@
-﻿using BusinessLogic.DTOs;
+using BusinessLogic.DTOs;
 using DataAccess.Models;
 using System;
 using System.Collections.Generic;
