@@ -71,9 +71,19 @@ namespace BusinessLogic.DTOs
     /// </summary>
     public class CheckInByQrResponse
     {
+        public bool Success { get; set; }
         public string Message { get; set; } = null!;
         public string MemberName { get; set; } = null!;
         public bool AlreadyCheckedIn { get; set; }
+    }
+
+    public class VerifyByLinkResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = null!;
+        public bool AlreadyCheckedIn { get; set; }
+        public string? MemberName { get; set; }
+        public string? EventName { get; set; }
     }
 
     /// <summary>

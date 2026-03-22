@@ -1,13 +1,17 @@
 
 using BusinessLogic.DTOs;
+using BusinessLogic.Services;
 using BusinessLogic.Services.Background;
 using BusinessLogic.Services.Implementation;
 using BusinessLogic.Services.Interface;
 using DataAccess.Context;
 using DataAccess.Models;
+using DataAccess.Repositories;
 using DataAccess.Repositories.Implementation;
-using DataAccess.Seed;
 using DataAccess.Repositories.Interface;
+using DataAccess.Seed;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OData;
@@ -22,11 +26,12 @@ using UNIC.BusinessLogic.Services.Implementation;
 using UNIC.BusinessLogic.Services.Interface;
 using UNIC.DataAccess.Repositories.Implementation;
 using UNIC.DataAccess.Repositories.Interface;
-using UNIC.Presentation.Hubs;
-using FluentValidation;
-using FluentValidation.AspNetCore;
 using UNIC.DataAccess.Seed;
+<<<<<<< HEAD
 using UNIC.Presentation.Helpers;
+=======
+using UNIC.Presentation.Hubs;
+>>>>>>> c13c0ff01e827169a0438ee5d23e5a20f072ff4c
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,12 +41,6 @@ builder.Services.AddDbContext<UnicContext>(options =>
 builder.Services.AddDbContext<MeetingDbContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("MeetingRoomConnection"));
-});
-
-//redis
-builder.Services.AddStackExchangeRedisCache(redisOptions=>
-{
-    redisOptions.Configuration = builder.Configuration.GetConnectionString("RedisConnection");
 });
 
 builder.Services.AddCors(options =>
@@ -85,6 +84,8 @@ builder.Services.AddScoped<IApplicationService, ApplicationService>();
 builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
 builder.Services.AddScoped<IInterviewRepository, InterviewRepository>();
 builder.Services.AddScoped<IInterviewService, InterviewService>();
+builder.Services.AddScoped<IClubCreationRequestRepository, ClubCreationRequestRepository>();
+builder.Services.AddScoped<IClubCreationRequestService, ClubCreationRequestService>();
 
 // Register Cloudinary as a singleton
 builder.Services.AddSingleton(sp =>
@@ -103,6 +104,12 @@ builder.Services.AddSingleton(sp =>
 
 // Register Background Services
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.Configure<BusinessLogic.Options.PayOSOptions>(builder.Configuration.GetSection(BusinessLogic.Options.PayOSOptions.SectionName));
+builder.Services.AddHttpClient<IPayOSService, PayOSService>((sp, client) =>
+{
+    var opt = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<BusinessLogic.Options.PayOSOptions>>().Value;
+    client.BaseAddress = new Uri(opt.BaseUrl.TrimEnd('/') + "/");
+});
 builder.Services.AddScoped<IFundRepository, FundRepository>();
 builder.Services.AddScoped<IClubFundService, ClubFundService>();
 builder.Services.AddScoped<IClubRepository, ClubRepository>();

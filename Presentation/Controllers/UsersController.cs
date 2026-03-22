@@ -2,8 +2,6 @@ using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.OData.Query;
-using Microsoft.IdentityModel.Tokens;
 using System.Linq;
 
 namespace Presentation.Controllers
@@ -13,11 +11,13 @@ namespace Presentation.Controllers
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly IClubRoleService _clubRoleService;
         private readonly IFileStorageService _fileStorageService;
 
-        public UsersController(IUserService userService, IFileStorageService fileStorageService)
+        public UsersController(IUserService userService, IClubRoleService clubRoleService, IFileStorageService fileStorageService)
         {
             _userService = userService;
+            _clubRoleService = clubRoleService;
             _fileStorageService = fileStorageService;
         }
 
@@ -136,11 +136,22 @@ namespace Presentation.Controllers
                 return NotFound(new { success = false, message = "User not found" });
             }
             var result = await _userService.GetAllClubsById(id);
-            if (result.IsNullOrEmpty())
+            if (result == null || !result.Any())
             {
                 return NotFound(new { success = false, message = "You have not join any club!" });
             }
             return Ok(new { success = true, data = result });
+        }
+        [HttpGet("/api/Users/{userId}/managed-clubs")]
+        public async Task<IActionResult> GetManagedClubs(Guid userId)
+        {
+            var clubs = await _clubRoleService.GetManagedClubsAsync(userId);
+
+            return Ok(new
+            {
+                success = true,
+                data = clubs
+            });
         }
     }
 }

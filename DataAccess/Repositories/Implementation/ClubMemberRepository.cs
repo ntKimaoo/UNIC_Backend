@@ -93,7 +93,7 @@ namespace DataAccess.Repositories.Implementation
                 .Include(m => m.Club)
                 .Include(m => m.ClubRole)
                 .Include(m => m.User)
-                .Where(m => m.UserId == userId)
+                .Where(m => m.UserId == userId && m.Status != null && m.Status.ToUpper() == "ACTIVE")
                 .OrderBy(m => m.JoinDate)
                 .ToListAsync();
         }

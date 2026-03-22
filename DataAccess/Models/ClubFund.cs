@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DataAccess.Models
@@ -22,6 +22,9 @@ namespace DataAccess.Models
         public decimal CurrentBalance { get; set; } = 0;
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        [MaxLength(20)]
+        public string Status { get; set; } = "PENDING";
 
         [ForeignKey("ClubId")]
         public virtual Club Club { get; set; }

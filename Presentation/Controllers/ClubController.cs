@@ -25,6 +25,7 @@ namespace Presentation.Controllers
         /// Requires "ViewClubs" policy
         /// </summary>
         [HttpGet]
+        //[RequirePolicy("ViewClubs")]
         public async Task<IActionResult> GetAll()
         {
             var clubs = await _service.GetAllAsync();
@@ -90,6 +91,7 @@ namespace Presentation.Controllers
         /// Create a new club
         /// </summary>
         [HttpPost]
+        //[RequirePolicy("CreateClub")]
         public async Task<IActionResult> Create([FromBody] CreateClubDto dto)
         {
             if (!ModelState.IsValid)

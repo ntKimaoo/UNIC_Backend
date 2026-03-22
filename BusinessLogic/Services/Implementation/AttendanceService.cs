@@ -259,15 +259,63 @@ namespace BusinessLogic.Services.Implementation
 
             return new CheckInByQrResponse
             {
+                Success = true,
                 Message = alreadyCheckedIn ? "Đã điểm danh trước đó." : "Đã điểm danh thành công.",
                 MemberName = attendance.User?.FullName ?? "—",
                 AlreadyCheckedIn = alreadyCheckedIn
             };
         }
 
-        /// <summary>
-        /// Trims token and, if it looks like a URL (e.g. .../qr/TOKEN), extracts the token part so scanning a QR that encodes the image URL still works.
-        /// </summary>
+        public async Task<VerifyByLinkResult> VerifyAttendanceByLinkAsync(string? email, string code)
+        {
+            var codeTrimmed = NormalizeVerifyCode(code);
+            if (string.IsNullOrWhiteSpace(codeTrimmed))
+                return new VerifyByLinkResult { Success = false, Message = "Mã xác nhận không hợp lệ." };
+
+            var attendance = await _unitOfWork.Attendances.GetByCheckInTokenAsync(codeTrimmed);
+            if (attendance == null)
+                return new VerifyByLinkResult { Success = false, Message = "Mã xác nhận không hợp lệ hoặc đã hết hạn." };
+
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                var userEmail = attendance.User?.Email?.Trim();
+                if (string.IsNullOrEmpty(userEmail) || !string.Equals(userEmail, email.Trim(), StringComparison.OrdinalIgnoreCase))
+                    return new VerifyByLinkResult { Success = false, Message = "Email không khớp với đăng ký." };
+            }
+
+            var alreadyCheckedIn = attendance.AttendanceStatus == "PRESENT";
+            if (!alreadyCheckedIn)
+            {
+                attendance.AttendanceStatus = "PRESENT";
+                attendance.CheckInTime = DateTime.Now;
+                _unitOfWork.Attendances.Update(attendance);
+                await _unitOfWork.SaveChangesAsync();
+            }
+
+            return new VerifyByLinkResult
+            {
+                Success = true,
+                Message = alreadyCheckedIn ? "Bạn đã được điểm danh trước đó." : "Đã xác nhận điểm danh thành công.",
+                AlreadyCheckedIn = alreadyCheckedIn,
+                MemberName = attendance.User?.FullName,
+                EventName = attendance.Event?.EventName
+            };
+        }
+
+        private static string? NormalizeVerifyCode(string? code)
+        {
+            var s = code?.Trim();
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            if (s.Contains("code=", StringComparison.OrdinalIgnoreCase))
+            {
+                var idx = s.IndexOf("code=", StringComparison.OrdinalIgnoreCase) + 5;
+                var end = s.IndexOf('&', idx);
+                if (end < 0) end = s.Length;
+                s = s.Substring(idx, end - idx).Trim();
+            }
+            return NormalizeCheckInToken(s) ?? (string.IsNullOrWhiteSpace(s) ? null : s);
+        }
+
         private static string? NormalizeCheckInToken(string? token)
         {
             var s = token?.Trim();
@@ -280,6 +328,16 @@ namespace BusinessLogic.Services.Implementation
                 var query = s.IndexOf('?');
                 if (query >= 0) s = s.Substring(0, query);
                 s = s.Trim();
+            }
+            if (string.IsNullOrWhiteSpace(s))
+                return null;
+            if (s.Contains("code=", StringComparison.OrdinalIgnoreCase))
+            {
+                var codeIdx = s.IndexOf("code=", StringComparison.OrdinalIgnoreCase) + 5;
+                var end = s.IndexOf('&', codeIdx);
+                if (end < 0) end = s.Length;
+                s = s.Substring(codeIdx, end - codeIdx).Trim();
+                try { s = Uri.UnescapeDataString(s); } catch { }
             }
             return string.IsNullOrWhiteSpace(s) ? null : s;
         }

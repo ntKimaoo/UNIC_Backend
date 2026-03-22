@@ -77,17 +77,29 @@ namespace UNIC.Presentation.Controllers
             {
                 if (id != request.EventId) return BadRequest(new { error = "Mã sự kiện không khớp." });
 
-                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
-                if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
-                    return Unauthorized(new { error = "Invalid token" });
-                
-                request.UserId = userId;
-                await _attendanceService.CheckInMemberAsync(request);
-                return Ok(new { message = "Điểm danh thành công." });
+                var token = request?.Code?.Trim();
+                if (string.IsNullOrEmpty(token))
+                    return BadRequest(new { error = "Mã QR không hợp lệ." });
+
+                var response = await _attendanceService.CheckInByQrTokenAsync(id, token);
+                return Ok(response);
             }
-            catch (NotFoundException ex) { return NotFound(new { error = ex.Message }); }
-            catch (DomainException ex) { return BadRequest(new { error = ex.Message }); }
-            catch (Exception ex) { return StatusCode(500, new { error = "Lỗi khi điểm danh", details = ex.Message }); }
+            catch (NotFoundException)
+            {
+                return NotFound(new
+                {
+                    error = "Mã QR không hợp lệ hoặc đã hết hạn.",
+                    hint = "Nếu bạn vừa quét thành công (đã thấy PRESENT trên màn hình), có thể do quét liên tục. Hãy bỏ điện thoại ra khỏi mã QR sau khi quét một lần."
+                });
+            }
+            catch (DomainException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Lỗi khi điểm danh bằng QR", details = ex.Message });
+            }
         }
 
         /// <summary>
