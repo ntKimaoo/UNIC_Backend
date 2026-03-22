@@ -27,11 +27,8 @@ using UNIC.BusinessLogic.Services.Interface;
 using UNIC.DataAccess.Repositories.Implementation;
 using UNIC.DataAccess.Repositories.Interface;
 using UNIC.DataAccess.Seed;
-<<<<<<< HEAD
 using UNIC.Presentation.Helpers;
-=======
 using UNIC.Presentation.Hubs;
->>>>>>> c13c0ff01e827169a0438ee5d23e5a20f072ff4c
 
 var builder = WebApplication.CreateBuilder(args);
 
