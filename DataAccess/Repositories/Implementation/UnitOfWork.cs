@@ -1,5 +1,6 @@
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
+using Microsoft.EntityFrameworkCore.Storage;
 using System;
 using System.Threading.Tasks;
 
@@ -33,6 +34,11 @@ namespace DataAccess.Repositories.Implementation
         public async Task<int> SaveChangesAsync()
         {
             return await _context.SaveChangesAsync();
+        }
+
+        public async Task<IDbContextTransaction> BeginTransactionAsync()
+        {
+            return await _context.Database.BeginTransactionAsync();
         }
 
         public void Dispose()

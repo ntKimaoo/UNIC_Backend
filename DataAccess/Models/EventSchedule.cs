@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace DataAccess.Models
@@ -18,7 +18,12 @@ namespace DataAccess.Models
         public DateTime? StartTime { get; set; }
         public DateTime? EndTime { get; set; }
 
-        public string Description { get; set; }
+        public string? Location { get; set; }
+        public string? Description { get; set; }
+
+        /// <summary>Loại phiên: "main" (Hoạt động chính), "setup" (Hậu cần), "break" (Nghỉ giải lao)</summary>
+        [MaxLength(20)]
+        public string SessionType { get; set; } = "main";
 
         [ForeignKey("EventId")]
         public virtual Event Event { get; set; }

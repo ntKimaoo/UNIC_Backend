@@ -91,47 +91,64 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("User", request.UserId);
             }
 
-            string status = nameof(AttendanceStatus.REGISTERED);
-            bool isWaitlist = false;
+            string status;
 
-            var currentAttendeesCount = await _unitOfWork.Events.GetAttendeeCountAsync(request.EventId);
-
-            // Optimistic Concurrency Check for Capacity
-            if (eventEntity.MaxAttendees.HasValue)
+            // Giai đoạn 2: Atomic slot reservation — dùng transaction + ExecuteUpdateAsync
+            await using var txn = await _unitOfWork.BeginTransactionAsync();
+            try
             {
-                if (currentAttendeesCount >= eventEntity.MaxAttendees.Value)
+                if (eventEntity.MaxAttendees.HasValue)
                 {
-                    status = nameof(AttendanceStatus.WAITLIST);
-                    isWaitlist = true;
+                    // Atomic: trừ 1 slot nếu còn AvailableSlots > 0 (DB row-level lock)
+                    bool gotSlot = await _unitOfWork.Events.TryDecrementSlotAsync(request.EventId);
+                    if (!gotSlot)
+                    {
+                        // Slot hết → vào WAITLIST (không cần trừ slot)
+                        status = nameof(AttendanceStatus.WAITLIST);
+                    }
+                    else
+                    {
+                        // Có slot → PENDING nếu cần duyệt, REGISTERED nếu không
+                        status = eventEntity.RequiresApproval
+                            ? nameof(AttendanceStatus.PENDING)
+                            : nameof(AttendanceStatus.REGISTERED);
+                    }
                 }
                 else
                 {
-                    status = nameof(AttendanceStatus.REGISTERED);
+                    // Không giới hạn chỗ → không cần trừ slot
+                    status = eventEntity.RequiresApproval
+                        ? nameof(AttendanceStatus.PENDING)
+                        : nameof(AttendanceStatus.REGISTERED);
+                }
+
+                var attendance = new Attendance
+                {
+                    EventId = request.EventId,
+                    UserId = request.UserId,
+                    RegistrationDate = DateTime.Now,
+                    AttendanceStatus = status,
+                    CheckInToken = Guid.NewGuid().ToString("N")
+                };
+
+                await _unitOfWork.Attendances.AddAsync(attendance);
+                await _unitOfWork.SaveChangesAsync();
+                await txn.CommitAsync();
+
+                // Email ngoài transaction — lỗi email KHÔNG rollback DB
+                if (status == nameof(AttendanceStatus.REGISTERED))
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try { await _emailService.SendEventRegistrationSuccessAsync(user.Email, user.FullName, eventEntity.EventName, eventEntity.StartDate, attendance.CheckInToken); }
+                        catch (Exception ex) { Console.WriteLine($"[Email] SendRegistration failed: {ex.Message}"); }
+                    });
                 }
             }
-            else
+            catch
             {
-                // No limit, just check approval
-                status = nameof(AttendanceStatus.REGISTERED);
-            }
-
-            // Create attendance record
-            var attendance = new Attendance
-            {
-                EventId = request.EventId,
-                UserId = request.UserId,
-                RegistrationDate = DateTime.Now,
-                AttendanceStatus = status,
-                CheckInToken = Guid.NewGuid().ToString("N")
-            };
-
-            await _unitOfWork.Attendances.AddAsync(attendance);
-            await _unitOfWork.SaveChangesAsync();
-
-            // Send notification in background if registered directly
-            if (status == nameof(AttendanceStatus.REGISTERED))
-            {
-                _ = Task.Run(() => _emailService.SendEventRegistrationSuccessAsync(user.Email, user.FullName, eventEntity.EventName, eventEntity.StartDate, attendance.CheckInToken));
+                await txn.RollbackAsync();
+                throw;
             }
         }
 
@@ -332,8 +349,38 @@ namespace BusinessLogic.Services.Implementation
             _unitOfWork.Attendances.Update(attendance);
             await _unitOfWork.SaveChangesAsync();
 
-            // Background email
-            // _ = Task.Run(() => _emailService.SendRegistrationApprovedEmailAsync(attendance.User.Email, attendance.User.FullName, attendance.Event.EventName, attendance.Event.StartDate, attendance.CheckInToken));
+            // Gửi email riêng, lỗi email KHÔNG rollback DB
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var user = attendance.User;
+                    var ev = attendance.Event;
+                    if (user != null && ev != null)
+                        await _emailService.SendEventRegistrationSuccessAsync(
+                            user.Email, user.FullName, ev.EventName, ev.StartDate, attendance.CheckInToken);
+                }
+                catch (Exception ex) { Console.WriteLine($"[Email] ApproveRegistration email failed: {ex.Message}"); }
+            });
+        }
+
+        public async Task<int> BulkApproveAsync(int eventId, List<Guid> userIds)
+        {
+            int approved = 0;
+            foreach (var userId in userIds)
+            {
+                var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, userId);
+                if (attendance == null) continue;
+                if (attendance.AttendanceStatus != nameof(AttendanceStatus.PENDING)
+                    && attendance.AttendanceStatus != nameof(AttendanceStatus.WAITLIST))
+                    continue;
+
+                attendance.AttendanceStatus = nameof(AttendanceStatus.REGISTERED);
+                _unitOfWork.Attendances.Update(attendance);
+                approved++;
+            }
+            if (approved > 0) await _unitOfWork.SaveChangesAsync();
+            return approved;
         }
 
         public async Task RejectRegistrationAsync(int eventId, Guid userId)
@@ -341,55 +388,73 @@ namespace BusinessLogic.Services.Implementation
             var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, userId);
             if (attendance == null) throw new NotFoundException("Attendance", userId);
 
+            var oldStatus = attendance.AttendanceStatus;
+            if (oldStatus != nameof(AttendanceStatus.PENDING) && oldStatus != nameof(AttendanceStatus.WAITLIST)
+                && oldStatus != nameof(AttendanceStatus.REGISTERED))
+                throw new DomainException($"Không thể từ chối đăng ký có trạng thái '{oldStatus}'.");
+
             attendance.AttendanceStatus = nameof(AttendanceStatus.REJECTED);
             _unitOfWork.Attendances.Update(attendance);
             await _unitOfWork.SaveChangesAsync();
+
+            // PENDING và REGISTERED đã chiếm slot → nhả slot với Atomic Direct-Promote
+            bool wasOccupying = oldStatus == nameof(AttendanceStatus.PENDING)
+                             || oldStatus == nameof(AttendanceStatus.REGISTERED);
+            if (wasOccupying)
+            {
+                var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
+                if (eventEntity != null)
+                    await HandleSlotReleaseAsync(eventId, eventEntity.RequiresApproval);
+            }
         }
 
         public async Task CancelRegistrationAsync(int eventId, Guid userId)
         {
-            try
+            var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, userId);
+            if (attendance == null) throw new NotFoundException("Attendance", userId);
+
+            var oldStatus = attendance.AttendanceStatus;
+            attendance.AttendanceStatus = nameof(AttendanceStatus.CANCELLED);
+            _unitOfWork.Attendances.Update(attendance);
+            await _unitOfWork.SaveChangesAsync();
+
+            // Chỉ nhả slot khi status cũ thực sự chiếm slot
+            var slotOccupying = new[]
             {
-                var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, userId);
-                if (attendance == null) throw new NotFoundException("Attendance", userId);
+                nameof(AttendanceStatus.REGISTERED),
+                nameof(AttendanceStatus.PENDING),
+                nameof(AttendanceStatus.PRESENT),
+                nameof(AttendanceStatus.CHECKED_IN),
+                nameof(AttendanceStatus.ABSENT),
+            };
 
-                var oldStatus = attendance.AttendanceStatus;
-                attendance.AttendanceStatus = nameof(AttendanceStatus.CANCELLED);
-                _unitOfWork.Attendances.Update(attendance);
-
+            if (slotOccupying.Contains(oldStatus))
+            {
                 var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
-                
-                // If the user being cancelled was REGISTERED or PENDING (occupying a potential slot), we might promote someone from waitlist
-                if (oldStatus == nameof(AttendanceStatus.REGISTERED) || oldStatus == nameof(AttendanceStatus.PENDING))
-                {
-                    // Try to promote the oldest waitlisted person
-                    var oldestWaitlist = await _unitOfWork.Attendances.GetOldestWaitlistedAttendeeAsync(eventId);
-                    if (oldestWaitlist != null && eventEntity != null)
-                    {
-                        oldestWaitlist.AttendanceStatus = nameof(AttendanceStatus.REGISTERED);
-                        _unitOfWork.Attendances.Update(oldestWaitlist);
-                        
-                        await _unitOfWork.SaveChangesAsync();
-
-                        // AFTER COMMIT: Send background email to the promoted user
-                        // _ = Task.Run(() => _emailService.SendWaitlistPromotionEmailAsync(
-                        //     oldestWaitlist.User.Email, 
-                        //     oldestWaitlist.User.FullName, 
-                        //     eventEntity.EventName, 
-                        //     eventEntity.StartDate, 
-                        //     false, 
-                        //     oldestWaitlist.CheckInToken));
-                        
-                        return; // Early return
-                    }
-                }
-
-                await _unitOfWork.SaveChangesAsync();
+                if (eventEntity != null)
+                    await HandleSlotReleaseAsync(eventId, eventEntity.RequiresApproval);
             }
-            catch
-            {
-                throw;
-            }
+        }
+
+        // Giai đoạn 3: Atomic Direct-Promote — không bao giờ nhả slot vào free pool
+        private async Task HandleSlotReleaseAsync(int eventId, bool requiresApproval)
+        {
+            // Kiểm tra event có giới hạn không (AvailableSlots null = không giới hạn)
+            var ev = await _unitOfWork.Events.GetByIdAsync(eventId);
+            if (ev?.MaxAttendees == null) return;
+
+            var promoteToStatus = requiresApproval
+                ? nameof(AttendanceStatus.PENDING)     // vẫn cần manager duyệt
+                : nameof(AttendanceStatus.REGISTERED);
+
+            // Thử promote trực tiếp (WAITLIST → target) không qua pool
+            // Guard condition 'AND Status=WAITLIST' chống Double Cancel
+            bool promoted = await _unitOfWork.Events
+                .TryDirectPromoteOldestWaitlistAsync(eventId, promoteToStatus);
+
+            // Chỉ cộng slot lại khi không có ai để promote — không rải slot cho người ngoài cướp
+            if (!promoted)
+                await _unitOfWork.Events.IncrementSlotAsync(eventId);
         }
 
         private string GenerateRandomCode(int length)

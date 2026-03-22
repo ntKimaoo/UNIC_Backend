@@ -16,18 +16,18 @@ namespace BusinessLogic.Mappings
             CreateMap<Event, EventDetailDto>()
                 .ForMember(dest => dest.Sessions, opt => opt.MapFrom(src => src.EventSchedules))
                 .ForMember(dest => dest.CurrentAttendees, opt => opt.MapFrom(src => src.Attendances != null ? src.Attendances.Count : 0))
-                .ForMember(dest => dest.RequiresApproval, opt => opt.MapFrom(src => false))
+                .ForMember(dest => dest.RequiresApproval, opt => opt.MapFrom(src => src.RequiresApproval))
+                .ForMember(dest => dest.AvailableSlots, opt => opt.MapFrom(src => src.AvailableSlots))
                 .ForMember(dest => dest.MeetLink, opt => opt.MapFrom(src => src.IsPublic ? null : src.Location))
                 .ForMember(dest => dest.Location, opt => opt.MapFrom(src => src.IsPublic ? src.Location : "Online (WebRTC)"));
 
-            // EventSchedule -> SessionDto
             CreateMap<EventSchedule, SessionDto>()
-                .ForMember(dest => dest.ScheduleId, opt => opt.MapFrom(src => src.ScheduleId))
+                .ForMember(dest => dest.ScheduleId,   opt => opt.MapFrom(src => src.ScheduleId))
                 .ForMember(dest => dest.ScheduleName, opt => opt.MapFrom(src => src.ScheduleName))
-                .ForMember(dest => dest.StartTime, opt => opt.MapFrom(src => src.StartTime))
-                .ForMember(dest => dest.EndTime, opt => opt.MapFrom(src => src.EndTime))
-                .ForMember(dest => dest.Location, opt => opt.MapFrom(src => src.Description))
-                .ForMember(dest => dest.Description, opt => opt.MapFrom(src => src.Description));
+                .ForMember(dest => dest.StartTime,    opt => opt.MapFrom(src => src.StartTime))
+                .ForMember(dest => dest.EndTime,      opt => opt.MapFrom(src => src.EndTime))
+                .ForMember(dest => dest.Location,     opt => opt.MapFrom(src => src.Location))
+                .ForMember(dest => dest.Description,  opt => opt.MapFrom(src => src.Description));
 
             // CreateEventRequest -> Event
             CreateMap<CreateEventRequest, Event>()
@@ -35,14 +35,14 @@ namespace BusinessLogic.Mappings
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => "PLANNED"))
                 .ForMember(dest => dest.IsPublic, opt => opt.MapFrom(src => src.IsPublic))
                 .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.Now))
+                // AvailableSlots = MaxAttendees khi tạo event mới
+                .ForMember(dest => dest.AvailableSlots, opt => opt.MapFrom(src => src.MaxAttendees))
                 .ForMember(dest => dest.Club, opt => opt.Ignore())
                 .ForMember(dest => dest.EventSchedules, opt => opt.Ignore())
                 .ForMember(dest => dest.EventImages, opt => opt.Ignore())
                 .ForMember(dest => dest.EventBudgets, opt => opt.Ignore())
                 .ForMember(dest => dest.Attendances, opt => opt.Ignore())
                 .IgnoreAllPropertiesWithAnInaccessibleSetter();
-                // .ForMember(dest => dest.RequiresApproval, opt => opt.Ignore())
-                // .ForMember(dest => dest.CurrentAttendeesCount, opt => opt.Ignore());
 
             // UpdateEventRequest -> Event
             CreateMap<UpdateEventRequest, Event>()
@@ -59,10 +59,23 @@ namespace BusinessLogic.Mappings
 
             // CreateSessionRequest -> EventSchedule
             CreateMap<CreateSessionRequest, EventSchedule>()
-                .ForMember(dest => dest.ScheduleId, opt => opt.Ignore())
-                .ForMember(dest => dest.ScheduleName, opt => opt.MapFrom(src => src.SessionName))
-                .ForMember(dest => dest.Event, opt => opt.Ignore())
+                .ForMember(dest => dest.ScheduleId,      opt => opt.Ignore())
+                .ForMember(dest => dest.ScheduleName,    opt => opt.MapFrom(src => src.SessionName))
+                .ForMember(dest => dest.Location,        opt => opt.MapFrom(src => src.Location))
+                .ForMember(dest => dest.Description,     opt => opt.MapFrom(src => src.Description))
+                .ForMember(dest => dest.SessionType,     opt => opt.MapFrom(src => src.SessionType))
+                .ForMember(dest => dest.Event,           opt => opt.Ignore())
                 .ForMember(dest => dest.ScheduleDetails, opt => opt.Ignore());
+
+            // EventSchedule -> SessionDto
+            CreateMap<EventSchedule, SessionDto>()
+                .ForMember(dest => dest.ScheduleId,   opt => opt.MapFrom(src => src.ScheduleId))
+                .ForMember(dest => dest.ScheduleName, opt => opt.MapFrom(src => src.ScheduleName))
+                .ForMember(dest => dest.StartTime,    opt => opt.MapFrom(src => src.StartTime))
+                .ForMember(dest => dest.EndTime,      opt => opt.MapFrom(src => src.EndTime))
+                .ForMember(dest => dest.Location,     opt => opt.MapFrom(src => src.Location))
+                .ForMember(dest => dest.Description,  opt => opt.MapFrom(src => src.Description))
+                .ForMember(dest => dest.SessionType,  opt => opt.MapFrom(src => src.SessionType));
         }
     }
 }

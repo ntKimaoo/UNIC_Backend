@@ -94,6 +94,30 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>
+        /// Bulk approve multiple pending registrations (Manager only)
+        /// </summary>
+        [HttpPost("{id}/approve-bulk")]
+        public async Task<IActionResult> BulkApproveRegistrations(int clubId, int id, [FromBody] List<Guid> userIds)
+        {
+            try
+            {
+                if (!IsClubManager(clubId))
+                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "Bạn không có quyền quản lý sự kiện này." });
+
+                if (userIds == null || userIds.Count == 0)
+                    return BadRequest(new { error = "Danh sách userId không được rỗng." });
+
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                if (existingEvent.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                var approvedCount = await _attendanceService.BulkApproveAsync(id, userIds);
+                return Ok(new { message = $"Đã duyệt {approvedCount}/{userIds.Count} đăng ký.", approvedCount });
+            }
+            catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        }
+
+        /// <summary>
         /// Generate check-in code for an event (Manager only)
         /// </summary>
         [HttpPost("{id}/checkin-code")]

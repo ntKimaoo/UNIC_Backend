@@ -26,6 +26,7 @@ using UNIC.Presentation.Hubs;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using UNIC.DataAccess.Seed;
+using UNIC.Presentation.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -139,6 +140,9 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    // Luôn serialize DateTime với suffix 'Z' để frontend (UTC+7) parse đúng giờ
+    options.JsonSerializerOptions.Converters.Add(new DateTimeUtcJsonConverter());
+    options.JsonSerializerOptions.Converters.Add(new NullableDateTimeUtcJsonConverter());
 }); ;
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

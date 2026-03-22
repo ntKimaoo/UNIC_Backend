@@ -16,6 +16,7 @@ namespace BusinessLogic.Services.Interface
         Task<IEnumerable<AttendanceDetailDto>> GetEventAttendeesAsync(int eventId);
         Task ApproveRegistrationAsync(int eventId, Guid userId);
         Task RejectRegistrationAsync(int eventId, Guid userId);
+        Task<int> BulkApproveAsync(int eventId, List<Guid> userIds);
         Task CancelRegistrationAsync(int eventId, Guid userId);
     }
 }

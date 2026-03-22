@@ -4,16 +4,19 @@ using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    partial class UnicContextModelSnapshot : ModelSnapshot
+    [Migration("20260321105509_AddLocationToEventSchedule")]
+    partial class AddLocationToEventSchedule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -488,9 +491,6 @@ namespace UNIC.DataAccess.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EventId"));
 
-                    b.Property<int?>("AvailableSlots")
-                        .HasColumnType("int");
-
                     b.Property<string>("CheckInCode")
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
@@ -536,9 +536,6 @@ namespace UNIC.DataAccess.Migrations
 
                     b.Property<DateTime?>("RegistrationStartDate")
                         .HasColumnType("datetime2");
-
-                    b.Property<bool>("RequiresApproval")
-                        .HasColumnType("bit");
 
                     b.Property<DateTime?>("StartDate")
                         .HasColumnType("datetime2");
@@ -646,11 +643,6 @@ namespace UNIC.DataAccess.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SessionType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
 
                     b.Property<DateTime?>("StartTime")
                         .HasColumnType("datetime2");
