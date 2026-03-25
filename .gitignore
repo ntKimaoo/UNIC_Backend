@@ -398,7 +398,6 @@ appsettings.Development.json
 appsettings.Production.json
 appsettings.Staging.json
 appsettings.*.json
-!appsettings.example.json
 
 # Environment variables
 .env
