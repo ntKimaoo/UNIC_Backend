@@ -26,13 +26,46 @@ namespace Presentation.Controllers
         /// </summary>
         [HttpGet]
         //[RequirePolicy("ViewClubs")]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(int pageSize, string? searchQuery, string pageIndex)
         {
             var clubs = await _service.GetAllAsync();
+
+            if (!string.IsNullOrEmpty(searchQuery))
+            {
+                var searchLower = searchQuery.ToLower();
+                clubs = clubs.Where(c =>
+                    c.ClubName.ToLower().Contains(searchLower) ||
+                    c.ShortName.ToLower().Contains(searchLower)
+                );
+            }
+
+            if (pageIndex.ToLower() != "all")
+            {
+                var totalCount = clubs.Count();
+                var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+                if (int.TryParse(pageIndex, out int pageInt))
+                {
+                    clubs = clubs
+                        .Skip((pageInt - 1) * pageSize)
+                        .Take(pageSize);
+
+                    return Ok(new
+                    {
+                        success = true,
+                        data = clubs,
+                        totalPages = totalPages,
+                        totalCount = totalCount
+                    });
+                }
+            }
+
             return Ok(new
             {
                 success = true,
-                data = clubs
+                data = clubs,
+                totalPages = 1,
+                totalCount = clubs.Count()
             });
         }
 
@@ -40,13 +73,45 @@ namespace Presentation.Controllers
         /// Get all active clubs
         /// </summary>
         [HttpGet("active")]
-        public async Task<IActionResult> GetActiveClubs()
+        public async Task<IActionResult> GetActiveClubs(int pageSize, string? searchQuery, string pageIndex)
         {
             var clubs = await _service.GetActiveClubsAsync();
+            if (!string.IsNullOrEmpty(searchQuery))
+            {
+                var searchLower = searchQuery.ToLower();
+                clubs = clubs.Where(c =>
+                    c.ClubName.ToLower().Contains(searchLower) ||
+                    c.ShortName.ToLower().Contains(searchLower)
+                );
+            }
+
+            if (pageIndex.ToLower() != "all")
+            {
+                var totalCount = clubs.Count();
+                var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+                if (int.TryParse(pageIndex, out int pageInt))
+                {
+                    clubs = clubs
+                        .Skip((pageInt - 1) * pageSize)
+                        .Take(pageSize);
+
+                    return Ok(new
+                    {
+                        success = true,
+                        data = clubs,
+                        totalPages = totalPages,
+                        totalCount = totalCount
+                    });
+                }
+            }
+
             return Ok(new
             {
                 success = true,
-                data = clubs
+                data = clubs,
+                totalPages = 1,
+                totalCount = clubs.Count()
             });
         }
 
