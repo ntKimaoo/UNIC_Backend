@@ -2,6 +2,7 @@ using AutoMapper;
 using BusinessLogic.DTOs;
 using BusinessLogic.Exceptions;
 using BusinessLogic.Services.Interface;
+using BusinessLogic.Services.Background;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using DataAccess.Enums;
@@ -319,7 +320,14 @@ namespace BusinessLogic.Services.Implementation
                 var user = await _unitOfWork.Users.GetByIdAsync(att.UserId);
                 if (user != null)
                 {
-                    _ = _emailService.SendEventCheckInCodeAsync(user.Email, user.FullName, eventEntity.EventName, generatedCode);
+                    EmailQueueService.EnqueueEmail(new EmailQueueItem
+                    {
+                        ToEmail = user.Email,
+                        FullName = user.FullName,
+                        EmailType = EmailType.EventCheckIn,
+                        EventName = eventEntity.EventName,
+                        CheckInCode = generatedCode
+                    });
                 }
             }
 

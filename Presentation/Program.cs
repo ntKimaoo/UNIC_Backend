@@ -127,6 +127,7 @@ builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<INotificationHubContext, NotificationHubContext>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventReminderService>();
+builder.Services.AddHostedService<BusinessLogic.Services.Background.EventStatusSyncService>();
 
 // Unit of Work and Repositories
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IUnitOfWork, DataAccess.Repositories.Implementation.UnitOfWork>();
