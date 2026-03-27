@@ -36,5 +36,24 @@ namespace DataAccess.Repositories.Interface
         // ── RoomEvent ─────────────────────────────────────────────
         Task<IEnumerable<RoomEvent>> GetEventsByRoomIdAsync(int roomId);
         Task<RoomEvent> CreateEventAsync(RoomEvent roomEvent);
+
+        // ── EvaluationCriterion ──────────────────────────────────
+        Task<IEnumerable<EvaluationCriterion>> GetCriteriaByCampaignIdAsync(int campaignId);
+        Task<EvaluationCriterion?> GetCriterionByIdAsync(int id);
+        Task<EvaluationCriterion> CreateCriterionAsync(EvaluationCriterion criterion);
+        Task<bool> UpdateCriterionAsync(EvaluationCriterion criterion);
+        Task<bool> DeleteCriterionAsync(int id);
+
+        // ── CriteriaScore ────────────────────────────────────────
+        Task<CriteriaScore> CreateCriteriaScoreAsync(CriteriaScore score);
+        Task<IEnumerable<CriteriaScore>> GetCriteriaScoresByAssignmentIdAsync(int assignmentId);
+        Task<IEnumerable<CriteriaScore>> GetCriteriaScoresByScheduleIdAsync(int scheduleId);
+
+        // ── CampaignDecision ─────────────────────────────────────
+        Task<IEnumerable<CampaignDecision>> GetDecisionsByCampaignIdAsync(int campaignId);
+        Task<CampaignDecision?> GetDecisionByScheduleIdAsync(int scheduleId);
+        Task<CampaignDecision> CreateDecisionAsync(CampaignDecision decision);
+        Task<bool> UpdateDecisionAsync(CampaignDecision decision);
     }
 }
+
