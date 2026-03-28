@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
 namespace BusinessLogic.DTOs
@@ -75,6 +77,7 @@ namespace BusinessLogic.DTOs
     {
         public int TransactionId { get; set; }
         public int FundId { get; set; }
+        public string? FundName { get; set; }
         public int? CategoryId { get; set; }
         public string TransactionType { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
@@ -101,6 +104,15 @@ namespace BusinessLogic.DTOs
         public int? ClubId { get; set; }
     }
 
+    public class FundMenuItemDto
+    {
+        /// <summary>Ổn định cho frontend route: overview | transactions | reports | settings</summary>
+        public string Id { get; set; } = string.Empty;
+        public string LabelVi { get; set; } = string.Empty;
+        public string LabelEn { get; set; } = string.Empty;
+        public bool Visible { get; set; }
+    }
+
     public class FundCapabilitiesDto
     {
         public int ClubId { get; set; }
@@ -114,5 +126,21 @@ namespace BusinessLogic.DTOs
         public bool CanContribute { get; set; }
         public bool CanCreateFund { get; set; }
         public bool CanApproveOrRejectFundEntity { get; set; }
+
+        /// <summary>Thứ tự menu Quản lý quỹ (không còn expense report; có báo cáo).</summary>
+        public IReadOnlyList<FundMenuItemDto> MenuItems { get; set; } = Array.Empty<FundMenuItemDto>();
+    }
+
+    public class ClubFundReportSummaryDto
+    {
+        public int ClubId { get; set; }
+        public DateTime? FromUtc { get; set; }
+        public DateTime? ToUtc { get; set; }
+        public int PendingFundCount { get; set; }
+        public int ApprovedFundCount { get; set; }
+        public int RejectedFundCount { get; set; }
+        public decimal TotalBalanceApprovedFunds { get; set; }
+        public decimal TotalApprovedIncome { get; set; }
+        public decimal TotalApprovedExpense { get; set; }
     }
 }

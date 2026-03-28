@@ -32,7 +32,22 @@ namespace UNIC.DataAccess.Repositories.Interface
             Guid? createdByUserId,
             int pageNumber,
             int pageSize);
+
+        Task<(IEnumerable<FundTransaction> Items, int TotalCount)> GetTransactionsByClubIdPagedAsync(
+            int clubId,
+            int? fundId,
+            string? status,
+            bool memberContributionsOnly,
+            Guid? createdByUserId,
+            DateTime? fromUtc,
+            DateTime? toUtc,
+            int pageNumber,
+            int pageSize);
         Task<IEnumerable<ClubFund>> GetFundsByClubIdAsync(int clubId);
         Task<(IEnumerable<ClubFund> Items, int TotalCount)> GetFundsByClubIdPagedAsync(int clubId, int pageNumber, int pageSize);
+        Task<(int PendingFundCount, int ApprovedFundCount, int RejectedFundCount, decimal TotalBalanceApprovedFunds, decimal TotalApprovedIncome, decimal TotalApprovedExpense)> GetClubFundReportAggregatesAsync(
+            int clubId,
+            DateTime? fromUtc,
+            DateTime? toUtc);
     }
 }

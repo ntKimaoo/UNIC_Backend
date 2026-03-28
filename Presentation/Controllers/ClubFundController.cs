@@ -66,6 +66,62 @@ namespace Presentation.Controllers
             return Ok(new { success = true, data = clubs });
         }
 
+        [HttpGet("report-summary")]
+        [RequireMemberPolicy("viewfinance")]
+        public async Task<IActionResult> GetFundReportSummary(
+            int clubId,
+            [FromQuery] DateTime? fromUtc,
+            [FromQuery] DateTime? toUtc)
+        {
+            var data = await _clubFundService.GetClubFundReportSummaryAsync(clubId, fromUtc, toUtc);
+            return Ok(new { success = true, data });
+        }
+
+        [HttpGet("transactions")]
+        [RequireMemberPolicy("viewfinance")]
+        public async Task<IActionResult> GetClubFundTransactions(
+            int clubId,
+            [FromQuery] int? fundId,
+            [FromQuery] string? status,
+            [FromQuery] string? scope,
+            [FromQuery] DateTime? fromUtc,
+            [FromQuery] DateTime? toUtc,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
+        {
+            try
+            {
+                if (page < 1)
+                    return BadRequest(new { success = false, message = "Page phải >= 1." });
+                if (pageSize < 1 || pageSize > 100)
+                    return BadRequest(new { success = false, message = "PageSize từ 1 đến 100." });
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
+
+                if (fundId.HasValue)
+                {
+                    var fund = await _clubFundService.GetFundByIdAsync(fundId.Value);
+                    if (fund == null)
+                        return NotFound(new { success = false, message = "Quỹ không tồn tại." });
+                    if (fund.ClubId != clubId)
+                        return BadRequest(new { success = false, message = "Quỹ không thuộc câu lạc bộ này." });
+                }
+
+                var data = await _clubFundService.GetClubFundTransactionsPagedAsync(
+                    clubId, fundId, status, scope, userId, fromUtc, toUtc, page, pageSize);
+                return Ok(new { success = true, data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
         [HttpGet("capabilities")]
         public async Task<IActionResult> GetFundCapabilities(int clubId)
         {

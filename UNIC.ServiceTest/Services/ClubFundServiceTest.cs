@@ -668,6 +668,82 @@ namespace UNIC.ServiceTest.Services
             Assert.True(dto.CanViewFunds);
             Assert.True(dto.CanCreateFund);
             Assert.True(dto.CanApproveOrRejectFundEntity);
+            Assert.Equal(4, dto.MenuItems.Count);
+            Assert.Equal(new[] { "overview", "transactions", "reports", "settings" }, dto.MenuItems.Select(m => m.Id).ToArray());
+            Assert.All(dto.MenuItems, m => Assert.True(m.Visible));
+        }
+
+        [Fact]
+        public async Task GetFundCapabilitiesAsync_ShouldReturnEmptyMenu_WhenCannotViewFunds()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, 1));
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "viewfinance")).ReturnsAsync(false);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "createfinance")).ReturnsAsync(false);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "editfinance")).ReturnsAsync(false);
+
+            var dto = await _service.GetFundCapabilitiesAsync(uid, 1);
+            Assert.False(dto.CanViewFunds);
+            Assert.Empty(dto.MenuItems);
+        }
+
+        [Fact]
+        public async Task GetClubFundReportSummaryAsync_ShouldMapAggregates_FromRepository()
+        {
+            _fundRepo.Setup(r => r.GetClubFundReportAggregatesAsync(3, null, null))
+                .ReturnsAsync((1, 4, 2, 100m, 500m, 200m));
+
+            var dto = await _service.GetClubFundReportSummaryAsync(3, null, null);
+
+            Assert.Equal(3, dto.ClubId);
+            Assert.Equal(1, dto.PendingFundCount);
+            Assert.Equal(4, dto.ApprovedFundCount);
+            Assert.Equal(2, dto.RejectedFundCount);
+            Assert.Equal(100m, dto.TotalBalanceApprovedFunds);
+            Assert.Equal(500m, dto.TotalApprovedIncome);
+            Assert.Equal(200m, dto.TotalApprovedExpense);
+        }
+
+        [Fact]
+        public async Task GetClubFundTransactionsPagedAsync_PassesApprovedAndAllTypes_ToRepository()
+        {
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetTransactionsByClubIdPagedAsync(
+                    1, null, "APPROVED", false, null, null, null, 1, 20))
+                .ReturnsAsync((Array.Empty<FundTransaction>(), 0));
+
+            await _service.GetClubFundTransactionsPagedAsync(1, null, null, null, uid, null, null, 1, 20);
+
+            _fundRepo.Verify(r => r.GetTransactionsByClubIdPagedAsync(
+                1, null, "APPROVED", false, null, null, null, 1, 20), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetClubFundTransactionsPagedAsync_ScopeMine_PassesUserId()
+        {
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetTransactionsByClubIdPagedAsync(
+                    1, 2, "APPROVED", false, uid, null, null, 1, 10))
+                .ReturnsAsync((Array.Empty<FundTransaction>(), 0));
+
+            await _service.GetClubFundTransactionsPagedAsync(1, 2, null, "mine", uid, null, null, 1, 10);
+
+            _fundRepo.Verify(r => r.GetTransactionsByClubIdPagedAsync(
+                1, 2, "APPROVED", false, uid, null, null, 1, 10), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetClubFundTransactionsPagedAsync_StatusAll_PassesNullStatus()
+        {
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetTransactionsByClubIdPagedAsync(
+                    1, null, null, false, null, null, null, 1, 10))
+                .ReturnsAsync((Array.Empty<FundTransaction>(), 0));
+
+            await _service.GetClubFundTransactionsPagedAsync(1, null, "ALL", null, uid, null, null, 1, 10);
+
+            _fundRepo.Verify(r => r.GetTransactionsByClubIdPagedAsync(
+                1, null, null, false, null, null, null, 1, 10), Times.Once);
         }
 
         #endregion

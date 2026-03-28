@@ -1,3 +1,4 @@
+using System;
 using BusinessLogic.DTOs;
 using BusinessLogic.Options;
 using BusinessLogic.Services.Interface;
@@ -253,6 +254,43 @@ namespace BusinessLogic.Services.Implementation
             return ToPagedResult(items.Select(MapToTransactionDto), pageNumber, pageSize, totalCount);
         }
 
+        public async Task<PagedResultDto<FundTransactionResponseDto>> GetClubFundTransactionsPagedAsync(
+            int clubId,
+            int? fundId,
+            string? status,
+            string? scope,
+            Guid currentUserId,
+            DateTime? fromUtc,
+            DateTime? toUtc,
+            int pageNumber,
+            int pageSize)
+        {
+            var trimmed = status?.Trim();
+            string? normalizedStatus;
+            if (string.IsNullOrEmpty(trimmed))
+                normalizedStatus = STATUS_APPROVED;
+            else if (string.Equals(trimmed, "ALL", StringComparison.OrdinalIgnoreCase))
+                normalizedStatus = null;
+            else
+                normalizedStatus = trimmed.ToUpperInvariant();
+
+            var normalizedScope = scope?.Trim().ToLowerInvariant();
+            Guid? filterUser = normalizedScope == "mine" ? currentUserId : null;
+
+            var (items, totalCount) = await _fundRepository.GetTransactionsByClubIdPagedAsync(
+                clubId,
+                fundId,
+                normalizedStatus,
+                memberContributionsOnly: false,
+                filterUser,
+                fromUtc,
+                toUtc,
+                pageNumber,
+                pageSize);
+
+            return ToPagedResult(items.Select(MapToTransactionDto), pageNumber, pageSize, totalCount);
+        }
+
         private static PagedResultDto<T> ToPagedResult<T>(IEnumerable<T> items, int pageNumber, int pageSize, int totalCount)
         {
             var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
@@ -294,10 +332,15 @@ namespace BusinessLogic.Services.Implementation
                 ? null
                 : t.Creator!.FullName.Trim();
 
+            var fundName = string.IsNullOrWhiteSpace(t.ClubFund?.FundName)
+                ? null
+                : t.ClubFund!.FundName.Trim();
+
             return new FundTransactionResponseDto
             {
                 TransactionId = t.TransactionId,
                 FundId = t.FundId,
+                FundName = fundName,
                 CategoryId = t.CategoryId,
                 TransactionType = t.TransactionType ?? "INCOME",
                 Status = t.Status ?? "PENDING",
@@ -411,7 +454,64 @@ namespace BusinessLogic.Services.Implementation
             dto.CanCreateFund = hasCreate && isMgrOrVice;
             dto.CanApproveOrRejectFundEntity = hasEdit && isMgr;
 
+            dto.MenuItems = BuildFundMenuItems(dto);
             return dto;
+        }
+
+        public async Task<ClubFundReportSummaryDto> GetClubFundReportSummaryAsync(int clubId, DateTime? fromUtc, DateTime? toUtc)
+        {
+            var (pending, approved, rejected, balance, income, expense) =
+                await _fundRepository.GetClubFundReportAggregatesAsync(clubId, fromUtc, toUtc);
+            return new ClubFundReportSummaryDto
+            {
+                ClubId = clubId,
+                FromUtc = fromUtc,
+                ToUtc = toUtc,
+                PendingFundCount = pending,
+                ApprovedFundCount = approved,
+                RejectedFundCount = rejected,
+                TotalBalanceApprovedFunds = balance,
+                TotalApprovedIncome = income,
+                TotalApprovedExpense = expense
+            };
+        }
+
+        private static IReadOnlyList<FundMenuItemDto> BuildFundMenuItems(FundCapabilitiesDto caps)
+        {
+            if (!caps.CanViewFunds)
+                return Array.Empty<FundMenuItemDto>();
+
+            return new FundMenuItemDto[]
+            {
+                new()
+                {
+                    Id = "overview",
+                    LabelVi = "Tổng quan quỹ",
+                    LabelEn = "Fund overview",
+                    Visible = true
+                },
+                new()
+                {
+                    Id = "transactions",
+                    LabelVi = "Giao dịch",
+                    LabelEn = "Transactions",
+                    Visible = true
+                },
+                new()
+                {
+                    Id = "reports",
+                    LabelVi = "Báo cáo & thống kê",
+                    LabelEn = "Reports & statistics",
+                    Visible = true
+                },
+                new()
+                {
+                    Id = "settings",
+                    LabelVi = "Cài đặt quỹ",
+                    LabelEn = "Fund settings",
+                    Visible = true
+                }
+            };
         }
 
         public async Task<IReadOnlyList<FundCategoryResponseDto>> GetFundCategoriesForClubAsync(int clubId)

@@ -189,6 +189,62 @@ namespace DataAccess.Repositories.Implementation
             return (items, totalCount);
         }
 
+        public async Task<(IEnumerable<FundTransaction> Items, int TotalCount)> GetTransactionsByClubIdPagedAsync(
+            int clubId,
+            int? fundId,
+            string? status,
+            bool memberContributionsOnly,
+            Guid? createdByUserId,
+            DateTime? fromUtc,
+            DateTime? toUtc,
+            int pageNumber,
+            int pageSize)
+        {
+            var query = _context.FundTransactions
+                .AsNoTracking()
+                .Include(t => t.Creator)
+                .Include(t => t.FundCategory)
+                .Include(t => t.ClubFund)
+                .Where(t => t.ClubFund != null && t.ClubFund.ClubId == clubId);
+
+            if (fundId.HasValue)
+                query = query.Where(t => t.FundId == fundId.Value);
+
+            if (!string.IsNullOrEmpty(status))
+            {
+                var st = status.ToUpperInvariant();
+                query = query.Where(t => t.Status != null && t.Status.ToUpper() == st);
+            }
+
+            if (memberContributionsOnly)
+            {
+                query = query.Where(t =>
+                    t.IsMemberContribution &&
+                    t.TransactionType != null &&
+                    t.TransactionType.ToUpper() == "INCOME");
+            }
+
+            if (createdByUserId.HasValue)
+                query = query.Where(t => t.CreatedBy == createdByUserId.Value);
+
+            if (fromUtc.HasValue)
+                query = query.Where(t => t.TransactionDate >= fromUtc.Value);
+            if (toUtc.HasValue)
+                query = query.Where(t => t.TransactionDate <= toUtc.Value);
+
+            query = query
+                .OrderByDescending(t => t.UpdatedAt)
+                .ThenByDescending(t => t.TransactionId);
+
+            var totalCount = await query.CountAsync();
+            var items = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+
         private IQueryable<FundTransaction> BuildFundTransactionQuery(
             int fundId,
             string? status,
@@ -221,6 +277,61 @@ namespace DataAccess.Repositories.Implementation
             }
 
             return query;
+        }
+
+        public async Task<(int PendingFundCount, int ApprovedFundCount, int RejectedFundCount, decimal TotalBalanceApprovedFunds, decimal TotalApprovedIncome, decimal TotalApprovedExpense)> GetClubFundReportAggregatesAsync(
+            int clubId,
+            DateTime? fromUtc,
+            DateTime? toUtc)
+        {
+            var statuses = await _context.ClubFunds
+                .AsNoTracking()
+                .Where(f => f.ClubId == clubId)
+                .Select(f => f.Status)
+                .ToListAsync();
+
+            var pending = 0;
+            var approved = 0;
+            var rejected = 0;
+            foreach (var s in statuses)
+            {
+                var u = (s ?? "PENDING").Trim().ToUpperInvariant();
+                if (u == "APPROVED")
+                    approved++;
+                else if (u == "REJECTED")
+                    rejected++;
+                else
+                    pending++;
+            }
+
+            var totalBalanceApproved = await _context.ClubFunds
+                .AsNoTracking()
+                .Where(f => f.ClubId == clubId && f.Status != null && f.Status.ToUpper() == "APPROVED")
+                .SumAsync(f => (decimal?)f.CurrentBalance) ?? 0m;
+
+            var txQuery =
+                from t in _context.FundTransactions.AsNoTracking()
+                join f in _context.ClubFunds.AsNoTracking() on t.FundId equals f.FundId
+                where f.ClubId == clubId
+                    && t.Status != null
+                    && t.Status.ToUpper() == "APPROVED"
+                    && t.TransactionType != null
+                select t;
+
+            if (fromUtc.HasValue)
+                txQuery = txQuery.Where(t => t.TransactionDate >= fromUtc.Value);
+            if (toUtc.HasValue)
+                txQuery = txQuery.Where(t => t.TransactionDate <= toUtc.Value);
+
+            var income = await txQuery
+                .Where(t => t.TransactionType!.ToUpper() == "INCOME")
+                .SumAsync(t => (decimal?)t.Amount) ?? 0m;
+
+            var expense = await txQuery
+                .Where(t => t.TransactionType!.ToUpper() == "EXPENSE")
+                .SumAsync(t => (decimal?)t.Amount) ?? 0m;
+
+            return (pending, approved, rejected, totalBalanceApproved, income, expense);
         }
     }
 }

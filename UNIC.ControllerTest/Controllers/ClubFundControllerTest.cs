@@ -149,6 +149,108 @@ namespace UNIC.ControllerTest.Controllers
 
         #endregion
 
+        #region GetFundReportSummary
+
+        [Fact]
+        public async Task GetFundReportSummary_Returns403_WhenNotMember()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 2)).ReturnsAsync(false);
+
+            var result = await _controller.GetFundReportSummary(2, null, null);
+
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(403, obj.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetFundReportSummary_ReturnsOk_WhenMember()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 2)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetClubFundReportSummaryAsync(2, null, null))
+                .ReturnsAsync(new ClubFundReportSummaryDto
+                {
+                    ClubId = 2,
+                    ApprovedFundCount = 1,
+                    TotalBalanceApprovedFunds = 50m
+                });
+
+            var result = await _controller.GetFundReportSummary(2, null, null);
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+
+        #endregion
+
+        #region GetClubFundTransactions
+
+        [Fact]
+        public async Task GetClubFundTransactions_Returns403_WhenNotMember()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 2)).ReturnsAsync(false);
+
+            var result = await _controller.GetClubFundTransactions(2, null, null, null, null, null, 1, 20);
+
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(403, obj.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetClubFundTransactions_ReturnsBadRequest_WhenPageInvalid()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+
+            var result = await _controller.GetClubFundTransactions(1, null, null, null, null, null, 0, 20);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task GetClubFundTransactions_ReturnsBadRequest_WhenFundNotInClub()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetFundByIdAsync(5)).ReturnsAsync(new FundResponseDto
+            {
+                FundId = 5,
+                ClubId = 99
+            });
+
+            var result = await _controller.GetClubFundTransactions(1, 5, null, null, null, null, 1, 20);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task GetClubFundTransactions_ReturnsNotFound_WhenFundMissing()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetFundByIdAsync(999)).ReturnsAsync((FundResponseDto?)null);
+
+            var result = await _controller.GetClubFundTransactions(1, 999, null, null, null, null, 1, 20);
+
+            Assert.IsType<NotFoundObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task GetClubFundTransactions_ReturnsOk_WhenMember()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 2)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetClubFundTransactionsPagedAsync(
+                    2, null, null, null, _userId, null, null, 1, 20))
+                .ReturnsAsync(new PagedResultDto<FundTransactionResponseDto>
+                {
+                    Items = Array.Empty<FundTransactionResponseDto>(),
+                    PageNumber = 1,
+                    PageSize = 20,
+                    TotalCount = 0
+                });
+
+            var result = await _controller.GetClubFundTransactions(2, null, null, null, null, null, 1, 20);
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+
+        #endregion
+
         #region GetFund / GetFundsByClub
 
         [Fact]
