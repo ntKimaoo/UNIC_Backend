@@ -1,4 +1,5 @@
 using BusinessLogic.DTOs;
+using System.Collections.Generic;
 
 namespace BusinessLogic.Services.Interface
 {
@@ -16,5 +17,6 @@ namespace BusinessLogic.Services.Interface
         Task<bool> ProcessPayOSPaymentSuccessAsync(int orderCode);
         Task<bool> TryCompleteOwnPendingContributionForDevelopmentAsync(Guid userId, int clubId, int transactionId);
         Task<FundCapabilitiesDto> GetFundCapabilitiesAsync(Guid userId, int clubId);
+        Task<IReadOnlyList<FundCategoryResponseDto>> GetFundCategoriesForClubAsync(int clubId);
     }
 }

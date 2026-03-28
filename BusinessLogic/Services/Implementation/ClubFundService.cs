@@ -5,6 +5,7 @@ using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using Microsoft.Extensions.Options;
 using UNIC.DataAccess.Repositories.Interface;
+using System.Linq;
 
 namespace BusinessLogic.Services.Implementation
 {
@@ -98,6 +99,15 @@ namespace BusinessLogic.Services.Implementation
             if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
                 throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được nộp tiền vào quỹ.");
 
+            if (request.CategoryId.HasValue)
+            {
+                var category = await _fundRepository.GetFundCategoryByIdAsync(request.CategoryId.Value);
+                if (category == null)
+                    throw new ArgumentException("Danh mục không tồn tại.", nameof(request.CategoryId));
+                if (category.ClubId.HasValue && category.ClubId.Value != fund.ClubId)
+                    throw new ArgumentException("Danh mục không thuộc câu lạc bộ của quỹ này.", nameof(request.CategoryId));
+            }
+
             var utc = DateTime.UtcNow;
             var transaction = new FundTransaction
             {
@@ -116,27 +126,35 @@ namespace BusinessLogic.Services.Implementation
 
             await _fundRepository.AddTransactionAsync(transaction);
 
-            var payOsResult = await _payOSService.CreatePaymentLinkAsync(
-                transaction.TransactionId,
-                transaction.Amount,
-                transaction.Description ?? "Nop quy",
-                cancellationToken);
-
-            transaction.PaymentLinkId = payOsResult.PaymentLinkId;
-            transaction.UpdatedAt = DateTime.UtcNow;
-            await _fundRepository.UpdateTransactionAsync(transaction);
-
-            var expiresAtUtc = transaction.TransactionDate.AddMinutes(_payOSOptions.LinkExpirationMinutes);
-            return new ContributeResponseDto
+            try
             {
-                TransactionId = transaction.TransactionId,
-                CheckoutUrl = payOsResult.CheckoutUrl,
-                QrCode = payOsResult.QrCode,
-                PaymentLinkId = payOsResult.PaymentLinkId,
-                Amount = transaction.Amount,
-                PaymentLinkExpiresAtUtc = expiresAtUtc,
-                Message = "Quét QR hoặc mở link để thanh toán. Sau khi thanh toán thành công, quỹ sẽ được cập nhật tự động."
-            };
+                var payOsResult = await _payOSService.CreatePaymentLinkAsync(
+                    transaction.TransactionId,
+                    transaction.Amount,
+                    transaction.Description ?? "Nop quy",
+                    cancellationToken);
+
+                transaction.PaymentLinkId = payOsResult.PaymentLinkId;
+                transaction.UpdatedAt = DateTime.UtcNow;
+                await _fundRepository.UpdateTransactionAsync(transaction);
+
+                var expiresAtUtc = transaction.TransactionDate.AddMinutes(_payOSOptions.LinkExpirationMinutes);
+                return new ContributeResponseDto
+                {
+                    TransactionId = transaction.TransactionId,
+                    CheckoutUrl = payOsResult.CheckoutUrl,
+                    QrCode = payOsResult.QrCode,
+                    PaymentLinkId = payOsResult.PaymentLinkId,
+                    Amount = transaction.Amount,
+                    PaymentLinkExpiresAtUtc = expiresAtUtc,
+                    Message = "Quét QR hoặc mở link để thanh toán. Sau khi thanh toán thành công, quỹ sẽ được cập nhật tự động."
+                };
+            }
+            catch
+            {
+                await _fundRepository.DeleteTransactionByIdAsync(transaction.TransactionId);
+                throw;
+            }
         }
 
         public async Task<ContributionPaymentStatusDto?> GetContributionPaymentStatusAsync(Guid userId, int clubId, int transactionId)
@@ -294,7 +312,10 @@ namespace BusinessLogic.Services.Implementation
                 UpdatedAt = updatedAt,
                 MemberName = displayName,
                 ContributorName = displayName,
-                UserFullName = displayName
+                UserFullName = displayName,
+                CategoryName = string.IsNullOrWhiteSpace(t.FundCategory?.CategoryName)
+                    ? null
+                    : t.FundCategory!.CategoryName.Trim()
             };
         }
 
@@ -312,25 +333,7 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<bool> ProcessPayOSPaymentSuccessAsync(int orderCode)
         {
-            var transaction = await _fundRepository.GetTransactionByIdAsync(orderCode);
-            if (transaction == null)
-                return false;
-            if (!transaction.IsMemberContribution || transaction.TransactionType != TYPE_INCOME || transaction.Status != STATUS_PENDING)
-                return false;
-
-            var fund = transaction.ClubFund;
-            if (fund == null)
-                return false;
-
-            var utc = DateTime.UtcNow;
-            transaction.Status = STATUS_APPROVED;
-            transaction.TransactionDate = utc;
-            transaction.UpdatedAt = utc;
-            fund.CurrentBalance += transaction.Amount;
-            fund.TotalAmount += transaction.Amount;
-
-            await _fundRepository.UpdateTransactionAndFundAsync(transaction, fund);
-            return true;
+            return await _fundRepository.TryApproveMemberContributionAsync(orderCode);
         }
 
         public async Task<bool> TryCompleteOwnPendingContributionForDevelopmentAsync(Guid userId, int clubId, int transactionId)
@@ -409,6 +412,18 @@ namespace BusinessLogic.Services.Implementation
             dto.CanApproveOrRejectFundEntity = hasEdit && isMgr;
 
             return dto;
+        }
+
+        public async Task<IReadOnlyList<FundCategoryResponseDto>> GetFundCategoriesForClubAsync(int clubId)
+        {
+            var list = await _fundRepository.GetFundCategoriesForClubAsync(clubId);
+            return list.Select(c => new FundCategoryResponseDto
+            {
+                CategoryId = c.CategoryId,
+                CategoryName = c.CategoryName,
+                Description = c.Description,
+                ClubId = c.ClubId
+            }).ToList();
         }
     }
 }

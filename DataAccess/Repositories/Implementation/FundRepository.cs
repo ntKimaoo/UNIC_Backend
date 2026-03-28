@@ -1,3 +1,4 @@
+using System.Data;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using Microsoft.EntityFrameworkCore;
@@ -60,6 +61,71 @@ namespace DataAccess.Repositories.Implementation
             _context.FundTransactions.Update(transaction);
             _context.ClubFunds.Update(fund);
             await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteTransactionByIdAsync(int transactionId)
+        {
+            var entity = await _context.FundTransactions.FindAsync(transactionId);
+            if (entity != null)
+            {
+                _context.FundTransactions.Remove(entity);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task<FundCategory?> GetFundCategoryByIdAsync(int categoryId)
+        {
+            return await _context.FundCategories
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.CategoryId == categoryId);
+        }
+
+        public async Task<IReadOnlyList<FundCategory>> GetFundCategoriesForClubAsync(int clubId)
+        {
+            return await _context.FundCategories
+                .AsNoTracking()
+                .Where(c => c.ClubId == null || c.ClubId == clubId)
+                .OrderBy(c => c.CategoryName)
+                .ToListAsync();
+        }
+
+        public async Task<bool> TryApproveMemberContributionAsync(int transactionId)
+        {
+            await using var tx = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            try
+            {
+                var entity = await _context.FundTransactions
+                    .Include(t => t.ClubFund)
+                    .FirstOrDefaultAsync(t => t.TransactionId == transactionId);
+
+                if (entity == null
+                    || !entity.IsMemberContribution
+                    || entity.TransactionType == null
+                    || !string.Equals(entity.TransactionType, "INCOME", StringComparison.OrdinalIgnoreCase)
+                    || entity.Status == null
+                    || !string.Equals(entity.Status, "PENDING", StringComparison.OrdinalIgnoreCase)
+                    || entity.ClubFund == null)
+                {
+                    await tx.RollbackAsync();
+                    return false;
+                }
+
+                var utc = DateTime.UtcNow;
+                entity.Status = "APPROVED";
+                entity.TransactionDate = utc;
+                entity.UpdatedAt = utc;
+                entity.ClubFund.CurrentBalance += entity.Amount;
+                entity.ClubFund.TotalAmount += entity.Amount;
+
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+                return true;
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
         }
 
         public async Task<IEnumerable<ClubFund>> GetFundsByClubIdAsync(int clubId)
@@ -132,6 +198,7 @@ namespace DataAccess.Repositories.Implementation
             var query = _context.FundTransactions
                 .AsNoTracking()
                 .Include(t => t.Creator)
+                .Include(t => t.FundCategory)
                 .Where(t => t.FundId == fundId);
 
             if (!string.IsNullOrEmpty(status))

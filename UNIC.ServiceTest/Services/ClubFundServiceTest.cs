@@ -279,6 +279,122 @@ namespace UNIC.ServiceTest.Services
             _payOS.Verify(p => p.CreatePaymentLinkAsync(100, 10_000m, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         }
 
+        [Fact]
+        public async Task CreateContributionAsync_ShouldThrow_WhenCategoryNotFound()
+        {
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            {
+                FundId = 1,
+                ClubId = 2,
+                Status = "APPROVED",
+                FundName = "F"
+            });
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+            _fundRepo.Setup(r => r.GetFundCategoryByIdAsync(99)).ReturnsAsync((FundCategory?)null);
+
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.CreateContributionAsync(uid, new ContributeRequestDto
+                {
+                    FundId = 1,
+                    CategoryId = 99,
+                    Amount = 5000
+                }, CancellationToken.None));
+        }
+
+        [Fact]
+        public async Task CreateContributionAsync_ShouldThrow_WhenCategoryBelongsToOtherClub()
+        {
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            {
+                FundId = 1,
+                ClubId = 2,
+                Status = "APPROVED",
+                FundName = "F"
+            });
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+            _fundRepo.Setup(r => r.GetFundCategoryByIdAsync(5)).ReturnsAsync(new FundCategory
+            {
+                CategoryId = 5,
+                ClubId = 99,
+                CategoryName = "X",
+                Description = ""
+            });
+
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.CreateContributionAsync(uid, new ContributeRequestDto
+                {
+                    FundId = 1,
+                    CategoryId = 5,
+                    Amount = 5000
+                }, CancellationToken.None));
+        }
+
+        [Fact]
+        public async Task CreateContributionAsync_ShouldCallPayOS_WhenCategoryGlobal()
+        {
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            {
+                FundId = 1,
+                ClubId = 2,
+                Status = "APPROVED",
+                FundName = "F"
+            });
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+            _fundRepo.Setup(r => r.GetFundCategoryByIdAsync(5)).ReturnsAsync(new FundCategory
+            {
+                CategoryId = 5,
+                ClubId = null,
+                CategoryName = "Du Lịch",
+                Description = ""
+            });
+            _fundRepo.Setup(r => r.AddTransactionAsync(It.IsAny<FundTransaction>()))
+                .Callback<FundTransaction>(t => t.TransactionId = 200)
+                .Returns(Task.CompletedTask);
+            _payOS.Setup(p => p.CreatePaymentLinkAsync(200, 5000m, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new PayOSPaymentLinkResult { CheckoutUrl = "u", QrCode = "q", PaymentLinkId = "p" });
+            _fundRepo.Setup(r => r.UpdateTransactionAsync(It.IsAny<FundTransaction>())).Returns(Task.CompletedTask);
+
+            await _service.CreateContributionAsync(uid, new ContributeRequestDto
+            {
+                FundId = 1,
+                CategoryId = 5,
+                Amount = 5000
+            }, CancellationToken.None);
+
+            _fundRepo.Verify(r => r.GetFundCategoryByIdAsync(5), Times.Once);
+        }
+
+        [Fact]
+        public async Task CreateContributionAsync_ShouldDeleteTransaction_WhenPayOSFails()
+        {
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            {
+                FundId = 1,
+                ClubId = 2,
+                Status = "APPROVED",
+                FundName = "F"
+            });
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+            _fundRepo.Setup(r => r.AddTransactionAsync(It.IsAny<FundTransaction>()))
+                .Callback<FundTransaction>(t => t.TransactionId = 300)
+                .Returns(Task.CompletedTask);
+            _payOS.Setup(p => p.CreatePaymentLinkAsync(300, It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("payos down"));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _service.CreateContributionAsync(uid, new ContributeRequestDto
+                {
+                    FundId = 1,
+                    Amount = 5000
+                }, CancellationToken.None));
+
+            _fundRepo.Verify(r => r.DeleteTransactionByIdAsync(300), Times.Once);
+        }
+
         #endregion
 
         #region GetContributionPaymentStatus
@@ -472,40 +588,18 @@ namespace UNIC.ServiceTest.Services
         [Fact]
         public async Task ProcessPayOSPaymentSuccessAsync_ShouldReturnFalse_WhenTransactionInvalid()
         {
-            _fundRepo.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync((FundTransaction?)null);
+            _fundRepo.Setup(r => r.TryApproveMemberContributionAsync(1)).ReturnsAsync(false);
             Assert.False(await _service.ProcessPayOSPaymentSuccessAsync(1));
         }
 
         [Fact]
-        public async Task ProcessPayOSPaymentSuccessAsync_ShouldUpdateBalances_WhenValidPendingIncome()
+        public async Task ProcessPayOSPaymentSuccessAsync_ShouldReturnTrue_WhenRepositoryApproves()
         {
-            var fund = new ClubFund
-            {
-                FundId = 1,
-                ClubId = 1,
-                CurrentBalance = 100,
-                TotalAmount = 100,
-                FundName = "F"
-            };
-            var tx = new FundTransaction
-            {
-                TransactionId = 9,
-                FundId = 1,
-                IsMemberContribution = true,
-                TransactionType = "INCOME",
-                Status = "PENDING",
-                Amount = 50,
-                ClubFund = fund
-            };
-            _fundRepo.Setup(r => r.GetTransactionByIdAsync(9)).ReturnsAsync(tx);
-            _fundRepo.Setup(r => r.UpdateTransactionAndFundAsync(It.IsAny<FundTransaction>(), It.IsAny<ClubFund>()))
-                .Returns(Task.CompletedTask);
+            _fundRepo.Setup(r => r.TryApproveMemberContributionAsync(9)).ReturnsAsync(true);
 
             var ok = await _service.ProcessPayOSPaymentSuccessAsync(9);
             Assert.True(ok);
-            Assert.Equal(150, fund.CurrentBalance);
-            Assert.Equal(150, fund.TotalAmount);
-            Assert.Equal("APPROVED", tx.Status);
+            _fundRepo.Verify(r => r.TryApproveMemberContributionAsync(9), Times.Once);
         }
 
         [Fact]
@@ -542,8 +636,7 @@ namespace UNIC.ServiceTest.Services
                 Amount = 20
             };
             _fundRepo.Setup(r => r.GetTransactionByIdAsync(3)).ReturnsAsync(tx);
-            _fundRepo.Setup(r => r.UpdateTransactionAndFundAsync(It.IsAny<FundTransaction>(), It.IsAny<ClubFund>()))
-                .Returns(Task.CompletedTask);
+            _fundRepo.Setup(r => r.TryApproveMemberContributionAsync(3)).ReturnsAsync(true);
 
             Assert.True(await _service.TryCompleteOwnPendingContributionForDevelopmentAsync(uid, 2, 3));
         }

@@ -290,6 +290,12 @@ public partial class UnicContext : DbContext
             .HasForeignKey(ft => ft.FundId)
             .OnDelete(DeleteBehavior.NoAction);
 
+        modelBuilder.Entity<FundCategory>()
+            .HasOne(fc => fc.Club)
+            .WithMany()
+            .HasForeignKey(fc => fc.ClubId)
+            .OnDelete(DeleteBehavior.NoAction);
+
         modelBuilder.Entity<FundTransaction>()
             .HasOne(ft => ft.FundCategory)
             .WithMany(fc => fc.FundTransactions)

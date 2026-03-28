@@ -444,7 +444,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetHistory_ReturnsBadRequest_WhenPageInvalid()
         {
-            var result = await _controller.GetHistory(1, null, null, 0, 10);
+            var result = await _controller.GetHistory(1, 1, null, null, 0, 10);
             Assert.IsType<BadRequestObjectResult>(result);
         }
 
@@ -453,9 +453,20 @@ namespace UNIC.ControllerTest.Controllers
         {
             _fundService.Setup(s => s.GetFundByIdAsync(3)).ReturnsAsync((FundResponseDto?)null);
 
-            var result = await _controller.GetHistory(3, null, null, 1, 10);
+            var result = await _controller.GetHistory(1, 3, null, null, 1, 10);
 
             Assert.IsType<NotFoundObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task GetHistory_Returns403_WhenFundNotInRouteClub()
+        {
+            _fundService.Setup(s => s.GetFundByIdAsync(3)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
+
+            var result = await _controller.GetHistory(1, 3, null, null, 1, 10);
+
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(403, obj.StatusCode);
         }
 
         [Fact]
@@ -464,7 +475,7 @@ namespace UNIC.ControllerTest.Controllers
             _fundService.Setup(s => s.GetFundByIdAsync(3)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
             _memberService.Setup(m => m.IsMemberAsync(_userId, 8)).ReturnsAsync(false);
 
-            var result = await _controller.GetHistory(3, null, null, 1, 10);
+            var result = await _controller.GetHistory(8, 3, null, null, 1, 10);
 
             var obj = Assert.IsType<ObjectResult>(result);
             Assert.Equal(403, obj.StatusCode);
@@ -484,7 +495,7 @@ namespace UNIC.ControllerTest.Controllers
                     TotalCount = 0
                 });
 
-            var result = await _controller.GetHistory(3, null, null, 1, 10);
+            var result = await _controller.GetHistory(8, 3, null, null, 1, 10);
 
             Assert.IsType<OkObjectResult>(result);
         }

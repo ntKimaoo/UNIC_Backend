@@ -16,6 +16,10 @@ namespace UNIC.DataAccess.Repositories.Interface
         Task UpdateTransactionAsync(FundTransaction transaction);
         Task UpdateClubFundAsync(ClubFund fund);
         Task UpdateTransactionAndFundAsync(FundTransaction transaction, ClubFund fund);
+        Task DeleteTransactionByIdAsync(int transactionId);
+        Task<FundCategory?> GetFundCategoryByIdAsync(int categoryId);
+        Task<IReadOnlyList<FundCategory>> GetFundCategoriesForClubAsync(int clubId);
+        Task<bool> TryApproveMemberContributionAsync(int transactionId);
         Task<IEnumerable<FundTransaction>> GetTransactionsByFundIdAsync(
             int fundId,
             string? status = null,

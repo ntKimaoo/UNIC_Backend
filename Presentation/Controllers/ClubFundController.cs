@@ -83,6 +83,24 @@ namespace Presentation.Controllers
             }
         }
 
+        [HttpGet("categories")]
+        [RequireMemberPolicy("viewfinance")]
+        public async Task<IActionResult> GetFundCategories(int clubId)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+                var data = await _clubFundService.GetFundCategoriesForClubAsync(clubId);
+                return Ok(new { success = true, data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { success = false, message = ex.Message });
+            }
+        }
+
         [HttpGet("{fundId}")]
         [RequireMemberPolicy("viewfinance")]
         public async Task<IActionResult> GetFund(int fundId)
@@ -296,6 +314,7 @@ namespace Presentation.Controllers
         [HttpGet("history/{fundId}")]
         [RequireMemberPolicy("viewfinance")]
         public async Task<IActionResult> GetHistory(
+            int clubId,
             int fundId,
             [FromQuery] string? status,
             [FromQuery] string? scope,
@@ -311,6 +330,8 @@ namespace Presentation.Controllers
                 var fund = await _clubFundService.GetFundByIdAsync(fundId);
                 if (fund == null)
                     return NotFound(new { success = false, message = "Quỹ không tồn tại." });
+                if (fund.ClubId != clubId)
+                    return StatusCode(403, new { success = false, message = "Quỹ không thuộc câu lạc bộ này." });
                 var userId = GetCurrentUserId();
                 if (!await CanAccessClubAsync(userId, fund.ClubId))
                     return StatusCode(403, new { success = false, message = "Bạn không có quyền xem lịch sử quỹ của câu lạc bộ này." });
