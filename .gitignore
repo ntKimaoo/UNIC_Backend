@@ -393,11 +393,11 @@ FodyWeavers.xsd
 ##############################################
 
 # Sensitive configuration files (DO NOT commit passwords/secrets)
+appsettings.json
 appsettings.Development.json
 appsettings.Production.json
 appsettings.Staging.json
 appsettings.*.json
-!appsettings.json
 
 # Environment variables
 .env
@@ -432,9 +432,4 @@ EmailTemplates/cache/
 
 # Migration scripts (temporary)
 *.migration.sql
-=========
-# Ignore AppSettings (Sensitive Data)
-appsettings.json
-appsettings.Development.json
->>>>>>>>> Temporary merge branch 2
 /sql-query

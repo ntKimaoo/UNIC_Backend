@@ -164,10 +164,71 @@ namespace UNIC.Presentation.Controllers
                     return BadRequest(new { error = "Event does not belong to this club." });
 
                 var sessionDto = await _eventService.CreateSessionAsync(request);
-                return CreatedAtAction("GetEventById", "Events", new { id = request.EventId }, sessionDto);
+                return Ok(sessionDto);
             }
-            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+            catch (DomainException ex) { return BadRequest(new { error = ex.Message }); }
+            catch (Exception ex)
+            {
+                var msg = ex.InnerException?.Message ?? ex.Message;
+                return StatusCode(500, new { error = msg });
+            }
         }
+
+        /// <summary>
+        /// Update an existing session for an event within a club
+        /// </summary>
+        [HttpPut("{id}/sessions/{scheduleId}")]
+        public async Task<ActionResult<SessionDto>> UpdateSession(int clubId, int id, int scheduleId, [FromBody] UpdateSessionRequest request)
+        {
+            try
+            {
+                if (!IsClubManager(clubId))
+                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
+
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                if (existingEvent.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                request.ScheduleId = scheduleId;
+                request.EventId    = id;
+                var sessionDto = await _eventService.UpdateSessionAsync(request);
+                return Ok(sessionDto);
+            }
+            catch (NotFoundException ex) { return NotFound(new { error = ex.Message }); }
+            catch (DomainException    ex) { return BadRequest(new { error = ex.Message }); }
+            catch (Exception ex)
+            {
+                var msg = ex.InnerException?.Message ?? ex.Message;
+                return StatusCode(500, new { error = msg });
+            }
+        }
+
+        /// <summary>
+        /// Delete a session for an event within a club
+        /// </summary>
+        [HttpDelete("{id}/sessions/{scheduleId}")]
+        public async Task<IActionResult> DeleteSession(int clubId, int id, int scheduleId)
+        {
+            try
+            {
+                if (!IsClubManager(clubId))
+                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
+
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                if (existingEvent.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                await _eventService.DeleteSessionAsync(scheduleId, id);
+                return NoContent();
+            }
+            catch (NotFoundException ex) { return NotFound(new { error = ex.Message }); }
+            catch (Exception ex)
+            {
+                var msg = ex.InnerException?.Message ?? ex.Message;
+                return StatusCode(500, new { error = msg });
+            }
+        }
+
 
         /// <summary>
         /// Open registration for an event within a club
@@ -230,6 +291,24 @@ namespace UNIC.Presentation.Controllers
 
                 await _eventService.CompleteEventAsync(id);
                 return Ok(new { message = "Event completed." });
+            }
+            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+        }
+
+        /// <summary>Get sessions of an event within a club</summary>
+        [HttpGet("{id}/sessions")]
+        public async Task<IActionResult> GetSessions(int clubId, int id)
+        {
+            try
+            {
+                if (!IsClubManager(clubId))
+                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
+
+                var ev = await _eventService.GetEventByIdAsync(id);
+                if (ev.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                return Ok(ev.Sessions ?? new List<SessionDto>());
             }
             catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
         }

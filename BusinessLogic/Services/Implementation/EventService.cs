@@ -170,6 +170,42 @@ namespace BusinessLogic.Services.Implementation
             return _mapper.Map<SessionDto>(schedule);
         }
 
+        public async Task<SessionDto> UpdateSessionAsync(UpdateSessionRequest request)
+        {
+            var schedule = await _unitOfWork.EventSchedules.GetByIdAsync(request.ScheduleId);
+            if (schedule == null)
+                throw new NotFoundException("Session", request.ScheduleId);
+
+            if (schedule.EventId != request.EventId)
+                throw new DomainException("Session does not belong to this event.");
+
+            schedule.ScheduleName = request.SessionName;
+            schedule.StartTime    = request.StartTime;
+            schedule.EndTime      = request.EndTime;
+            schedule.Location     = request.Location;
+            schedule.Description  = request.Description;
+            if (request.SessionType != null)
+                schedule.SessionType = request.SessionType;
+
+            _unitOfWork.EventSchedules.Update(schedule);
+            await _unitOfWork.SaveChangesAsync();
+
+            return _mapper.Map<SessionDto>(schedule);
+        }
+
+        public async Task DeleteSessionAsync(int scheduleId, int eventId)
+        {
+            var schedule = await _unitOfWork.EventSchedules.GetByIdAsync(scheduleId);
+            if (schedule == null)
+                throw new NotFoundException("Session", scheduleId);
+
+            if (schedule.EventId != eventId)
+                throw new DomainException("Session does not belong to this event.");
+
+            _unitOfWork.EventSchedules.Delete(schedule);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
         public async Task<EventDetailDto> OpenRegistrationAsync(OpenRegistrationRequest request)
         {
             // Validate input
@@ -203,6 +239,9 @@ namespace BusinessLogic.Services.Implementation
             eventEntity.RegistrationStartDate = request.RegistrationStartDate;
             eventEntity.RegistrationEndDate = request.RegistrationEndDate;
             eventEntity.MaxAttendees = request.MaxAttendees;
+            // Sync AvailableSlots = MaxAttendees khi mở đăng ký (bắt đầu đếm slot)
+            if (request.MaxAttendees.HasValue)
+                eventEntity.AvailableSlots = request.MaxAttendees.Value;
 
             _unitOfWork.Events.Update(eventEntity);
             await _unitOfWork.SaveChangesAsync();

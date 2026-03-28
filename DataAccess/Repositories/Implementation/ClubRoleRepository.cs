@@ -140,5 +140,25 @@ namespace DataAccess.Repositories.Implementation
                 .Where(cr => cr.DepartmentId == departmentId)
                 .ToListAsync();
         }
+
+        public async Task<List<int>> GetClubIdsWithFewRolesAsync(int threshold)
+        {
+            return await _context.ClubRoles
+                .Where(cr => cr.ClubId != null)
+                .GroupBy(cr => cr.ClubId!.Value)
+                .Where(g => g.Count() < threshold)
+                .Select(g => g.Key)
+                .ToListAsync();
+        }
+
+        public async Task<List<Guid>> GetManagerIdsForClubsAsync(List<int> clubIds)
+        {
+            return await _context.UserClubRoles
+                .Where(ucr => clubIds.Contains(ucr.ClubId) && ucr.ClubRole.Level == 0)
+                .Select(ucr => ucr.UserId)
+                .Distinct()
+                .ToListAsync();
+        }
+
     }
 }

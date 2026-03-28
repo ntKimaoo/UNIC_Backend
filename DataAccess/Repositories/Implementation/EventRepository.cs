@@ -63,9 +63,60 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<int> GetAttendeeCountAsync(int eventId)
         {
+            // Chỉ đếm các status thực sự chiếm slot (loại WAITLIST + REJECTED + CANCELLED)
+            var occupying = new[]
+            {
+                nameof(AttendanceStatus.REGISTERED),
+                nameof(AttendanceStatus.PENDING),
+                nameof(AttendanceStatus.PRESENT),
+                nameof(AttendanceStatus.CHECKED_IN),
+                nameof(AttendanceStatus.ABSENT),
+            };
             return await _context.Attendances
-                .Where(a => a.EventId == eventId && a.AttendanceStatus != nameof(AttendanceStatus.CANCELLED))
+                .Where(a => a.EventId == eventId && occupying.Contains(a.AttendanceStatus))
                 .CountAsync();
+        }
+
+        // Atomic: trừ 1 slot nếu còn chỗ — trả về true nếu thành công
+        public async Task<bool> TryDecrementSlotAsync(int eventId)
+        {
+            var rows = await _context.Events
+                .Where(e => e.EventId == eventId && e.AvailableSlots > 0)
+                .ExecuteUpdateAsync(s =>
+                    s.SetProperty(e => e.AvailableSlots, e => e.AvailableSlots - 1));
+            return rows == 1;
+        }
+
+        // Atomic Direct-Promote: chuyển người WAITLIST lâu nhất thành targetStatus
+        // KHÔNG nhả slot vào pool — chống Slot Stealing & Double Cancel
+        public async Task<bool> TryDirectPromoteOldestWaitlistAsync(int eventId, string targetStatus)
+        {
+            var oldestId = await _context.Attendances
+                .Where(a => a.EventId == eventId
+                         && a.AttendanceStatus == nameof(AttendanceStatus.WAITLIST))
+                .OrderBy(a => a.RegistrationDate)
+                .Select(a => (int?)a.AttendId)
+                .FirstOrDefaultAsync();
+
+            if (oldestId == null) return false;
+
+            // Guard condition chống Double Cancel: chỉ update nếu vẫn còn WAITLIST
+            var rows = await _context.Attendances
+                .Where(a => a.AttendId == oldestId.Value
+                         && a.AttendanceStatus == nameof(AttendanceStatus.WAITLIST))
+                .ExecuteUpdateAsync(s =>
+                    s.SetProperty(a => a.AttendanceStatus, targetStatus));
+
+            return rows == 1;
+        }
+
+        // Cộng slot lại — chỉ gọi khi không có ai ở WAITLIST
+        public async Task IncrementSlotAsync(int eventId)
+        {
+            await _context.Events
+                .Where(e => e.EventId == eventId && e.MaxAttendees.HasValue)
+                .ExecuteUpdateAsync(s =>
+                    s.SetProperty(e => e.AvailableSlots, e => e.AvailableSlots + 1));
         }
 
         public async Task AddAsync(Event @event)

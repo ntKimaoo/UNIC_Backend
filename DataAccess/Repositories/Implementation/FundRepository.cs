@@ -17,13 +17,17 @@ namespace DataAccess.Repositories.Implementation
         public async Task<FundTransaction?> GetTransactionByIdAsync(int id)
         {
             return await _context.FundTransactions
+                .AsNoTracking()
                 .Include(t => t.ClubFund)
+                .Include(t => t.Creator)
                 .FirstOrDefaultAsync(t => t.TransactionId == id);
         }
 
         public async Task<ClubFund?> GetFundByIdAsync(int id)
         {
-            return await _context.ClubFunds.FindAsync(id);
+            return await _context.ClubFunds
+                .AsNoTracking()
+                .FirstOrDefaultAsync(f => f.FundId == id);
         }
 
         public async Task<ClubFund> AddFundAsync(ClubFund fund)
@@ -61,24 +65,95 @@ namespace DataAccess.Repositories.Implementation
         public async Task<IEnumerable<ClubFund>> GetFundsByClubIdAsync(int clubId)
         {
             return await _context.ClubFunds
+                .AsNoTracking()
                 .Where(cf => cf.ClubId == clubId)
                 .OrderBy(cf => cf.FundName)
                 .ToListAsync();
         }
 
-        public async Task<IEnumerable<FundTransaction>> GetTransactionsByFundIdAsync(int fundId, string? status = null)
+        public async Task<(IEnumerable<ClubFund> Items, int TotalCount)> GetFundsByClubIdPagedAsync(
+            int clubId, int pageNumber, int pageSize)
+        {
+            var query = _context.ClubFunds
+                .AsNoTracking()
+                .Where(cf => cf.ClubId == clubId)
+                .OrderBy(cf => cf.FundName);
+
+            var totalCount = await query.CountAsync();
+            var items = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+
+        public async Task<IEnumerable<FundTransaction>> GetTransactionsByFundIdAsync(
+            int fundId,
+            string? status = null,
+            bool memberContributionsOnly = false,
+            Guid? createdByUserId = null)
+        {
+            var query = BuildFundTransactionQuery(fundId, status, memberContributionsOnly, createdByUserId);
+            return await query
+                .OrderByDescending(t => t.UpdatedAt)
+                .ThenByDescending(t => t.TransactionId)
+                .ToListAsync();
+        }
+
+        public async Task<(IEnumerable<FundTransaction> Items, int TotalCount)> GetTransactionsByFundIdPagedAsync(
+            int fundId,
+            string? status,
+            bool memberContributionsOnly,
+            Guid? createdByUserId,
+            int pageNumber,
+            int pageSize)
+        {
+            var query = BuildFundTransactionQuery(fundId, status, memberContributionsOnly, createdByUserId);
+            query = query
+                .OrderByDescending(t => t.UpdatedAt)
+                .ThenByDescending(t => t.TransactionId);
+
+            var totalCount = await query.CountAsync();
+            var items = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+
+        private IQueryable<FundTransaction> BuildFundTransactionQuery(
+            int fundId,
+            string? status,
+            bool memberContributionsOnly,
+            Guid? createdByUserId)
         {
             var query = _context.FundTransactions
+                .AsNoTracking()
+                .Include(t => t.Creator)
                 .Where(t => t.FundId == fundId);
 
             if (!string.IsNullOrEmpty(status))
             {
-                query = query.Where(t => t.Status == status);
+                var st = status.ToUpperInvariant();
+                query = query.Where(t => t.Status != null && t.Status.ToUpper() == st);
             }
 
-            return await query
-                .OrderByDescending(t => t.TransactionDate)
-                .ToListAsync();
+            if (memberContributionsOnly)
+            {
+                query = query.Where(t =>
+                    t.IsMemberContribution &&
+                    t.TransactionType != null &&
+                    t.TransactionType.ToUpper() == "INCOME");
+            }
+
+            if (createdByUserId.HasValue)
+            {
+                query = query.Where(t => t.CreatedBy == createdByUserId.Value);
+            }
+
+            return query;
         }
     }
 }

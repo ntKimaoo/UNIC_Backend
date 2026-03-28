@@ -1,4 +1,3 @@
-
 using BusinessLogic.DTOs;
 using BusinessLogic.Services;
 using BusinessLogic.Services.Background;
@@ -12,6 +11,7 @@ using DataAccess.Repositories.Interface;
 using DataAccess.Seed;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OData;
@@ -27,7 +27,10 @@ using UNIC.BusinessLogic.Services.Interface;
 using UNIC.DataAccess.Repositories.Implementation;
 using UNIC.DataAccess.Repositories.Interface;
 using UNIC.DataAccess.Seed;
+using UNIC.Presentation.Helpers;
 using UNIC.Presentation.Hubs;
+using BusinessLogic.Hubs;
+using Presentation.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -119,6 +122,10 @@ builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
 builder.Services.AddHostedService<ImageUploadQueueService>();
+builder.Services.AddHostedService<ClubRoleNotificationService>();
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+builder.Services.AddScoped<INotificationHubContext, NotificationHubContext>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventReminderService>();
 
 // Unit of Work and Repositories
@@ -143,6 +150,9 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    // Luôn serialize DateTime với suffix 'Z' để frontend (UTC+7) parse đúng giờ
+    options.JsonSerializerOptions.Converters.Add(new DateTimeUtcJsonConverter());
+    options.JsonSerializerOptions.Converters.Add(new NullableDateTimeUtcJsonConverter());
 }); ;
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -183,6 +193,18 @@ builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvide
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
     options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10MB
+});
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+        | ForwardedHeaders.XForwardedProto
+        | ForwardedHeaders.XForwardedHost;
+    if (builder.Environment.IsDevelopment())
+    {
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    }
 });
 
 //builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
@@ -233,18 +255,28 @@ app.UseExceptionHandler(appError =>
     });
 });
 
+app.UseForwardedHeaders();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
 app.UseCors("AllowFE");
 app.UseStaticFiles(); // Enable serving files from wwwroot
 app.MapHub<WebRtcHub>("/webrtc");
+app.MapHub<NotificationHub>("/notifications");
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+if (app.Environment.IsDevelopment())
+{
+    // Tránh 404 khi mở base URL qua ngrok (GET / không có controller).
+    app.MapGet("/", () => Results.Redirect("/swagger"));
+}
 
 app.Run();

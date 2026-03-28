@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -34,6 +34,8 @@ namespace DataAccess.Models
         public DateTime? RegistrationStartDate { get; set; }
         public DateTime? RegistrationEndDate { get; set; }
         public int? MaxAttendees { get; set; }
+        public bool RequiresApproval { get; set; } = false;
+        public int? AvailableSlots { get; set; }    // null = không giới hạn, được tính từ MaxAttendees
 
         // Check-in fields
         [MaxLength(10)]
