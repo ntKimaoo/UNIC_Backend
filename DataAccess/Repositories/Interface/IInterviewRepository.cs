@@ -22,6 +22,7 @@ namespace DataAccess.Repositories.Interface
         Task<bool> DeleteAssignmentAsync(int id);
 
         // ── MeetingRoom ───────────────────────────────────────────
+        Task<MeetingRoom?> GetRoomByIdAsync(int roomId);
         Task<MeetingRoom?> GetRoomByScheduleIdAsync(int scheduleId);
         Task<MeetingRoom?> GetRoomByCodeAsync(string roomCode);
         Task<MeetingRoom> CreateRoomAsync(MeetingRoom room);

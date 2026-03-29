@@ -45,6 +45,11 @@ namespace BusinessLogic.Services.Implementation
             var room = new MeetingRoom
             {
                 InterviewScheduleId = created.Id,
+                RoomType            = RoomType.Interview,
+                Title               = dto.Title,
+                CreatedByUserId     = dto.CreatedByUserId,
+                ScheduledStartAt    = dto.ScheduledAt,
+                ScheduledEndAt      = dto.ScheduledAt.AddMinutes(dto.DurationMinutes),
                 RoomCode            = GenerateRoomCode(),
                 Status              = RoomStatus.Idle,
                 CreatedAt           = DateTime.UtcNow
@@ -235,6 +240,44 @@ namespace BusinessLogic.Services.Implementation
         {
             var room = await _repo.GetRoomByScheduleIdAsync(scheduleId);
             return room == null ? null : MapRoomToDto(room);
+        }
+
+        public async Task<MeetingRoomResponseDto?> GetRoomByIdAsync(int roomId)
+        {
+            var room = await _repo.GetRoomByIdAsync(roomId);
+            return room == null ? null : MapRoomToDto(room);
+        }
+
+        public async Task<MeetingRoomResponseDto?> GetRoomByCodeAsync(string roomCode)
+        {
+            var room = await _repo.GetRoomByCodeAsync(roomCode);
+            return room == null ? null : MapRoomToDto(room);
+        }
+
+        public async Task<MeetingRoomResponseDto> CreateStandaloneRoomAsync(CreateMeetingRoomDto dto)
+        {
+            if (!Enum.TryParse<RoomType>(dto.RoomType, true, out var roomType))
+                roomType = RoomType.General;
+
+            var room = new MeetingRoom
+            {
+                RoomType            = roomType,
+                Title               = dto.Title,
+                Description         = dto.Description,
+                CreatedByUserId     = dto.CreatedByUserId,
+                ScheduledStartAt    = dto.ScheduledStartAt,
+                ScheduledEndAt      = dto.ScheduledEndAt,
+                InterviewScheduleId = dto.InterviewScheduleId,
+                RoomCode            = GenerateRoomCode(),
+                MaxParticipants     = dto.MaxParticipants,
+                IsWaitingRoomEnabled = dto.IsWaitingRoomEnabled,
+                IsRecordingEnabled  = dto.IsRecordingEnabled,
+                Status              = RoomStatus.Idle,
+                CreatedAt           = DateTime.UtcNow
+            };
+
+            var created = await _repo.CreateRoomAsync(room);
+            return MapRoomToDto(created);
         }
 
         public async Task<JoinRoomResponseDto> JoinRoomAsync(string roomCode, JoinRoomDto dto)
@@ -459,6 +502,12 @@ namespace BusinessLogic.Services.Implementation
             return new MeetingRoomResponseDto
             {
                 Id                     = r.Id,
+                RoomType               = r.RoomType.ToString(),
+                Title                  = r.Title,
+                Description            = r.Description,
+                CreatedByUserId        = r.CreatedByUserId,
+                ScheduledStartAt       = r.ScheduledStartAt,
+                ScheduledEndAt         = r.ScheduledEndAt,
                 InterviewScheduleId    = r.InterviewScheduleId,
                 RoomCode               = r.RoomCode,
                 StunServerUri          = r.StunServerUri,

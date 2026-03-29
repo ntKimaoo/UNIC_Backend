@@ -126,7 +126,13 @@ namespace BusinessLogic.DTOs
     public class MeetingRoomResponseDto
     {
         public int Id { get; set; }
-        public int InterviewScheduleId { get; set; }
+        public string RoomType { get; set; } = null!;
+        public string Title { get; set; } = null!;
+        public string? Description { get; set; }
+        public Guid CreatedByUserId { get; set; }
+        public DateTime? ScheduledStartAt { get; set; }
+        public DateTime? ScheduledEndAt { get; set; }
+        public int? InterviewScheduleId { get; set; }
         public string RoomCode { get; set; } = null!;
         public string? StunServerUri { get; set; }
         public string? TurnServerUri { get; set; }
@@ -142,6 +148,36 @@ namespace BusinessLogic.DTOs
         public DateTime CreatedAt { get; set; }
     }
 
+    public class CreateMeetingRoomDto
+    {
+        /// <summary>
+        /// Interview, Internal, Training, General
+        /// </summary>
+        [Required]
+        public string RoomType { get; set; } = "General";
+
+        [Required]
+        [MaxLength(300)]
+        public string Title { get; set; } = null!;
+
+        public string? Description { get; set; }
+
+        [Required]
+        public Guid CreatedByUserId { get; set; }
+
+        public DateTime? ScheduledStartAt { get; set; }
+        public DateTime? ScheduledEndAt { get; set; }
+
+        /// <summary>
+        /// Chỉ cần khi RoomType = Interview
+        /// </summary>
+        public int? InterviewScheduleId { get; set; }
+
+        public int MaxParticipants { get; set; } = 10;
+        public bool IsWaitingRoomEnabled { get; set; } = true;
+        public bool IsRecordingEnabled { get; set; } = false;
+    }
+
     public class JoinRoomDto
     {
         [Required]
@@ -152,9 +188,9 @@ namespace BusinessLogic.DTOs
         public string DisplayName { get; set; } = null!;
 
         /// <summary>
-        /// "Interviewer" | "Candidate" | "Observer"
+        /// "Interviewer" | "Candidate" | "Observer" | "Host" | "Participant" | "Guest"
         /// </summary>
-        public string Role { get; set; } = "Candidate";
+        public string Role { get; set; } = "Participant";
     }
 
     public class JoinRoomResponseDto

@@ -133,6 +133,14 @@ namespace DataAccess.Repositories.Implementation
         //  MeetingRoom
         // ═══════════════════════════════════════════════════════════
 
+        public async Task<MeetingRoom?> GetRoomByIdAsync(int roomId)
+        {
+            return await _context.MeetingRooms
+                .Include(r => r.Participants)
+                .Include(r => r.Events)
+                .FirstOrDefaultAsync(r => r.Id == roomId);
+        }
+
         public async Task<MeetingRoom?> GetRoomByScheduleIdAsync(int scheduleId)
         {
             return await _context.MeetingRooms

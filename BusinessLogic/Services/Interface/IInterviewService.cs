@@ -22,6 +22,9 @@ namespace BusinessLogic.Services.Interface
         Task<bool> ConfirmAssignmentAsync(int scheduleId, int assignmentId);
 
         // ── Meeting Room ──────────────────────────────────────────
+        Task<MeetingRoomResponseDto> CreateStandaloneRoomAsync(CreateMeetingRoomDto dto);
+        Task<MeetingRoomResponseDto?> GetRoomByIdAsync(int roomId);
+        Task<MeetingRoomResponseDto?> GetRoomByCodeAsync(string roomCode);
         Task<MeetingRoomResponseDto?> GetRoomByScheduleIdAsync(int scheduleId);
         Task<JoinRoomResponseDto> JoinRoomAsync(string roomCode, JoinRoomDto dto);
         Task<bool> LeaveRoomAsync(string roomCode, LeaveRoomDto dto);
