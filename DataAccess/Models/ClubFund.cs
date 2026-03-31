@@ -15,6 +15,9 @@ namespace DataAccess.Models
         [MaxLength(100)]
         public string FundName { get; set; }
 
+        [MaxLength(1000)]
+        public string? Description { get; set; }
+
         [Column(TypeName = "decimal(15,2)")]
         public decimal TotalAmount { get; set; } = 0;
 
