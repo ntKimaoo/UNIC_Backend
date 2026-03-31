@@ -31,6 +31,21 @@ namespace DataAccess.Repositories.Implementation
                 .FirstOrDefaultAsync(f => f.FundId == id);
         }
 
+        public async Task<bool> ExistsNonRejectedFundNameInClubAsync(int clubId, string fundNameNormalized)
+        {
+            var normalized = (fundNameNormalized ?? string.Empty).Trim().ToUpperInvariant();
+            if (string.IsNullOrEmpty(normalized))
+                return false;
+
+            return await _context.ClubFunds
+                .AsNoTracking()
+                .AnyAsync(f =>
+                    f.ClubId == clubId &&
+                    f.FundName != null &&
+                    f.FundName.Trim().ToUpper() == normalized &&
+                    (f.Status == null || f.Status.ToUpper() != "REJECTED"));
+        }
+
         public async Task<ClubFund> AddFundAsync(ClubFund fund)
         {
             await _context.ClubFunds.AddAsync(fund);
@@ -138,12 +153,130 @@ namespace DataAccess.Repositories.Implementation
         }
 
         public async Task<(IEnumerable<ClubFund> Items, int TotalCount)> GetFundsByClubIdPagedAsync(
-            int clubId, int pageNumber, int pageSize)
+            int clubId,
+            string? status,
+            string? search,
+            string sort,
+            int pageNumber,
+            int pageSize)
         {
             var query = _context.ClubFunds
                 .AsNoTracking()
-                .Where(cf => cf.ClubId == clubId)
-                .OrderBy(cf => cf.FundName);
+                .Where(cf => cf.ClubId == clubId);
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                var st = status.Trim().ToUpperInvariant();
+                if (st == "PENDING")
+                {
+                    query = query.Where(cf => cf.Status == null || cf.Status.ToUpper() == st);
+                }
+                else
+                {
+                    query = query.Where(cf => cf.Status != null && cf.Status.ToUpper() == st);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var keyword = search.Trim();
+                query = query.Where(cf => cf.FundName != null && cf.FundName.Contains(keyword));
+            }
+
+            query = sort switch
+            {
+                "OLDEST" => query
+                    .OrderBy(cf => cf.CreatedAt)
+                    .ThenBy(cf => cf.FundId),
+                "NAME_ASC" => query
+                    .OrderBy(cf => cf.FundName)
+                    .ThenBy(cf => cf.FundId),
+                "NAME_DESC" => query
+                    .OrderByDescending(cf => cf.FundName)
+                    .ThenByDescending(cf => cf.FundId),
+                _ => query
+                    .OrderByDescending(cf => cf.CreatedAt)
+                    .ThenByDescending(cf => cf.FundId)
+            };
+
+            var totalCount = await query.CountAsync();
+            var items = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, totalCount);
+        }
+
+        public async Task<(IEnumerable<ClubFund> Items, int TotalCount)> GetMyFundsByClubIdPagedAsync(
+            int clubId,
+            Guid currentUserId,
+            string mineType,
+            string? status,
+            string? search,
+            string sort,
+            int pageNumber,
+            int pageSize)
+        {
+            var fundIds = _context.FundTransactions
+                .AsNoTracking()
+                .Where(t => t.ClubFund != null && t.ClubFund.ClubId == clubId);
+
+            if (mineType == "CREATED")
+            {
+                fundIds = fundIds.Where(t => t.CreatedBy == currentUserId);
+            }
+            else if (mineType == "RESPONSIBLE")
+            {
+                fundIds = fundIds.Where(t => t.ApprovedBy == currentUserId);
+            }
+            else
+            {
+                fundIds = fundIds.Where(t => t.CreatedBy == currentUserId || t.ApprovedBy == currentUserId);
+            }
+
+            var myFundIds = fundIds
+                .Select(t => t.FundId)
+                .Distinct();
+
+            var query = _context.ClubFunds
+                .AsNoTracking()
+                .Where(cf => cf.ClubId == clubId && myFundIds.Contains(cf.FundId));
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                var st = status.Trim().ToUpperInvariant();
+                if (st == "PENDING")
+                {
+                    query = query.Where(cf => cf.Status == null || cf.Status.ToUpper() == st);
+                }
+                else
+                {
+                    query = query.Where(cf => cf.Status != null && cf.Status.ToUpper() == st);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var keyword = search.Trim();
+                query = query.Where(cf => cf.FundName != null && cf.FundName.Contains(keyword));
+            }
+
+            query = sort switch
+            {
+                "OLDEST" => query
+                    .OrderBy(cf => cf.CreatedAt)
+                    .ThenBy(cf => cf.FundId),
+                "NAME_ASC" => query
+                    .OrderBy(cf => cf.FundName)
+                    .ThenBy(cf => cf.FundId),
+                "NAME_DESC" => query
+                    .OrderByDescending(cf => cf.FundName)
+                    .ThenByDescending(cf => cf.FundId),
+                _ => query
+                    .OrderByDescending(cf => cf.CreatedAt)
+                    .ThenByDescending(cf => cf.FundId)
+            };
 
             var totalCount = await query.CountAsync();
             var items = await query

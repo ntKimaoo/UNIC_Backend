@@ -1,19 +1,58 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace BusinessLogic.DTOs
 {
     public class CreateFundDto
     {
+        private static readonly HashSet<string> DescriptionAliases = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "description",
+            "fundDescription",
+            "fund_description",
+            "desc",
+            "note",
+            "content",
+            "mota",
+            "moTa"
+        };
+
         [Required]
         public int ClubId { get; set; }
         [Required]
         [MaxLength(100)]
         public string FundName { get; set; } = string.Empty;
-        [Range(0, double.MaxValue, ErrorMessage = "Số tiền ban đầu không được âm")]
-        public decimal InitialAmount { get; set; } = 0;
+        [MaxLength(1000)]
+        public string? Description { get; set; }
         public DateTime? ExpiresAt { get; set; }
+
+        [JsonExtensionData]
+        public Dictionary<string, JsonElement>? ExtraData { get; set; }
+
+        public string? ResolveDescription()
+        {
+            if (!string.IsNullOrWhiteSpace(Description))
+                return Description.Trim();
+            if (ExtraData == null || ExtraData.Count == 0)
+                return null;
+
+            foreach (var item in ExtraData)
+            {
+                if (!DescriptionAliases.Contains(item.Key))
+                    continue;
+                if (item.Value.ValueKind != JsonValueKind.String)
+                    continue;
+
+                var value = item.Value.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                    return value.Trim();
+            }
+
+            return null;
+        }
     }
 
     public class ContributeRequestDto
@@ -65,6 +104,7 @@ namespace BusinessLogic.DTOs
         public int FundId { get; set; }
         public int ClubId { get; set; }
         public string FundName { get; set; } = string.Empty;
+        public string? Description { get; set; }
         public decimal TotalAmount { get; set; }
         public decimal CurrentBalance { get; set; }
         public DateTime CreatedAt { get; set; }
@@ -106,7 +146,6 @@ namespace BusinessLogic.DTOs
 
     public class FundMenuItemDto
     {
-        /// <summary>Ổn định cho frontend route: overview | transactions | reports | settings</summary>
         public string Id { get; set; } = string.Empty;
         public string LabelVi { get; set; } = string.Empty;
         public string LabelEn { get; set; } = string.Empty;
@@ -127,7 +166,7 @@ namespace BusinessLogic.DTOs
         public bool CanCreateFund { get; set; }
         public bool CanApproveOrRejectFundEntity { get; set; }
 
-        /// <summary>Thứ tự menu Quản lý quỹ (không còn expense report; có báo cáo).</summary>
+        /// <summary>Thứ tự menu Quản lý quỹ (có mục Quỹ của tôi).</summary>
         public IReadOnlyList<FundMenuItemDto> MenuItems { get; set; } = Array.Empty<FundMenuItemDto>();
     }
 

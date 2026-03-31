@@ -73,6 +73,9 @@ namespace Presentation.Controllers
             [FromQuery] DateTime? fromUtc,
             [FromQuery] DateTime? toUtc)
         {
+            var userId = GetCurrentUserId();
+            if (!await CanAccessClubAsync(userId, clubId))
+                return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
             var data = await _clubFundService.GetClubFundReportSummaryAsync(clubId, fromUtc, toUtc);
             return Ok(new { success = true, data });
         }
@@ -170,14 +173,15 @@ namespace Presentation.Controllers
             return Ok(new { success = true, data = fund });
         }
 
-        /// <param name="page">Trang, từ 1.</param>
-        /// <param name="pageSize">1–100, mặc định 10.</param>
         [HttpGet]
         [RequireMemberPolicy("viewfinance")]
         public async Task<IActionResult> GetFundsByClub(
             int clubId,
+            [FromQuery] string? status,
+            [FromQuery] string? search,
+            [FromQuery] string? sort,
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 10)
+            [FromQuery] int pageSize = 9)
         {
             if (page < 1)
                 return BadRequest(new { success = false, message = "Page phải >= 1." });
@@ -186,8 +190,40 @@ namespace Presentation.Controllers
             var userId = GetCurrentUserId();
             if (!await CanAccessClubAsync(userId, clubId))
                 return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
-            var paged = await _clubFundService.GetFundsByClubIdPagedAsync(clubId, page, pageSize);
+            var paged = await _clubFundService.GetFundsByClubIdPagedAsync(clubId, status, search, sort, page, pageSize);
             return Ok(new { success = true, data = paged });
+        }
+
+        [HttpGet("my")]
+        [RequireMemberPolicy("viewfinance")]
+        public async Task<IActionResult> GetMyFunds(
+            int clubId,
+            [FromQuery] string? mineType,
+            [FromQuery] string? status,
+            [FromQuery] string? search,
+            [FromQuery] string? sort,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 9)
+        {
+            try
+            {
+                if (page < 1)
+                    return BadRequest(new { success = false, message = "Page phải >= 1." });
+                if (pageSize < 1 || pageSize > 100)
+                    return BadRequest(new { success = false, message = "PageSize từ 1 đến 100." });
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
+
+                var paged = await _clubFundService.GetMyFundsByClubIdPagedAsync(
+                    clubId, userId, mineType, status, search, sort, page, pageSize);
+
+                return Ok(new { success = true, data = paged });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
         }
 
         [HttpPost("contribute")]

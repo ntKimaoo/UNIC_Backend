@@ -10,6 +10,7 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -30,6 +31,8 @@ namespace UNIC.ServiceTest.Services
             _memberRepo = new Mock<IClubMemberRepository>();
             _payOS = new Mock<IPayOSService>();
             _policy = new Mock<IPolicyService>();
+            _fundRepo.Setup(r => r.ExistsNonRejectedFundNameInClubAsync(It.IsAny<int>(), It.IsAny<string>()))
+                .ReturnsAsync(false);
 
             var payOpts = Options.Create(new PayOSOptions { LinkExpirationMinutes = 60 });
             _service = new ClubFundService(
@@ -59,15 +62,20 @@ namespace UNIC.ServiceTest.Services
         }
 
         [Fact]
-        public async Task CreateFundAsync_ShouldThrow_WhenInitialAmountNegative()
+        public async Task CreateFundAsync_ShouldThrow_WhenFundNameAlreadyExistsInClub()
         {
-            await Assert.ThrowsAsync<ArgumentException>(() =>
-                _service.CreateFundAsync(Guid.NewGuid(), new CreateFundDto
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.ExistsNonRejectedFundNameInClubAsync(1, "Q2")).ReturnsAsync(true);
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 2));
+
+            var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.CreateFundAsync(uid, new CreateFundDto
                 {
                     ClubId = 1,
-                    FundName = "Q",
-                    InitialAmount = -1
+                    FundName = "Q2"
                 }));
+
+            Assert.Contains("Tên quỹ đã tồn tại", ex.Message);
         }
 
         [Fact]
@@ -78,7 +86,6 @@ namespace UNIC.ServiceTest.Services
                 {
                     ClubId = 1,
                     FundName = "Q",
-                    InitialAmount = 0,
                     ExpiresAt = DateTime.UtcNow.Date.AddDays(-1)
                 }));
         }
@@ -136,13 +143,16 @@ namespace UNIC.ServiceTest.Services
             {
                 ClubId = 1,
                 FundName = " Quỹ A ",
-                InitialAmount = 5000
+                Description = "  Mo ta quy  "
             });
 
             Assert.NotNull(captured);
             Assert.Equal("APPROVED", captured!.Status);
-            Assert.Equal(5000, captured.CurrentBalance);
+            Assert.Equal(0, captured.CurrentBalance);
+            Assert.Equal(0, captured.TotalAmount);
             Assert.Equal("Quỹ A", result.FundName);
+            Assert.Equal("Mo ta quy", captured.Description);
+            Assert.Equal("Mo ta quy", result.Description);
         }
 
         [Fact]
@@ -156,9 +166,38 @@ namespace UNIC.ServiceTest.Services
                 .Callback<ClubFund>(f => captured = f)
                 .ReturnsAsync((ClubFund f) => f);
 
-            await _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q", InitialAmount = 0 });
+            await _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q" });
 
             Assert.Equal("PENDING", captured!.Status);
+        }
+
+        [Fact]
+        public async Task CreateFundAsync_ShouldMapDescription_FromAliasKey()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
+
+            ClubFund? captured = null;
+            _fundRepo.Setup(r => r.AddFundAsync(It.IsAny<ClubFund>()))
+                .Callback<ClubFund>(f => captured = f)
+                .ReturnsAsync((ClubFund f) => f);
+
+            var aliasJson = JsonDocument.Parse("\"Mo ta tu alias\"").RootElement.Clone();
+            var dto = new CreateFundDto
+            {
+                ClubId = 1,
+                FundName = "Q Alias",
+                ExtraData = new Dictionary<string, JsonElement>
+                {
+                    ["fundDescription"] = aliasJson
+                }
+            };
+
+            var result = await _service.CreateFundAsync(uid, dto);
+
+            Assert.NotNull(captured);
+            Assert.Equal("Mo ta tu alias", captured!.Description);
+            Assert.Equal("Mo ta tu alias", result.Description);
         }
 
         #endregion
@@ -467,11 +506,46 @@ namespace UNIC.ServiceTest.Services
                     CreatedAt = DateTime.UtcNow
                 }
             };
-            _fundRepo.Setup(r => r.GetFundsByClubIdPagedAsync(2, 1, 10)).ReturnsAsync((list, 1));
+            _fundRepo.Setup(r => r.GetFundsByClubIdPagedAsync(2, null, null, "NEWEST", 1, 10)).ReturnsAsync((list, 1));
 
-            var page = await _service.GetFundsByClubIdPagedAsync(2, 1, 10);
+            var page = await _service.GetFundsByClubIdPagedAsync(2, null, null, null, 1, 10);
             Assert.Single(page.Items);
             Assert.Equal(1, page.TotalCount);
+        }
+
+        [Fact]
+        public async Task GetFundsByClubIdPagedAsync_ShouldThrow_WhenStatusInvalid()
+        {
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.GetFundsByClubIdPagedAsync(2, "INVALID", null, null, 1, 10));
+        }
+
+        [Fact]
+        public async Task GetFundsByClubIdPagedAsync_ShouldThrow_WhenSortInvalid()
+        {
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.GetFundsByClubIdPagedAsync(2, null, null, "RANDOM", 1, 10));
+        }
+
+        [Fact]
+        public async Task GetMyFundsByClubIdPagedAsync_ShouldPassNormalizedFilters_ToRepository()
+        {
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetMyFundsByClubIdPagedAsync(
+                    2, uid, "ALL", null, null, "NEWEST", 1, 10))
+                .ReturnsAsync((Enumerable.Empty<ClubFund>(), 0));
+
+            await _service.GetMyFundsByClubIdPagedAsync(2, uid, null, "ALL", null, null, 1, 10);
+
+            _fundRepo.Verify(r => r.GetMyFundsByClubIdPagedAsync(
+                2, uid, "ALL", null, null, "NEWEST", 1, 10), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetMyFundsByClubIdPagedAsync_ShouldThrow_WhenMineTypeInvalid()
+        {
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.GetMyFundsByClubIdPagedAsync(2, Guid.NewGuid(), "INVALID", null, null, null, 1, 10));
         }
 
         #endregion
@@ -668,8 +742,8 @@ namespace UNIC.ServiceTest.Services
             Assert.True(dto.CanViewFunds);
             Assert.True(dto.CanCreateFund);
             Assert.True(dto.CanApproveOrRejectFundEntity);
-            Assert.Equal(4, dto.MenuItems.Count);
-            Assert.Equal(new[] { "overview", "transactions", "reports", "settings" }, dto.MenuItems.Select(m => m.Id).ToArray());
+            Assert.Equal(5, dto.MenuItems.Count);
+            Assert.Equal(new[] { "overview", "my-funds", "transactions", "reports", "settings" }, dto.MenuItems.Select(m => m.Id).ToArray());
             Assert.All(dto.MenuItems, m => Assert.True(m.Visible));
         }
 

@@ -11,7 +11,22 @@ namespace BusinessLogic.Services.Interface
         Task<ContributionPaymentStatusDto?> GetContributionPaymentStatusAsync(Guid userId, int clubId, int transactionId);
         Task<ContributionPaymentStatusDto?> GetContributionPaymentStatusByOrderCodeAsync(Guid userId, int orderCode);
         Task<FundResponseDto?> GetFundByIdAsync(int fundId);
-        Task<PagedResultDto<FundResponseDto>> GetFundsByClubIdPagedAsync(int clubId, int pageNumber, int pageSize);
+        Task<PagedResultDto<FundResponseDto>> GetFundsByClubIdPagedAsync(
+            int clubId,
+            string? status,
+            string? search,
+            string? sort,
+            int pageNumber,
+            int pageSize);
+        Task<PagedResultDto<FundResponseDto>> GetMyFundsByClubIdPagedAsync(
+            int clubId,
+            Guid currentUserId,
+            string? mineType,
+            string? status,
+            string? search,
+            string? sort,
+            int pageNumber,
+            int pageSize);
         Task<PagedResultDto<FundTransactionResponseDto>> GetFundHistoryPagedAsync(
             int fundId, string? status, string? scope, Guid? currentUserId, int pageNumber, int pageSize);
 

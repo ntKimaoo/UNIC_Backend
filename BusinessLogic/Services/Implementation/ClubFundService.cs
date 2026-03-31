@@ -42,8 +42,9 @@ namespace BusinessLogic.Services.Implementation
         {
             if (string.IsNullOrWhiteSpace(dto.FundName))
                 throw new ArgumentException("Tên quỹ không được để trống.", nameof(dto.FundName));
-            if (dto.InitialAmount < 0)
-                throw new ArgumentException("Số tiền ban đầu không được âm.", nameof(dto.InitialAmount));
+            var fundName = dto.FundName.Trim();
+            if (await _fundRepository.ExistsNonRejectedFundNameInClubAsync(dto.ClubId, fundName))
+                throw new ArgumentException("Tên quỹ đã tồn tại trong câu lạc bộ này.", nameof(dto.FundName));
 
             DateTime? expiresAtDate = null;
             if (dto.ExpiresAt.HasValue)
@@ -67,9 +68,10 @@ namespace BusinessLogic.Services.Implementation
             var fund = new ClubFund
             {
                 ClubId = dto.ClubId,
-                FundName = dto.FundName.Trim(),
-                TotalAmount = dto.InitialAmount,
-                CurrentBalance = dto.InitialAmount,
+                FundName = fundName,
+                Description = dto.ResolveDescription(),
+                TotalAmount = 0m,
+                CurrentBalance = 0m,
                 CreatedAt = DateTime.UtcNow,
                 Status = fundStatus,
                 ExpiresAt = expiresAtDate
@@ -222,9 +224,85 @@ namespace BusinessLogic.Services.Implementation
             return fund == null ? null : MapToFundDto(fund);
         }
 
-        public async Task<PagedResultDto<FundResponseDto>> GetFundsByClubIdPagedAsync(int clubId, int pageNumber, int pageSize)
+        public async Task<PagedResultDto<FundResponseDto>> GetFundsByClubIdPagedAsync(
+            int clubId,
+            string? status,
+            string? search,
+            string? sort,
+            int pageNumber,
+            int pageSize)
         {
-            var (items, totalCount) = await _fundRepository.GetFundsByClubIdPagedAsync(clubId, pageNumber, pageSize);
+            string? normalizedStatus;
+            var trimmedStatus = status?.Trim();
+            if (string.IsNullOrEmpty(trimmedStatus) || string.Equals(trimmedStatus, "ALL", StringComparison.OrdinalIgnoreCase))
+            {
+                normalizedStatus = null;
+            }
+            else
+            {
+                var upper = trimmedStatus.ToUpperInvariant();
+                if (upper != STATUS_PENDING && upper != STATUS_APPROVED && upper != STATUS_REJECTED)
+                    throw new ArgumentException("Trạng thái hợp lệ: PENDING, APPROVED, REJECTED hoặc ALL.", nameof(status));
+                normalizedStatus = upper;
+            }
+
+            var normalizedSearch = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+            var normalizedSort = string.IsNullOrWhiteSpace(sort) ? "NEWEST" : sort.Trim().ToUpperInvariant();
+            if (normalizedSort is not ("NEWEST" or "OLDEST" or "NAME_ASC" or "NAME_DESC"))
+                throw new ArgumentException("Sắp xếp hợp lệ: NEWEST, OLDEST, NAME_ASC, NAME_DESC.", nameof(sort));
+            var (items, totalCount) = await _fundRepository.GetFundsByClubIdPagedAsync(
+                clubId,
+                normalizedStatus,
+                normalizedSearch,
+                normalizedSort,
+                pageNumber,
+                pageSize);
+            return ToPagedResult(items.Select(MapToFundDto), pageNumber, pageSize, totalCount);
+        }
+
+        public async Task<PagedResultDto<FundResponseDto>> GetMyFundsByClubIdPagedAsync(
+            int clubId,
+            Guid currentUserId,
+            string? mineType,
+            string? status,
+            string? search,
+            string? sort,
+            int pageNumber,
+            int pageSize)
+        {
+            var normalizedMineType = string.IsNullOrWhiteSpace(mineType) ? "ALL" : mineType.Trim().ToUpperInvariant();
+            if (normalizedMineType is not ("ALL" or "CREATED" or "RESPONSIBLE"))
+                throw new ArgumentException("mineType hợp lệ: ALL, CREATED, RESPONSIBLE.", nameof(mineType));
+
+            string? normalizedStatus;
+            var trimmedStatus = status?.Trim();
+            if (string.IsNullOrEmpty(trimmedStatus) || string.Equals(trimmedStatus, "ALL", StringComparison.OrdinalIgnoreCase))
+            {
+                normalizedStatus = null;
+            }
+            else
+            {
+                var upper = trimmedStatus.ToUpperInvariant();
+                if (upper != STATUS_PENDING && upper != STATUS_APPROVED && upper != STATUS_REJECTED)
+                    throw new ArgumentException("Trạng thái hợp lệ: PENDING, APPROVED, REJECTED hoặc ALL.", nameof(status));
+                normalizedStatus = upper;
+            }
+
+            var normalizedSearch = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+            var normalizedSort = string.IsNullOrWhiteSpace(sort) ? "NEWEST" : sort.Trim().ToUpperInvariant();
+            if (normalizedSort is not ("NEWEST" or "OLDEST" or "NAME_ASC" or "NAME_DESC"))
+                throw new ArgumentException("Sắp xếp hợp lệ: NEWEST, OLDEST, NAME_ASC, NAME_DESC.", nameof(sort));
+
+            var (items, totalCount) = await _fundRepository.GetMyFundsByClubIdPagedAsync(
+                clubId,
+                currentUserId,
+                normalizedMineType,
+                normalizedStatus,
+                normalizedSearch,
+                normalizedSort,
+                pageNumber,
+                pageSize);
+
             return ToPagedResult(items.Select(MapToFundDto), pageNumber, pageSize, totalCount);
         }
 
@@ -315,6 +393,7 @@ namespace BusinessLogic.Services.Implementation
                 FundId = fund.FundId,
                 ClubId = fund.ClubId,
                 FundName = fund.FundName,
+                Description = fund.Description,
                 TotalAmount = fund.TotalAmount,
                 CurrentBalance = fund.CurrentBalance,
                 CreatedAt = fund.CreatedAt,
@@ -488,6 +567,13 @@ namespace BusinessLogic.Services.Implementation
                     Id = "overview",
                     LabelVi = "Tổng quan quỹ",
                     LabelEn = "Fund overview",
+                    Visible = true
+                },
+                new()
+                {
+                    Id = "my-funds",
+                    LabelVi = "Quỹ của tôi",
+                    LabelEn = "My funds",
                     Visible = true
                 },
                 new()

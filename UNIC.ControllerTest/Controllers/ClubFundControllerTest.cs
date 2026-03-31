@@ -57,7 +57,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task CreateFund_ReturnsOk_WhenSuccess()
         {
-            var dto = new CreateFundDto { ClubId = 1, FundName = "Q1", InitialAmount = 0 };
+            var dto = new CreateFundDto { ClubId = 1, FundName = "Q1" };
             var response = new FundResponseDto { FundId = 1, FundName = "Q1", ClubId = 1 };
 
             _fundService.Setup(s => s.CreateFundAsync(_userId, It.IsAny<CreateFundDto>()))
@@ -293,14 +293,14 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetFundsByClub_ReturnsBadRequest_WhenPageInvalid()
         {
-            var result = await _controller.GetFundsByClub(1, 0, 10);
+            var result = await _controller.GetFundsByClub(1, null, null, null, 0, 10);
             Assert.IsType<BadRequestObjectResult>(result);
         }
 
         [Fact]
         public async Task GetFundsByClub_ReturnsBadRequest_WhenPageSizeInvalid()
         {
-            var result = await _controller.GetFundsByClub(1, 1, 200);
+            var result = await _controller.GetFundsByClub(1, null, null, null, 1, 200);
             Assert.IsType<BadRequestObjectResult>(result);
         }
 
@@ -309,7 +309,7 @@ namespace UNIC.ControllerTest.Controllers
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 2)).ReturnsAsync(false);
 
-            var result = await _controller.GetFundsByClub(2, 1, 10);
+            var result = await _controller.GetFundsByClub(2, null, null, null, 1, 10);
 
             var obj = Assert.IsType<ObjectResult>(result);
             Assert.Equal(403, obj.StatusCode);
@@ -319,7 +319,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task GetFundsByClub_ReturnsOk_WhenAllowed()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 2)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundsByClubIdPagedAsync(2, 1, 10))
+            _fundService.Setup(s => s.GetFundsByClubIdPagedAsync(2, "APPROVED", "quy", "NAME_ASC", 1, 10))
                 .ReturnsAsync(new PagedResultDto<FundResponseDto>
                 {
                     Items = Array.Empty<FundResponseDto>(),
@@ -328,7 +328,52 @@ namespace UNIC.ControllerTest.Controllers
                     TotalCount = 0
                 });
 
-            var result = await _controller.GetFundsByClub(2, 1, 10);
+            var result = await _controller.GetFundsByClub(2, "APPROVED", "quy", "NAME_ASC", 1, 10);
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+
+        #endregion
+
+        #region GetMyFunds
+
+        [Fact]
+        public async Task GetMyFunds_Returns403_WhenNotMember()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 2)).ReturnsAsync(false);
+
+            var result = await _controller.GetMyFunds(2, null, null, null, null, 1, 10);
+
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(403, obj.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetMyFunds_ReturnsBadRequest_WhenMineTypeInvalid()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 2)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetMyFundsByClubIdPagedAsync(2, _userId, "WRONG", null, null, null, 1, 10))
+                .ThrowsAsync(new ArgumentException("mineType invalid"));
+
+            var result = await _controller.GetMyFunds(2, "WRONG", null, null, null, 1, 10);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task GetMyFunds_ReturnsOk_WhenAllowed()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 2)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetMyFundsByClubIdPagedAsync(2, _userId, "ALL", "APPROVED", "quy", "NEWEST", 1, 10))
+                .ReturnsAsync(new PagedResultDto<FundResponseDto>
+                {
+                    Items = Array.Empty<FundResponseDto>(),
+                    PageNumber = 1,
+                    PageSize = 10,
+                    TotalCount = 0
+                });
+
+            var result = await _controller.GetMyFunds(2, "ALL", "APPROVED", "quy", "NEWEST", 1, 10);
 
             Assert.IsType<OkObjectResult>(result);
         }
