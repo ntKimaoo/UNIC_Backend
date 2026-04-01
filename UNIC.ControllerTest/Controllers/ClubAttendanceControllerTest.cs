@@ -19,6 +19,7 @@ namespace UNIC.ControllerTest.Controllers
     {
         private readonly Mock<IAttendanceService> _mockAttendanceService;
         private readonly Mock<IEventService> _mockEventService;
+        private readonly Mock<global::DataAccess.Repositories.Interface.IUnitOfWork> _mockUnitOfWork;
         private readonly ClubAttendanceController _controller;
         private const int ClubId = 1;
 
@@ -26,7 +27,8 @@ namespace UNIC.ControllerTest.Controllers
         {
             _mockAttendanceService = new Mock<IAttendanceService>();
             _mockEventService = new Mock<IEventService>();
-            _controller = new ClubAttendanceController(_mockAttendanceService.Object, _mockEventService.Object);
+            _mockUnitOfWork = new Mock<global::DataAccess.Repositories.Interface.IUnitOfWork>();
+            _controller = new ClubAttendanceController(_mockAttendanceService.Object, _mockEventService.Object, _mockUnitOfWork.Object);
         }
 
         private void SetupManagerClaims(int clubId)

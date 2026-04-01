@@ -43,6 +43,7 @@ public class User
     public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public virtual ICollection<UserRole> UserRoles { get; set; }
     public virtual ICollection<UserClubRole> ClubMembers { get; set; }
+    public virtual ICollection<UserEventRole> EventMembers { get; set; }
     public virtual ICollection<ClubPost> ClubPosts { get; set; }
     public virtual ICollection<Notification> Notifications { get; set; }
     public virtual ICollection<Attendance> Attendances { get; set; }

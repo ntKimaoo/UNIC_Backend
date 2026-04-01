@@ -45,7 +45,7 @@ namespace BusinessLogic.Services.Implementation
             _attendanceService = attendanceService;
         }
 
-        public async Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null)
+        public async Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null, Guid? creatorUserId = null)
         {
             // Validate input
             var validationResult = await _createValidator.ValidateAsync(request);
@@ -71,6 +71,39 @@ namespace BusinessLogic.Services.Implementation
             // Add to repository
             await _unitOfWork.Events.AddAsync(eventEntity);
             await _unitOfWork.SaveChangesAsync();
+
+            // Auto-assign CREATOR role to event creator
+            if (creatorUserId.HasValue)
+            {
+                var role = new EventRole
+                {
+                    EventId = eventEntity.EventId,
+                    RoleName = "Trưởng ban tổ chức",
+                    Description = "Người tạo sự kiện, toàn quyền quản trị",
+                    Level = 1
+                };
+                await _unitOfWork.EventRoles.CreateAsync(role);
+                // Get all Event policies from Policy table
+                var allEventPolicyNames = await _unitOfWork.EventRoles.GetEventPolicyNamesAsync();
+                
+                // Assign to user
+                var collaborator = new UserEventRole
+                {
+                    EventId = eventEntity.EventId,
+                    UserId = creatorUserId.Value,
+                    EventRole = role,
+                    JoinDate = DateTime.Now,
+                    AssignedBy = creatorUserId.Value
+                };
+                await _unitOfWork.EventMembers.AddAsync(collaborator);
+                await _unitOfWork.SaveChangesAsync();
+                
+                // Seed policies for Trưởng ban (all event policies)
+                if (allEventPolicyNames.Any())
+                {
+                    await _unitOfWork.EventRoles.SetPoliciesAsync(role.EventRoleId, allEventPolicyNames);
+                }
+            }
 
             return _mapper.Map<EventDetailDto>(eventEntity);
         }
@@ -100,24 +133,26 @@ namespace BusinessLogic.Services.Implementation
             // Map updates
             existingEvent.EventName = request.EventName;
             existingEvent.Description = request.Description;
-            
+            existingEvent.IsOnline = request.IsOnline;
+            existingEvent.MeetLink = request.MeetLink;
+
             // Handle Type switch (Offline <-> Online)
             if (request.IsOnline)
             {
-                // If switching to or staying Online, ensure we have a WebRTC link
-                if (string.IsNullOrEmpty(existingEvent.Location) || !existingEvent.Location.StartsWith("/webrtc/"))
+                // Online event: use provided MeetLink; generate internal room code if none provided
+                if (string.IsNullOrWhiteSpace(request.MeetLink))
                 {
-                    existingEvent.Location = $"/webrtc/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+                    if (string.IsNullOrEmpty(existingEvent.MeetLink))
+                        existingEvent.MeetLink = $"/event-room/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
                 }
+                // Location is optional for online events (clear it or keep as-is)
             }
             else
             {
-                // If staying or switching to Offline, ensure they provided a physical location
-                if (string.IsNullOrWhiteSpace(request.Location))
-                {
-                    throw new DomainException("Location is required for offline events.");
-                }
-                existingEvent.Location = request.Location;
+                // Offline event: clear MeetLink, require Location
+                existingEvent.MeetLink = null;
+                if (!string.IsNullOrWhiteSpace(request.Location))
+                    existingEvent.Location = request.Location;
             }
             
             existingEvent.StartDate = request.StartDate;

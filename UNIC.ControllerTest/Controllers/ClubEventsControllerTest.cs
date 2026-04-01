@@ -19,6 +19,7 @@ namespace UNIC.ControllerTest.Controllers
     {
         private readonly Mock<IEventService> _mockEventService;
         private readonly Mock<IFileStorageService> _mockFileStorageService;
+        private readonly Mock<global::DataAccess.Repositories.Interface.IUnitOfWork> _mockUnitOfWork;
         private readonly ClubEventsController _controller;
         private const int ClubId = 1;
 
@@ -26,7 +27,8 @@ namespace UNIC.ControllerTest.Controllers
         {
             _mockEventService = new Mock<IEventService>();
             _mockFileStorageService = new Mock<IFileStorageService>();
-            _controller = new ClubEventsController(_mockEventService.Object, _mockFileStorageService.Object);
+            _mockUnitOfWork = new Mock<global::DataAccess.Repositories.Interface.IUnitOfWork>();
+            _controller = new ClubEventsController(_mockEventService.Object, _mockFileStorageService.Object, _mockUnitOfWork.Object);
         }
 
         /// <summary>
@@ -78,10 +80,10 @@ namespace UNIC.ControllerTest.Controllers
                 StartDate = DateTime.Now.AddDays(7),
                 EndDate = DateTime.Now.AddDays(8)
             };
-            var dto = new EventDetailDto { EventId = 1, EventName = "New Event" };
+            var createdEvent = new EventDetailDto { EventId = 1, EventName = "New Event" };
 
-            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), null))
-                .ReturnsAsync(dto);
+            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), It.IsAny<string>(), It.IsAny<Guid?>()))
+                .ReturnsAsync(createdEvent);
 
             var result = await _controller.CreateEvent(ClubId, request, null);
 
@@ -106,7 +108,7 @@ namespace UNIC.ControllerTest.Controllers
             SetupManagerClaims(ClubId);
             var request = new CreateEventRequest { EventName = "Bad", Description = "D" };
 
-            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), null))
+            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), It.IsAny<string>(), It.IsAny<Guid?>()))
                 .ThrowsAsync(new DomainException("Validation failed"));
 
             var result = await _controller.CreateEvent(ClubId, request, null);
@@ -120,7 +122,7 @@ namespace UNIC.ControllerTest.Controllers
             SetupManagerClaims(ClubId);
             var request = new CreateEventRequest { EventName = "Error", Description = "D" };
 
-            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), null))
+            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), It.IsAny<string>(), It.IsAny<Guid?>()))
                 .ThrowsAsync(new Exception("Database error"));
 
             var result = await _controller.CreateEvent(ClubId, request, null);
@@ -148,7 +150,8 @@ namespace UNIC.ControllerTest.Controllers
             var updatedDto = new EventDetailDto { EventId = 1, EventName = "Updated" };
 
             _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(existingDto);
-            _mockEventService.Setup(s => s.UpdateEventAsync(request)).ReturnsAsync(updatedDto);
+            _mockEventService.Setup(s => s.UpdateEventAsync(It.IsAny<UpdateEventRequest>()))
+                .ReturnsAsync(updatedDto);
 
             var result = await _controller.UpdateEvent(ClubId, 1, request, null);
 

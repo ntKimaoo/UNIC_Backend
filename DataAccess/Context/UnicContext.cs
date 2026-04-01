@@ -51,6 +51,10 @@ public partial class UnicContext : DbContext
     public DbSet<UserPolicy> UserPolicies { get; set; }
     public DbSet<UserRolePolicy> UserRolePolicies { get; set; }
     public DbSet<ClubCreationRequest> ClubCreationRequests { get; set; }
+    public DbSet<EventRole> EventRoles { get; set; }
+    public DbSet<UserEventRole> UserEventRoles { get; set; }
+    public DbSet<EventRolePolicy> EventRolePolicies { get; set; }
+    public DbSet<EventMemberPolicy> EventMemberPolicies { get; set; }
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
 
@@ -229,6 +233,70 @@ public partial class UnicContext : DbContext
             .WithMany(c => c.Events)
             .HasForeignKey(e => e.ClubId)
             .OnDelete(DeleteBehavior.NoAction);
+
+        // -- EVENT PERMISSIONS --
+        
+        // EventRole
+        modelBuilder.Entity<EventRole>()
+            .HasOne(er => er.Event)
+            .WithMany(e => e.EventRoles)
+            .HasForeignKey(er => er.EventId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // UserEventRole
+        modelBuilder.Entity<UserEventRole>()
+            .HasOne(uer => uer.Event)
+            .WithMany(e => e.EventMembers)
+            .HasForeignKey(uer => uer.EventId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserEventRole>()
+            .HasOne(uer => uer.User)
+            .WithMany(u => u.EventMembers)
+            .HasForeignKey(uer => uer.UserId)
+            .OnDelete(DeleteBehavior.NoAction);
+            
+        modelBuilder.Entity<UserEventRole>()
+            .HasOne(uer => uer.EventRole)
+            .WithMany(er => er.UserEventRoles)
+            .HasForeignKey(uer => uer.EventRoleId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<UserEventRole>()
+            .HasIndex(uer => new { uer.EventId, uer.UserId })
+            .IsUnique();
+
+        // EventRolePolicy (Composite PK)
+        modelBuilder.Entity<EventRolePolicy>()
+            .HasKey(erp => new { erp.EventRoleId, erp.PolicyId });
+
+        modelBuilder.Entity<EventRolePolicy>()
+            .HasOne(erp => erp.EventRole)
+            .WithMany(er => er.EventRolePolicies)
+            .HasForeignKey(erp => erp.EventRoleId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<EventRolePolicy>()
+            .HasOne(erp => erp.Policy)
+            .WithMany(p => p.EventRolePolicies)
+            .HasForeignKey(erp => erp.PolicyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // EventMemberPolicy (Composite PK)
+        modelBuilder.Entity<EventMemberPolicy>()
+            .HasKey(emp => new { emp.EventMemberId, emp.PolicyId });
+
+        modelBuilder.Entity<EventMemberPolicy>()
+            .HasOne(emp => emp.UserEventRole)
+            .WithMany(uer => uer.EventMemberPolicies)
+            .HasForeignKey(emp => emp.EventMemberId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<EventMemberPolicy>()
+            .HasOne(emp => emp.Policy)
+            .WithMany(p => p.EventMemberPolicies)
+            .HasForeignKey(emp => emp.PolicyId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // EventSchedule - Event
         modelBuilder.Entity<EventSchedule>()
