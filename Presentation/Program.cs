@@ -1,3 +1,4 @@
+using UNIC.BusinessLogic.Services;
 using BusinessLogic.DTOs;
 using BusinessLogic.Services;
 using BusinessLogic.Services.Background;
@@ -156,7 +157,12 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new NullableDateTimeUtcJsonConverter());
 }); ;
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    c.IncludeXmlComments(xmlPath);
+});
 //signalR
 builder.Services.AddSignalR();
 //jwt

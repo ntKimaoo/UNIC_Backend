@@ -4,6 +4,7 @@ using DataAccess.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace UNIC.DataAccess.Migrations.MeetingDb
 {
     [DbContext(typeof(MeetingDbContext))]
-    partial class MeetingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260323120418_AddEvaluationCriteria")]
+    partial class AddEvaluationCriteria
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -276,17 +279,10 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
                     b.Property<DateTime?>("EndedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("InterviewScheduleId")
+                    b.Property<int>("InterviewScheduleId")
                         .HasColumnType("int");
 
                     b.Property<bool>("IsRecordingEnabled")
@@ -303,17 +299,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.Property<string>("RoomType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateTime?>("ScheduledEndAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("ScheduledStartAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("datetime2");
 
@@ -325,11 +310,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.Property<string>("StunServerUri")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
 
                     b.Property<string>("TurnCredential")
                         .HasMaxLength(200)
@@ -348,11 +328,8 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedByUserId");
-
                     b.HasIndex("InterviewScheduleId")
-                        .IsUnique()
-                        .HasFilter("[InterviewScheduleId] IS NOT NULL");
+                        .IsUnique();
 
                     b.HasIndex("RoomCode")
                         .IsUnique();
@@ -488,7 +465,8 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.HasOne("DataAccess.Models.Meeting.InterviewSchedule", "InterviewSchedule")
                         .WithOne("MeetingRoom")
                         .HasForeignKey("DataAccess.Models.Meeting.MeetingRoom", "InterviewScheduleId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("InterviewSchedule");
                 });

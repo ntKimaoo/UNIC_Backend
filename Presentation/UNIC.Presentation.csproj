@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>UNIC-Presentation-PayOS-7c2f4a9e-1b3d-4e8f-9a0c-6d5e4f3a2b1c</UserSecretsId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
