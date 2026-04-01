@@ -138,7 +138,7 @@ namespace Presentation.Controllers
             var result = await _userService.GetAllClubsById(id);
             if (result == null || !result.Any())
             {
-                return NotFound(new { success = false, message = "You have not join any club!" });
+                return NotFound(new { success = true, message = "You have not join any club!" });
             }
             return Ok(new { success = true, data = result });
         }

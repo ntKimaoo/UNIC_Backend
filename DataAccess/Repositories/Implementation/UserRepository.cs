@@ -124,6 +124,12 @@ namespace DataAccess.Repositories.Implementation
         }
         public async Task<IEnumerable<Club>> GetAllClubByUser(Guid userId)
         {
+            bool isAdmin = await _context.UserRoles
+                .AnyAsync(m => m.UserId == userId && m.RoleName == "Admin");
+            if (isAdmin)
+            {
+                return await _context.Clubs.ToListAsync();
+            }
             return await _context.UserClubRoles
                 .Where(cm => cm.UserId == userId)
                 .Select(cm => cm.Club)

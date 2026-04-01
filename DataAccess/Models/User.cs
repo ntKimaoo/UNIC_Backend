@@ -47,5 +47,4 @@ public class User
     public virtual ICollection<Notification> Notifications { get; set; }
     public virtual ICollection<Attendance> Attendances { get; set; }
     public virtual ICollection<Application> Applications { get; set; }
-    public virtual IList<UserPolicy>? UserPolicies { get; set; }
 }
