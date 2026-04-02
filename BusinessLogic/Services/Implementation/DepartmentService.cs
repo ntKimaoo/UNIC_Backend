@@ -172,5 +172,38 @@ namespace UNIC.BusinessLogic.Services.Implementation
 
             return MapToDto(existingDepartment);
         }
+
+        public async Task<IEnumerable<DepartmentMemberDto>?> GetDepartmentMembersAsync(
+            int clubId, int departmentId)
+        {
+            // Verify the department belongs to this club
+            var department = await _departmentRepository.GetByIdAsync(departmentId);
+            if (department == null || department.ClubId != clubId)
+                return null;
+
+            var members = await _departmentRepository
+                .GetMembersWithRolesByDepartmentAsync(clubId, departmentId);
+
+            return members.Select(ucr => new DepartmentMemberDto
+            {
+                ClubMemberId = ucr.ClubMemberId,
+                UserId       = ucr.UserId,
+                FullName     = ucr.User?.FullName ?? string.Empty,
+                Email        = ucr.User?.Email ?? string.Empty,
+                Avatar       = ucr.User?.Avatar,
+                StudentId    = ucr.User?.StudentId,
+                Status       = ucr.Status,
+                JoinDate     = ucr.JoinDate,
+                DepartmentRole    = (ucr.ClubRole != null && ucr.ClubRole.DepartmentId == departmentId)
+                    ? new DepartmentMemberRoleDto
+                    {
+                        ClubRoleId  = ucr.ClubRole.ClubRoleId,
+                        RoleName    = ucr.ClubRole.RoleName,
+                        Description = ucr.ClubRole.Description,
+                        Level       = ucr.ClubRole.Level
+                    }
+                    : null
+            });
+        }
     }
 }

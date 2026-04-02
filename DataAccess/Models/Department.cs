@@ -34,5 +34,8 @@ namespace DataAccess.Models
         public virtual ClubRole? ManagerRole { get; set; }
 
         public virtual ICollection<ClubRole> ClubRoles { get; set; } = new List<ClubRole>();
+
+        /// <summary>Members assigned to this department (many-to-many via UserClubRoleDepartment).</summary>
+        public virtual ICollection<UserClubRoleDepartment> DepartmentMembers { get; set; } = new List<UserClubRoleDepartment>();
     }
 }

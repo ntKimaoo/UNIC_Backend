@@ -108,5 +108,19 @@ namespace UNIC.DataAccess.Repositories.Implementation
                 .Include(d => d.ClubRoles)
                 .FirstOrDefaultAsync(d => d.ManagerRoleId == managerRoleId);
         }
+
+        public async Task<IEnumerable<UserClubRole>> GetMembersWithRolesByDepartmentAsync(
+            int clubId, int departmentId)
+        {
+            return await _context.UserClubRoleDepartments
+                .Where(ud => ud.DepartmentId == departmentId
+                          && ud.ClubMember.ClubId == clubId)
+                .Include(ud => ud.ClubMember)
+                    .ThenInclude(ucr => ucr.User)
+                .Include(ud => ud.ClubMember)
+                    .ThenInclude(ucr => ucr.ClubRole)
+                .Select(ud => ud.ClubMember)
+                .ToListAsync();
+        }
     }
 }
