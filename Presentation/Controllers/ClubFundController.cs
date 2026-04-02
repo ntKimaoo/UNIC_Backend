@@ -67,7 +67,7 @@ namespace Presentation.Controllers
         }
 
         [HttpGet("report-summary")]
-        [RequireMemberPolicy("viewfinance")]
+        [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFundReportSummary(
             int clubId,
             [FromQuery] DateTime? fromUtc,
@@ -87,7 +87,7 @@ namespace Presentation.Controllers
         }
 
         [HttpGet("transactions")]
-        [RequireMemberPolicy("viewfinance")]
+        [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetClubFundTransactions(
             int clubId,
             [FromQuery] int? fundId,
@@ -159,7 +159,7 @@ namespace Presentation.Controllers
         }
 
         [HttpGet("categories")]
-        [RequireMemberPolicy("viewfinance")]
+        [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFundCategories(int clubId)
         {
             try
@@ -211,7 +211,7 @@ namespace Presentation.Controllers
         }
 
         [HttpGet("my")]
-        [RequireMemberPolicy("viewfinance")]
+        [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetMyFunds(
             int clubId,
             [FromQuery] string? mineType,
