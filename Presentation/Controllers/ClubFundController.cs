@@ -73,6 +73,12 @@ namespace Presentation.Controllers
             [FromQuery] DateTime? fromUtc,
             [FromQuery] DateTime? toUtc)
         {
+            if (!IsValidDateRange(fromUtc, toUtc))
+                return BuildBadRequest(
+                    "INVALID_DATE_RANGE",
+                    "Từ ngày không được lớn hơn đến ngày.",
+                    new { fromField = "fromUtc", toField = "toUtc" });
+
             var userId = GetCurrentUserId();
             if (!await CanAccessClubAsync(userId, clubId))
                 return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
@@ -95,9 +101,15 @@ namespace Presentation.Controllers
             try
             {
                 if (page < 1)
-                    return BadRequest(new { success = false, message = "Page phải >= 1." });
+                    return BuildBadRequest("INVALID_PAGE", "Page phải >= 1.");
                 if (pageSize < 1 || pageSize > 100)
-                    return BadRequest(new { success = false, message = "PageSize từ 1 đến 100." });
+                    return BuildBadRequest("INVALID_PAGE_SIZE", "PageSize từ 1 đến 100.");
+                if (!IsValidDateRange(fromUtc, toUtc))
+                    return BuildBadRequest(
+                        "INVALID_DATE_RANGE",
+                        "Từ ngày không được lớn hơn đến ngày.",
+                        new { fromField = "fromUtc", toField = "toUtc" });
+
                 var userId = GetCurrentUserId();
                 if (!await CanAccessClubAsync(userId, clubId))
                     return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
@@ -108,7 +120,7 @@ namespace Presentation.Controllers
                     if (fund == null)
                         return NotFound(new { success = false, message = "Quỹ không tồn tại." });
                     if (fund.ClubId != clubId)
-                        return BadRequest(new { success = false, message = "Quỹ không thuộc câu lạc bộ này." });
+                        return BuildBadRequest("INVALID_FUND_ID", "Quỹ không thuộc câu lạc bộ này.");
                 }
 
                 var data = await _clubFundService.GetClubFundTransactionsPagedAsync(
@@ -119,9 +131,13 @@ namespace Presentation.Controllers
             {
                 return Unauthorized(new { success = false, message = ex.Message });
             }
+            catch (ArgumentException ex)
+            {
+                return BuildBadRequest("INVALID_REQUEST", ex.Message);
+            }
             catch (Exception ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return BuildBadRequest("TRANSACTION_QUERY_ERROR", ex.Message);
             }
         }
 
@@ -473,6 +489,25 @@ namespace Presentation.Controllers
             if (User.IsInRole("Admin"))
                 return true;
             return await _clubMemberService.IsMemberAsync(userId, clubId);
+        }
+
+        private static bool IsValidDateRange(DateTime? fromUtc, DateTime? toUtc)
+        {
+            if (!fromUtc.HasValue || !toUtc.HasValue)
+                return true;
+
+            return fromUtc.Value <= toUtc.Value;
+        }
+
+        private BadRequestObjectResult BuildBadRequest(string errorCode, string message, object? details = null)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                errorCode,
+                message,
+                details
+            });
         }
 
         private Guid GetCurrentUserId()
