@@ -174,5 +174,28 @@ namespace UNIC.Presentation.Controllers
                 data = new { id } 
             });
         }
+
+        /// <summary>
+        /// Get all members (and their club-wide role) that belong to a specific department.
+        /// Route: GET api/club/{clubId}/department/{departmentId}/all-members
+        /// </summary>
+        [HttpGet("{departmentId}/all-members")]
+        public async Task<IActionResult> GetDepartmentMembers(int clubId, int departmentId)
+        {
+            var members = await _departmentService.GetDepartmentMembersAsync(clubId, departmentId);
+
+            if (members == null)
+                return NotFound(new
+                {
+                    success = false,
+                    message = "Department not found in this club"
+                });
+
+            return Ok(new
+            {
+                success = true,
+                data = members
+            });
+        }
     }
 }

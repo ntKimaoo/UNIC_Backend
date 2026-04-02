@@ -4,16 +4,19 @@ using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    partial class UnicContextModelSnapshot : ModelSnapshot
+    [Migration("20260401162433_updateuserrole")]
+    partial class updateuserrole
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -297,10 +300,6 @@ namespace UNIC.DataAccess.Migrations
 
                     b.Property<decimal>("CurrentBalance")
                         .HasColumnType("decimal(15,2)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<DateTime?>("ExpiresAt")
                         .HasColumnType("date");
@@ -1089,21 +1088,6 @@ namespace UNIC.DataAccess.Migrations
                     b.ToTable("UserClubRoles");
                 });
 
-            modelBuilder.Entity("DataAccess.Models.UserClubRoleDepartment", b =>
-                {
-                    b.Property<int>("ClubMemberId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("DepartmentId")
-                        .HasColumnType("int");
-
-                    b.HasKey("ClubMemberId", "DepartmentId");
-
-                    b.HasIndex("DepartmentId");
-
-                    b.ToTable("UserClubRoleDepartments");
-                });
-
             modelBuilder.Entity("DataAccess.Models.UserRole", b =>
                 {
                     b.Property<int>("RoleId")
@@ -1578,25 +1562,6 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DataAccess.Models.UserClubRoleDepartment", b =>
-                {
-                    b.HasOne("DataAccess.Models.UserClubRole", "ClubMember")
-                        .WithMany("MemberDepartments")
-                        .HasForeignKey("ClubMemberId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DataAccess.Models.Department", "Department")
-                        .WithMany("DepartmentMembers")
-                        .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ClubMember");
-
-                    b.Navigation("Department");
-                });
-
             modelBuilder.Entity("DataAccess.Models.UserRole", b =>
                 {
                     b.HasOne("DataAccess.Models.User", "User")
@@ -1724,8 +1689,6 @@ namespace UNIC.DataAccess.Migrations
             modelBuilder.Entity("DataAccess.Models.Department", b =>
                 {
                     b.Navigation("ClubRoles");
-
-                    b.Navigation("DepartmentMembers");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Event", b =>
@@ -1778,8 +1741,6 @@ namespace UNIC.DataAccess.Migrations
             modelBuilder.Entity("DataAccess.Models.UserClubRole", b =>
                 {
                     b.Navigation("ClubMemberPolicies");
-
-                    b.Navigation("MemberDepartments");
                 });
 
             modelBuilder.Entity("UNIC.DataAccess.Models.Policy", b =>

@@ -2,7 +2,9 @@ using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Linq;
+using System.Security.Claims;
 
 namespace Presentation.Controllers
 {
@@ -19,6 +21,14 @@ namespace Presentation.Controllers
             _userService = userService;
             _clubRoleService = clubRoleService;
             _fileStorageService = fileStorageService;
+        }
+
+        private Guid? GetCurrentUserId()
+        {
+            var claim = User.FindFirst("UserId")
+                ?? User.FindFirst(ClaimTypes.NameIdentifier)
+                ?? User.FindFirst("sub");
+            return claim != null && Guid.TryParse(claim.Value, out var id) ? id : null;
         }
 
         [HttpGet]
@@ -138,7 +148,7 @@ namespace Presentation.Controllers
             var result = await _userService.GetAllClubsById(id);
             if (result == null || !result.Any())
             {
-                return NotFound(new { success = false, message = "You have not join any club!" });
+                return NotFound(new { success = true, message = "You have not join any club!" });
             }
             return Ok(new { success = true, data = result });
         }
@@ -151,6 +161,35 @@ namespace Presentation.Controllers
             {
                 success = true,
                 data = clubs
+            });
+        }
+
+        /// <summary>
+        /// Get all departments the current user (from token) has joined within a specific club,
+        /// along with the user's role in each department (if any).
+        /// Route: GET api/users/me/club/{clubId}/all-department
+        /// </summary>
+        [Authorize]
+        [HttpGet("me/club/{clubId}/all-department")]
+        public async Task<IActionResult> GetUserDepartmentsInClub(int clubId)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return Unauthorized(new { success = false, message = "Invalid or missing token" });
+
+            var departments = await _userService.GetUserDepartmentsInClubAsync(userId.Value, clubId);
+
+            if (departments == null)
+                return NotFound(new
+                {
+                    success = false,
+                    message = "User is not a member of this club"
+                });
+
+            return Ok(new
+            {
+                success = true,
+                data = departments
             });
         }
     }

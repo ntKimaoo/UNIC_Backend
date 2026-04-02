@@ -13,6 +13,12 @@ namespace DataAccess.Repositories.Interface
         Task<IEnumerable<UserClubRole>> GetMembersByClubIdAsync(int clubId);
 
         /// <summary>
+        /// Lấy members của club có hỗ trợ phân trang, lọc, sắp xếp
+        /// </summary>
+        Task<(IEnumerable<UserClubRole> Items, int TotalCount)> GetMembersByClubIdAsync(
+            int clubId, int? pagination, int? page, string? filter, bool? ascending, string? sortBy);
+
+        /// <summary>
         /// Lấy thông tin member theo ID
         /// </summary>
         Task<UserClubRole?> GetMemberByIdAsync(int clubMemberId);
