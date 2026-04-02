@@ -165,8 +165,6 @@ namespace BusinessLogic.DTOs
         public bool CanContribute { get; set; }
         public bool CanCreateFund { get; set; }
         public bool CanApproveOrRejectFundEntity { get; set; }
-
-        /// <summary>Thứ tự menu Quản lý quỹ (có mục Quỹ của tôi).</summary>
         public IReadOnlyList<FundMenuItemDto> MenuItems { get; set; } = Array.Empty<FundMenuItemDto>();
     }
 
