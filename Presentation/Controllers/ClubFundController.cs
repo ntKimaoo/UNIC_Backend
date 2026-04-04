@@ -189,6 +189,10 @@ namespace Presentation.Controllers
             return Ok(new { success = true, data = fund });
         }
 
+        /// <summary>
+        /// Danh sách quỹ CLB (tổng quan). Thành viên không duyệt quỹ: luôn chỉ thấy quỹ APPROVED (query status khác bị ghi đè phía server).
+        /// Admin hệ thống hoặc Club Manager có editfinance: status = ALL | PENDING | APPROVED | REJECTED.
+        /// </summary>
         [HttpGet]
         [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFundsByClub(
@@ -206,7 +210,9 @@ namespace Presentation.Controllers
             var userId = GetCurrentUserId();
             if (!await CanAccessClubAsync(userId, clubId))
                 return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
-            var paged = await _clubFundService.GetFundsByClubIdPagedAsync(clubId, status, search, sort, page, pageSize);
+            var isSystemAdmin = User.IsInRole("Admin");
+            var paged = await _clubFundService.GetFundsByClubIdPagedAsync(
+                clubId, userId, isSystemAdmin, status, search, sort, page, pageSize);
             return Ok(new { success = true, data = paged });
         }
 

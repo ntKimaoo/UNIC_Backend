@@ -218,30 +218,27 @@ namespace DataAccess.Repositories.Implementation
             int pageNumber,
             int pageSize)
         {
-            var fundIds = _context.FundTransactions
+            var query = _context.ClubFunds
                 .AsNoTracking()
-                .Where(t => t.ClubFund != null && t.ClubFund.ClubId == clubId);
+                .Where(cf => cf.ClubId == clubId);
 
             if (mineType == "CREATED")
             {
-                fundIds = fundIds.Where(t => t.CreatedBy == currentUserId);
+                query = query.Where(cf => cf.CreatedBy == currentUserId);
             }
             else if (mineType == "RESPONSIBLE")
             {
-                fundIds = fundIds.Where(t => t.ApprovedBy == currentUserId);
+                query = query.Where(cf => cf.ApprovedBy == currentUserId);
             }
             else
             {
-                fundIds = fundIds.Where(t => t.CreatedBy == currentUserId || t.ApprovedBy == currentUserId);
+                query = query.Where(cf =>
+                    cf.CreatedBy == currentUserId
+                    || cf.ApprovedBy == currentUserId
+                    || _context.FundTransactions.Any(t =>
+                        t.FundId == cf.FundId
+                        && (t.CreatedBy == currentUserId || t.ApprovedBy == currentUserId)));
             }
-
-            var myFundIds = fundIds
-                .Select(t => t.FundId)
-                .Distinct();
-
-            var query = _context.ClubFunds
-                .AsNoTracking()
-                .Where(cf => cf.ClubId == clubId && myFundIds.Contains(cf.FundId));
 
             if (!string.IsNullOrWhiteSpace(status))
             {

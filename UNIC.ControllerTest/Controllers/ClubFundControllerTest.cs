@@ -319,7 +319,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task GetFundsByClub_ReturnsOk_WhenAllowed()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 2)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundsByClubIdPagedAsync(2, "APPROVED", "quy", "NAME_ASC", 1, 10))
+            _fundService.Setup(s => s.GetFundsByClubIdPagedAsync(2, _userId, false, "APPROVED", "quy", "NAME_ASC", 1, 10))
                 .ReturnsAsync(new PagedResultDto<FundResponseDto>
                 {
                     Items = Array.Empty<FundResponseDto>(),

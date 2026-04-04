@@ -74,7 +74,9 @@ namespace BusinessLogic.Services.Implementation
                 CurrentBalance = 0m,
                 CreatedAt = DateTime.UtcNow,
                 Status = fundStatus,
-                ExpiresAt = expiresAtDate
+                ExpiresAt = expiresAtDate,
+                CreatedBy = userId,
+                ApprovedBy = fundStatus == STATUS_APPROVED ? userId : null
             };
 
             var created = await _fundRepository.AddFundAsync(fund);
@@ -226,14 +228,30 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<PagedResultDto<FundResponseDto>> GetFundsByClubIdPagedAsync(
             int clubId,
+            Guid currentUserId,
+            bool isSystemAdmin,
             string? status,
             string? search,
             string? sort,
             int pageNumber,
             int pageSize)
         {
+            bool canFilterByWorkflowStatus;
+            if (isSystemAdmin)
+            {
+                canFilterByWorkflowStatus = true;
+            }
+            else
+            {
+                var member = await _clubMemberRepository.GetMemberAsync(currentUserId, clubId);
+                var hasEditFinance = await _policyService.HasMemberPolicyInClubAsync(currentUserId, clubId, "editfinance");
+                canFilterByWorkflowStatus = hasEditFinance && member != null && HasHighestClubLevel(member.ClubRole);
+            }
+
+            var statusForNormalization = (!canFilterByWorkflowStatus) ? STATUS_APPROVED : status;
+
             string? normalizedStatus;
-            var trimmedStatus = status?.Trim();
+            var trimmedStatus = statusForNormalization?.Trim();
             if (string.IsNullOrEmpty(trimmedStatus) || string.Equals(trimmedStatus, "ALL", StringComparison.OrdinalIgnoreCase))
             {
                 normalizedStatus = null;
@@ -270,9 +288,13 @@ namespace BusinessLogic.Services.Implementation
             int pageNumber,
             int pageSize)
         {
-            var normalizedMineType = string.IsNullOrWhiteSpace(mineType) ? "ALL" : mineType.Trim().ToUpperInvariant();
+            var normalizedMineType = string.IsNullOrWhiteSpace(mineType) ? "CREATED" : mineType.Trim().ToUpperInvariant();
             if (normalizedMineType is not ("ALL" or "CREATED" or "RESPONSIBLE"))
-                throw new ArgumentException("mineType hợp lệ: ALL, CREATED, RESPONSIBLE.", nameof(mineType));
+                throw new ArgumentException(
+                    "mineType hợp lệ: CREATED, ALL, RESPONSIBLE. Mặc định (bỏ trống): CREATED — chỉ quỹ do bạn tạo. " +
+                    "ALL — quỹ có liên quan: bạn tạo, bạn duyệt/từ chối (ApprovedBy), hoặc có giao dịch bạn tạo/duyệt. " +
+                    "RESPONSIBLE — quỹ mà bạn là người duyệt/từ chối gần nhất (ApprovedBy).",
+                    nameof(mineType));
 
             string? normalizedStatus;
             var trimmedStatus = status?.Trim();
@@ -386,8 +408,34 @@ namespace BusinessLogic.Services.Implementation
 
         private static FundResponseDto MapToFundDto(ClubFund fund)
         {
-            var approved = string.Equals(fund.Status, STATUS_APPROVED, StringComparison.OrdinalIgnoreCase);
+            var status = string.IsNullOrWhiteSpace(fund.Status) ? STATUS_PENDING : fund.Status.Trim();
+            var approved = string.Equals(status, STATUS_APPROVED, StringComparison.OrdinalIgnoreCase);
+            var rejected = string.Equals(status, STATUS_REJECTED, StringComparison.OrdinalIgnoreCase);
+            var pending = string.Equals(status, STATUS_PENDING, StringComparison.OrdinalIgnoreCase);
             var notExpired = !fund.ExpiresAt.HasValue || DateTime.UtcNow.Date <= fund.ExpiresAt.Value.Date;
+            var canContribute = approved && notExpired;
+
+            string? cannotContributeReason = null;
+            if (!canContribute)
+            {
+                if (rejected)
+                    cannotContributeReason = "Quỹ đã bị từ chối.";
+                else if (pending)
+                    cannotContributeReason = "Quỹ đang chờ duyệt.";
+                else if (approved && !notExpired)
+                    cannotContributeReason = "Đã quá hạn nhận nộp tiền.";
+                else
+                    cannotContributeReason = "Quỹ chưa được duyệt hoặc không thể nhận nộp ở trạng thái hiện tại.";
+            }
+
+            string? balanceContext = null;
+            if (rejected)
+                balanceContext = "Quỹ không hoạt động.";
+            else if (pending)
+                balanceContext = "Quỹ đang chờ duyệt — số dư sẽ cập nhật sau khi được duyệt.";
+            else if (approved && fund.CurrentBalance == 0m && fund.TotalAmount == 0m)
+                balanceContext = "Chưa có giao dịch thu/chi được duyệt (số 0 là bình thường nếu chưa phát sinh).";
+
             return new FundResponseDto
             {
                 FundId = fund.FundId,
@@ -397,9 +445,17 @@ namespace BusinessLogic.Services.Implementation
                 TotalAmount = fund.TotalAmount,
                 CurrentBalance = fund.CurrentBalance,
                 CreatedAt = fund.CreatedAt,
-                Status = fund.Status ?? "PENDING",
+                Status = status,
                 ExpiresAt = fund.ExpiresAt,
-                CanAcceptContributions = approved && notExpired
+                RejectReason = fund.RejectReason,
+                RejectedAt = fund.RejectedAt,
+                RejectionReasonVi = rejected ? fund.RejectReason : null,
+                CanAcceptContributions = canContribute,
+                CannotContributeReasonVi = cannotContributeReason,
+                BalanceContextVi = balanceContext,
+                ExpiresAtUtcNoteVi = fund.ExpiresAt.HasValue
+                    ? "Hạn nhận nộp theo ngày lưu trong DB (UTC, so với ngày hiện tại của máy chủ)."
+                    : null
             };
         }
 
@@ -475,13 +531,20 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<bool> ApproveFundAsync(Guid managerId, ApproveFundDto dto)
         {
+            const int rejectReasonMinLen = 5;
+            const int rejectReasonMaxLen = 2000;
+
             var fund = await _fundRepository.GetFundByIdAsync(dto.FundId);
             if (fund == null)
                 throw new InvalidOperationException("Quỹ không tồn tại.");
-            if (string.Equals(fund.Status, STATUS_APPROVED, StringComparison.OrdinalIgnoreCase))
+
+            var st = string.IsNullOrWhiteSpace(fund.Status) ? STATUS_PENDING : fund.Status.Trim();
+            if (string.Equals(st, STATUS_APPROVED, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Quỹ đã được duyệt trước đó.");
-            if (string.Equals(fund.Status, STATUS_REJECTED, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(st, STATUS_REJECTED, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Quỹ đã bị từ chối, không thể duyệt.");
+            if (!string.Equals(st, STATUS_PENDING, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Chỉ có thể duyệt hoặc từ chối quỹ đang chờ duyệt (PENDING).");
 
             var member = await _clubMemberRepository.GetMemberAsync(managerId, fund.ClubId);
             if (member == null)
@@ -493,11 +556,31 @@ namespace BusinessLogic.Services.Implementation
 
             var action = dto.Action?.Trim().ToUpperInvariant();
             if (action == "APPROVE")
+            {
                 fund.Status = STATUS_APPROVED;
+                fund.RejectReason = null;
+                fund.RejectedAt = null;
+            }
             else if (action == "REJECT")
+            {
+                var reason = dto.ResolveRejectReason();
+                if (string.IsNullOrEmpty(reason))
+                    throw new ArgumentException("Khi từ chối quỹ, bắt buộc nhập lý do (rejectReason).", nameof(dto.RejectReason));
+                if (reason.Length < rejectReasonMinLen)
+                    throw new ArgumentException(
+                        $"Lý do từ chối phải có ít nhất {rejectReasonMinLen} ký tự sau khi bỏ khoảng trắng đầu cuối.",
+                        nameof(dto.RejectReason));
+                if (reason.Length > rejectReasonMaxLen)
+                    throw new ArgumentException($"Lý do từ chối không được vượt quá {rejectReasonMaxLen} ký tự.", nameof(dto.RejectReason));
+
                 fund.Status = STATUS_REJECTED;
+                fund.RejectReason = reason;
+                fund.RejectedAt = DateTime.UtcNow;
+            }
             else
                 throw new ArgumentException("Hành động phải là APPROVE hoặc REJECT.", nameof(dto.Action));
+
+            fund.ApprovedBy = managerId;
 
             await _fundRepository.UpdateClubFundAsync(fund);
             return true;
@@ -515,7 +598,11 @@ namespace BusinessLogic.Services.Implementation
             dto.ClubRoleName = member.ClubRole?.RoleName;
 
             if (!dto.IsActiveClubMember)
+            {
+                dto.FinanceAccessHintVi =
+                    "Tài khoản thành viên chưa ở trạng thái hoạt động — các quyền tài chính và thao tác quỹ có thể bị hạn chế.";
                 return dto;
+            }
 
             var hasView = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "viewfinance");
             var hasCreate = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "createfinance");
@@ -532,6 +619,16 @@ namespace BusinessLogic.Services.Implementation
             dto.CanContribute = true;
             dto.CanCreateFund = hasCreate && isMgrOrVice;
             dto.CanApproveOrRejectFundEntity = hasEdit && isMgr;
+
+            if (!hasView)
+                dto.FinanceAccessHintVi =
+                    "Bạn chưa có quyền xem tài chính CLB (policy viewfinance). Liên hệ quản lý CLB nếu cần cấp quyền.";
+            else if (!hasEdit && isMgr)
+                dto.FinanceAccessHintVi =
+                    "Bạn chưa có quyền duyệt quỹ (policy editfinance). Liên hệ quản lý CLB nếu cần cấp quyền.";
+            else if (!hasCreate && isMgrOrVice)
+                dto.FinanceAccessHintVi =
+                    "Bạn chưa có quyền tạo quỹ (policy createfinance). Liên hệ quản lý CLB nếu cần cấp quyền.";
 
             dto.MenuItems = BuildFundMenuItems(dto);
             return dto;

@@ -93,10 +93,44 @@ namespace BusinessLogic.DTOs
 
     public class ApproveFundDto
     {
+        private static readonly HashSet<string> RejectReasonAliases = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "rejectReason",
+            "RejectReason",
+            "rejectionReason",
+            "RejectionReason"
+        };
+
         [Required]
         public int FundId { get; set; }
         [Required]
-        public string Action { get; set; } 
+        public string Action { get; set; } = string.Empty;
+
+        public string? RejectReason { get; set; }
+
+        [JsonExtensionData]
+        public Dictionary<string, JsonElement>? ExtraData { get; set; }
+
+        public string? ResolveRejectReason()
+        {
+            if (!string.IsNullOrWhiteSpace(RejectReason))
+                return RejectReason.Trim();
+            if (ExtraData == null || ExtraData.Count == 0)
+                return null;
+
+            foreach (var item in ExtraData)
+            {
+                if (!RejectReasonAliases.Contains(item.Key))
+                    continue;
+                if (item.Value.ValueKind != JsonValueKind.String)
+                    continue;
+                var value = item.Value.GetString();
+                if (!string.IsNullOrWhiteSpace(value))
+                    return value.Trim();
+            }
+
+            return null;
+        }
     }
 
     public class FundResponseDto
@@ -110,7 +144,14 @@ namespace BusinessLogic.DTOs
         public DateTime CreatedAt { get; set; }
         public string Status { get; set; } = "PENDING";
         public DateTime? ExpiresAt { get; set; }
+        public string? RejectReason { get; set; }
+        public DateTime? RejectedAt { get; set; }
+        [JsonPropertyName("rejectionReasonVi")]
+        public string? RejectionReasonVi { get; set; }
         public bool CanAcceptContributions { get; set; }
+        public string? CannotContributeReasonVi { get; set; }
+        public string? BalanceContextVi { get; set; }
+        public string? ExpiresAtUtcNoteVi { get; set; }
     }
 
     public class FundTransactionResponseDto
@@ -165,6 +206,7 @@ namespace BusinessLogic.DTOs
         public bool CanContribute { get; set; }
         public bool CanCreateFund { get; set; }
         public bool CanApproveOrRejectFundEntity { get; set; }
+        public string? FinanceAccessHintVi { get; set; }
         public IReadOnlyList<FundMenuItemDto> MenuItems { get; set; } = Array.Empty<FundMenuItemDto>();
     }
 
@@ -173,6 +215,9 @@ namespace BusinessLogic.DTOs
         public int ClubId { get; set; }
         public DateTime? FromUtc { get; set; }
         public DateTime? ToUtc { get; set; }
+        public string DateFilterNoteVi { get; set; } =
+            "fromUtc/toUtc lọc theo mốc thời gian giao dịch (UTC). Nên dùng cùng khoảng ngày khi đối chiếu với GET .../funds/transactions.";
+
         public int PendingFundCount { get; set; }
         public int ApprovedFundCount { get; set; }
         public int RejectedFundCount { get; set; }
