@@ -13,22 +13,26 @@ namespace UNIC.DataAccess.Repositories.Interface
         Task<bool> UpdateAsync(Application application);
         Task<bool> DeleteAsync(int applicationId, int clubId);
 
-        Task<IEnumerable<Application>> GetByUserIdAsync(Guid userId, int clubId);
+        // change
+        Task<IEnumerable<Application>> GetByUserIdAsync(Guid userId);
         Task<IEnumerable<Application>> GetByFormIdAsync(int formId, int clubId);
         Task<IEnumerable<Application>> GetByStatusAsync(string status, int clubId);
-        Task<Application?> GetByUserIdAndFormIdAsync(Guid userId, int formId, int clubId);
+        // change
+        Task<Application?> GetByUserIdAndFormIdAsync(Guid userId, int formId);
         Task<IEnumerable<Application>> GetByCampaignIdAsync(int campaignId, int clubId, string? status = null);
         Task<IEnumerable<Application>> GetByClubIdAsync(int clubId, string? status = null);
 
         Task<IEnumerable<ApplicationForm>> GetAllFormsAsync(int clubId);
         Task<IEnumerable<ApplicationForm>> GetFormsByCampaignIdAsync(int campaignId, int clubId);
-        Task<ApplicationForm?> GetFormByIdAsync(int formId, int clubId);
+        // change
+        Task<ApplicationForm?> GetFormByIdAsync(int formId);
         Task<ApplicationForm> CreateFormAsync(ApplicationForm form);
         Task<bool> UpdateFormAsync(ApplicationForm form);
         Task<bool> DeleteFormAsync(int formId, int clubId);
 
         Task<IEnumerable<ApplicationQuestion>> GetAllQuestionsAsync(int clubId);
-        Task<IEnumerable<ApplicationQuestion>> GetQuestionsByFormIdAsync(int formId, int clubId);
+        // change
+        Task<IEnumerable<ApplicationQuestion>> GetQuestionsByFormIdAsync(int formId);
         Task<ApplicationQuestion?> GetQuestionByIdAsync(int questionId, int clubId);
         Task<ApplicationQuestion> CreateQuestionAsync(ApplicationQuestion question);
         Task<bool> UpdateQuestionAsync(ApplicationQuestion question);

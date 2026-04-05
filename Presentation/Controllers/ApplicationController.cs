@@ -43,10 +43,11 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = application });
         }
 
-        [HttpGet("{clubId:int}/user/{userId:guid}")]
-        public async Task<IActionResult> GetApplicationsByUser(Guid userId, int clubId)
+        // change
+        [HttpGet("user/{userId:guid}")]
+        public async Task<IActionResult> GetApplicationsByUser(Guid userId)
         {
-            var applications = await _applicationService.GetApplicationsByUserAsync(userId, clubId);
+            var applications = await _applicationService.GetApplicationsByUserAsync(userId);
             return Ok(new { success = true, data = applications });
         }
 
@@ -64,13 +65,11 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = applications });
         }
 
-        [HttpGet("{clubId:int}/user/{userId:guid}/form/{formId:int}")]
-        public async Task<IActionResult> GetApplicationByUserAndForm(Guid userId, int formId, int clubId)
+        // change
+        [HttpGet("user/{userId:guid}/form/{formId:int}")]
+        public async Task<IActionResult> GetApplicationByUserAndForm(Guid userId, int formId)
         {
-            var application = await _applicationService.GetApplicationByUserAndFormAsync(userId, formId, clubId);
-            if (application == null)
-                return NotFound(new { success = false });
-
+            var application = await _applicationService.GetApplicationByUserAndFormAsync(userId, formId);
             return Ok(new { success = true, data = application });
         }
 
@@ -148,10 +147,11 @@ namespace UNIC.Presentation.Controllers
             return Ok(new { success = true, data = forms });
         }
 
-        [HttpGet("{clubId:int}/forms/{id:int}")]
-        public async Task<IActionResult> GetFormById(int id, int clubId)
+        // change
+        [HttpGet("forms/{id:int}")]
+        public async Task<IActionResult> GetFormById(int id)
         {
-            var form = await _applicationService.GetFormByIdAsync(id, clubId);
+            var form = await _applicationService.GetFormByIdAsync(id);
             if (form == null)
                 return NotFound(new { success = false });
 
@@ -187,10 +187,11 @@ namespace UNIC.Presentation.Controllers
 
         // ================= QUESTION =================
 
-        [HttpGet("{clubId:int}/forms/{formId:int}/questions")]
-        public async Task<IActionResult> GetQuestionsByForm(int formId, int clubId)
+        // change
+        [HttpGet("forms/{formId:int}/questions")]
+        public async Task<IActionResult> GetQuestionsByForm(int formId)
         {
-            var questions = await _applicationService.GetQuestionsByFormAsync(formId, clubId);
+            var questions = await _applicationService.GetQuestionsByFormAsync(formId);
             return Ok(new { success = true, data = questions });
         }
 
@@ -266,13 +267,18 @@ namespace UNIC.Presentation.Controllers
             }
         }
 
-        [HttpPost("{clubId:int}/submit")]
-        public async Task<IActionResult> SubmitApplication(int clubId, [FromBody] SubmitApplicationWithAnswersDto request)
+        // change
+        [HttpPost("submit")]
+        public async Task<IActionResult> SubmitApplication([FromBody] SubmitApplicationWithAnswersDto request)
         {
             try
             {
-                var created = await _applicationService.SubmitApplicationWithAnswersAsync(clubId, request);
+                var created = await _applicationService.SubmitApplicationWithAnswersAsync(request);
                 return Ok(new { success = true, data = created });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { success = false, message = ex.Message });
             }
             catch (Exception ex)
             {
