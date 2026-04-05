@@ -2016,11 +2016,7 @@ namespace UNIC.DataAccess.Migrations
                             b.Navigation("EventMemberPolicies");
                         });
 
-                    modelBuilder.Entity("DataAccess.Models.UserRole", b =>
-                        {
-                            b.Navigation("UserRolePolicies");
-                        });
-
+                    
                     modelBuilder.Entity("UNIC.DataAccess.Models.Policy", b =>
                         {
                             b.Navigation("ClubMemberPolicies");
@@ -2031,9 +2027,6 @@ namespace UNIC.DataAccess.Migrations
 
                             b.Navigation("EventRolePolicies");
 
-                            b.Navigation("UserPolicies");
-
-                            b.Navigation("UserRolePolicies");
                         });
 
                     modelBuilder.Entity("UNIC.DataAccess.Models.PolicyGroup", b =>
