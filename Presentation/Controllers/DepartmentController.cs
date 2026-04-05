@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
+using Presentation.Authorization;
 using UNIC.BusinessLogic.DTOs;
 using UNIC.BusinessLogic.Services.Interface;
 
@@ -58,6 +59,7 @@ namespace UNIC.Presentation.Controllers
         /// Create a new department for a club
         /// </summary>
         [HttpPost]
+        [RequireClubPolicyOrRole("createdepartment")]
         public async Task<IActionResult> CreateDepartment(int clubId, [FromBody] CreateDepartmentDto request)
         {
             if (!ModelState.IsValid)
@@ -102,6 +104,8 @@ namespace UNIC.Presentation.Controllers
         /// Update a department in a club
         /// </summary>
         [HttpPut("{id}")]
+        [RequireClubPolicyOrRole("editdepartment")]
+
         public async Task<IActionResult> UpdateDepartment(int clubId, int id, [FromBody] UpdateDepartmentDto request)
         {
             if (!ModelState.IsValid)
