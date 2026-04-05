@@ -70,9 +70,6 @@ namespace UNIC.Presentation.Controllers
         public async Task<IActionResult> GetApplicationByUserAndForm(Guid userId, int formId)
         {
             var application = await _applicationService.GetApplicationByUserAndFormAsync(userId, formId);
-            if (application == null)
-                return NotFound(new { success = false });
-
             return Ok(new { success = true, data = application });
         }
 
