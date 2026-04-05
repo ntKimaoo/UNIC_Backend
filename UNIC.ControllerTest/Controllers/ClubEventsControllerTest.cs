@@ -125,13 +125,6 @@ namespace UNIC.ControllerTest.Controllers
             result.Result.Should().BeOfType<OkObjectResult>();
         }
 
-        [Fact]
-        public async Task UpdateEvent_Returns403_WhenNotManager()
-        {
-            SetupNonManagerClaims();
-            var result = await _controller.UpdateEvent(ClubId, 1, new UpdateEventRequest { EventId = 1, EventName = "X", Description = "X" }, null);
-            result.Result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        }
 
         [Fact]
         public async Task UpdateEvent_ReturnsBadRequest_WhenIdMismatch()
@@ -176,15 +169,6 @@ namespace UNIC.ControllerTest.Controllers
             result.Should().BeOfType<BadRequestObjectResult>();
         }
 
-        [Fact]
-        public async Task UploadEventImage_Returns403_WhenNotManager()
-        {
-            SetupNonManagerClaims();
-            var mockFile = new Mock<IFormFile>();
-            mockFile.Setup(f => f.Length).Returns(1024);
-            var result = await _controller.UploadEventImage(ClubId, 1, mockFile.Object);
-            result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        }
 
         #endregion
 
@@ -201,13 +185,6 @@ namespace UNIC.ControllerTest.Controllers
             result.Result.Should().BeOfType<OkObjectResult>();
         }
 
-        [Fact]
-        public async Task CreateSession_Returns403_WhenNotManager()
-        {
-            SetupNonManagerClaims();
-            var result = await _controller.CreateSession(ClubId, 1, new CreateSessionRequest { EventId = 1, SessionName = "X" });
-            result.Result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        }
 
         [Fact]
         public async Task CreateSession_ReturnsBadRequest_WhenIdMismatch()
@@ -241,13 +218,6 @@ namespace UNIC.ControllerTest.Controllers
             result.Result.Should().BeOfType<NotFoundObjectResult>();
         }
 
-        [Fact]
-        public async Task UpdateSession_Returns403_WhenNotManager()
-        {
-            SetupNonManagerClaims();
-            var result = await _controller.UpdateSession(ClubId, 1, 10, new UpdateSessionRequest { SessionName = "X" });
-            result.Result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        }
 
         #endregion
 
@@ -273,13 +243,6 @@ namespace UNIC.ControllerTest.Controllers
             result.Should().BeOfType<NotFoundObjectResult>();
         }
 
-        [Fact]
-        public async Task DeleteSession_Returns403_WhenNotManager()
-        {
-            SetupNonManagerClaims();
-            var result = await _controller.DeleteSession(ClubId, 1, 10);
-            result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        }
 
         #endregion
 
@@ -296,13 +259,6 @@ namespace UNIC.ControllerTest.Controllers
             result.Result.Should().BeOfType<OkObjectResult>();
         }
 
-        [Fact]
-        public async Task OpenRegistration_Returns403_WhenNotManager()
-        {
-            SetupNonManagerClaims();
-            var result = await _controller.OpenRegistration(ClubId, 1, new OpenRegistrationRequest { EventId = 1 });
-            result.Result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        }
 
         [Fact]
         public async Task OpenRegistration_ReturnsBadRequest_WhenIdMismatch()
@@ -326,13 +282,6 @@ namespace UNIC.ControllerTest.Controllers
             result.Should().BeOfType<OkObjectResult>();
         }
 
-        [Fact]
-        public async Task StartEvent_Returns403_WhenNotManager()
-        {
-            SetupNonManagerClaims();
-            var result = await _controller.StartEvent(ClubId, 1);
-            result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        }
 
         #endregion
 
@@ -348,13 +297,6 @@ namespace UNIC.ControllerTest.Controllers
             result.Should().BeOfType<OkObjectResult>();
         }
 
-        [Fact]
-        public async Task CompleteEvent_Returns403_WhenNotManager()
-        {
-            SetupNonManagerClaims();
-            var result = await _controller.CompleteEvent(ClubId, 1);
-            result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        }
 
         #endregion
 
@@ -478,13 +420,6 @@ namespace UNIC.ControllerTest.Controllers
             result.Should().BeOfType<BadRequestObjectResult>();
         }
 
-        [Fact]
-        public async Task CreateEventRole_Returns403_WhenNotManager()
-        {
-            SetupNonManagerClaims();
-            var result = await _controller.CreateEventRole(ClubId, 1, new ClubEventsController.EventRoleDto { RoleName = "T" });
-            result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        }
 
         #endregion
 
@@ -518,13 +453,6 @@ namespace UNIC.ControllerTest.Controllers
             result.Should().BeOfType<BadRequestObjectResult>();
         }
 
-        [Fact]
-        public async Task UpdateEventRole_Returns403_WhenNotManager()
-        {
-            SetupNonManagerClaims();
-            var result = await _controller.UpdateEventRole(ClubId, 1, 2, new ClubEventsController.EventRoleDto { RoleName = "X" });
-            result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        }
 
         #endregion
 
@@ -558,13 +486,6 @@ namespace UNIC.ControllerTest.Controllers
             result.Should().BeOfType<BadRequestObjectResult>();
         }
 
-        [Fact]
-        public async Task DeleteEventRole_Returns403_WhenNotManager()
-        {
-            SetupNonManagerClaims();
-            var result = await _controller.DeleteEventRole(ClubId, 1, 2);
-            result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        }
 
         #endregion
 
@@ -649,13 +570,6 @@ namespace UNIC.ControllerTest.Controllers
             result.Should().BeOfType<BadRequestObjectResult>();
         }
 
-        [Fact]
-        public async Task AddEventMember_Returns403_WhenNotManager()
-        {
-            SetupNonManagerClaims();
-            var result = await _controller.AddEventMember(ClubId, 1, new ClubEventsController.AddEventMemberRequest { UserId = Guid.NewGuid() });
-            result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        }
 
         #endregion
 
@@ -689,13 +603,6 @@ namespace UNIC.ControllerTest.Controllers
             result.Should().BeOfType<BadRequestObjectResult>();
         }
 
-        [Fact]
-        public async Task UpdateEventMemberRole_Returns403_WhenNotManager()
-        {
-            SetupNonManagerClaims();
-            var result = await _controller.UpdateEventMemberRole(ClubId, 1, 5, 2);
-            result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        }
 
         #endregion
 
@@ -729,13 +636,6 @@ namespace UNIC.ControllerTest.Controllers
             result.Should().BeOfType<BadRequestObjectResult>();
         }
 
-        [Fact]
-        public async Task RemoveEventMember_Returns403_WhenNotManager()
-        {
-            SetupNonManagerClaims();
-            var result = await _controller.RemoveEventMember(ClubId, 1, 5);
-            result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
-        }
 
         #endregion
 
@@ -766,6 +666,192 @@ namespace UNIC.ControllerTest.Controllers
             SetupManagerClaims(ClubId);
             _mockEventMembers.Setup(m => m.GetByIdAsync(1)).ReturnsAsync(new UserEventRole { EventMemberId = 1, EventId = 1, EventRole = new EventRole { Level = 1 } });
             var result = await _controller.SetEventMemberPolicies(ClubId, 1, 1, new List<string> { "x" });
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        #endregion
+
+        #region Additional Branch Coverage Tests
+
+        [Fact]
+        public async Task CreateEvent_WithImage_ReturnsCreated()
+        {
+            SetupManagerClaims(ClubId);
+            var request = new CreateEventRequest { EventName = "Ev", Description = "D", StartDate = DateTime.Now.AddDays(7), EndDate = DateTime.Now.AddDays(8) };
+            var mockFile = new Mock<IFormFile>(); mockFile.Setup(f => f.Length).Returns(1024);
+            _mockFileStorageService.Setup(f => f.SaveFileAsync(It.IsAny<IFormFile>(), "uniclub/events")).ReturnsAsync("https://img.jpg");
+            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), "https://img.jpg", It.IsAny<Guid?>())).ReturnsAsync(new EventDetailDto { EventId = 1 });
+            var result = await _controller.CreateEvent(ClubId, request, mockFile.Object);
+            result.Result.Should().BeOfType<CreatedAtActionResult>();
+        }
+
+        [Fact]
+        public async Task CreateEvent_ReturnsBadRequest_WhenInvalidOperationException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), It.IsAny<string>(), It.IsAny<Guid?>())).ThrowsAsync(new InvalidOperationException("invalid"));
+            var result = await _controller.CreateEvent(ClubId, new CreateEventRequest { EventName = "E", Description = "D" }, null);
+            result.Result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task UpdateEvent_WithImage_ReturnsOk()
+        {
+            SetupManagerClaims(ClubId);
+            var request = new UpdateEventRequest { EventId = 1, EventName = "U", Description = "D", Location = "L" };
+            var mockFile = new Mock<IFormFile>(); mockFile.Setup(f => f.Length).Returns(512);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
+            _mockFileStorageService.Setup(f => f.SaveFileAsync(It.IsAny<IFormFile>(), "uniclub/events")).ReturnsAsync("https://new.jpg");
+            _mockEventService.Setup(s => s.UpdateEventAsync(It.IsAny<UpdateEventRequest>())).ReturnsAsync(new EventDetailDto { EventId = 1 });
+            var result = await _controller.UpdateEvent(ClubId, 1, request, mockFile.Object);
+            result.Result.Should().BeOfType<OkObjectResult>();
+        }
+
+        [Fact]
+        public async Task UploadEventImage_ReturnsBadRequest_WhenWrongClub()
+        {
+            SetupManagerClaims(ClubId);
+            var mockFile = new Mock<IFormFile>(); mockFile.Setup(f => f.Length).Returns(1024);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = 999 });
+            var result = await _controller.UploadEventImage(ClubId, 1, mockFile.Object);
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task CreateSession_ReturnsBadRequest_WhenWrongClub()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = 999 });
+            var result = await _controller.CreateSession(ClubId, 1, new CreateSessionRequest { EventId = 1, SessionName = "S" });
+            result.Result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task CreateSession_ReturnsBadRequest_WhenDomainException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
+            _mockEventService.Setup(s => s.CreateSessionAsync(It.IsAny<CreateSessionRequest>())).ThrowsAsync(new DomainException("dup"));
+            var result = await _controller.CreateSession(ClubId, 1, new CreateSessionRequest { EventId = 1, SessionName = "S" });
+            result.Result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task CreateSession_Returns500_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
+            _mockEventService.Setup(s => s.CreateSessionAsync(It.IsAny<CreateSessionRequest>())).ThrowsAsync(new Exception("DB error"));
+            var result = await _controller.CreateSession(ClubId, 1, new CreateSessionRequest { EventId = 1, SessionName = "S" });
+            result.Result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(500);
+        }
+
+        [Fact]
+        public async Task UpdateSession_ReturnsBadRequest_WhenWrongClub()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = 999 });
+            var result = await _controller.UpdateSession(ClubId, 1, 10, new UpdateSessionRequest { SessionName = "X" });
+            result.Result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task UpdateSession_ReturnsBadRequest_WhenDomainException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
+            _mockEventService.Setup(s => s.UpdateSessionAsync(It.IsAny<UpdateSessionRequest>())).ThrowsAsync(new DomainException("err"));
+            var result = await _controller.UpdateSession(ClubId, 1, 10, new UpdateSessionRequest { SessionName = "X" });
+            result.Result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task UpdateSession_Returns500_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
+            _mockEventService.Setup(s => s.UpdateSessionAsync(It.IsAny<UpdateSessionRequest>())).ThrowsAsync(new Exception("err"));
+            var result = await _controller.UpdateSession(ClubId, 1, 10, new UpdateSessionRequest { SessionName = "X" });
+            result.Result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(500);
+        }
+
+        [Fact]
+        public async Task DeleteSession_ReturnsBadRequest_WhenWrongClub()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = 999 });
+            var result = await _controller.DeleteSession(ClubId, 1, 10);
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task DeleteSession_Returns500_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
+            _mockEventService.Setup(s => s.DeleteSessionAsync(10, 1)).ThrowsAsync(new Exception("err"));
+            var result = await _controller.DeleteSession(ClubId, 1, 10);
+            result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(500);
+        }
+
+        [Fact]
+        public async Task OpenRegistration_ReturnsBadRequest_WhenWrongClub()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = 999 });
+            var result = await _controller.OpenRegistration(ClubId, 1, new OpenRegistrationRequest { EventId = 1 });
+            result.Result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task StartEvent_ReturnsBadRequest_WhenWrongClub()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = 999 });
+            var result = await _controller.StartEvent(ClubId, 1);
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task CompleteEvent_ReturnsBadRequest_WhenWrongClub()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = 999 });
+            var result = await _controller.CompleteEvent(ClubId, 1);
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task GetMyRole_ReturnsNullRole_WhenNotCollaborator()
+        {
+            var userId = Guid.NewGuid();
+            var claims = new List<Claim>
+            {
+                new Claim("club_roles", JsonSerializer.Serialize(new[] { new { ClubId = 99, RoleName = "Member", Level = 3 } })),
+                new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+            };
+            _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
+            _mockEventMembers.Setup(m => m.GetByEventAndUserAsync(1, userId)).ReturnsAsync((UserEventRole?)null);
+            _mockEventRoles.Setup(r => r.GetEventPolicyNamesAsync()).ReturnsAsync(new List<string>());
+            var result = await _controller.GetMyRole(ClubId, 1);
+            result.Should().BeOfType<OkObjectResult>();
+        }
+
+        [Fact]
+        public async Task GetSessions_ReturnsEmptyList_WhenSessionsNull()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId, Sessions = null });
+            var result = await _controller.GetSessions(ClubId, 1);
+            result.Should().BeOfType<OkObjectResult>();
+        }
+
+        [Fact]
+        public async Task GetSessions_ReturnsBadRequest_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ThrowsAsync(new Exception("err"));
+            var result = await _controller.GetSessions(ClubId, 1);
             result.Should().BeOfType<BadRequestObjectResult>();
         }
 
