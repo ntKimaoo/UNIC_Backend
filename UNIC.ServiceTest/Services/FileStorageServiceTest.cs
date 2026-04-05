@@ -115,6 +115,21 @@ namespace UNIC.ServiceTest.Services
                 () => _service.SaveFileAsync(file, "test-folder"));
         }
 
+        [Fact]
+        public async Task SaveFileAsync_ThrowsInvalidOperation_WhenFileTooLarge()
+        {
+            var file = CreateMockFile("big.jpg", 10 * 1024 * 1024); // 10MB > 5MB
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => _service.SaveFileAsync(file, "test-folder"));
+        }
+
+        [Fact]
+        public async Task SaveFileAsync_ThrowsInvalidOperation_WhenFileNull()
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => _service.SaveFileAsync(null!, "test-folder"));
+        }
+
         #endregion
 
         #region DeleteFileAsync
@@ -132,6 +147,58 @@ namespace UNIC.ServiceTest.Services
             // Invalid URL will throw an exception
             var result = await _service.DeleteFileAsync("not-a-valid-url");
             Assert.False(result);
+        }
+
+        [Fact]
+        public async Task DeleteFileAsync_ReturnsFalse_WhenUrlIsMalformed()
+        {
+            var result = await _service.DeleteFileAsync("ftp://invalid/url");
+            Assert.False(result);
+        }
+
+        #endregion
+
+        #region ValidateImageFile_EdgeCases
+
+        [Fact]
+        public void ValidateImageFile_CaseInsensitive_Extension()
+        {
+            var file = CreateMockFile("photo.JPG", 1024);
+            var result = _service.ValidateImageFile(file);
+            Assert.True(result);
+        }
+
+        [Fact]
+        public void ValidateImageFile_ReturnsFalse_ForDocFiles()
+        {
+            var file = CreateMockFile("document.pdf", 1024);
+            Assert.False(_service.ValidateImageFile(file));
+        }
+
+        [Fact]
+        public void ValidateImageFile_ReturnsFalse_ForNoExtension()
+        {
+            var file = CreateMockFile("photo", 1024);
+            Assert.False(_service.ValidateImageFile(file));
+        }
+
+        #endregion
+
+        #region Constructor_Defaults
+
+        [Fact]
+        public void Constructor_UsesDefaults_WhenConfigNotSet()
+        {
+            var emptyConfig = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>())
+                .Build();
+
+            var mockCloudinary = new Mock<Cloudinary>(new Account("cloud", "key", "secret"));
+            var service = new FileStorageService(emptyConfig, mockCloudinary.Object);
+
+            // Should use default extensions
+            var validFile = CreateMockFile("photo.jpg", 1024);
+            Assert.True(service.ValidateImageFile(validFile));
         }
 
         #endregion

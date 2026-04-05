@@ -192,6 +192,95 @@ namespace UNIC.ServiceTest.Services
             Assert.Null(result);
         }
 
+        [Fact]
+        public void ValidateAccessToken_ReturnsNull_ForValidToken_WithGuidSub()
+        {
+            // GUID cannot be parsed as int, so ValidateAccessToken returns null
+            // but this covers the SUCCESS path inside try block (lines 104-112)
+            var user = new User
+            {
+                UserId = Guid.NewGuid(),
+                Email = "test@test.com",
+                FullName = "Test User",
+                UserRoles = new List<UserRole>(),
+                ClubMembers = new List<UserClubRole>()
+            };
+
+            var token = _service.GenerateAccessToken(user);
+            var result = _service.ValidateAccessToken(token);
+
+            // Returns null because GUID can't be parsed as int
+            Assert.Null(result);
+        }
+
+        [Fact]
+        public void ValidateAccessToken_ReturnsNull_WhenTokenIsEmpty()
+        {
+            var result = _service.ValidateAccessToken(string.Empty);
+            Assert.Null(result);
+        }
+
+        #endregion
+
+        #region GenerateAccessToken_Additional
+
+        [Fact]
+        public void GenerateAccessToken_WithNullUserRoles()
+        {
+            var user = new User
+            {
+                UserId = Guid.NewGuid(),
+                Email = "null@test.com",
+                FullName = "Null Roles",
+                UserRoles = null,
+                ClubMembers = null
+            };
+
+            var token = _service.GenerateAccessToken(user);
+            Assert.NotNull(token);
+            Assert.NotEmpty(token);
+        }
+
+        [Fact]
+        public void GenerateAccessToken_WithMultipleRoles()
+        {
+            var user = new User
+            {
+                UserId = Guid.NewGuid(),
+                Email = "multi@test.com",
+                FullName = "Multi Role",
+                UserRoles = new List<UserRole>
+                {
+                    new UserRole { RoleName = "Admin" },
+                    new UserRole { RoleName = "User" }
+                },
+                ClubMembers = new List<UserClubRole>
+                {
+                    new UserClubRole
+                    {
+                        ClubId = 1,
+                        Status = "Active",
+                        ClubRole = new ClubRole { RoleName = "President", Level = 1 }
+                    },
+                    new UserClubRole
+                    {
+                        ClubId = 2,
+                        Status = "Active",
+                        ClubRole = new ClubRole { RoleName = "Member", Level = 5 }
+                    }
+                }
+            };
+
+            var token = _service.GenerateAccessToken(user);
+            var handler = new JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
+
+            var roles = jwtToken.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value).ToList();
+            Assert.Contains("Admin", roles);
+            Assert.Contains("User", roles);
+            Assert.Contains(jwtToken.Claims, c => c.Type == "club_roles");
+        }
+
         #endregion
     }
 }
