@@ -24,5 +24,7 @@ namespace UNIC.DataAccess.Repositories.Interface
         /// (via UserClubRoleDepartment), including the user and club-role data.
         /// </summary>
         Task<IEnumerable<UserClubRole>> GetMembersWithRolesByDepartmentAsync(int clubId, int departmentId);
+        Task<UserClubRoleDepartment> AddMemberTodepartment(UserClubRoleDepartment departMember);
+        Task<UserClubRoleDepartment> RemoveMemberFromDepartment(UserClubRoleDepartment departMember);
     }
 }
