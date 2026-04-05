@@ -5,6 +5,34 @@ using System.ComponentModel.DataAnnotations;
 namespace BusinessLogic.DTOs
 {
     // ═══════════════════════════════════════════════════════════════
+    //  PROPOSED TIME SLOTS
+    // ═══════════════════════════════════════════════════════════════
+
+    public class ProposedTimeSlotItemDto
+    {
+        [Required]
+        public string Date { get; set; } = null!;  // "2026-04-01"
+
+        [Required]
+        public string Time { get; set; } = null!;  // "09:00"
+    }
+
+    public class ProposedTimeSlotResponseDto
+    {
+        public int Id { get; set; }
+        public int InterviewScheduleId { get; set; }
+        public DateTime ProposedAt { get; set; }
+        public bool IsSelected { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class ConfirmTimeSlotDto
+    {
+        [Required]
+        public int TimeSlotId { get; set; }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     //  INTERVIEW SCHEDULE
     // ═══════════════════════════════════════════════════════════════
 
@@ -37,6 +65,13 @@ namespace BusinessLogic.DTOs
         /// Danh sách interviewer assign ngay khi tạo lịch (tuỳ chọn).
         /// </summary>
         public List<AssignInterviewerItemDto>? Interviewers { get; set; }
+
+        /// <summary>
+        /// Danh sách khung giờ đề xuất cho ứng viên chọn (tuỳ chọn).
+        /// Nếu chỉ có 1 slot thì dùng luôn ScheduledAt.
+        /// Nếu nhiều slot thì ứng viên sẽ chọn.
+        /// </summary>
+        public List<ProposedTimeSlotItemDto>? ProposedTimeSlots { get; set; }
     }
 
     public class UpdateInterviewScheduleDto
@@ -82,6 +117,7 @@ namespace BusinessLogic.DTOs
         public DateTime? UpdatedAt { get; set; }
         public List<InterviewAssignmentResponseDto> Assignments { get; set; } = new();
         public MeetingRoomResponseDto? MeetingRoom { get; set; }
+        public List<ProposedTimeSlotResponseDto> ProposedTimeSlots { get; set; } = new();
     }
 
     // ═══════════════════════════════════════════════════════════════

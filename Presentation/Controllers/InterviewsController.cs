@@ -138,6 +138,47 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
+        /// GET /api/interviews/{id}/time-slots – Lấy danh sách time slots đề xuất
+        /// </summary>
+        [HttpGet("{id}/time-slots")]
+        public async Task<IActionResult> GetTimeSlots(int id)
+        {
+            try
+            {
+                var slots = await _service.GetTimeSlotsAsync(id);
+                return Ok(new { success = true, data = slots });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// POST /api/interviews/{id}/confirm-time-slot – Candidate chọn và xác nhận time slot
+        /// </summary>
+        [HttpPost("{id}/confirm-time-slot")]
+        public async Task<IActionResult> ConfirmTimeSlot(int id, [FromBody] ConfirmTimeSlotDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
+
+            try
+            {
+                var result = await _service.ConfirmTimeSlotAsync(id, dto);
+                return Ok(new { success = true, message = "Time slot confirmed", data = result });
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { success = false, message = "Interview schedule not found" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// POST /api/interviews/{id}/assignments – Assign interviewer(s)
         /// </summary>
         [HttpPost("{id}/assignments")]

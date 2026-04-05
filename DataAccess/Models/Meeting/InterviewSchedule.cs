@@ -61,6 +61,7 @@ public class InterviewSchedule
 
     // ── Navigation ───────────────────────────────────────────────
 
-    public ICollection<InterviewAssignment> Assignments { get; set; } = new List<InterviewAssignment>();
-    public MeetingRoom?                     MeetingRoom { get; set; }
+    public ICollection<InterviewAssignment> Assignments      { get; set; } = new List<InterviewAssignment>();
+    public ICollection<ProposedTimeSlot>    ProposedTimeSlots { get; set; } = new List<ProposedTimeSlot>();
+    public MeetingRoom?                     MeetingRoom      { get; set; }
 }

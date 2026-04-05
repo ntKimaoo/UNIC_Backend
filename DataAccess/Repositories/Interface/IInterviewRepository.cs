@@ -58,6 +58,13 @@ namespace DataAccess.Repositories.Interface
         Task<CampaignDecision?> GetDecisionByScheduleIdAsync(int scheduleId);
         Task<CampaignDecision> CreateDecisionAsync(CampaignDecision decision);
         Task<bool> UpdateDecisionAsync(CampaignDecision decision);
+
+        // ── ProposedTimeSlot ────────────────────────────────────
+        Task<IEnumerable<ProposedTimeSlot>> GetTimeSlotsByScheduleIdAsync(int scheduleId);
+        Task<ProposedTimeSlot?> GetTimeSlotByIdAsync(int id);
+        Task<ProposedTimeSlot> CreateTimeSlotAsync(ProposedTimeSlot slot);
+        Task<bool> UpdateTimeSlotAsync(ProposedTimeSlot slot);
+        Task DeleteTimeSlotsByScheduleIdAsync(int scheduleId);
     }
 }
 

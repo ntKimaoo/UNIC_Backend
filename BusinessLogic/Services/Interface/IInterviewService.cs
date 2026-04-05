@@ -15,6 +15,10 @@ namespace BusinessLogic.Services.Interface
         Task<bool> UpdateScheduleStatusAsync(int id, UpdateInterviewStatusDto dto);
         Task<bool> DeleteScheduleAsync(int id);
 
+        // ── Proposed Time Slots ──────────────────────────────────
+        Task<List<ProposedTimeSlotResponseDto>> GetTimeSlotsAsync(int scheduleId);
+        Task<InterviewScheduleResponseDto> ConfirmTimeSlotAsync(int scheduleId, ConfirmTimeSlotDto dto);
+
         // ── Interviewer Assignment ────────────────────────────────
         Task<List<InterviewAssignmentResponseDto>> AssignInterviewersAsync(int scheduleId, AssignInterviewersDto dto);
         Task<IEnumerable<InterviewAssignmentResponseDto>> GetAssignmentsAsync(int scheduleId);

@@ -41,6 +41,25 @@ namespace BusinessLogic.Services.Implementation
 
             var created = await _repo.CreateScheduleAsync(schedule);
 
+            // Add Proposed Time Slots
+            if (dto.ProposedTimeSlots != null && dto.ProposedTimeSlots.Count > 0)
+            {
+                foreach (var slot in dto.ProposedTimeSlots)
+                {
+                    if (DateTime.TryParse($"{slot.Date}T{slot.Time}", out var proposedAt))
+                    {
+                        var timeSlot = new ProposedTimeSlot
+                        {
+                            InterviewScheduleId = created.Id,
+                            ProposedAt          = proposedAt,
+                            IsSelected          = false,
+                            CreatedAt           = DateTime.UtcNow
+                        };
+                        await _repo.CreateTimeSlotAsync(timeSlot);
+                    }
+                }
+            }
+
             // Auto-create MeetingRoom
             var room = new MeetingRoom
             {
@@ -173,6 +192,59 @@ namespace BusinessLogic.Services.Implementation
                 throw new InvalidOperationException("Chỉ có thể xoá lịch ở trạng thái Scheduled.");
 
             return await _repo.DeleteScheduleAsync(id);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  Proposed Time Slots
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<List<ProposedTimeSlotResponseDto>> GetTimeSlotsAsync(int scheduleId)
+        {
+            var slots = await _repo.GetTimeSlotsByScheduleIdAsync(scheduleId);
+            return slots.Select(MapProposedTimeSlotToDto).ToList();
+        }
+
+        public async Task<InterviewScheduleResponseDto> ConfirmTimeSlotAsync(int scheduleId, ConfirmTimeSlotDto dto)
+        {
+            var schedule = await _repo.GetScheduleByIdAsync(scheduleId);
+            if (schedule == null)
+                throw new KeyNotFoundException("Interview schedule not found.");
+
+            if (schedule.Status != InterviewStatus.Scheduled && schedule.Status != InterviewStatus.Rescheduled)
+                throw new InvalidOperationException("Chỉ có thể xác nhận giờ cho lịch đang ở trạng thái Scheduled hoặc Rescheduled.");
+
+            var slots = (await _repo.GetTimeSlotsByScheduleIdAsync(scheduleId)).ToList();
+            var selectedSlot = slots.FirstOrDefault(s => s.Id == dto.TimeSlotId);
+
+            if (selectedSlot == null)
+                throw new ArgumentException("Time slot không hợp lệ hoặc không thuộc về lịch phỏng vấn này.");
+
+            // Đánh dấu slot được chọn, các slot khác bỏ chọn
+            foreach (var slot in slots)
+            {
+                slot.IsSelected = (slot.Id == dto.TimeSlotId);
+                await _repo.UpdateTimeSlotAsync(slot);
+            }
+
+            // Cập nhật ScheduledAt của InterviewSchedule
+            schedule.ScheduledAt = selectedSlot.ProposedAt;
+            // Workflow: Confirm slot xong sẽ coi như lịch đã chốt giờ => chuyển status sang Confirmed, 
+            // giống như frontend gọi api update status sang Confirmed
+            schedule.Status = InterviewStatus.Confirmed;
+            schedule.UpdatedAt = DateTime.UtcNow;
+
+            await _repo.UpdateScheduleAsync(schedule);
+
+            // Cập nhật lại thời gian MeetingRoom nếu có báo phòng
+            if (schedule.MeetingRoom != null)
+            {
+                schedule.MeetingRoom.ScheduledStartAt = selectedSlot.ProposedAt;
+                schedule.MeetingRoom.ScheduledEndAt = selectedSlot.ProposedAt.AddMinutes(schedule.DurationMinutes);
+                await _repo.UpdateRoomAsync(schedule.MeetingRoom);
+            }
+
+            var full = await _repo.GetScheduleByIdAsync(scheduleId);
+            return MapScheduleToDto(full!);
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -475,7 +547,20 @@ namespace BusinessLogic.Services.Implementation
                 CreatedAt       = s.CreatedAt,
                 UpdatedAt       = s.UpdatedAt,
                 Assignments     = s.Assignments?.Select(MapAssignmentToDto).ToList() ?? new(),
-                MeetingRoom     = s.MeetingRoom != null ? MapRoomToDto(s.MeetingRoom) : null
+                MeetingRoom     = s.MeetingRoom != null ? MapRoomToDto(s.MeetingRoom) : null,
+                ProposedTimeSlots = s.ProposedTimeSlots?.Select(MapProposedTimeSlotToDto).ToList() ?? new()
+            };
+        }
+
+        private static ProposedTimeSlotResponseDto MapProposedTimeSlotToDto(ProposedTimeSlot t)
+        {
+            return new ProposedTimeSlotResponseDto
+            {
+                Id                  = t.Id,
+                InterviewScheduleId = t.InterviewScheduleId,
+                ProposedAt          = t.ProposedAt,
+                IsSelected          = t.IsSelected,
+                CreatedAt           = t.CreatedAt
             };
         }
 

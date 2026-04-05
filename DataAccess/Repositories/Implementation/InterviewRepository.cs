@@ -29,6 +29,7 @@ namespace DataAccess.Repositories.Implementation
                 .Include(s => s.Assignments)
                     .ThenInclude(a => a.CriteriaScores)
                 .Include(s => s.MeetingRoom)
+                .Include(s => s.ProposedTimeSlots)
                 .FirstOrDefaultAsync(s => s.Id == id);
         }
 
@@ -39,6 +40,7 @@ namespace DataAccess.Repositories.Implementation
                 .Include(s => s.Assignments)
                     .ThenInclude(a => a.CriteriaScores)
                 .Include(s => s.MeetingRoom)
+                .Include(s => s.ProposedTimeSlots)
                 .AsQueryable();
 
             if (campaignId.HasValue)
@@ -376,6 +378,54 @@ namespace DataAccess.Repositories.Implementation
                 return true;
             }
             catch { return false; }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  ProposedTimeSlot
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<IEnumerable<ProposedTimeSlot>> GetTimeSlotsByScheduleIdAsync(int scheduleId)
+        {
+            return await _context.ProposedTimeSlots
+                .Where(t => t.InterviewScheduleId == scheduleId)
+                .OrderBy(t => t.ProposedAt)
+                .ToListAsync();
+        }
+
+        public async Task<ProposedTimeSlot?> GetTimeSlotByIdAsync(int id)
+        {
+            return await _context.ProposedTimeSlots.FindAsync(id);
+        }
+
+        public async Task<ProposedTimeSlot> CreateTimeSlotAsync(ProposedTimeSlot slot)
+        {
+            await _context.ProposedTimeSlots.AddAsync(slot);
+            await _context.SaveChangesAsync();
+            return slot;
+        }
+
+        public async Task<bool> UpdateTimeSlotAsync(ProposedTimeSlot slot)
+        {
+            try
+            {
+                _context.ProposedTimeSlots.Update(slot);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public async Task DeleteTimeSlotsByScheduleIdAsync(int scheduleId)
+        {
+            var slots = await _context.ProposedTimeSlots
+                .Where(t => t.InterviewScheduleId == scheduleId)
+                .ToListAsync();
+
+            if (slots.Any())
+            {
+                _context.ProposedTimeSlots.RemoveRange(slots);
+                await _context.SaveChangesAsync();
+            }
         }
     }
 }
