@@ -44,5 +44,30 @@ namespace UNIC.ServiceTest.Services
             Assert.NotNull(b);
             Assert.Equal(a!.Length, b!.Length);
         }
+
+        [Fact]
+        public void GetQrCodePngBytes_ReturnsNull_WhenContentExceedsQrCapacity()
+        {
+            // QRCoder throws when payload cannot fit; service catches and returns null.
+            var huge = new string('a', 4000);
+            Assert.Null(_service.GetQrCodePngBytes(huge));
+        }
+
+        [Fact]
+        public void GetQrCodePngBytes_ReturnsPngBytes_WhenContentIsMinimal()
+        {
+            var bytes = _service.GetQrCodePngBytes("1");
+            Assert.NotNull(bytes);
+            Assert.True(bytes!.Length > 20);
+            Assert.Equal(0x89, bytes[0]);
+        }
+
+        [Fact]
+        public void GetQrCodePngBytes_ReturnsPngBytes_WhenContentHasUnicode()
+        {
+            var bytes = _service.GetQrCodePngBytes("Thanh toán quỹ CLB — 你好");
+            Assert.NotNull(bytes);
+            Assert.Equal(0x89, bytes[0]);
+        }
     }
 }
