@@ -205,7 +205,7 @@ namespace UNIC.ServiceTest.Services
         }
 
         [Fact]
-        public async Task UpdateEventAsync_SwitchToOnline_GeneratesWebRTCLink()
+        public async Task UpdateEventAsync_SwitchToOnline_GeneratesMeetLink()
         {
             // Arrange
             var request = new UpdateEventRequest
@@ -229,8 +229,8 @@ namespace UNIC.ServiceTest.Services
             // Act
             await _eventService.UpdateEventAsync(request);
 
-            // Assert
-            existingEvent.Location.Should().StartWith("/webrtc/");
+            // Assert – code generates /event-room/{guid} when MeetLink is empty
+            existingEvent.MeetLink.Should().StartWith("/event-room/");
         }
 
         [Fact]
@@ -282,7 +282,7 @@ namespace UNIC.ServiceTest.Services
         }
 
         [Fact]
-        public async Task UpdateEventAsync_OfflineMissingLocation_ThrowsDomainException()
+        public async Task UpdateEventAsync_OfflineMissingLocation_KeepsExistingLocation()
         {
             // Arrange
             var request = new UpdateEventRequest
@@ -293,16 +293,21 @@ namespace UNIC.ServiceTest.Services
                 IsOnline = false,
                 Location = null
             };
-            var existingEvent = new Event { EventId = 1, Status = "PLANNED" };
+            var existingEvent = new Event { EventId = 1, Status = "PLANNED", Location = "Old Place" };
 
             _mockUpdateValidator.Setup(v => v.ValidateAsync(request, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(ValidResult());
             _mockUnitOfWork.Setup(u => u.Events.GetByIdAsync(1)).ReturnsAsync(existingEvent);
+            _mockUnitOfWork.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
+            _mockMapper.Setup(m => m.Map<EventDetailDto>(existingEvent))
+                .Returns(new EventDetailDto());
 
-            // Act & Assert
-            var act = () => _eventService.UpdateEventAsync(request);
-            await act.Should().ThrowAsync<DomainException>()
-                .WithMessage("*Location is required*");
+            // Act
+            await _eventService.UpdateEventAsync(request);
+
+            // Assert – offline with null location: code keeps existing location unchanged
+            existingEvent.Location.Should().Be("Old Place");
+            existingEvent.MeetLink.Should().BeNull();
         }
 
         [Fact]

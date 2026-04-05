@@ -84,16 +84,6 @@ builder.Services.AddScoped<IApplicationService, ApplicationService>();
 builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
 builder.Services.AddScoped<IInterviewRepository, InterviewRepository>();
 builder.Services.AddScoped<IInterviewService, InterviewService>();
-
-// ── AI Analysis (OpenRouter) ─────────────────────────────────
-builder.Services.Configure<BusinessLogic.Options.OpenRouterOptions>(
-    builder.Configuration.GetSection(BusinessLogic.Options.OpenRouterOptions.SectionName));
-builder.Services.AddHttpClient<IAiAnalysisService, AiAnalysisService>((sp, client) =>
-{
-    var opt = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<BusinessLogic.Options.OpenRouterOptions>>().Value;
-    client.BaseAddress = new Uri(opt.BaseUrl.TrimEnd('/') + "/");
-    client.Timeout = TimeSpan.FromSeconds(opt.TimeoutSeconds);
-});
 builder.Services.AddScoped<IClubCreationRequestRepository, ClubCreationRequestRepository>();
 builder.Services.AddScoped<IClubCreationRequestService, ClubCreationRequestService>();
 
@@ -197,10 +187,16 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(key)
     };
 });
-// Single handler: club-scoped policy check OR UserRole claim check (OR logic)
-builder.Services.AddScoped<IAuthorizationHandler, ClubPolicyOrRoleHandler>();
+// Register authorization handler
+builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
 
-// Dynamic policy provider (ClubPolicy_ / Role_ / ClubPolicyOrRole_ prefixes)
+// Register club-scoped authorization handler
+builder.Services.AddScoped<IAuthorizationHandler, ClubMemberAuthorizationHandler>();
+
+// Register event-scoped authorization handler
+builder.Services.AddScoped<IAuthorizationHandler, EventPermissionAuthorizationHandler>();
+
+// Register dynamic policy provider
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 
 // Configure file upload size limits

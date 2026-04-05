@@ -130,27 +130,24 @@ namespace UNIC.ServiceTest.Services
         [Fact]
         public async Task ExecuteAsync_StopsOnCancellation()
         {
-            _mockEventRepo.Setup(r => r.BulkSyncStatusAsync()).ReturnsAsync(0);
+            int callCount = 0;
+            _mockEventRepo.Setup(r => r.BulkSyncStatusAsync())
+                .ReturnsAsync(() => { Interlocked.Increment(ref callCount); return 0; });
 
             var cts = new CancellationTokenSource();
             var service = new EventStatusSyncService(_mockLogger.Object, _mockServiceProvider.Object);
 
-            // Cancel immediately
-            cts.Cancel();
-
+            // Start the service, let it run briefly, then cancel
             await service.StartAsync(cts.Token);
             await Task.Delay(200);
+            cts.Cancel();
+            await Task.Delay(300);
             await service.StopAsync(CancellationToken.None);
 
-            // Should have logged "stopped" message
-            _mockLogger.Verify(
-                x => x.Log(
-                    LogLevel.Information,
-                    It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((o, t) => o.ToString()!.Contains("stop")),
-                    null,
-                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
-                Times.AtLeastOnce);
+            // Capture the count after stop, wait more, verify no new calls
+            int countAfterStop = callCount;
+            await Task.Delay(500);
+            callCount.Should().Be(countAfterStop, "no more iterations should run after cancellation");
         }
     }
 }
