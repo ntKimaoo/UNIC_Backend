@@ -4,7 +4,7 @@ using UNIC.BusinessLogic.DTOs;
 using UNIC.BusinessLogic.Services.Interface;
 using UNIC.Presentation.Controllers;
 
-namespace UNIC.ServiceTest.Controllers
+namespace UNIC.ControllerTest.Controllers
 {
 
     public class ApplicationControllerTest

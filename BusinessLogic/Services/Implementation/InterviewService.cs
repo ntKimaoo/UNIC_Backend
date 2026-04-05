@@ -428,7 +428,6 @@ namespace BusinessLogic.Services.Implementation
 
             assignment.FeedbackNotes = dto.FeedbackNotes;
             assignment.Result = result;
-            assignment.Score = dto.Score;
             assignment.FeedbackSubmittedAt = DateTime.UtcNow;
 
             return await _repo.UpdateAssignmentAsync(assignment);
@@ -491,9 +490,15 @@ namespace BusinessLogic.Services.Implementation
                 HasConfirmed        = a.HasConfirmed,
                 FeedbackNotes       = a.FeedbackNotes,
                 Result              = a.Result?.ToString(),
-                Score               = a.Score,
                 AssignedAt          = a.AssignedAt,
-                FeedbackSubmittedAt = a.FeedbackSubmittedAt
+                FeedbackSubmittedAt = a.FeedbackSubmittedAt,
+                CriteriaScores      = a.CriteriaScores?.Select(cs => new CriteriaScoreResponseDto
+                {
+                    Id                    = cs.Id,
+                    EvaluationCriterionId = cs.EvaluationCriterionId,
+                    Note                  = cs.Note,
+                    CreatedAt             = cs.CreatedAt
+                }).ToList() ?? new()
             };
         }
 
@@ -560,13 +565,13 @@ namespace BusinessLogic.Services.Implementation
         /// <summary>
         /// 5 tiêu chí mặc định – tự tạo khi campaign chưa có tiêu chí nào.
         /// </summary>
-        private static readonly List<(string Name, string Desc, int Weight, int Order)> DefaultCriteria = new()
+        private static readonly List<(string Name, string Desc, int Weight)> DefaultCriteria = new()
         {
-            ("Kiến thức chuyên môn",       "Đánh giá kiến thức nền tảng, chuyên ngành liên quan", 25, 1),
-            ("Kỹ năng giao tiếp",          "Khả năng trình bày, tương tác, diễn đạt ý tưởng",    20, 2),
-            ("Tư duy & giải quyết vấn đề", "Khả năng phân tích, tư duy logic, đề xuất giải pháp", 20, 3),
-            ("Phù hợp văn hóa CLB",        "Mức độ phù hợp với giá trị, phong cách hoạt động CLB", 20, 4),
-            ("Kinh nghiệm & thành tích",   "Kinh nghiệm hoạt động, thành tích cá nhân, kỹ năng mềm", 15, 5),
+            ("Kiến thức chuyên môn",       "Đánh giá kiến thức nền tảng, chuyên ngành liên quan", 25),
+            ("Kỹ năng giao tiếp",          "Khả năng trình bày, tương tác, diễn đạt ý tưởng",    20),
+            ("Tư duy & giải quyết vấn đề", "Khả năng phân tích, tư duy logic, đề xuất giải pháp", 20),
+            ("Phù hợp văn hóa CLB",        "Mức độ phù hợp với giá trị, phong cách hoạt động CLB", 20),
+            ("Kinh nghiệm & thành tích",   "Kinh nghiệm hoạt động, thành tích cá nhân, kỹ năng mềm", 15),
         };
 
         public async Task<List<EvaluationCriterionDto>> GetCampaignCriteriaAsync(int campaignId)
@@ -577,7 +582,7 @@ namespace BusinessLogic.Services.Implementation
             // Nếu chưa có tiêu chí → seed 5 default
             if (list.Count == 0)
             {
-                foreach (var (name, desc, weight, order) in DefaultCriteria)
+                foreach (var (name, desc, weight) in DefaultCriteria)
                 {
                     var c = new EvaluationCriterion
                     {
@@ -585,7 +590,6 @@ namespace BusinessLogic.Services.Implementation
                         Name         = name,
                         Description  = desc,
                         Weight       = weight,
-                        DisplayOrder = order,
                         IsDefault    = true,
                         CreatedAt    = DateTime.UtcNow
                     };
@@ -605,7 +609,6 @@ namespace BusinessLogic.Services.Implementation
                 Name         = dto.Name,
                 Description  = dto.Description,
                 Weight       = dto.Weight,
-                DisplayOrder = dto.DisplayOrder,
                 IsDefault    = false,
                 CreatedAt    = DateTime.UtcNow
             };
@@ -625,8 +628,6 @@ namespace BusinessLogic.Services.Implementation
                 criterion.Description = dto.Description;
             if (dto.Weight.HasValue)
                 criterion.Weight = dto.Weight.Value;
-            if (dto.DisplayOrder.HasValue)
-                criterion.DisplayOrder = dto.DisplayOrder.Value;
 
             await _repo.UpdateCriterionAsync(criterion);
             return MapCriterionToDto(criterion);
@@ -643,8 +644,23 @@ namespace BusinessLogic.Services.Implementation
             if (assignment == null || assignment.InterviewScheduleId != scheduleId)
                 return false;
 
-            assignment.AssignedCriteriaIds = string.Join(",", dto.CriteriaIds);
-            return await _repo.UpdateAssignmentAsync(assignment);
+            // Xoá CriteriaScore cũ của assignment này
+            await _repo.DeleteCriteriaScoresByAssignmentIdAsync(assignmentId);
+
+            // Tạo CriteriaScore mới cho từng tiêu chí được phân công
+            foreach (var criterionId in dto.CriteriaIds)
+            {
+                var score = new CriteriaScore
+                {
+                    InterviewAssignmentId = assignmentId,
+                    EvaluationCriterionId = criterionId,
+                    Note                  = null,
+                    CreatedAt             = DateTime.UtcNow
+                };
+                await _repo.CreateCriteriaScoreAsync(score);
+            }
+
+            return true;
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -657,44 +673,38 @@ namespace BusinessLogic.Services.Implementation
             if (assignment == null || assignment.InterviewScheduleId != scheduleId)
                 return false;
 
-            // Lưu điểm từng tiêu chí
-            foreach (var item in dto.Scores)
+            // Lưu / cập nhật nhận xét từng tiêu chí (upsert)
+            foreach (var item in dto.Notes)
             {
-                var score = new CriteriaScore
+                // Kiểm tra xem đã có CriteriaScore chưa (tạo từ bước Assign Criteria)
+                var existing = await _repo.GetCriteriaScoreAsync(assignmentId, item.CriterionId);
+                if (existing != null)
                 {
-                    InterviewAssignmentId  = assignmentId,
-                    EvaluationCriterionId  = item.CriterionId,
-                    Score                  = item.Score,
-                    Note                   = item.Note,
-                    CreatedAt              = DateTime.UtcNow
-                };
-                await _repo.CreateCriteriaScoreAsync(score);
-            }
-
-            // Cập nhật feedback tổng hợp vào assignment (tương thích feedback cũ)
-            if (!Enum.TryParse<InterviewResult>(dto.Result, true, out var result))
-                throw new ArgumentException($"Invalid result: {dto.Result}");
-
-            // Tính điểm /100 từ tiêu chí (lấy criteria của campaign)
-            var schedule = await _repo.GetScheduleByIdAsync(scheduleId);
-            if (schedule == null) return false;
-
-            var criteria = (await _repo.GetCriteriaByCampaignIdAsync(schedule.CampaignId)).ToList();
-            var totalWeight = criteria.Sum(c => c.Weight);
-            double weightedScore = 0;
-
-            foreach (var item in dto.Scores)
-            {
-                var criterion = criteria.FirstOrDefault(c => c.Id == item.CriterionId);
-                if (criterion != null && totalWeight > 0)
+                    // Cập nhật note vào record đã tồn tại
+                    existing.Note = item.Note;
+                    existing.CreatedAt = DateTime.UtcNow;
+                    await _repo.UpdateCriteriaScoreAsync(existing);
+                }
+                else
                 {
-                    weightedScore += (item.Score / 5.0) * 100 * ((double)criterion.Weight / totalWeight);
+                    // Tạo mới nếu chưa được phân tiêu chí trước đó
+                    var note = new CriteriaScore
+                    {
+                        InterviewAssignmentId = assignmentId,
+                        EvaluationCriterionId = item.CriterionId,
+                        Note                  = item.Note,
+                        CreatedAt             = DateTime.UtcNow
+                    };
+                    await _repo.CreateCriteriaScoreAsync(note);
                 }
             }
 
-            assignment.FeedbackNotes = dto.FeedbackNotes;
-            assignment.Result = result;
-            assignment.Score = (int)Math.Round(weightedScore);
+            // Cập nhật feedback tổng hợp vào assignment
+            if (!Enum.TryParse<InterviewResult>(dto.Result, true, out var result))
+                throw new ArgumentException($"Invalid result: {dto.Result}");
+
+            assignment.FeedbackNotes       = dto.FeedbackNotes;
+            assignment.Result              = result;
             assignment.FeedbackSubmittedAt = DateTime.UtcNow;
 
             return await _repo.UpdateAssignmentAsync(assignment);
@@ -706,41 +716,28 @@ namespace BusinessLogic.Services.Implementation
             if (schedule == null) return null;
 
             var criteria = (await _repo.GetCriteriaByCampaignIdAsync(schedule.CampaignId)).ToList();
-            var allScores = (await _repo.GetCriteriaScoresByScheduleIdAsync(scheduleId)).ToList();
+            var allNotes = (await _repo.GetCriteriaScoresByScheduleIdAsync(scheduleId)).ToList();
 
             var criteriaSummaries = criteria.Select(c =>
             {
-                var scoresForCriterion = allScores.Where(s => s.EvaluationCriterionId == c.Id).ToList();
-                var avg = scoresForCriterion.Any() ? scoresForCriterion.Average(s => s.Score) : 0;
+                var notesForCriterion = allNotes.Where(s => s.EvaluationCriterionId == c.Id).ToList();
 
                 return new CriteriaSummaryItemDto
                 {
-                    CriterionId    = c.Id,
-                    CriterionName  = c.Name,
-                    Weight         = c.Weight,
-                    AverageScore   = Math.Round(avg, 2),
-                    IndividualScores = scoresForCriterion.Select(s => new CriteriaScoreResultDto
+                    CriterionId   = c.Id,
+                    CriterionName = c.Name,
+                    Weight        = c.Weight,
+                    IndividualNotes = notesForCriterion.Select(s => new CriteriaNoteResultDto
                     {
                         CriterionId       = c.Id,
                         CriterionName     = c.Name,
                         Weight            = c.Weight,
-                        Score             = s.Score,
                         Note              = s.Note,
                         InterviewerUserId = s.InterviewAssignment.InterviewerUserId,
                         InterviewerRole   = s.InterviewAssignment.Role.ToString()
                     }).ToList()
                 };
             }).ToList();
-
-            var totalWeight = criteria.Sum(c => c.Weight);
-            double totalScore = 0;
-            if (totalWeight > 0)
-            {
-                totalScore = criteriaSummaries.Sum(cs =>
-                    (cs.AverageScore / 5.0) * 100 * ((double)cs.Weight / totalWeight));
-            }
-
-            var suggested = totalScore >= 70 ? "Pass" : totalScore >= 50 ? "OnHold" : "Fail";
 
             return new EvaluationSummaryDto
             {
@@ -749,8 +746,6 @@ namespace BusinessLogic.Services.Implementation
                 CandidateUserId     = schedule.CandidateUserId,
                 CampaignId          = schedule.CampaignId,
                 CriteriaSummaries   = criteriaSummaries,
-                TotalScore          = Math.Round(totalScore, 2),
-                SuggestedResult     = suggested,
                 Feedbacks           = schedule.Assignments?.Select(MapAssignmentToDto).ToList() ?? new()
             };
         }
@@ -758,47 +753,50 @@ namespace BusinessLogic.Services.Implementation
         public async Task<List<CandidateComparisonItemDto>> GetCampaignComparisonAsync(int campaignId)
         {
             var schedules = (await _repo.GetSchedulesAsync(campaignId, null, null, null)).ToList();
-            var criteria = (await _repo.GetCriteriaByCampaignIdAsync(campaignId)).ToList();
-            var totalWeight = criteria.Sum(c => c.Weight);
+            var criteria  = (await _repo.GetCriteriaByCampaignIdAsync(campaignId)).ToList();
 
             var items = new List<CandidateComparisonItemDto>();
 
             foreach (var schedule in schedules)
             {
-                var allScores = (await _repo.GetCriteriaScoresByScheduleIdAsync(schedule.Id)).ToList();
+                var allNotes = (await _repo.GetCriteriaScoresByScheduleIdAsync(schedule.Id)).ToList();
 
-                var criteriaScoresDict = new Dictionary<int, double>();
-                double totalScore = 0;
-
-                foreach (var c in criteria)
+                var criteriaSummaries = criteria.Select(c =>
                 {
-                    var scoresForCriterion = allScores.Where(s => s.EvaluationCriterionId == c.Id).ToList();
-                    var avg = scoresForCriterion.Any() ? scoresForCriterion.Average(s => s.Score) : 0;
-                    criteriaScoresDict[c.Id] = Math.Round(avg, 2);
+                    var notesForCriterion = allNotes.Where(n => n.EvaluationCriterionId == c.Id).ToList();
+                    return new CriteriaSummaryItemDto
+                    {
+                        CriterionId   = c.Id,
+                        CriterionName = c.Name,
+                        Weight        = c.Weight,
+                        IndividualNotes = notesForCriterion.Select(n => new CriteriaNoteResultDto
+                        {
+                            CriterionId       = c.Id,
+                            CriterionName     = c.Name,
+                            Weight            = c.Weight,
+                            Note              = n.Note,
+                            InterviewerUserId = n.InterviewAssignment.InterviewerUserId,
+                            InterviewerRole   = n.InterviewAssignment.Role.ToString()
+                        }).ToList()
+                    };
+                }).ToList();
 
-                    if (totalWeight > 0)
-                        totalScore += (avg / 5.0) * 100 * ((double)c.Weight / totalWeight);
-                }
-
-                var suggested = totalScore >= 70 ? "Pass" : totalScore >= 50 ? "OnHold" : "Fail";
+                var feedbackNotes = schedule.Assignments
+                    .Where(a => !string.IsNullOrEmpty(a.FeedbackNotes))
+                    .Select(a => a.FeedbackNotes!)
+                    .ToList();
 
                 items.Add(new CandidateComparisonItemDto
                 {
                     InterviewScheduleId = schedule.Id,
                     CandidateUserId     = schedule.CandidateUserId,
                     Title               = schedule.Title,
-                    CriteriaScores      = criteriaScoresDict,
-                    TotalScore          = Math.Round(totalScore, 2),
-                    SuggestedResult     = suggested
+                    FeedbackNotes       = feedbackNotes,
+                    CriteriaSummaries   = criteriaSummaries
                 });
             }
 
-            // Xếp hạng theo tổng điểm
-            var ranked = items.OrderByDescending(i => i.TotalScore).ToList();
-            for (int i = 0; i < ranked.Count; i++)
-                ranked[i].Rank = i + 1;
-
-            return ranked;
+            return items;
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -895,7 +893,6 @@ namespace BusinessLogic.Services.Implementation
                 Name         = c.Name,
                 Description  = c.Description,
                 Weight       = c.Weight,
-                DisplayOrder = c.DisplayOrder,
                 IsDefault    = c.IsDefault
             };
         }

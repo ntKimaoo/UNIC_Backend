@@ -36,11 +36,6 @@ public class EvaluationCriterion
     public int Weight { get; set; }
 
     /// <summary>
-    /// Thứ tự hiển thị.
-    /// </summary>
-    public int DisplayOrder { get; set; }
-
-    /// <summary>
     /// Tiêu chí mặc định hay do admin tạo thêm.
     /// </summary>
     public bool IsDefault { get; set; } = true;

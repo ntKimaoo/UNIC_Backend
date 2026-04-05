@@ -82,6 +82,16 @@ builder.Services.AddScoped<IApplicationService, ApplicationService>();
 builder.Services.AddScoped<IApplicationRepository, ApplicationRepository>();
 builder.Services.AddScoped<IInterviewRepository, InterviewRepository>();
 builder.Services.AddScoped<IInterviewService, InterviewService>();
+
+// ── AI Analysis (OpenRouter) ─────────────────────────────────
+builder.Services.Configure<BusinessLogic.Options.OpenRouterOptions>(
+    builder.Configuration.GetSection(BusinessLogic.Options.OpenRouterOptions.SectionName));
+builder.Services.AddHttpClient<IAiAnalysisService, AiAnalysisService>((sp, client) =>
+{
+    var opt = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<BusinessLogic.Options.OpenRouterOptions>>().Value;
+    client.BaseAddress = new Uri(opt.BaseUrl.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(opt.TimeoutSeconds);
+});
 builder.Services.AddScoped<IClubCreationRequestRepository, ClubCreationRequestRepository>();
 builder.Services.AddScoped<IClubCreationRequestService, ClubCreationRequestService>();
 

@@ -4,6 +4,7 @@ using DataAccess.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace UNIC.DataAccess.Migrations.MeetingDb
 {
     [DbContext(typeof(MeetingDbContext))]
-    partial class MeetingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260403044110_RemoveScoreFromInterview")]
+    partial class RemoveScoreFromInterview
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -126,6 +129,9 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
                     b.Property<bool>("IsDefault")
                         .HasColumnType("bit");
 
@@ -141,6 +147,8 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
 
                     b.HasIndex("CampaignId");
 
+                    b.HasIndex("CampaignId", "DisplayOrder");
+
                     b.ToTable("EvaluationCriteria", (string)null);
                 });
 
@@ -154,6 +162,10 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
 
                     b.Property<DateTime>("AssignedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("AssignedCriteriaIds")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("FeedbackNotes")
                         .HasColumnType("nvarchar(max)");

@@ -14,12 +14,14 @@ namespace UNIC.ControllerTest.Controllers
     public class InterviewsControllerTest
     {
         private readonly Mock<IInterviewService> _mockService;
+        private readonly Mock<IAiAnalysisService> _mockAiService;
         private readonly InterviewsController _controller;
 
         public InterviewsControllerTest()
         {
             _mockService = new Mock<IInterviewService>();
-            _controller = new InterviewsController(_mockService.Object);
+            _mockAiService = new Mock<IAiAnalysisService>();
+            _controller = new InterviewsController(_mockService.Object, _mockAiService.Object);
 
             _controller.ControllerContext = new ControllerContext
             {
@@ -372,7 +374,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task SubmitFeedback_ReturnsOk_WhenSuccess()
         {
-            var dto = new SubmitFeedbackDto { Result = "Pass", Score = 8, FeedbackNotes = "Good" };
+            var dto = new SubmitFeedbackDto { Result = "Pass", FeedbackNotes = "Good" };
 
             _mockService.Setup(s => s.SubmitFeedbackAsync(1, 2, dto))
                         .ReturnsAsync(true);

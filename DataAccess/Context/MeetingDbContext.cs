@@ -55,7 +55,6 @@ public class MeetingDbContext : DbContext
             e.Property(a => a.Role).HasConversion<string>().HasMaxLength(50);
             e.Property(a => a.Result).HasConversion<string>().HasMaxLength(50);
             e.Property(a => a.InterviewerUserId).IsRequired();
-            e.Property(a => a.AssignedCriteriaIds).HasMaxLength(500);
             e.HasIndex(a => a.InterviewerUserId);
 
             e.HasOne(a => a.InterviewSchedule)
@@ -141,7 +140,6 @@ public class MeetingDbContext : DbContext
             e.Property(c => c.CampaignId).IsRequired();
 
             e.HasIndex(c => c.CampaignId);
-            e.HasIndex(c => new { c.CampaignId, c.DisplayOrder });
         });
 
         // ── CriteriaScore ─────────────────────────────────────────

@@ -47,8 +47,11 @@ namespace DataAccess.Repositories.Interface
 
         // ── CriteriaScore ────────────────────────────────────────
         Task<CriteriaScore> CreateCriteriaScoreAsync(CriteriaScore score);
+        Task<CriteriaScore?> GetCriteriaScoreAsync(int assignmentId, int criterionId);
+        Task<bool> UpdateCriteriaScoreAsync(CriteriaScore score);
         Task<IEnumerable<CriteriaScore>> GetCriteriaScoresByAssignmentIdAsync(int assignmentId);
         Task<IEnumerable<CriteriaScore>> GetCriteriaScoresByScheduleIdAsync(int scheduleId);
+        Task DeleteCriteriaScoresByAssignmentIdAsync(int assignmentId);
 
         // ── CampaignDecision ─────────────────────────────────────
         Task<IEnumerable<CampaignDecision>> GetDecisionsByCampaignIdAsync(int campaignId);

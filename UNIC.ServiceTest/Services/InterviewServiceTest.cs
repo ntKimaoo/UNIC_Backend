@@ -203,12 +203,11 @@ namespace UNIC.ServiceTest.Services
             _mockRepo.Setup(r => r.GetAssignmentByIdAsync(1)).ReturnsAsync(assignment);
             _mockRepo.Setup(r => r.UpdateAssignmentAsync(assignment)).ReturnsAsync(true);
 
-            var dto = new SubmitFeedbackDto { Result = "Pass", Score = 8, FeedbackNotes = "Good" };
+            var dto = new SubmitFeedbackDto { Result = "Pass", FeedbackNotes = "Good" };
             var result = await _interviewService.SubmitFeedbackAsync(1, 1, dto);
 
             Assert.True(result);
             Assert.Equal(InterviewResult.Pass, assignment.Result);
-            Assert.Equal(8, assignment.Score);
             _mockRepo.Verify(r => r.UpdateAssignmentAsync(assignment), Times.Once);
         }
 

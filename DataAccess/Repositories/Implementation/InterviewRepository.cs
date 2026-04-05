@@ -27,6 +27,7 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.InterviewSchedules
                 .Include(s => s.Assignments)
+                    .ThenInclude(a => a.CriteriaScores)
                 .Include(s => s.MeetingRoom)
                 .FirstOrDefaultAsync(s => s.Id == id);
         }
@@ -36,6 +37,7 @@ namespace DataAccess.Repositories.Implementation
         {
             var query = _context.InterviewSchedules
                 .Include(s => s.Assignments)
+                    .ThenInclude(a => a.CriteriaScores)
                 .Include(s => s.MeetingRoom)
                 .AsQueryable();
 
@@ -90,12 +92,15 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<InterviewAssignment?> GetAssignmentByIdAsync(int id)
         {
-            return await _context.InterviewAssignments.FindAsync(id);
+            return await _context.InterviewAssignments
+                .Include(a => a.CriteriaScores)
+                .FirstOrDefaultAsync(a => a.Id == id);
         }
 
         public async Task<IEnumerable<InterviewAssignment>> GetAssignmentsByScheduleIdAsync(int scheduleId)
         {
             return await _context.InterviewAssignments
+                .Include(a => a.CriteriaScores)
                 .Where(a => a.InterviewScheduleId == scheduleId)
                 .OrderBy(a => a.AssignedAt)
                 .ToListAsync();
@@ -241,7 +246,7 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.EvaluationCriteria
                 .Where(c => c.CampaignId == campaignId)
-                .OrderBy(c => c.DisplayOrder)
+                .OrderBy(c => c.Name)
                 .ToListAsync();
         }
 
@@ -289,6 +294,24 @@ namespace DataAccess.Repositories.Implementation
             return score;
         }
 
+        public async Task<CriteriaScore?> GetCriteriaScoreAsync(int assignmentId, int criterionId)
+        {
+            return await _context.CriteriaScores
+                .FirstOrDefaultAsync(cs => cs.InterviewAssignmentId == assignmentId
+                                        && cs.EvaluationCriterionId == criterionId);
+        }
+
+        public async Task<bool> UpdateCriteriaScoreAsync(CriteriaScore score)
+        {
+            try
+            {
+                _context.CriteriaScores.Update(score);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch { return false; }
+        }
+
         public async Task<IEnumerable<CriteriaScore>> GetCriteriaScoresByAssignmentIdAsync(int assignmentId)
         {
             return await _context.CriteriaScores
@@ -304,6 +327,19 @@ namespace DataAccess.Repositories.Implementation
                 .Include(cs => cs.InterviewAssignment)
                 .Where(cs => cs.InterviewAssignment.InterviewScheduleId == scheduleId)
                 .ToListAsync();
+        }
+
+        public async Task DeleteCriteriaScoresByAssignmentIdAsync(int assignmentId)
+        {
+            var scores = await _context.CriteriaScores
+                .Where(cs => cs.InterviewAssignmentId == assignmentId)
+                .ToListAsync();
+
+            if (scores.Any())
+            {
+                _context.CriteriaScores.RemoveRange(scores);
+                await _context.SaveChangesAsync();
+            }
         }
 
         // ═══════════════════════════════════════════════════════════
