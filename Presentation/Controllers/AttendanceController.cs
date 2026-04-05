@@ -102,6 +102,7 @@ namespace UNIC.Presentation.Controllers
             }
         }
 
+
         /// <summary>
         /// Get current user's QR code content for event check-in
         /// </summary>
@@ -118,6 +119,17 @@ namespace UNIC.Presentation.Controllers
                 return NotFound(new { error = "Bạn chưa đăng ký sự kiện này." });
 
             return Ok(response);
+        }
+
+        /// <summary>
+        /// Evaluate a member's attendance for an event (Manager/Admin only)
+        /// </summary>
+        [HttpPost("{id}/evaluate")]
+        // [Authorize(Roles = "Manager,Admin")] // Uncomment when authentication is fully set up
+        public async Task<IActionResult> EvaluateMember(int id, [FromBody] EvaluateMemberRequest request)
+        {
+            // TODO: implement _attendanceService.EvaluateMemberAsync when service method is available
+            return StatusCode(501, new { error = "Not implemented yet." });
         }
     }
 }

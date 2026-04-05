@@ -1,7 +1,9 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.Options;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
+using Microsoft.Extensions.Options;
 using UNIC.DataAccess.Repositories.Interface;
 
 namespace BusinessLogic.Services.Implementation
@@ -11,19 +13,27 @@ namespace BusinessLogic.Services.Implementation
         private readonly IFundRepository _fundRepository;
         private readonly IClubMemberRepository _clubMemberRepository;
         private readonly IPayOSService _payOSService;
-
+        private readonly IPolicyService _policyService;
+        private readonly PayOSOptions _payOSOptions;
         private const string STATUS_PENDING = "PENDING";
         private const string STATUS_APPROVED = "APPROVED";
         private const string STATUS_REJECTED = "REJECTED";
         private const string TYPE_INCOME = "INCOME";
-        private const string TYPE_EXPENSE = "EXPENSE";
         private const string MEMBER_STATUS_ACTIVE = "ACTIVE";
+        private const decimal MinTransactionAmountVnd = 1000m;
 
-        public ClubFundService(IFundRepository fundRepository, IClubMemberRepository clubMemberRepository, IPayOSService payOSService)
+        public ClubFundService(
+            IFundRepository fundRepository,
+            IClubMemberRepository clubMemberRepository,
+            IPayOSService payOSService,
+            IPolicyService policyService,
+            IOptions<PayOSOptions> payOSOptions)
         {
             _fundRepository = fundRepository;
             _clubMemberRepository = clubMemberRepository;
             _payOSService = payOSService;
+            _policyService = policyService;
+            _payOSOptions = payOSOptions.Value;
         }
 
         public async Task<FundResponseDto> CreateFundAsync(Guid userId, CreateFundDto dto)
@@ -33,6 +43,15 @@ namespace BusinessLogic.Services.Implementation
             if (dto.InitialAmount < 0)
                 throw new ArgumentException("Số tiền ban đầu không được âm.", nameof(dto.InitialAmount));
 
+            DateTime? expiresAtDate = null;
+            if (dto.ExpiresAt.HasValue)
+            {
+                var lastDay = dto.ExpiresAt.Value.Date;
+                if (lastDay < DateTime.UtcNow.Date)
+                    throw new ArgumentException("Ngày hết hạn nhận nộp tiền phải từ hôm nay trở đi.", nameof(dto.ExpiresAt));
+                expiresAtDate = lastDay;
+            }
+
             var member = await _clubMemberRepository.GetMemberAsync(userId, dto.ClubId);
             if (member == null)
                 throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
@@ -41,7 +60,6 @@ namespace BusinessLogic.Services.Implementation
             if (!HasManagerOrViceLevel(member.ClubRole))
                 throw new UnauthorizedAccessException("Chỉ Club Manager hoặc Vice Manager mới được tạo quỹ.");
 
-            // Manager (Level 1) tạo quỹ → đã duyệt; Vice Manager (Level 2) tạo → chờ duyệt.
             var fundStatus = HasHighestClubLevel(member.ClubRole) ? STATUS_APPROVED : STATUS_PENDING;
 
             var fund = new ClubFund
@@ -51,7 +69,8 @@ namespace BusinessLogic.Services.Implementation
                 TotalAmount = dto.InitialAmount,
                 CurrentBalance = dto.InitialAmount,
                 CreatedAt = DateTime.UtcNow,
-                Status = fundStatus
+                Status = fundStatus,
+                ExpiresAt = expiresAtDate
             };
 
             var created = await _fundRepository.AddFundAsync(fund);
@@ -62,12 +81,16 @@ namespace BusinessLogic.Services.Implementation
         {
             if (request.Amount <= 0)
                 throw new ArgumentException("Số tiền phải lớn hơn 0.", nameof(request.Amount));
+            if (request.Amount < MinTransactionAmountVnd)
+                throw new ArgumentException($"Số tiền tối thiểu là {MinTransactionAmountVnd:N0} ₫.", nameof(request.Amount));
 
             var fund = await _fundRepository.GetFundByIdAsync(request.FundId);
             if (fund == null)
                 throw new InvalidOperationException("Quỹ không tồn tại.");
             if (!string.Equals(fund.Status, STATUS_APPROVED, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Chỉ có thể nộp tiền vào quỹ đã được duyệt.");
+            if (fund.ExpiresAt.HasValue && DateTime.UtcNow.Date > fund.ExpiresAt.Value.Date)
+                throw new InvalidOperationException("Quỹ đã hết hạn nhận nộp tiền.");
 
             var member = await _clubMemberRepository.GetMemberAsync(userId, fund.ClubId);
             if (member == null)
@@ -75,6 +98,7 @@ namespace BusinessLogic.Services.Implementation
             if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
                 throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được nộp tiền vào quỹ.");
 
+            var utc = DateTime.UtcNow;
             var transaction = new FundTransaction
             {
                 FundId = request.FundId,
@@ -82,9 +106,12 @@ namespace BusinessLogic.Services.Implementation
                 TransactionType = TYPE_INCOME,
                 Amount = request.Amount,
                 Description = request.Description?.Trim() ?? "Nộp quỹ",
-                TransactionDate = DateTime.UtcNow,
+                TransactionDate = utc,
+                CreatedAt = utc,
+                UpdatedAt = utc,
                 Status = STATUS_PENDING,
-                CreatedBy = userId
+                CreatedBy = userId,
+                IsMemberContribution = true
             };
 
             await _fundRepository.AddTransactionAsync(transaction);
@@ -96,8 +123,10 @@ namespace BusinessLogic.Services.Implementation
                 cancellationToken);
 
             transaction.PaymentLinkId = payOsResult.PaymentLinkId;
+            transaction.UpdatedAt = DateTime.UtcNow;
             await _fundRepository.UpdateTransactionAsync(transaction);
 
+            var expiresAtUtc = transaction.TransactionDate.AddMinutes(_payOSOptions.LinkExpirationMinutes);
             return new ContributeResponseDto
             {
                 TransactionId = transaction.TransactionId,
@@ -105,100 +134,67 @@ namespace BusinessLogic.Services.Implementation
                 QrCode = payOsResult.QrCode,
                 PaymentLinkId = payOsResult.PaymentLinkId,
                 Amount = transaction.Amount,
+                PaymentLinkExpiresAtUtc = expiresAtUtc,
                 Message = "Quét QR hoặc mở link để thanh toán. Sau khi thanh toán thành công, quỹ sẽ được cập nhật tự động."
             };
         }
 
-        public async Task<FundTransaction> CreateRequestAsync(Guid userId, CreateFundRequestDto request)
+        public async Task<ContributionPaymentStatusDto?> GetContributionPaymentStatusAsync(Guid userId, int clubId, int transactionId)
         {
-            if (request.Amount <= 0)
-                throw new ArgumentException("Số tiền phải lớn hơn 0.", nameof(request.Amount));
+            var t = await _fundRepository.GetTransactionByIdAsync(transactionId);
+            if (t == null || !t.IsMemberContribution || !string.Equals(t.TransactionType, TYPE_INCOME, StringComparison.OrdinalIgnoreCase))
+                return null;
+            if (t.CreatedBy != userId)
+                return null;
+            if (t.ClubFund == null || t.ClubFund.ClubId != clubId)
+                return null;
 
-            var transactionType = request.TransactionType?.Trim().ToUpperInvariant();
-            if (transactionType != TYPE_INCOME && transactionType != TYPE_EXPENSE)
-                throw new ArgumentException("Loại giao dịch phải là INCOME hoặc EXPENSE.", nameof(request.TransactionType));
-
-            var fund = await _fundRepository.GetFundByIdAsync(request.FundId);
-            if (fund == null)
-                throw new InvalidOperationException("Quỹ không tồn tại.");
-            if (!string.Equals(fund.Status, STATUS_APPROVED, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Chỉ có thể tạo yêu cầu THU/CHI khi quỹ đã được duyệt.");
-
-            var member = await _clubMemberRepository.GetMemberAsync(userId, fund.ClubId);
-            if (member == null)
-                throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
-            if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
-                throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được gửi yêu cầu.");
-
-            var transaction = new FundTransaction
-            {
-                FundId = request.FundId,
-                CategoryId = request.CategoryId,
-                TransactionType = transactionType,
-                Amount = request.Amount,
-                Description = request.Description?.Trim() ?? string.Empty,
-                TransactionDate = DateTime.UtcNow,
-                Status = STATUS_PENDING,
-                CreatedBy = userId
-            };
-
-            await _fundRepository.AddTransactionAsync(transaction);
-            return transaction;
+            return MapContributionPaymentStatus(t);
         }
 
-        public async Task<bool> ProcessRequestAsync(Guid managerId, ProcessFundRequestDto request)
+        public async Task<ContributionPaymentStatusDto?> GetContributionPaymentStatusByOrderCodeAsync(Guid userId, int orderCode)
         {
-            var transaction = await _fundRepository.GetTransactionByIdAsync(request.TransactionId);
-            if (transaction == null)
-                throw new InvalidOperationException("Giao dịch không tồn tại.");
-            if (transaction.Status != STATUS_PENDING)
-                throw new InvalidOperationException("Giao dịch đã được xử lý trước đó.");
+            var t = await _fundRepository.GetTransactionByIdAsync(orderCode);
+            if (t == null || !t.IsMemberContribution || !string.Equals(t.TransactionType, TYPE_INCOME, StringComparison.OrdinalIgnoreCase))
+                return null;
+            if (t.CreatedBy != userId)
+                return null;
+            if (t.ClubFund == null)
+                return null;
 
-            var action = request.Action?.Trim().ToUpperInvariant();
-            if (action != "APPROVE" && action != "REJECT")
-                throw new ArgumentException("Hành động phải là APPROVE hoặc REJECT.", nameof(request.Action));
+            return MapContributionPaymentStatus(t);
+        }
 
-            var fund = transaction.ClubFund;
-            if (fund == null)
-                throw new InvalidOperationException("Không tìm thấy quỹ liên kết với giao dịch.");
-
-            var approverMember = await _clubMemberRepository.GetMemberAsync(managerId, fund.ClubId);
-            if (approverMember == null)
-                throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
-            if (!string.Equals(approverMember.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
-                throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được duyệt yêu cầu.");
-            if (!HasManagerOrViceLevel(approverMember.ClubRole))
-                throw new UnauthorizedAccessException("Chỉ Club Manager hoặc Vice Manager mới được duyệt/từ chối yêu cầu quỹ.");
-
-            transaction.ApprovedBy = managerId;
-            transaction.TransactionDate = DateTime.UtcNow;
-
-            if (action == "APPROVE")
+        private ContributionPaymentStatusDto MapContributionPaymentStatus(FundTransaction t)
+        {
+            var status = t.Status ?? STATUS_PENDING;
+            var isPaid = string.Equals(status, STATUS_APPROVED, StringComparison.OrdinalIgnoreCase);
+            DateTime? expiresAtUtc = null;
+            var linkExpired = false;
+            if (string.Equals(status, STATUS_PENDING, StringComparison.OrdinalIgnoreCase))
             {
-                if (transaction.Amount <= 0)
-                    throw new InvalidOperationException("Số tiền giao dịch không hợp lệ.");
-
-                if (transaction.TransactionType == TYPE_EXPENSE)
-                {
-                    if (fund.CurrentBalance < transaction.Amount)
-                        throw new InvalidOperationException("Số dư quỹ không đủ để duyệt chi tiêu này.");
-                    fund.CurrentBalance -= transaction.Amount;
-                }
-                else if (transaction.TransactionType == TYPE_INCOME)
-                {
-                    fund.CurrentBalance += transaction.Amount;
-                    fund.TotalAmount += transaction.Amount;
-                }
-
-                transaction.Status = STATUS_APPROVED;
-            }
-            else
-            {
-                transaction.Status = STATUS_REJECTED;
+                expiresAtUtc = t.TransactionDate.AddMinutes(_payOSOptions.LinkExpirationMinutes);
+                linkExpired = DateTime.UtcNow > expiresAtUtc.Value;
             }
 
-            await _fundRepository.UpdateTransactionAndFundAsync(transaction, fund);
-            return true;
+            var message = isPaid
+                ? "Thanh toán thành công, quỹ đã được cập nhật."
+                : linkExpired
+                    ? "Link thanh toán đã hết hạn. Hãy tạo yêu cầu nộp tiền mới."
+                    : "Đang chờ thanh toán. Sau khi hoàn tất, trạng thái sẽ chuyển thành công (có thể trễ vài giây so với webhook).";
+
+            return new ContributionPaymentStatusDto
+            {
+                ClubId = t.ClubFund!.ClubId,
+                TransactionId = t.TransactionId,
+                FundId = t.FundId,
+                Status = status,
+                Amount = t.Amount,
+                IsPaid = isPaid,
+                IsPaymentLinkExpired = linkExpired,
+                PaymentLinkExpiresAtUtc = expiresAtUtc,
+                Message = message
+            };
         }
 
         public async Task<FundResponseDto?> GetFundByIdAsync(int fundId)
@@ -207,21 +203,57 @@ namespace BusinessLogic.Services.Implementation
             return fund == null ? null : MapToFundDto(fund);
         }
 
-        public async Task<IEnumerable<FundResponseDto>> GetFundsByClubIdAsync(int clubId)
+        public async Task<PagedResultDto<FundResponseDto>> GetFundsByClubIdPagedAsync(int clubId, int pageNumber, int pageSize)
         {
-            var funds = await _fundRepository.GetFundsByClubIdAsync(clubId);
-            return funds.Select(MapToFundDto);
+            var (items, totalCount) = await _fundRepository.GetFundsByClubIdPagedAsync(clubId, pageNumber, pageSize);
+            return ToPagedResult(items.Select(MapToFundDto), pageNumber, pageSize, totalCount);
         }
 
-        public async Task<IEnumerable<FundTransactionResponseDto>> GetFundHistoryAsync(int fundId, string? status)
+        public async Task<PagedResultDto<FundTransactionResponseDto>> GetFundHistoryPagedAsync(
+            int fundId, string? status, string? scope, Guid? currentUserId, int pageNumber, int pageSize)
         {
-            var normalizedStatus = status?.ToUpperInvariant();
-            var list = await _fundRepository.GetTransactionsByFundIdAsync(fundId, normalizedStatus);
-            return list.Select(MapToTransactionDto);
+            var trimmed = status?.Trim();
+            string? normalizedStatus;
+            if (string.IsNullOrEmpty(trimmed))
+                normalizedStatus = STATUS_APPROVED;
+            else if (string.Equals(trimmed, "ALL", StringComparison.OrdinalIgnoreCase))
+                normalizedStatus = null;
+            else
+                normalizedStatus = trimmed.ToUpperInvariant();
+
+            var normalizedScope = scope?.Trim().ToLowerInvariant();
+            Guid? filterUser = normalizedScope == "mine" ? currentUserId : null;
+
+            var (items, totalCount) = await _fundRepository.GetTransactionsByFundIdPagedAsync(
+                fundId,
+                normalizedStatus,
+                memberContributionsOnly: true,
+                filterUser,
+                pageNumber,
+                pageSize);
+
+            return ToPagedResult(items.Select(MapToTransactionDto), pageNumber, pageSize, totalCount);
+        }
+
+        private static PagedResultDto<T> ToPagedResult<T>(IEnumerable<T> items, int pageNumber, int pageSize, int totalCount)
+        {
+            var totalPages = totalCount == 0 ? 0 : (int)Math.Ceiling(totalCount / (double)pageSize);
+            return new PagedResultDto<T>
+            {
+                Items = items,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                HasPreviousPage = pageNumber > 1,
+                HasNextPage = pageNumber < totalPages
+            };
         }
 
         private static FundResponseDto MapToFundDto(ClubFund fund)
         {
+            var approved = string.Equals(fund.Status, STATUS_APPROVED, StringComparison.OrdinalIgnoreCase);
+            var notExpired = !fund.ExpiresAt.HasValue || DateTime.UtcNow.Date <= fund.ExpiresAt.Value.Date;
             return new FundResponseDto
             {
                 FundId = fund.FundId,
@@ -230,12 +262,20 @@ namespace BusinessLogic.Services.Implementation
                 TotalAmount = fund.TotalAmount,
                 CurrentBalance = fund.CurrentBalance,
                 CreatedAt = fund.CreatedAt,
-                Status = fund.Status ?? "PENDING"
+                Status = fund.Status ?? "PENDING",
+                ExpiresAt = fund.ExpiresAt,
+                CanAcceptContributions = approved && notExpired
             };
         }
 
         private static FundTransactionResponseDto MapToTransactionDto(FundTransaction t)
         {
+            var createdAt = t.CreatedAt != default ? t.CreatedAt : t.TransactionDate;
+            var updatedAt = t.UpdatedAt != default ? t.UpdatedAt : t.TransactionDate;
+            var displayName = string.IsNullOrWhiteSpace(t.Creator?.FullName)
+                ? null
+                : t.Creator!.FullName.Trim();
+
             return new FundTransactionResponseDto
             {
                 TransactionId = t.TransactionId,
@@ -248,7 +288,13 @@ namespace BusinessLogic.Services.Implementation
                 TransactionDate = t.TransactionDate,
                 CreatedBy = t.CreatedBy,
                 ApprovedBy = t.ApprovedBy,
-                PaymentLinkId = t.PaymentLinkId
+                PaymentLinkId = t.PaymentLinkId,
+                IsMemberContribution = t.IsMemberContribution,
+                CreatedAt = createdAt,
+                UpdatedAt = updatedAt,
+                MemberName = displayName,
+                ContributorName = displayName,
+                UserFullName = displayName
             };
         }
 
@@ -269,20 +315,37 @@ namespace BusinessLogic.Services.Implementation
             var transaction = await _fundRepository.GetTransactionByIdAsync(orderCode);
             if (transaction == null)
                 return false;
-            if (transaction.TransactionType != TYPE_INCOME || transaction.Status != STATUS_PENDING)
+            if (!transaction.IsMemberContribution || transaction.TransactionType != TYPE_INCOME || transaction.Status != STATUS_PENDING)
                 return false;
 
             var fund = transaction.ClubFund;
             if (fund == null)
                 return false;
 
+            var utc = DateTime.UtcNow;
             transaction.Status = STATUS_APPROVED;
-            transaction.TransactionDate = DateTime.UtcNow;
+            transaction.TransactionDate = utc;
+            transaction.UpdatedAt = utc;
             fund.CurrentBalance += transaction.Amount;
             fund.TotalAmount += transaction.Amount;
 
             await _fundRepository.UpdateTransactionAndFundAsync(transaction, fund);
             return true;
+        }
+
+        public async Task<bool> TryCompleteOwnPendingContributionForDevelopmentAsync(Guid userId, int clubId, int transactionId)
+        {
+            var transaction = await _fundRepository.GetTransactionByIdAsync(transactionId);
+            if (transaction == null)
+                return false;
+            if (transaction.CreatedBy != userId)
+                return false;
+            if (transaction.ClubFund == null || transaction.ClubFund.ClubId != clubId)
+                return false;
+            if (!transaction.IsMemberContribution || !string.Equals(transaction.TransactionType, TYPE_INCOME, StringComparison.OrdinalIgnoreCase) || transaction.Status != STATUS_PENDING)
+                return false;
+
+            return await ProcessPayOSPaymentSuccessAsync(transactionId);
         }
 
         public async Task<bool> ApproveFundAsync(Guid managerId, ApproveFundDto dto)
@@ -313,6 +376,39 @@ namespace BusinessLogic.Services.Implementation
 
             await _fundRepository.UpdateClubFundAsync(fund);
             return true;
+        }
+
+        public async Task<FundCapabilitiesDto> GetFundCapabilitiesAsync(Guid userId, int clubId)
+        {
+            var dto = new FundCapabilitiesDto { ClubId = clubId };
+            var member = await _clubMemberRepository.GetMemberAsync(userId, clubId);
+            if (member == null)
+                return dto;
+
+            dto.IsActiveClubMember = string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase);
+            dto.ClubRoleLevel = member.ClubRole?.Level;
+            dto.ClubRoleName = member.ClubRole?.RoleName;
+
+            if (!dto.IsActiveClubMember)
+                return dto;
+
+            var hasView = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "viewfinance");
+            var hasCreate = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "createfinance");
+            var hasEdit = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "editfinance");
+
+            dto.HasViewFinancePolicy = hasView;
+            dto.HasCreateFinancePolicy = hasCreate;
+            dto.HasEditFinancePolicy = hasEdit;
+
+            var isMgrOrVice = HasManagerOrViceLevel(member.ClubRole);
+            var isMgr = HasHighestClubLevel(member.ClubRole);
+
+            dto.CanViewFunds = hasView;
+            dto.CanContribute = true;
+            dto.CanCreateFund = hasCreate && isMgrOrVice;
+            dto.CanApproveOrRejectFundEntity = hasEdit && isMgr;
+
+            return dto;
         }
     }
 }

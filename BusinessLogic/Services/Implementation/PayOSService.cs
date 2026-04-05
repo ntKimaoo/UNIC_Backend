@@ -30,14 +30,24 @@ namespace BusinessLogic.Services.Implementation
             string description,
             CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrEmpty(_options.ClientId) || string.IsNullOrEmpty(_options.ApiKey) || string.IsNullOrEmpty(_options.ChecksumKey))
-                throw new InvalidOperationException("PayOS chưa được cấu hình (ClientId, ApiKey, ChecksumKey).");
-
             var amountInt = (int)Math.Round(amountVnd);
             if (amountInt <= 0)
                 throw new ArgumentException("Số tiền phải lớn hơn 0.", nameof(amountVnd));
 
-            // Mô tả với một số ngân hàng giới hạn 9 ký tự; PayOS cho phép dài hơn với tài khoản liên kết
+            if (_options.UseMock)
+            {
+                var mockUrl = BuildMockCheckoutUrl(orderCode);
+                return new PayOSPaymentLinkResult
+                {
+                    CheckoutUrl = mockUrl,
+                    QrCode = mockUrl,
+                    PaymentLinkId = $"mock-{orderCode}"
+                };
+            }
+
+            if (string.IsNullOrEmpty(_options.ClientId) || string.IsNullOrEmpty(_options.ApiKey) || string.IsNullOrEmpty(_options.ChecksumKey))
+                throw new InvalidOperationException("PayOS chưa được cấu hình (ClientId, ApiKey, ChecksumKey). Bật PayOS:UseMock=true trong appsettings.Development.json để test local không cần credential.");
+
             var desc = description?.Trim() ?? "Nop quy";
             if (desc.Length > 255) desc = desc[..255];
 
@@ -46,7 +56,6 @@ namespace BusinessLogic.Services.Implementation
 
             var expiredAt = DateTimeOffset.UtcNow.AddMinutes(_options.LinkExpirationMinutes).ToUnixTimeSeconds();
 
-            // PayOS signature: data sort alphabetically, giá trị giống như gửi trong body (theo doc)
             var dataStr = $"amount={amountInt}&cancelUrl={cancelUrl}&description={desc}&orderCode={orderCode}&returnUrl={returnUrl}";
             var signature = ComputeHmacSha256Hex(_options.ChecksumKey, dataStr);
 
@@ -92,6 +101,23 @@ namespace BusinessLogic.Services.Implementation
                 QrCode = qrCode,
                 PaymentLinkId = paymentLinkId
             };
+        }
+
+        private string BuildMockCheckoutUrl(long orderCode)
+        {
+            var template = _options.MockCheckoutUrlTemplate?.Trim();
+            if (!string.IsNullOrEmpty(template))
+            {
+                return template
+                    .Replace("{transactionId}", orderCode.ToString(), StringComparison.Ordinal)
+                    .Replace("{orderCode}", orderCode.ToString(), StringComparison.Ordinal);
+            }
+
+            var ret = _options.ReturnUrl?.Trim();
+            if (!string.IsNullOrEmpty(ret))
+                return $"{ret.TrimEnd('/')}?mockTransactionId={orderCode}";
+
+            return $"about:blank#mock-pay-txn-{orderCode}";
         }
 
         public bool VerifyWebhookSignature(string receivedSignature, JsonElement dataElement)

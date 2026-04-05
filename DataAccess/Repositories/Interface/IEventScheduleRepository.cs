@@ -7,5 +7,7 @@ namespace DataAccess.Repositories.Interface
     {
         Task AddAsync(EventSchedule schedule);
         void Update(EventSchedule schedule);
+        void Delete(EventSchedule schedule);
+        Task<EventSchedule?> GetByIdAsync(int scheduleId);
     }
 }

@@ -1,5 +1,6 @@
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
+using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
 
 namespace DataAccess.Repositories.Implementation
@@ -21,6 +22,17 @@ namespace DataAccess.Repositories.Implementation
         public void Update(EventSchedule schedule)
         {
             _context.EventSchedules.Update(schedule);
+        }
+
+        public void Delete(EventSchedule schedule)
+        {
+            _context.EventSchedules.Remove(schedule);
+        }
+
+        public async Task<EventSchedule?> GetByIdAsync(int scheduleId)
+        {
+            return await _context.EventSchedules
+                .FirstOrDefaultAsync(s => s.ScheduleId == scheduleId);
         }
     }
 }
