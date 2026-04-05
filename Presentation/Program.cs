@@ -193,6 +193,9 @@ builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
 // Register club-scoped authorization handler
 builder.Services.AddScoped<IAuthorizationHandler, ClubMemberAuthorizationHandler>();
 
+// Register event-scoped authorization handler
+builder.Services.AddScoped<IAuthorizationHandler, EventPermissionAuthorizationHandler>();
+
 // Register dynamic policy provider
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 

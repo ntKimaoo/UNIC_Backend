@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Presentation.Authorization;
 using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
 using System.Linq;
@@ -147,12 +148,11 @@ namespace UNIC.Presentation.Controllers
         /// </summary>
         [HttpPut("{id}")]
         [Consumes("multipart/form-data")]
+        [RequireEventPolicy("editevent")]
         public async Task<ActionResult<EventDetailDto>> UpdateEvent(int clubId, int id, [FromForm] UpdateEventRequest request, IFormFile? image)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "editevent"))
-                    return Forbidden();
 
                 if (id != request.EventId) return BadRequest(new { error = "Event ID mismatch" });
 
@@ -176,12 +176,11 @@ namespace UNIC.Presentation.Controllers
         /// </summary>
         [HttpPost("{id}/image")]
         [Consumes("multipart/form-data")]
+        [RequireEventPolicy("editevent")]
         public async Task<IActionResult> UploadEventImage(int clubId, int id, IFormFile image)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "editevent"))
-                    return Forbidden();
 
                 if (image == null || image.Length == 0) return BadRequest(new { error = "No image file provided." });
 
@@ -209,12 +208,11 @@ namespace UNIC.Presentation.Controllers
         /// Create session — CREATOR, MANAGER, COORDINATOR
         /// </summary>
         [HttpPost("{id}/sessions")]
+        [RequireEventPolicy("managesession")]
         public async Task<ActionResult<SessionDto>> CreateSession(int clubId, int id, [FromBody] CreateSessionRequest request)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "managesession"))
-                    return Forbidden();
 
                 if (id != request.EventId) return BadRequest(new { error = "Event ID mismatch" });
 
@@ -237,12 +235,11 @@ namespace UNIC.Presentation.Controllers
         /// Update session — CREATOR, MANAGER, COORDINATOR
         /// </summary>
         [HttpPut("{id}/sessions/{scheduleId}")]
+        [RequireEventPolicy("managesession")]
         public async Task<ActionResult<SessionDto>> UpdateSession(int clubId, int id, int scheduleId, [FromBody] UpdateSessionRequest request)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "managesession"))
-                    return Forbidden();
 
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
@@ -266,12 +263,11 @@ namespace UNIC.Presentation.Controllers
         /// Delete session — CREATOR, MANAGER
         /// </summary>
         [HttpDelete("{id}/sessions/{scheduleId}")]
+        [RequireEventPolicy("managesession")]
         public async Task<IActionResult> DeleteSession(int clubId, int id, int scheduleId)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "managesession"))
-                    return Forbidden();
 
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
@@ -292,12 +288,11 @@ namespace UNIC.Presentation.Controllers
         /// Open registration — CREATOR, MANAGER
         /// </summary>
         [HttpPatch("{id}/open-registration")]
+        [RequireEventPolicy("openregistration")]
         public async Task<ActionResult<EventDetailDto>> OpenRegistration(int clubId, int id, [FromBody] OpenRegistrationRequest request)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "openregistration"))
-                    return Forbidden();
 
                 if (id != request.EventId) return BadRequest(new { error = "Event ID mismatch" });
 
@@ -315,12 +310,11 @@ namespace UNIC.Presentation.Controllers
         /// Start event — CREATOR, MANAGER
         /// </summary>
         [HttpPut("{id}/start")]
+        [RequireEventPolicy("startevent")]
         public async Task<IActionResult> StartEvent(int clubId, int id)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "startevent"))
-                    return Forbidden();
 
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
@@ -336,12 +330,11 @@ namespace UNIC.Presentation.Controllers
         /// Complete event — CREATOR, MANAGER
         /// </summary>
         [HttpPut("{id}/complete")]
+        [RequireEventPolicy("completeevent")]
         public async Task<IActionResult> CompleteEvent(int clubId, int id)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "completeevent"))
-                    return Forbidden();
 
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
@@ -431,11 +424,11 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPost("{id}/roles")]
+        [RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> CreateEventRole(int clubId, int id, [FromBody] EventRoleDto request)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "managecollaborator")) return Forbidden();
 
                 if (await _unitOfWork.EventRoles.RoleNameExistsAsync(request.RoleName, id))
                     return BadRequest(new { error = "Role name already exists in this event." });
@@ -454,11 +447,11 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPut("{id}/roles/{roleId}")]
+        [RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> UpdateEventRole(int clubId, int id, int roleId, [FromBody] EventRoleDto request)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "managecollaborator")) return Forbidden();
 
                 var role = await _unitOfWork.EventRoles.GetByIdAsync(roleId, id);
                 if (role == null) return NotFound(new { error = "Role not found." });
@@ -481,11 +474,11 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpDelete("{id}/roles/{roleId}")]
+        [RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> DeleteEventRole(int clubId, int id, int roleId)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "managecollaborator")) return Forbidden();
 
                 var role = await _unitOfWork.EventRoles.GetByIdAsync(roleId, id);
                 if (role == null) return NotFound(new { error = "Role not found." });
@@ -499,11 +492,11 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPut("{id}/roles/{roleId}/policies")]
+        [RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> SetEventRolePolicies(int clubId, int id, int roleId, [FromBody] List<string> policies)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "managecollaborator")) return Forbidden();
 
                 var role = await _unitOfWork.EventRoles.GetByIdAsync(roleId, id);
                 if (role == null) return NotFound(new { error = "Role not found." });
@@ -553,11 +546,11 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPost("{id}/members")]
+        [RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> AddEventMember(int clubId, int id, [FromBody] AddEventMemberRequest request)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "managecollaborator")) return Forbidden();
 
                 var existing = await _unitOfWork.EventMembers.GetByEventAndUserAsync(id, request.UserId);
                 if (existing != null) return BadRequest(new { error = "User is already a member of this event." });
@@ -578,11 +571,11 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPut("{id}/members/{memberId}/role")]
+        [RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> UpdateEventMemberRole(int clubId, int id, int memberId, [FromBody] int? roleId)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "managecollaborator")) return Forbidden();
 
                 var member = await _unitOfWork.EventMembers.GetByIdAsync(memberId);
                 if (member == null || member.EventId != id) return NotFound(new { error = "Member not found." });
@@ -598,11 +591,11 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpDelete("{id}/members/{memberId}")]
+        [RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> RemoveEventMember(int clubId, int id, int memberId)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "managecollaborator")) return Forbidden();
 
                 var member = await _unitOfWork.EventMembers.GetByIdAsync(memberId);
                 if (member == null || member.EventId != id) return NotFound(new { error = "Member not found." });
@@ -616,11 +609,11 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPut("{id}/members/{memberId}/policies")]
+        [RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> SetEventMemberPolicies(int clubId, int id, int memberId, [FromBody] List<string> policies)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "managecollaborator")) return Forbidden();
 
                 var member = await _unitOfWork.EventMembers.GetByIdAsync(memberId);
                 if (member == null || member.EventId != id) return NotFound(new { error = "Member not found." });

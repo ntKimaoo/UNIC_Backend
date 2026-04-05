@@ -4,6 +4,7 @@ using BusinessLogic.Services.Interface;
 using DataAccess.Enums;
 using DataAccess.Repositories.Interface;
 using Microsoft.AspNetCore.Authorization;
+using Presentation.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
@@ -99,12 +100,11 @@ namespace UNIC.Presentation.Controllers
         /// Approve registration — CREATOR, MANAGER, COORDINATOR
         /// </summary>
         [HttpPost("{id}/approve/{userId}")]
+        [RequireEventPolicy("approveattendance")]
         public async Task<IActionResult> ApproveRegistration(int clubId, int id, Guid userId)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "approveattendance"))
-                    return Forbidden("Bạn không có quyền duyệt đăng ký.");
 
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
@@ -120,12 +120,11 @@ namespace UNIC.Presentation.Controllers
         /// Reject registration — CREATOR, MANAGER, COORDINATOR
         /// </summary>
         [HttpPost("{id}/reject/{userId}")]
+        [RequireEventPolicy("approveattendance")]
         public async Task<IActionResult> RejectRegistration(int clubId, int id, Guid userId)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "approveattendance"))
-                    return Forbidden("Bạn không có quyền từ chối đăng ký.");
 
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
@@ -141,12 +140,11 @@ namespace UNIC.Presentation.Controllers
         /// Bulk approve — CREATOR, MANAGER, COORDINATOR
         /// </summary>
         [HttpPost("{id}/approve-bulk")]
+        [RequireEventPolicy("approveattendance")]
         public async Task<IActionResult> BulkApproveRegistrations(int clubId, int id, [FromBody] List<Guid> userIds)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "approveattendance"))
-                    return Forbidden("Bạn không có quyền duyệt đăng ký.");
 
                 if (userIds == null || userIds.Count == 0)
                     return BadRequest(new { error = "Danh sách userId không được rỗng." });
@@ -165,12 +163,11 @@ namespace UNIC.Presentation.Controllers
         /// Generate check-in code — CREATOR, MANAGER, COORDINATOR, CHECKER
         /// </summary>
         [HttpPost("{id}/checkin-code")]
+        [RequireEventPolicy("checkin")]
         public async Task<ActionResult<CheckInCodeResponse>> GenerateCheckInCode(int clubId, int id)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "checkin"))
-                    return Forbidden("Bạn không có quyền tạo mã điểm danh.");
 
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
@@ -187,12 +184,11 @@ namespace UNIC.Presentation.Controllers
         /// Check in by QR — CREATOR, MANAGER, COORDINATOR, CHECKER
         /// </summary>
         [HttpPost("{id}/checkin-qr")]
+        [RequireEventPolicy("checkin")]
         public async Task<ActionResult<CheckInByQrResponse>> CheckInByQr(int clubId, int id, [FromBody] CheckInByQrRequest request)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "checkin"))
-                    return Forbidden("Bạn không có quyền điểm danh.");
 
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
@@ -214,12 +210,11 @@ namespace UNIC.Presentation.Controllers
         /// Evaluate member — CREATOR, MANAGER, COORDINATOR
         /// </summary>
         [HttpPost("{id}/evaluate")]
+        [RequireEventPolicy("evaluatemember")]
         public async Task<IActionResult> EvaluateMember(int clubId, int id, [FromBody] EvaluateMemberRequest request)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "evaluatemember"))
-                    return Forbidden("Bạn không có quyền đánh giá thành viên.");
 
                 if (id != request.EventId) return BadRequest(new { error = "Mã sự kiện không khớp." });
 
@@ -237,12 +232,11 @@ namespace UNIC.Presentation.Controllers
         /// Get attendees — CREATOR, MANAGER, COORDINATOR, CHECKER
         /// </summary>
         [HttpGet("{id}/attendees")]
+        [RequireEventPolicy("viewattendance")]
         public async Task<ActionResult<IEnumerable<AttendanceDetailDto>>> GetEventAttendees(int clubId, int id)
         {
             try
             {
-                if (!await HasEventPermission(clubId, id, "viewattendance"))
-                    return Forbidden("Bạn không có quyền xem danh sách tham gia.");
 
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
