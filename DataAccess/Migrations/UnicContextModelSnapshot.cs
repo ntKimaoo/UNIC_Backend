@@ -1979,36 +1979,37 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("ClubMemberPolicies");
 
                     b.Navigation("MemberDepartments");
-            modelBuilder.Entity("DataAccess.Models.UserEventRole", b =>
-                {
-                    b.Navigation("EventMemberPolicies");
+                    modelBuilder.Entity("DataAccess.Models.UserEventRole", b =>
+                        {
+                            b.Navigation("EventMemberPolicies");
+                        });
+
+                    modelBuilder.Entity("DataAccess.Models.UserRole", b =>
+                        {
+                            b.Navigation("UserRolePolicies");
+                        });
+
+                    modelBuilder.Entity("UNIC.DataAccess.Models.Policy", b =>
+                        {
+                            b.Navigation("ClubMemberPolicies");
+
+                            b.Navigation("ClubRolePolicies");
+
+                            b.Navigation("EventMemberPolicies");
+
+                            b.Navigation("EventRolePolicies");
+
+                            b.Navigation("UserPolicies");
+
+                            b.Navigation("UserRolePolicies");
+                        });
+
+                    modelBuilder.Entity("UNIC.DataAccess.Models.PolicyGroup", b =>
+                        {
+                            b.Navigation("Policies");
+                        });
+
                 });
-
-            modelBuilder.Entity("DataAccess.Models.UserRole", b =>
-                {
-                    b.Navigation("UserRolePolicies");
-                });
-
-            modelBuilder.Entity("UNIC.DataAccess.Models.Policy", b =>
-                {
-                    b.Navigation("ClubMemberPolicies");
-
-                    b.Navigation("ClubRolePolicies");
-
-                    b.Navigation("EventMemberPolicies");
-
-                    b.Navigation("EventRolePolicies");
-
-                    b.Navigation("UserPolicies");
-
-                    b.Navigation("UserRolePolicies");
-                });
-
-            modelBuilder.Entity("UNIC.DataAccess.Models.PolicyGroup", b =>
-                {
-                    b.Navigation("Policies");
-                });
-#pragma warning restore 612, 618
         }
     }
 }
