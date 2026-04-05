@@ -456,6 +456,29 @@ namespace UNIC.ServiceTest.Services
         }
 
         [Fact]
+        public async Task GetContributionPaymentStatusAsync_ShouldReturnNull_WhenTransactionMissing()
+        {
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(404)).ReturnsAsync((FundTransaction?)null);
+            Assert.Null(await _service.GetContributionPaymentStatusAsync(Guid.NewGuid(), 1, 404));
+        }
+
+        [Fact]
+        public async Task GetContributionPaymentStatusAsync_ShouldReturnNull_WhenNotMemberContribution()
+        {
+            var uid = Guid.NewGuid();
+            var t = new FundTransaction
+            {
+                TransactionId = 2,
+                IsMemberContribution = false,
+                TransactionType = "INCOME",
+                CreatedBy = uid,
+                ClubFund = new ClubFund { ClubId = 1 }
+            };
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(2)).ReturnsAsync(t);
+            Assert.Null(await _service.GetContributionPaymentStatusAsync(uid, 1, 2));
+        }
+
+        [Fact]
         public async Task GetContributionPaymentStatusByOrderCodeAsync_ShouldMap_WhenPaid()
         {
             var uid = Guid.NewGuid();
@@ -479,6 +502,83 @@ namespace UNIC.ServiceTest.Services
             Assert.Equal(3, dto.ClubId);
         }
 
+        [Fact]
+        public async Task GetContributionPaymentStatusByOrderCodeAsync_ShouldReturnNull_WhenTransactionMissing()
+        {
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(404)).ReturnsAsync((FundTransaction?)null);
+            Assert.Null(await _service.GetContributionPaymentStatusByOrderCodeAsync(Guid.NewGuid(), 404));
+        }
+
+        [Fact]
+        public async Task GetContributionPaymentStatusByOrderCodeAsync_ShouldReturnNull_WhenWrongUser()
+        {
+            var uid = Guid.NewGuid();
+            var t = new FundTransaction
+            {
+                TransactionId = 8,
+                IsMemberContribution = true,
+                TransactionType = "INCOME",
+                CreatedBy = Guid.NewGuid(),
+                ClubFund = new ClubFund { ClubId = 1 }
+            };
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(8)).ReturnsAsync(t);
+            Assert.Null(await _service.GetContributionPaymentStatusByOrderCodeAsync(uid, 8));
+        }
+
+        [Fact]
+        public async Task GetContributionPaymentStatusByOrderCodeAsync_ShouldReturnNull_WhenNotMemberContribution()
+        {
+            var uid = Guid.NewGuid();
+            var t = new FundTransaction
+            {
+                TransactionId = 9,
+                IsMemberContribution = false,
+                TransactionType = "INCOME",
+                CreatedBy = uid,
+                ClubFund = new ClubFund { ClubId = 1 }
+            };
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(9)).ReturnsAsync(t);
+            Assert.Null(await _service.GetContributionPaymentStatusByOrderCodeAsync(uid, 9));
+        }
+
+        [Fact]
+        public async Task GetContributionPaymentStatusByOrderCodeAsync_ShouldReturnNull_WhenNotIncome()
+        {
+            var uid = Guid.NewGuid();
+            var t = new FundTransaction
+            {
+                TransactionId = 10,
+                IsMemberContribution = true,
+                TransactionType = "EXPENSE",
+                CreatedBy = uid,
+                ClubFund = new ClubFund { ClubId = 1 }
+            };
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(10)).ReturnsAsync(t);
+            Assert.Null(await _service.GetContributionPaymentStatusByOrderCodeAsync(uid, 10));
+        }
+
+        [Fact]
+        public async Task GetContributionPaymentStatusByOrderCodeAsync_ShouldMarkLinkExpired_WhenPendingAndPastExpiration()
+        {
+            var uid = Guid.NewGuid();
+            var t = new FundTransaction
+            {
+                TransactionId = 11,
+                FundId = 1,
+                IsMemberContribution = true,
+                TransactionType = "INCOME",
+                Status = "PENDING",
+                CreatedBy = uid,
+                TransactionDate = DateTime.UtcNow.AddHours(-3),
+                Amount = 50,
+                ClubFund = new ClubFund { ClubId = 1 }
+            };
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(11)).ReturnsAsync(t);
+            var dto = await _service.GetContributionPaymentStatusByOrderCodeAsync(uid, 11);
+            Assert.NotNull(dto);
+            Assert.True(dto!.IsPaymentLinkExpired);
+        }
+
         #endregion
 
         #region GetFundsByClubIdPagedAsync / GetFundByIdAsync
@@ -488,6 +588,47 @@ namespace UNIC.ServiceTest.Services
         {
             _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync((ClubFund?)null);
             Assert.Null(await _service.GetFundByIdAsync(1));
+        }
+
+        [Fact]
+        public async Task GetFundByIdAsync_ShouldMapUnknownStatus_WithGenericCannotContributeAndNoBalanceContext()
+        {
+            var fund = new ClubFund
+            {
+                FundId = 5,
+                ClubId = 1,
+                FundName = "X",
+                Status = "ARCHIVED",
+                TotalAmount = 100,
+                CurrentBalance = 50,
+                CreatedAt = DateTime.UtcNow
+            };
+            _fundRepo.Setup(r => r.GetFundByIdAsync(5)).ReturnsAsync(fund);
+            var dto = await _service.GetFundByIdAsync(5);
+            Assert.NotNull(dto);
+            Assert.False(dto!.CanAcceptContributions);
+            Assert.Contains("chưa được duyệt", dto.CannotContributeReasonVi ?? "", StringComparison.OrdinalIgnoreCase);
+            Assert.Null(dto.BalanceContextVi);
+        }
+
+        [Fact]
+        public async Task GetFundByIdAsync_ShouldSetBalanceContext_WhenApprovedWithZeroBalances()
+        {
+            var fund = new ClubFund
+            {
+                FundId = 6,
+                ClubId = 1,
+                FundName = "Y",
+                Status = "APPROVED",
+                TotalAmount = 0,
+                CurrentBalance = 0,
+                CreatedAt = DateTime.UtcNow
+            };
+            _fundRepo.Setup(r => r.GetFundByIdAsync(6)).ReturnsAsync(fund);
+            var dto = await _service.GetFundByIdAsync(6);
+            Assert.NotNull(dto);
+            Assert.True(dto!.CanAcceptContributions);
+            Assert.Contains("Chưa có giao dịch", dto.BalanceContextVi ?? "", StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]
@@ -573,6 +714,20 @@ namespace UNIC.ServiceTest.Services
         }
 
         [Fact]
+        public async Task GetFundsByClubIdPagedAsync_ShouldForceApproved_WhenMemberNull_EvenWithEditFinance()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync((UserClubRole?)null);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 2, "editfinance")).ReturnsAsync(true);
+            _fundRepo.Setup(r => r.GetFundsByClubIdPagedAsync(2, "APPROVED", null, "NEWEST", 1, 10))
+                .ReturnsAsync((Enumerable.Empty<ClubFund>(), 0));
+
+            await _service.GetFundsByClubIdPagedAsync(2, uid, false, "PENDING", null, null, 1, 10);
+
+            _fundRepo.Verify(r => r.GetFundsByClubIdPagedAsync(2, "APPROVED", null, "NEWEST", 1, 10), Times.Once);
+        }
+
+        [Fact]
         public async Task GetMyFundsByClubIdPagedAsync_ShouldPassNormalizedFilters_ToRepository()
         {
             var uid = Guid.NewGuid();
@@ -605,6 +760,34 @@ namespace UNIC.ServiceTest.Services
         {
             await Assert.ThrowsAsync<ArgumentException>(() =>
                 _service.GetMyFundsByClubIdPagedAsync(2, Guid.NewGuid(), "INVALID", null, null, null, 1, 10));
+        }
+
+        [Fact]
+        public async Task GetMyFundsByClubIdPagedAsync_ShouldPassResponsibleMineType_ToRepository()
+        {
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetMyFundsByClubIdPagedAsync(
+                    2, uid, "RESPONSIBLE", null, null, "NEWEST", 1, 10))
+                .ReturnsAsync((Enumerable.Empty<ClubFund>(), 0));
+
+            await _service.GetMyFundsByClubIdPagedAsync(2, uid, "RESPONSIBLE", null, null, null, 1, 10);
+
+            _fundRepo.Verify(r => r.GetMyFundsByClubIdPagedAsync(
+                2, uid, "RESPONSIBLE", null, null, "NEWEST", 1, 10), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetMyFundsByClubIdPagedAsync_ShouldThrow_WhenStatusInvalid()
+        {
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.GetMyFundsByClubIdPagedAsync(2, Guid.NewGuid(), null, "NOT_A_STATUS", null, null, 1, 10));
+        }
+
+        [Fact]
+        public async Task GetMyFundsByClubIdPagedAsync_ShouldThrow_WhenSortInvalid()
+        {
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.GetMyFundsByClubIdPagedAsync(2, Guid.NewGuid(), null, null, null, "BAD_SORT", 1, 10));
         }
 
         #endregion
@@ -916,6 +1099,435 @@ namespace UNIC.ServiceTest.Services
 
             _fundRepo.Verify(r => r.GetTransactionsByClubIdPagedAsync(
                 1, null, null, false, null, null, null, 1, 10), Times.Once);
+        }
+
+        [Fact]
+        public async Task CreateFundAsync_ShouldPersistExpiresAt_WhenDateIsInFuture()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
+            ClubFund? captured = null;
+            _fundRepo.Setup(r => r.AddFundAsync(It.IsAny<ClubFund>()))
+                .Callback<ClubFund>(f => captured = f)
+                .ReturnsAsync((ClubFund f) => f);
+
+            var future = DateTime.UtcNow.Date.AddDays(30);
+            await _service.CreateFundAsync(uid, new CreateFundDto
+            {
+                ClubId = 1,
+                FundName = "QExp",
+                ExpiresAt = future
+            });
+
+            Assert.NotNull(captured);
+            Assert.Equal(future, captured!.ExpiresAt!.Value.Date);
+        }
+
+        private static FundTransaction RichTransaction(int id)
+        {
+            return new FundTransaction
+            {
+                TransactionId = id,
+                FundId = 5,
+                CategoryId = 2,
+                TransactionType = "INCOME",
+                Status = "APPROVED",
+                Amount = 100m,
+                Description = "D",
+                TransactionDate = new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+                CreatedBy = Guid.NewGuid(),
+                IsMemberContribution = true,
+                PaymentLinkId = "pl",
+                CreatedAt = new DateTime(2024, 6, 2, 0, 0, 0, DateTimeKind.Utc),
+                UpdatedAt = new DateTime(2024, 6, 3, 0, 0, 0, DateTimeKind.Utc),
+                ClubFund = new ClubFund { FundId = 5, FundName = "  Quỹ X  " },
+                FundCategory = new FundCategory
+                {
+                    CategoryId = 2,
+                    CategoryName = "  Cat  ",
+                    Description = "d",
+                    ClubId = 1
+                },
+                Creator = new User { FullName = "  Nguyen Van A  " }
+            };
+        }
+
+        [Fact]
+        public async Task GetFundHistoryPagedAsync_ShouldMapTransactionDtos_WhenRepositoryReturnsRows()
+        {
+            var list = new List<FundTransaction> { RichTransaction(1) };
+            _fundRepo.Setup(r => r.GetTransactionsByFundIdPagedAsync(10, "APPROVED", true, null, 1, 5))
+                .ReturnsAsync((list, 1));
+
+            var page = await _service.GetFundHistoryPagedAsync(10, "", null, null, 1, 5);
+
+            Assert.Single(page.Items);
+            var item = page.Items.First();
+            Assert.Equal(1, item.TransactionId);
+            Assert.Equal("Quỹ X", item.FundName);
+            Assert.Equal("Cat", item.CategoryName);
+            Assert.Equal("Nguyen Van A", item.MemberName);
+            Assert.Equal(new DateTime(2024, 6, 2, 0, 0, 0, DateTimeKind.Utc), item.CreatedAt);
+        }
+
+        [Fact]
+        public async Task GetFundHistoryPagedAsync_ShouldMapSparseTransaction_WhenNavigationsMinimal()
+        {
+            var tx = new FundTransaction
+            {
+                TransactionId = 2,
+                FundId = 1,
+                TransactionType = "INCOME",
+                Status = null,
+                Amount = 1,
+                TransactionDate = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                CreatedAt = default,
+                UpdatedAt = default,
+                ClubFund = new ClubFund { FundName = "   " },
+                Creator = null!,
+                FundCategory = null!
+            };
+            _fundRepo.Setup(r => r.GetTransactionsByFundIdPagedAsync(10, "APPROVED", true, null, 1, 5))
+                .ReturnsAsync((new List<FundTransaction> { tx }, 1));
+
+            var page = await _service.GetFundHistoryPagedAsync(10, null, null, null, 1, 5);
+            var item = page.Items.First();
+            Assert.Null(item.FundName);
+            Assert.Null(item.CategoryName);
+            Assert.Null(item.MemberName);
+            Assert.Equal("PENDING", item.Status);
+        }
+
+        [Fact]
+        public async Task GetClubFundTransactionsPagedAsync_ShouldMapTransactions_WhenItemsReturned()
+        {
+            var uid = Guid.NewGuid();
+            var list = new List<FundTransaction> { RichTransaction(7) };
+            _fundRepo.Setup(r => r.GetTransactionsByClubIdPagedAsync(
+                    3, null, "APPROVED", false, null, null, null, 1, 10))
+                .ReturnsAsync((list, 1));
+
+            var page = await _service.GetClubFundTransactionsPagedAsync(3, null, null, null, uid, null, null, 1, 10);
+
+            Assert.Single(page.Items);
+            Assert.Equal(7, page.Items.First().TransactionId);
+        }
+
+        [Fact]
+        public async Task GetFundCategoriesForClubAsync_ShouldMap_FromRepository()
+        {
+            _fundRepo.Setup(r => r.GetFundCategoriesForClubAsync(8)).ReturnsAsync(new List<FundCategory>
+            {
+                new FundCategory { CategoryId = 1, CategoryName = "A", Description = "d", ClubId = 8 }
+            });
+
+            var list = await _service.GetFundCategoriesForClubAsync(8);
+
+            Assert.Single(list);
+            Assert.Equal(1, list[0].CategoryId);
+            Assert.Equal("A", list[0].CategoryName);
+            Assert.Equal(8, list[0].ClubId);
+        }
+
+        [Fact]
+        public async Task GetContributionPaymentStatusByOrderCodeAsync_ShouldReturnNull_WhenClubFundMissing()
+        {
+            var uid = Guid.NewGuid();
+            var t = new FundTransaction
+            {
+                TransactionId = 5,
+                IsMemberContribution = true,
+                TransactionType = "INCOME",
+                CreatedBy = uid,
+                ClubFund = null!
+            };
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(5)).ReturnsAsync(t);
+
+            Assert.Null(await _service.GetContributionPaymentStatusByOrderCodeAsync(uid, 5));
+        }
+
+        [Fact]
+        public async Task GetContributionPaymentStatusAsync_ShouldReturnNull_WhenClubMismatch()
+        {
+            var uid = Guid.NewGuid();
+            var t = new FundTransaction
+            {
+                TransactionId = 1,
+                IsMemberContribution = true,
+                TransactionType = "INCOME",
+                CreatedBy = uid,
+                ClubFund = new ClubFund { ClubId = 99 }
+            };
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(t);
+
+            Assert.Null(await _service.GetContributionPaymentStatusAsync(uid, 1, 1));
+        }
+
+        [Fact]
+        public async Task GetContributionPaymentStatusAsync_ShouldReturnNull_WhenNotIncome()
+        {
+            var uid = Guid.NewGuid();
+            var t = new FundTransaction
+            {
+                TransactionId = 1,
+                IsMemberContribution = true,
+                TransactionType = "EXPENSE",
+                CreatedBy = uid,
+                ClubFund = new ClubFund { ClubId = 1 }
+            };
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(t);
+
+            Assert.Null(await _service.GetContributionPaymentStatusAsync(uid, 1, 1));
+        }
+
+        [Fact]
+        public async Task GetContributionPaymentStatusAsync_ShouldMarkLinkExpired_WhenPastExpiration()
+        {
+            var uid = Guid.NewGuid();
+            var t = new FundTransaction
+            {
+                TransactionId = 1,
+                FundId = 1,
+                IsMemberContribution = true,
+                TransactionType = "INCOME",
+                Status = "PENDING",
+                CreatedBy = uid,
+                TransactionDate = DateTime.UtcNow.AddHours(-3),
+                Amount = 100,
+                ClubFund = new ClubFund { ClubId = 1 }
+            };
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(t);
+
+            var dto = await _service.GetContributionPaymentStatusAsync(uid, 1, 1);
+            Assert.NotNull(dto);
+            Assert.True(dto!.IsPaymentLinkExpired);
+            Assert.Contains("hết hạn", dto.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task GetContributionPaymentStatusAsync_ShouldShowWaiting_WhenPendingAndNotExpired()
+        {
+            var uid = Guid.NewGuid();
+            var t = new FundTransaction
+            {
+                TransactionId = 1,
+                FundId = 1,
+                IsMemberContribution = true,
+                TransactionType = "INCOME",
+                Status = "PENDING",
+                CreatedBy = uid,
+                TransactionDate = DateTime.UtcNow,
+                Amount = 100,
+                ClubFund = new ClubFund { ClubId = 1 }
+            };
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(t);
+
+            var dto = await _service.GetContributionPaymentStatusAsync(uid, 1, 1);
+            Assert.NotNull(dto);
+            Assert.False(dto!.IsPaymentLinkExpired);
+            Assert.Contains("chờ", dto.Message, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task GetFundCapabilitiesAsync_ShouldSetInactiveHint_WhenMemberNotActive()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(new UserClubRole
+            {
+                Status = "LEFT",
+                ClubRole = new ClubRole { Level = 1 }
+            });
+
+            var dto = await _service.GetFundCapabilitiesAsync(uid, 1);
+            Assert.False(dto.IsActiveClubMember);
+            Assert.Contains("hoạt động", dto.FinanceAccessHintVi ?? "", StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task GetFundCapabilitiesAsync_ShouldHintEditFinance_WhenManagerWithoutEdit()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, 1));
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "viewfinance")).ReturnsAsync(true);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "createfinance")).ReturnsAsync(true);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "editfinance")).ReturnsAsync(false);
+
+            var dto = await _service.GetFundCapabilitiesAsync(uid, 1);
+            Assert.Contains("duyệt quỹ", dto.FinanceAccessHintVi ?? "", StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task GetFundCapabilitiesAsync_ShouldHintCreateFinance_WhenViceWithoutCreate()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, 2));
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "viewfinance")).ReturnsAsync(true);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "createfinance")).ReturnsAsync(false);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "editfinance")).ReturnsAsync(false);
+
+            var dto = await _service.GetFundCapabilitiesAsync(uid, 1);
+            Assert.Contains("tạo quỹ", dto.FinanceAccessHintVi ?? "", StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task ApproveFundAsync_ShouldThrow_WhenActionInvalid()
+        {
+            var mid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            {
+                FundId = 1,
+                ClubId = 2,
+                Status = "PENDING",
+                FundName = "F"
+            });
+            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.ApproveFundAsync(mid, new ApproveFundDto { FundId = 1, Action = "HOLD" }));
+        }
+
+        [Fact]
+        public async Task ApproveFundAsync_ShouldThrow_WhenRejectReasonTooLong()
+        {
+            var mid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            {
+                FundId = 1,
+                ClubId = 2,
+                Status = "PENDING",
+                FundName = "F"
+            });
+            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+
+            var longReason = new string('x', 2001);
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.ApproveFundAsync(mid, new ApproveFundDto { FundId = 1, Action = "REJECT", RejectReason = longReason }));
+        }
+
+        [Fact]
+        public async Task ApproveFundAsync_ShouldThrow_WhenMemberInactive()
+        {
+            var mid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            {
+                FundId = 1,
+                ClubId = 2,
+                Status = "PENDING",
+                FundName = "F"
+            });
+            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(new UserClubRole
+            {
+                Status = "LEFT",
+                ClubRole = new ClubRole { Level = 1 }
+            });
+
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                _service.ApproveFundAsync(mid, new ApproveFundDto { FundId = 1, Action = "APPROVE" }));
+        }
+
+        [Fact]
+        public async Task ApproveFundAsync_ShouldThrow_WhenFundAlreadyRejected()
+        {
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            {
+                FundId = 1,
+                ClubId = 1,
+                Status = "REJECTED",
+                FundName = "F"
+            });
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _service.ApproveFundAsync(Guid.NewGuid(), new ApproveFundDto { FundId = 1, Action = "APPROVE" }));
+        }
+
+        [Fact]
+        public async Task ApproveFundAsync_ShouldThrow_WhenFundStatusUnexpected()
+        {
+            var mid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            {
+                FundId = 1,
+                ClubId = 1,
+                Status = "ARCHIVED",
+                FundName = "F"
+            });
+            _memberRepo.Setup(r => r.GetMemberAsync(mid, 1)).ReturnsAsync(ActiveManagerMember(1, 1));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _service.ApproveFundAsync(mid, new ApproveFundDto { FundId = 1, Action = "APPROVE" }));
+        }
+
+        [Fact]
+        public async Task TryCompleteOwnPendingContributionForDevelopmentAsync_ShouldReturnFalse_WhenWrongUser()
+        {
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(new FundTransaction
+            {
+                TransactionId = 1,
+                CreatedBy = Guid.NewGuid(),
+                ClubFund = new ClubFund { ClubId = 1 },
+                IsMemberContribution = true,
+                TransactionType = "INCOME",
+                Status = "PENDING"
+            });
+
+            Assert.False(await _service.TryCompleteOwnPendingContributionForDevelopmentAsync(uid, 1, 1));
+        }
+
+        [Fact]
+        public async Task TryCompleteOwnPendingContributionForDevelopmentAsync_ShouldReturnFalse_WhenNotPending()
+        {
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(new FundTransaction
+            {
+                TransactionId = 1,
+                CreatedBy = uid,
+                ClubFund = new ClubFund { ClubId = 1 },
+                IsMemberContribution = true,
+                TransactionType = "INCOME",
+                Status = "APPROVED"
+            });
+
+            Assert.False(await _service.TryCompleteOwnPendingContributionForDevelopmentAsync(uid, 1, 1));
+        }
+
+        [Fact]
+        public async Task TryCompleteOwnPendingContributionForDevelopmentAsync_ShouldReturnFalse_WhenTransactionMissing()
+        {
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(99)).ReturnsAsync((FundTransaction?)null);
+            Assert.False(await _service.TryCompleteOwnPendingContributionForDevelopmentAsync(Guid.NewGuid(), 1, 99));
+        }
+
+        [Fact]
+        public async Task TryCompleteOwnPendingContributionForDevelopmentAsync_ShouldReturnFalse_WhenClubFundMissing()
+        {
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(12)).ReturnsAsync(new FundTransaction
+            {
+                TransactionId = 12,
+                CreatedBy = uid,
+                ClubFund = null!,
+                IsMemberContribution = true,
+                TransactionType = "INCOME",
+                Status = "PENDING"
+            });
+            Assert.False(await _service.TryCompleteOwnPendingContributionForDevelopmentAsync(uid, 1, 12));
+        }
+
+        [Fact]
+        public async Task TryCompleteOwnPendingContributionForDevelopmentAsync_ShouldReturnFalse_WhenNotMemberContribution()
+        {
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(13)).ReturnsAsync(new FundTransaction
+            {
+                TransactionId = 13,
+                CreatedBy = uid,
+                ClubFund = new ClubFund { ClubId = 1 },
+                IsMemberContribution = false,
+                TransactionType = "INCOME",
+                Status = "PENDING"
+            });
+            Assert.False(await _service.TryCompleteOwnPendingContributionForDevelopmentAsync(uid, 1, 13));
         }
 
         #endregion
