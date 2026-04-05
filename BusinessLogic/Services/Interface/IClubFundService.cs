@@ -11,7 +11,6 @@ namespace BusinessLogic.Services.Interface
         Task<ContributionPaymentStatusDto?> GetContributionPaymentStatusAsync(Guid userId, int clubId, int transactionId);
         Task<ContributionPaymentStatusDto?> GetContributionPaymentStatusByOrderCodeAsync(Guid userId, int orderCode);
         Task<FundResponseDto?> GetFundByIdAsync(int fundId);
-        /// <param name="isSystemAdmin">JWT role Admin — được lọc mọi trạng thái như query.</param>
         Task<PagedResultDto<FundResponseDto>> GetFundsByClubIdPagedAsync(
             int clubId,
             Guid currentUserId,

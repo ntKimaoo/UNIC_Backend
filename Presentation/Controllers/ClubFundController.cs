@@ -189,10 +189,6 @@ namespace Presentation.Controllers
             return Ok(new { success = true, data = fund });
         }
 
-        /// <summary>
-        /// Danh sách quỹ CLB (tổng quan). Thành viên không duyệt quỹ: luôn chỉ thấy quỹ APPROVED (query status khác bị ghi đè phía server).
-        /// Admin hệ thống hoặc Club Manager có editfinance: status = ALL | PENDING | APPROVED | REJECTED.
-        /// </summary>
         [HttpGet]
         [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFundsByClub(
