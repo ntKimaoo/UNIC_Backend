@@ -25,6 +25,5 @@ namespace DataAccess.Models
 
         [ForeignKey("UserId")]
         public virtual User User { get; set; }
-        public virtual IList<UserRolePolicy> UserRolePolicies { get; set; }
     }
 }

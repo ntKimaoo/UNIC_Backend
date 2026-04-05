@@ -48,13 +48,12 @@ public partial class UnicContext : DbContext
     public DbSet<Policy> Policies { get; set; }
     public DbSet<ClubRolePolicy> ClubRolePolicies { get; set; }
     public DbSet<PolicyGroup> PolicyGroups { get; set; }
-    public DbSet<UserPolicy> UserPolicies { get; set; }
-    public DbSet<UserRolePolicy> UserRolePolicies { get; set; }
     public DbSet<ClubCreationRequest> ClubCreationRequests { get; set; }
     public DbSet<EventRole> EventRoles { get; set; }
     public DbSet<UserEventRole> UserEventRoles { get; set; }
     public DbSet<EventRolePolicy> EventRolePolicies { get; set; }
     public DbSet<EventMemberPolicy> EventMemberPolicies { get; set; }
+    public DbSet<UserClubRoleDepartment> UserClubRoleDepartments { get; set; }
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
 
@@ -444,10 +443,22 @@ public partial class UnicContext : DbContext
             .HasKey(cmp => new { cmp.ClubMemberId, cmp.PolicyId });
         modelBuilder.Entity<ClubRolePolicy>()
             .HasKey(crp => new { crp.ClubRoleId, crp.PolicyId });
-        modelBuilder.Entity<UserPolicy>()
-            .HasKey(cmp => new { cmp.UserId, cmp.PolicyId });
-        modelBuilder.Entity<UserRolePolicy>()
-            .HasKey(cmp => new { cmp.RoleId, cmp.PolicyId });
+
+        // UserClubRole - Department (many-to-many via UserClubRoleDepartment)
+        modelBuilder.Entity<UserClubRoleDepartment>()
+            .HasKey(ud => new { ud.ClubMemberId, ud.DepartmentId });
+
+        modelBuilder.Entity<UserClubRoleDepartment>()
+            .HasOne(ud => ud.ClubMember)
+            .WithMany(ucr => ucr.MemberDepartments)
+            .HasForeignKey(ud => ud.ClubMemberId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserClubRoleDepartment>()
+            .HasOne(ud => ud.Department)
+            .WithMany(d => d.DepartmentMembers)
+            .HasForeignKey(ud => ud.DepartmentId)
+            .OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ClubMemberPolicy>()
             .HasOne<UserClubRole>(u => u.ClubMember)
             .WithMany(p => p.ClubMemberPolicies)
@@ -464,23 +475,6 @@ public partial class UnicContext : DbContext
             .HasOne<Policy>(p => p.Policy)
             .WithMany(crp => crp.ClubRolePolicies)
             .HasForeignKey(crp => crp.PolicyId);
-        modelBuilder.Entity<UserPolicy>()
-            .HasOne<User>(cr => cr.User)
-            .WithMany(cmp => cmp.UserPolicies)
-            .HasForeignKey(crp => crp.UserId);
-        modelBuilder.Entity<UserPolicy>()
-            .HasOne<Policy>(p => p.Policy)
-            .WithMany(crp => crp.UserPolicies)
-            .HasForeignKey(crp => crp.PolicyId);
-        modelBuilder.Entity<UserRolePolicy>()
-            .HasOne<UserRole>(cr => cr.Role)
-            .WithMany(cmp => cmp.UserRolePolicies)
-            .HasForeignKey(crp => crp.RoleId);
-        modelBuilder.Entity<UserRolePolicy>()
-            .HasOne<Policy>(p => p.Policy)
-            .WithMany(crp => crp.UserRolePolicies)
-            .HasForeignKey(crp => crp.PolicyId);
-
         modelBuilder.Entity<Policy>()
             .HasOne<PolicyGroup>(pg => pg.PolicyGroup)
             .WithMany(p => p.Policies)

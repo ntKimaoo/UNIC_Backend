@@ -31,6 +31,28 @@ namespace BusinessLogic.Services.Implementation
             return members.Select(MapToResponseDto);
         }
 
+        public async Task<PagedResultDto<ClubMemberResponseDto>> GetMembersByClubAsync(
+            int clubId, int? pagination, int? page, string? filter, bool? ascending, string? sortBy)
+        {
+            var (items, totalCount) = await _memberRepository.GetMembersByClubIdAsync(
+                clubId, pagination, page, filter, ascending, sortBy);
+
+            var dtos = items.Select(MapToResponseDto).ToList();
+            var pageSize = pagination ?? totalCount; // if no pagination, pageSize logic defaults to total
+            if (pageSize == 0) pageSize = 1;
+
+            return new PagedResultDto<ClubMemberResponseDto>
+            {
+                Items = dtos,
+                TotalCount = totalCount,
+                PageNumber = page ?? 1,
+                PageSize = pagination ?? 0,
+                TotalPages = pagination.HasValue && pagination.Value > 0 ? (int)Math.Ceiling((double)totalCount / pagination.Value) : 1,
+                HasNextPage = pagination.HasValue && pagination.Value > 0 && (page ?? 1) * pagination.Value < totalCount,
+                HasPreviousPage = pagination.HasValue && pagination.Value > 0 && (page ?? 1) > 1
+            };
+        }
+
         public async Task<ClubMemberResponseDto?> GetMemberByIdAsync(int clubMemberId)
         {
             var member = await _memberRepository.GetMemberByIdAsync(clubMemberId);

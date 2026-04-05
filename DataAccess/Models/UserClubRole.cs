@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using UNIC.DataAccess.Models;
 
@@ -36,5 +36,8 @@ namespace DataAccess.Models
         [ForeignKey("AssignedBy")]
         public virtual User AssignedByUser { get; set; }
         public virtual IList<ClubMemberPolicy>? ClubMemberPolicies { get; set; }
+
+        /// <summary>Departments the member belongs to (many-to-many via UserClubRoleDepartment).</summary>
+        public virtual ICollection<UserClubRoleDepartment> MemberDepartments { get; set; } = new List<UserClubRoleDepartment>();
     }
 }

@@ -197,13 +197,10 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(key)
     };
 });
-// Register authorization handler
-builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
+// Single handler: club-scoped policy check OR UserRole claim check (OR logic)
+builder.Services.AddScoped<IAuthorizationHandler, ClubPolicyOrRoleHandler>();
 
-// Register club-scoped authorization handler
-builder.Services.AddScoped<IAuthorizationHandler, ClubMemberAuthorizationHandler>();
-
-// Register dynamic policy provider
+// Dynamic policy provider (ClubPolicy_ / Role_ / ClubPolicyOrRole_ prefixes)
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 
 // Configure file upload size limits

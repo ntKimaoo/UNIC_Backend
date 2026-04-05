@@ -18,5 +18,11 @@ namespace UNIC.DataAccess.Repositories.Interface
         Task<Department?> GetByManagerRoleIdAsync(int managerRoleId);
         Task<bool> ExistsAsync(int departmentId);
         Task<bool> DepartmentNameExistsInClubAsync(string departmentName, int clubId, int? excludeDepartmentId = null);
+
+        /// <summary>
+        /// Returns all UserClubRole entries that belong to the given department
+        /// (via UserClubRoleDepartment), including the user and club-role data.
+        /// </summary>
+        Task<IEnumerable<UserClubRole>> GetMembersWithRolesByDepartmentAsync(int clubId, int departmentId);
     }
 }

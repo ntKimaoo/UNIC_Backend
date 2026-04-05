@@ -23,7 +23,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Get all club roles
         /// </summary>
-        [RequireMemberPolicy("ViewRole")]
+        [RequireClubPolicyOrRole("ViewRole", "Admin")]
         [HttpGet("api/club/{clubId}/role")]
         public async Task<IActionResult> GetAll(int clubId)
         {
@@ -31,11 +31,11 @@ namespace Presentation.Controllers
             return Ok(new { success = true, data = roles });
         }
 
-        /// <summary>
-        /// Get club role by ID
-        /// </summary>
-        [RequireMemberPolicy("ViewRole")]
-        [HttpGet("api/club/{clubId}/role/{id}")]
+		/// <summary>
+		/// Get club role by ID
+		/// </summary>
+		[RequireClubPolicyOrRole("ViewRole", "Admin")]
+		[HttpGet("api/club/{clubId}/role/{id}")]
         public async Task<IActionResult> GetById(int id, int clubId)
         {
             var role = await _service.GetByIdAsync(id, clubId);
@@ -48,7 +48,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Create a new club role
         /// </summary>
-        [RequireMemberPolicy("CreateRole")]
+        [RequireClubPolicyOrRole("CreateRole", "Admin")]
         [HttpPost("api/club/{clubId}/role")]
         public async Task<IActionResult> Create([FromBody] CreateClubRoleDto dto, int clubId)
         {
@@ -80,8 +80,8 @@ namespace Presentation.Controllers
         /// Update an existing club role
         /// </summary>
         [HttpPut("api/club/{clubId}/role/{id}")]
-        [RequireMemberPolicy("EditRole")]
-        public async Task<IActionResult> Update(int id, [FromBody] UpdateClubRoleDto dto,int clubId)
+		[RequireClubPolicyOrRole("EditRole", "Admin")]
+		public async Task<IActionResult> Update(int id, [FromBody] UpdateClubRoleDto dto,int clubId)
         {
             if (!ModelState.IsValid)
                 return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
@@ -104,7 +104,7 @@ namespace Presentation.Controllers
             }
         }
         [HttpPut("api/club/{clubId}/role/{id}/policies")]
-        [RequireMemberPolicy("EditRole")]
+        [RequireClubPolicyOrRole("EditRole", "Admin")]
         public async Task<IActionResult> UpdatePolicies(int id, List<int> policyIds,int clubId)
         {
             if (!ModelState.IsValid)
@@ -128,7 +128,7 @@ namespace Presentation.Controllers
         /// Delete a club role
         /// </summary>
         [HttpDelete("api/club/{clubId}/role/{id}")]
-        [RequireMemberPolicy("DeleteRole")]
+        [RequireClubPolicyOrRole("DeleteRole", "Admin")]
         public async Task<IActionResult> Delete(int clubId, int id)
         {
             var result = await _service.DeleteAsync(id);

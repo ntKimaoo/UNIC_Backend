@@ -17,6 +17,7 @@ namespace DataAccess.Repositories.Implementation
         public async Task<FundTransaction?> GetTransactionByIdAsync(int id)
         {
             return await _context.FundTransactions
+                .AsNoTracking()
                 .Include(t => t.ClubFund)
                 .Include(t => t.Creator)
                 .FirstOrDefaultAsync(t => t.TransactionId == id);
@@ -24,7 +25,9 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<ClubFund?> GetFundByIdAsync(int id)
         {
-            return await _context.ClubFunds.FindAsync(id);
+            return await _context.ClubFunds
+                .AsNoTracking()
+                .FirstOrDefaultAsync(f => f.FundId == id);
         }
 
         public async Task<ClubFund> AddFundAsync(ClubFund fund)
@@ -62,6 +65,7 @@ namespace DataAccess.Repositories.Implementation
         public async Task<IEnumerable<ClubFund>> GetFundsByClubIdAsync(int clubId)
         {
             return await _context.ClubFunds
+                .AsNoTracking()
                 .Where(cf => cf.ClubId == clubId)
                 .OrderBy(cf => cf.FundName)
                 .ToListAsync();
@@ -71,6 +75,7 @@ namespace DataAccess.Repositories.Implementation
             int clubId, int pageNumber, int pageSize)
         {
             var query = _context.ClubFunds
+                .AsNoTracking()
                 .Where(cf => cf.ClubId == clubId)
                 .OrderBy(cf => cf.FundName);
 
@@ -125,6 +130,7 @@ namespace DataAccess.Repositories.Implementation
             Guid? createdByUserId)
         {
             var query = _context.FundTransactions
+                .AsNoTracking()
                 .Include(t => t.Creator)
                 .Where(t => t.FundId == fundId);
 
@@ -137,6 +143,7 @@ namespace DataAccess.Repositories.Implementation
             if (memberContributionsOnly)
             {
                 query = query.Where(t =>
+                    t.IsMemberContribution &&
                     t.TransactionType != null &&
                     t.TransactionType.ToUpper() == "INCOME");
             }
