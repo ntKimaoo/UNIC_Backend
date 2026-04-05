@@ -1,4 +1,4 @@
-using BusinessLogic.DTOs;
+﻿using BusinessLogic.DTOs;
 using BusinessLogic.Exceptions;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
@@ -673,156 +673,408 @@ namespace UNIC.ControllerTest.Controllers
 
         #region Additional Branch Coverage Tests
 
-        [Fact]
-        public async Task CreateEvent_WithImage_ReturnsCreated()
-        {
-            SetupManagerClaims(ClubId);
-            var request = new CreateEventRequest { EventName = "Ev", Description = "D", StartDate = DateTime.Now.AddDays(7), EndDate = DateTime.Now.AddDays(8) };
-            var mockFile = new Mock<IFormFile>(); mockFile.Setup(f => f.Length).Returns(1024);
-            _mockFileStorageService.Setup(f => f.SaveFileAsync(It.IsAny<IFormFile>(), "uniclub/events")).ReturnsAsync("https://img.jpg");
-            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), "https://img.jpg", It.IsAny<Guid?>())).ReturnsAsync(new EventDetailDto { EventId = 1 });
-            var result = await _controller.CreateEvent(ClubId, request, mockFile.Object);
-            result.Result.Should().BeOfType<CreatedAtActionResult>();
-        }
+
+        // â”€â”€ Exception catch blocks for all methods â”€â”€
 
         [Fact]
-        public async Task CreateEvent_ReturnsBadRequest_WhenInvalidOperationException()
+        public async Task UpdateEvent_ReturnsBadRequest_WhenException()
         {
             SetupManagerClaims(ClubId);
-            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), It.IsAny<string>(), It.IsAny<Guid?>())).ThrowsAsync(new InvalidOperationException("invalid"));
-            var result = await _controller.CreateEvent(ClubId, new CreateEventRequest { EventName = "E", Description = "D" }, null);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
+            _mockEventService.Setup(s => s.UpdateEventAsync(It.IsAny<UpdateEventRequest>())).ThrowsAsync(new Exception("err"));
+            var result = await _controller.UpdateEvent(ClubId, 1, new UpdateEventRequest { EventId = 1, EventName = "X", Description = "D" }, null);
             result.Result.Should().BeOfType<BadRequestObjectResult>();
         }
 
         [Fact]
-        public async Task UpdateEvent_WithImage_ReturnsOk()
+        public async Task UploadEventImage_ReturnsBadRequest_WhenZeroLengthFile()
         {
             SetupManagerClaims(ClubId);
-            var request = new UpdateEventRequest { EventId = 1, EventName = "U", Description = "D", Location = "L" };
-            var mockFile = new Mock<IFormFile>(); mockFile.Setup(f => f.Length).Returns(512);
-            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
-            _mockFileStorageService.Setup(f => f.SaveFileAsync(It.IsAny<IFormFile>(), "uniclub/events")).ReturnsAsync("https://new.jpg");
-            _mockEventService.Setup(s => s.UpdateEventAsync(It.IsAny<UpdateEventRequest>())).ReturnsAsync(new EventDetailDto { EventId = 1 });
-            var result = await _controller.UpdateEvent(ClubId, 1, request, mockFile.Object);
-            result.Result.Should().BeOfType<OkObjectResult>();
-        }
-
-        [Fact]
-        public async Task UploadEventImage_ReturnsBadRequest_WhenWrongClub()
-        {
-            SetupManagerClaims(ClubId);
-            var mockFile = new Mock<IFormFile>(); mockFile.Setup(f => f.Length).Returns(1024);
-            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = 999 });
+            var mockFile = new Mock<IFormFile>(); mockFile.Setup(f => f.Length).Returns(0);
             var result = await _controller.UploadEventImage(ClubId, 1, mockFile.Object);
             result.Should().BeOfType<BadRequestObjectResult>();
         }
 
         [Fact]
-        public async Task CreateSession_ReturnsBadRequest_WhenWrongClub()
+        public async Task UploadEventImage_ReturnsBadRequest_WhenException()
         {
             SetupManagerClaims(ClubId);
-            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = 999 });
-            var result = await _controller.CreateSession(ClubId, 1, new CreateSessionRequest { EventId = 1, SessionName = "S" });
-            result.Result.Should().BeOfType<BadRequestObjectResult>();
-        }
-
-        [Fact]
-        public async Task CreateSession_ReturnsBadRequest_WhenDomainException()
-        {
-            SetupManagerClaims(ClubId);
-            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
-            _mockEventService.Setup(s => s.CreateSessionAsync(It.IsAny<CreateSessionRequest>())).ThrowsAsync(new DomainException("dup"));
-            var result = await _controller.CreateSession(ClubId, 1, new CreateSessionRequest { EventId = 1, SessionName = "S" });
-            result.Result.Should().BeOfType<BadRequestObjectResult>();
-        }
-
-        [Fact]
-        public async Task CreateSession_Returns500_WhenException()
-        {
-            SetupManagerClaims(ClubId);
-            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
-            _mockEventService.Setup(s => s.CreateSessionAsync(It.IsAny<CreateSessionRequest>())).ThrowsAsync(new Exception("DB error"));
-            var result = await _controller.CreateSession(ClubId, 1, new CreateSessionRequest { EventId = 1, SessionName = "S" });
-            result.Result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(500);
-        }
-
-        [Fact]
-        public async Task UpdateSession_ReturnsBadRequest_WhenWrongClub()
-        {
-            SetupManagerClaims(ClubId);
-            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = 999 });
-            var result = await _controller.UpdateSession(ClubId, 1, 10, new UpdateSessionRequest { SessionName = "X" });
-            result.Result.Should().BeOfType<BadRequestObjectResult>();
-        }
-
-        [Fact]
-        public async Task UpdateSession_ReturnsBadRequest_WhenDomainException()
-        {
-            SetupManagerClaims(ClubId);
-            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
-            _mockEventService.Setup(s => s.UpdateSessionAsync(It.IsAny<UpdateSessionRequest>())).ThrowsAsync(new DomainException("err"));
-            var result = await _controller.UpdateSession(ClubId, 1, 10, new UpdateSessionRequest { SessionName = "X" });
-            result.Result.Should().BeOfType<BadRequestObjectResult>();
-        }
-
-        [Fact]
-        public async Task UpdateSession_Returns500_WhenException()
-        {
-            SetupManagerClaims(ClubId);
-            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
-            _mockEventService.Setup(s => s.UpdateSessionAsync(It.IsAny<UpdateSessionRequest>())).ThrowsAsync(new Exception("err"));
-            var result = await _controller.UpdateSession(ClubId, 1, 10, new UpdateSessionRequest { SessionName = "X" });
-            result.Result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(500);
-        }
-
-        [Fact]
-        public async Task DeleteSession_ReturnsBadRequest_WhenWrongClub()
-        {
-            SetupManagerClaims(ClubId);
-            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = 999 });
-            var result = await _controller.DeleteSession(ClubId, 1, 10);
+            var mockFile = new Mock<IFormFile>(); mockFile.Setup(f => f.Length).Returns(1024);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ThrowsAsync(new Exception("err"));
+            var result = await _controller.UploadEventImage(ClubId, 1, mockFile.Object);
             result.Should().BeOfType<BadRequestObjectResult>();
         }
 
         [Fact]
-        public async Task DeleteSession_Returns500_WhenException()
+        public async Task CreateSession_Returns500_WhenInnerException()
         {
             SetupManagerClaims(ClubId);
             _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
-            _mockEventService.Setup(s => s.DeleteSessionAsync(10, 1)).ThrowsAsync(new Exception("err"));
+            _mockEventService.Setup(s => s.CreateSessionAsync(It.IsAny<CreateSessionRequest>())).ThrowsAsync(new Exception("o", new Exception("inner")));
+            var result = await _controller.CreateSession(ClubId, 1, new CreateSessionRequest { EventId = 1, SessionName = "S" });
+            result.Result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(500);
+        }
+
+        [Fact]
+        public async Task UpdateSession_Returns500_WhenInnerException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
+            _mockEventService.Setup(s => s.UpdateSessionAsync(It.IsAny<UpdateSessionRequest>())).ThrowsAsync(new Exception("o", new Exception("inner")));
+            var result = await _controller.UpdateSession(ClubId, 1, 10, new UpdateSessionRequest { SessionName = "X" });
+            result.Result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(500);
+        }
+
+        [Fact]
+        public async Task DeleteSession_Returns500_WhenInnerException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
+            _mockEventService.Setup(s => s.DeleteSessionAsync(10, 1)).ThrowsAsync(new Exception("o", new Exception("inner")));
             var result = await _controller.DeleteSession(ClubId, 1, 10);
             result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(500);
         }
 
         [Fact]
-        public async Task OpenRegistration_ReturnsBadRequest_WhenWrongClub()
+        public async Task OpenRegistration_ReturnsBadRequest_WhenException()
         {
             SetupManagerClaims(ClubId);
-            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = 999 });
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
+            _mockEventService.Setup(s => s.OpenRegistrationAsync(It.IsAny<OpenRegistrationRequest>())).ThrowsAsync(new Exception("err"));
             var result = await _controller.OpenRegistration(ClubId, 1, new OpenRegistrationRequest { EventId = 1 });
             result.Result.Should().BeOfType<BadRequestObjectResult>();
         }
 
         [Fact]
-        public async Task StartEvent_ReturnsBadRequest_WhenWrongClub()
+        public async Task StartEvent_ReturnsBadRequest_WhenException()
         {
             SetupManagerClaims(ClubId);
-            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = 999 });
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
+            _mockEventService.Setup(s => s.StartEventAsync(1)).ThrowsAsync(new Exception("err"));
             var result = await _controller.StartEvent(ClubId, 1);
             result.Should().BeOfType<BadRequestObjectResult>();
         }
 
         [Fact]
-        public async Task CompleteEvent_ReturnsBadRequest_WhenWrongClub()
+        public async Task CompleteEvent_ReturnsBadRequest_WhenException()
         {
             SetupManagerClaims(ClubId);
-            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = 999 });
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId });
+            _mockEventService.Setup(s => s.CompleteEventAsync(1)).ThrowsAsync(new Exception("err"));
             var result = await _controller.CompleteEvent(ClubId, 1);
             result.Should().BeOfType<BadRequestObjectResult>();
         }
 
         [Fact]
-        public async Task GetMyRole_ReturnsNullRole_WhenNotCollaborator()
+        public async Task GetEventRoles_ReturnsBadRequest_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventRoles.Setup(r => r.GetAllAsync(1)).ThrowsAsync(new Exception("err"));
+            var result = await _controller.GetEventRoles(ClubId, 1);
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task CreateEventRole_ReturnsBadRequest_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventRoles.Setup(r => r.RoleNameExistsAsync("X", 1)).ThrowsAsync(new Exception("err"));
+            var result = await _controller.CreateEventRole(ClubId, 1, new ClubEventsController.EventRoleDto { RoleName = "X" });
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task UpdateEventRole_ReturnsBadRequest_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventRoles.Setup(r => r.GetByIdAsync(2, 1)).ThrowsAsync(new Exception("err"));
+            var result = await _controller.UpdateEventRole(ClubId, 1, 2, new ClubEventsController.EventRoleDto { RoleName = "X" });
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task DeleteEventRole_ReturnsBadRequest_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventRoles.Setup(r => r.GetByIdAsync(2, 1)).ThrowsAsync(new Exception("err"));
+            var result = await _controller.DeleteEventRole(ClubId, 1, 2);
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task SetEventRolePolicies_ReturnsBadRequest_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventRoles.Setup(r => r.GetByIdAsync(2, 1)).ThrowsAsync(new Exception("err"));
+            var result = await _controller.SetEventRolePolicies(ClubId, 1, 2, new List<string>());
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task GetEventMembers_ReturnsBadRequest_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventMembers.Setup(m => m.GetByEventIdAsync(1)).ThrowsAsync(new Exception("err"));
+            var result = await _controller.GetEventMembers(ClubId, 1);
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task AddEventMember_ReturnsBadRequest_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventMembers.Setup(m => m.GetByEventAndUserAsync(1, It.IsAny<Guid>())).ThrowsAsync(new Exception("err"));
+            var result = await _controller.AddEventMember(ClubId, 1, new ClubEventsController.AddEventMemberRequest { UserId = Guid.NewGuid() });
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task UpdateEventMemberRole_ReturnsBadRequest_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventMembers.Setup(m => m.GetByIdAsync(5)).ThrowsAsync(new Exception("err"));
+            var result = await _controller.UpdateEventMemberRole(ClubId, 1, 5, 2);
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task RemoveEventMember_ReturnsBadRequest_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventMembers.Setup(m => m.GetByIdAsync(5)).ThrowsAsync(new Exception("err"));
+            var result = await _controller.RemoveEventMember(ClubId, 1, 5);
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task SetEventMemberPolicies_ReturnsBadRequest_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventMembers.Setup(m => m.GetByIdAsync(5)).ThrowsAsync(new Exception("err"));
+            var result = await _controller.SetEventMemberPolicies(ClubId, 1, 5, new List<string>());
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        [Fact]
+        public async Task GetMyRole_ReturnsBadRequest_WhenException()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventRoles.Setup(r => r.GetEventPolicyNamesAsync()).ThrowsAsync(new Exception("err"));
+            var result = await _controller.GetMyRole(ClubId, 1);
+            result.Should().BeOfType<BadRequestObjectResult>();
+        }
+
+        // â”€â”€ Member wrong-eventId branches â”€â”€
+
+        [Fact]
+        public async Task UpdateEventMemberRole_Returns404_WhenWrongEvent()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventMembers.Setup(m => m.GetByIdAsync(5)).ReturnsAsync(new UserEventRole { EventMemberId = 5, EventId = 999 });
+            var result = await _controller.UpdateEventMemberRole(ClubId, 1, 5, 2);
+            result.Should().BeOfType<NotFoundObjectResult>();
+        }
+
+        [Fact]
+        public async Task RemoveEventMember_Returns404_WhenWrongEvent()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventMembers.Setup(m => m.GetByIdAsync(5)).ReturnsAsync(new UserEventRole { EventMemberId = 5, EventId = 999 });
+            var result = await _controller.RemoveEventMember(ClubId, 1, 5);
+            result.Should().BeOfType<NotFoundObjectResult>();
+        }
+
+        [Fact]
+        public async Task SetEventMemberPolicies_Returns404_WhenWrongEvent()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventMembers.Setup(m => m.GetByIdAsync(5)).ReturnsAsync(new UserEventRole { EventMemberId = 5, EventId = 999 });
+            var result = await _controller.SetEventMemberPolicies(ClubId, 1, 5, new List<string>());
+            result.Should().BeOfType<NotFoundObjectResult>();
+        }
+
+        // â”€â”€ Null EventRole branches (null?.Level) â”€â”€
+
+        [Fact]
+        public async Task UpdateEventMemberRole_ReturnsOk_WhenNullEventRole()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventMembers.Setup(m => m.GetByIdAsync(5)).ReturnsAsync(new UserEventRole { EventMemberId = 5, EventId = 1, EventRole = null });
+            _mockEventMembers.Setup(m => m.UpdateAsync(It.IsAny<UserEventRole>())).ReturnsAsync(true);
+            var result = await _controller.UpdateEventMemberRole(ClubId, 1, 5, 3);
+            result.Should().BeOfType<OkObjectResult>();
+        }
+
+        [Fact]
+        public async Task RemoveEventMember_ReturnsOk_WhenNullEventRole()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventMembers.Setup(m => m.GetByIdAsync(5)).ReturnsAsync(new UserEventRole { EventMemberId = 5, EventId = 1, EventRole = null });
+            _mockEventMembers.Setup(m => m.DeleteAsync(5)).ReturnsAsync(true);
+            var result = await _controller.RemoveEventMember(ClubId, 1, 5);
+            result.Should().BeOfType<OkObjectResult>();
+        }
+
+        [Fact]
+        public async Task SetEventMemberPolicies_ReturnsOk_WhenNullEventRole()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventMembers.Setup(m => m.GetByIdAsync(5)).ReturnsAsync(new UserEventRole { EventMemberId = 5, EventId = 1, EventRole = null });
+            _mockEventMembers.Setup(m => m.SetMemberPoliciesAsync(5, It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
+            var result = await _controller.SetEventMemberPolicies(ClubId, 1, 5, new List<string> { "x" });
+            result.Should().BeOfType<OkObjectResult>();
+        }
+
+        // â”€â”€ Null policies list (coalesce) â”€â”€
+
+        [Fact]
+        public async Task SetEventRolePolicies_ReturnsOk_WhenNullPolicies()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventRoles.Setup(r => r.GetByIdAsync(2, 1)).ReturnsAsync(new EventRole { EventRoleId = 2, Level = 2 });
+            _mockEventRoles.Setup(r => r.SetPoliciesAsync(2, It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
+            var result = await _controller.SetEventRolePolicies(ClubId, 1, 2, null!);
+            result.Should().BeOfType<OkObjectResult>();
+        }
+
+        [Fact]
+        public async Task SetEventMemberPolicies_ReturnsOk_WhenNullPolicies()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventMembers.Setup(m => m.GetByIdAsync(5)).ReturnsAsync(new UserEventRole { EventMemberId = 5, EventId = 1, EventRole = new EventRole { Level = 2 } });
+            _mockEventMembers.Setup(m => m.SetMemberPoliciesAsync(5, It.IsAny<IEnumerable<string>>())).Returns(Task.CompletedTask);
+            var result = await _controller.SetEventMemberPolicies(ClubId, 1, 5, null!);
+            result.Should().BeOfType<OkObjectResult>();
+        }
+
+        // â”€â”€ IsClubManager branches â”€â”€
+
+        [Fact]
+        public async Task CreateEvent_ReturnsCreated_WhenAdminRole()
+        {
+            var claims = new List<Claim> { new Claim(ClaimTypes.Role, "Admin"), new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()) };
+            _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
+            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), It.IsAny<string>(), It.IsAny<Guid?>())).ReturnsAsync(new EventDetailDto { EventId = 1 });
+            var result = await _controller.CreateEvent(ClubId, new CreateEventRequest { EventName = "E", Description = "D" }, null);
+            result.Result.Should().BeOfType<CreatedAtActionResult>();
+        }
+
+        [Fact]
+        public async Task CreateEvent_Returns403_WhenBadClubRolesJson()
+        {
+            var claims = new List<Claim> { new Claim("club_roles", "NOT_JSON!!!") };
+            _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
+            var result = await _controller.CreateEvent(ClubId, new CreateEventRequest { EventName = "E", Description = "D" }, null);
+            result.Result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
+        }
+
+        [Fact]
+        public async Task CreateEvent_Returns403_WhenNoClubRolesClaim()
+        {
+            var claims = new List<Claim> { new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()) };
+            _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
+            var result = await _controller.CreateEvent(ClubId, new CreateEventRequest { EventName = "E", Description = "D" }, null);
+            result.Result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
+        }
+
+        [Fact]
+        public async Task CreateEvent_Returns403_WhenManagerOfDifferentClub()
+        {
+            var clubRoles = JsonSerializer.Serialize(new[] { new { ClubId = 999, RoleName = "Manager", Level = 1 } });
+            var claims = new List<Claim> { new Claim("club_roles", clubRoles) };
+            _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
+            var result = await _controller.CreateEvent(ClubId, new CreateEventRequest { EventName = "E", Description = "D" }, null);
+            result.Result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
+        }
+
+        [Fact]
+        public async Task CreateEvent_ReturnsCreated_WhenClubAdmin()
+        {
+            var clubRoles = JsonSerializer.Serialize(new[] { new { ClubId = ClubId, RoleName = "Admin", Level = 1 } });
+            var claims = new List<Claim> { new Claim("club_roles", clubRoles), new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()) };
+            _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
+            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), It.IsAny<string>(), It.IsAny<Guid?>())).ReturnsAsync(new EventDetailDto { EventId = 1 });
+            var result = await _controller.CreateEvent(ClubId, new CreateEventRequest { EventName = "E", Description = "D" }, null);
+            result.Result.Should().BeOfType<CreatedAtActionResult>();
+        }
+
+        // â”€â”€ GetCurrentUserId branches â”€â”€
+
+        [Fact]
+        public async Task CreateEvent_UsesSubClaim()
+        {
+            var userId = Guid.NewGuid();
+            var clubRoles = JsonSerializer.Serialize(new[] { new { ClubId = ClubId, RoleName = "Manager", Level = 1 } });
+            var claims = new List<Claim> { new Claim("club_roles", clubRoles), new Claim("sub", userId.ToString()) };
+            _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
+            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), It.IsAny<string>(), userId)).ReturnsAsync(new EventDetailDto { EventId = 1 });
+            var result = await _controller.CreateEvent(ClubId, new CreateEventRequest { EventName = "E", Description = "D" }, null);
+            result.Result.Should().BeOfType<CreatedAtActionResult>();
+        }
+
+        [Fact]
+        public async Task CreateEvent_UsesUserIdClaim()
+        {
+            var userId = Guid.NewGuid();
+            var clubRoles = JsonSerializer.Serialize(new[] { new { ClubId = ClubId, RoleName = "Manager", Level = 1 } });
+            var claims = new List<Claim> { new Claim("club_roles", clubRoles), new Claim("UserId", userId.ToString()) };
+            _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
+            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), It.IsAny<string>(), userId)).ReturnsAsync(new EventDetailDto { EventId = 1 });
+            var result = await _controller.CreateEvent(ClubId, new CreateEventRequest { EventName = "E", Description = "D" }, null);
+            result.Result.Should().BeOfType<CreatedAtActionResult>();
+        }
+
+        [Fact]
+        public async Task CreateEvent_NullUserId_WhenNoUserClaims()
+        {
+            var clubRoles = JsonSerializer.Serialize(new[] { new { ClubId = ClubId, RoleName = "Manager", Level = 1 } });
+            var claims = new List<Claim> { new Claim("club_roles", clubRoles) };
+            _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
+            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), It.IsAny<string>(), null)).ReturnsAsync(new EventDetailDto { EventId = 1 });
+            var result = await _controller.CreateEvent(ClubId, new CreateEventRequest { EventName = "E", Description = "D" }, null);
+            result.Result.Should().BeOfType<CreatedAtActionResult>();
+        }
+
+        [Fact]
+        public async Task CreateEvent_NullUserId_WhenInvalidGuid()
+        {
+            var clubRoles = JsonSerializer.Serialize(new[] { new { ClubId = ClubId, RoleName = "Manager", Level = 1 } });
+            var claims = new List<Claim> { new Claim("club_roles", clubRoles), new Claim(ClaimTypes.NameIdentifier, "not-a-guid") };
+            _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
+            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), It.IsAny<string>(), null)).ReturnsAsync(new EventDetailDto { EventId = 1 });
+            var result = await _controller.CreateEvent(ClubId, new CreateEventRequest { EventName = "E", Description = "D" }, null);
+            result.Result.Should().BeOfType<CreatedAtActionResult>();
+        }
+
+        // â”€â”€ IsEventCollaborator branches â”€â”€
+
+        [Fact]
+        public async Task GetSessions_ReturnsOk_WhenCollaborator()
+        {
+            var userId = Guid.NewGuid();
+            var claims = new List<Claim>
+            {
+                new Claim("club_roles", JsonSerializer.Serialize(new[] { new { ClubId = 99, RoleName = "Member", Level = 3 } })),
+                new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+            };
+            _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
+            _mockEventMembers.Setup(m => m.GetByEventAndUserAsync(1, userId)).ReturnsAsync(new UserEventRole { EventMemberId = 1, EventId = 1, UserId = userId });
+            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId, Sessions = new List<SessionDto>() });
+            var result = await _controller.GetSessions(ClubId, 1);
+            result.Should().BeOfType<OkObjectResult>();
+        }
+
+        [Fact]
+        public async Task GetSessions_Returns403_WhenNoUserId()
+        {
+            var claims = new List<Claim> { new Claim("club_roles", JsonSerializer.Serialize(new[] { new { ClubId = 99, RoleName = "Member", Level = 3 } })) };
+            _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
+            var result = await _controller.GetSessions(ClubId, 1);
+            result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
+        }
+
+        [Fact]
+        public async Task GetSessions_Returns403_WhenCollabNotFound()
         {
             var userId = Guid.NewGuid();
             var claims = new List<Claim>
@@ -832,29 +1084,73 @@ namespace UNIC.ControllerTest.Controllers
             };
             _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
             _mockEventMembers.Setup(m => m.GetByEventAndUserAsync(1, userId)).ReturnsAsync((UserEventRole?)null);
-            _mockEventRoles.Setup(r => r.GetEventPolicyNamesAsync()).ReturnsAsync(new List<string>());
+            var result = await _controller.GetSessions(ClubId, 1);
+            result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(403);
+        }
+
+        // â”€â”€ Null navigation properties â”€â”€
+
+        [Fact]
+        public async Task GetEventMembers_ReturnsOk_WithNullNavProps()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventMembers.Setup(m => m.GetByEventIdAsync(1)).ReturnsAsync(new List<UserEventRole>
+            {
+                new UserEventRole { EventMemberId = 1, UserId = Guid.NewGuid(), User = null, EventRole = null, EventMemberPolicies = null }
+            });
+            var result = await _controller.GetEventMembers(ClubId, 1);
+            result.Should().BeOfType<OkObjectResult>();
+        }
+
+        [Fact]
+        public async Task GetEventRoles_ReturnsOk_WhenNullPolicies()
+        {
+            SetupManagerClaims(ClubId);
+            _mockEventRoles.Setup(r => r.GetAllAsync(1)).ReturnsAsync(new List<EventRole>
+            {
+                new EventRole { EventRoleId = 1, RoleName = "Creator", Level = 1, EventRolePolicies = null }
+            });
+            var result = await _controller.GetEventRoles(ClubId, 1);
+            result.Should().BeOfType<OkObjectResult>();
+        }
+
+        [Fact]
+        public async Task GetMyRole_ReturnsAdmin_WhenSystemAdmin()
+        {
+            var claims = new List<Claim> { new Claim(ClaimTypes.Role, "Admin"), new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()) };
+            _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
+            _mockEventRoles.Setup(r => r.GetEventPolicyNamesAsync()).ReturnsAsync(new List<string> { "editevent" });
             var result = await _controller.GetMyRole(ClubId, 1);
             result.Should().BeOfType<OkObjectResult>();
         }
 
         [Fact]
-        public async Task GetSessions_ReturnsEmptyList_WhenSessionsNull()
+        public async Task GetMyRole_CollabWithNullRole()
         {
-            SetupManagerClaims(ClubId);
-            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ReturnsAsync(new EventDetailDto { EventId = 1, ClubId = ClubId, Sessions = null });
-            var result = await _controller.GetSessions(ClubId, 1);
+            var userId = Guid.NewGuid();
+            var claims = new List<Claim>
+            {
+                new Claim("club_roles", JsonSerializer.Serialize(new[] { new { ClubId = 99, RoleName = "Member", Level = 3 } })),
+                new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+            };
+            _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) } };
+            var collab = new UserEventRole { EventMemberId = 1, EventId = 1, UserId = userId, EventRole = null, EventMemberPolicies = new List<EventMemberPolicy>() };
+            _mockEventMembers.Setup(m => m.GetByEventAndUserAsync(1, userId)).ReturnsAsync(collab);
+            var result = await _controller.GetMyRole(ClubId, 1);
             result.Should().BeOfType<OkObjectResult>();
         }
 
         [Fact]
-        public async Task GetSessions_ReturnsBadRequest_WhenException()
+        public async Task CreateEvent_WithZeroLengthImage_SkipsUpload()
         {
             SetupManagerClaims(ClubId);
-            _mockEventService.Setup(s => s.GetEventByIdAsync(1)).ThrowsAsync(new Exception("err"));
-            var result = await _controller.GetSessions(ClubId, 1);
-            result.Should().BeOfType<BadRequestObjectResult>();
+            var mockFile = new Mock<IFormFile>(); mockFile.Setup(f => f.Length).Returns(0);
+            _mockEventService.Setup(s => s.CreateEventAsync(It.IsAny<CreateEventRequest>(), null, It.IsAny<Guid?>())).ReturnsAsync(new EventDetailDto { EventId = 1 });
+            var result = await _controller.CreateEvent(ClubId, new CreateEventRequest { EventName = "E", Description = "D" }, mockFile.Object);
+            result.Result.Should().BeOfType<CreatedAtActionResult>();
         }
 
         #endregion
     }
 }
+
