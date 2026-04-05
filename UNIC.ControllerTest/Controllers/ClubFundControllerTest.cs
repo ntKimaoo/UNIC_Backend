@@ -93,9 +93,60 @@ namespace UNIC.ControllerTest.Controllers
             Assert.IsType<BadRequestObjectResult>(result);
         }
 
+        [Fact]
+        public async Task CreateFund_ReturnsBadRequest_WhenUnexpectedException()
+        {
+            _fundService.Setup(s => s.CreateFundAsync(_userId, It.IsAny<CreateFundDto>()))
+                .ThrowsAsync(new InvalidOperationException("db"));
+
+            var result = await _controller.CreateFund(1, new CreateFundDto { FundName = "x" });
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task CreateFund_ResolvesUserId_FromNameIdentifier_WhenUserIdClaimMissing()
+        {
+            _controller.HttpContext!.User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, _userId.ToString())
+            }, "Test"));
+
+            _fundService.Setup(s => s.CreateFundAsync(_userId, It.IsAny<CreateFundDto>()))
+                .ReturnsAsync(new FundResponseDto { FundId = 1, FundName = "Q", ClubId = 1 });
+
+            await _controller.CreateFund(1, new CreateFundDto { FundName = "Q" });
+
+            _fundService.Verify(s => s.CreateFundAsync(_userId, It.IsAny<CreateFundDto>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task CreateFund_ResolvesUserId_FromSubClaim_WhenOtherClaimsMissing()
+        {
+            _controller.HttpContext!.User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+            {
+                new Claim("sub", _userId.ToString())
+            }, "Test"));
+
+            _fundService.Setup(s => s.CreateFundAsync(_userId, It.IsAny<CreateFundDto>()))
+                .ReturnsAsync(new FundResponseDto { FundId = 1, FundName = "Q", ClubId = 1 });
+
+            await _controller.CreateFund(1, new CreateFundDto { FundName = "Q" });
+
+            _fundService.Verify(s => s.CreateFundAsync(_userId, It.IsAny<CreateFundDto>()), Times.Once);
+        }
+
         #endregion
 
         #region GetMyClubs
+
+        [Fact]
+        public async Task GetMyClubs_ThrowsUnauthorized_WhenNoUserClaim()
+        {
+            _controller.HttpContext!.User = new ClaimsPrincipal(new ClaimsIdentity());
+
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => _controller.GetMyClubs());
+        }
 
         [Fact]
         public async Task GetMyClubs_ReturnsOk()
@@ -344,6 +395,32 @@ namespace UNIC.ControllerTest.Controllers
             Assert.IsType<OkObjectResult>(result);
         }
 
+        [Fact]
+        public async Task GetClubFundTransactions_ReturnsBadRequest_WhenGenericExceptionFromService()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetClubFundTransactionsPagedAsync(
+                    1, null, null, null, _userId, null, null, 1, 20))
+                .ThrowsAsync(new Exception("query"));
+
+            var result = await _controller.GetClubFundTransactions(1, null, null, null, null, null, 1, 20);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task GetClubFundTransactions_ReturnsBadRequest_WhenArgumentExceptionFromService()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetClubFundTransactionsPagedAsync(
+                    1, null, null, null, _userId, null, null, 1, 20))
+                .ThrowsAsync(new ArgumentException("bad"));
+
+            var result = await _controller.GetClubFundTransactions(1, null, null, null, null, null, 1, 20);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
         #endregion
 
         #region GetFund / GetFundsByClub
@@ -492,6 +569,16 @@ namespace UNIC.ControllerTest.Controllers
             Assert.IsType<OkObjectResult>(result);
         }
 
+        [Fact]
+        public async Task GetMyFunds_ReturnsBadRequest_WhenPageSizeTooLarge()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 2)).ReturnsAsync(true);
+
+            var result = await _controller.GetMyFunds(2, null, null, null, null, 1, 101);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
         #endregion
 
         #region Contribute / status / dev simulate
@@ -545,6 +632,59 @@ namespace UNIC.ControllerTest.Controllers
             var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 5000 }, CancellationToken.None);
 
             Assert.IsType<OkObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task Contribute_Returns403_WhenServiceThrowsUnauthorized()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetFundByIdAsync(2)).ReturnsAsync(new FundResponseDto { FundId = 2, ClubId = 1 });
+            _fundService.Setup(s => s.CreateContributionAsync(_userId, It.IsAny<ContributeRequestDto>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new UnauthorizedAccessException("no"));
+
+            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 5000 }, CancellationToken.None);
+
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(403, obj.StatusCode);
+        }
+
+        [Fact]
+        public async Task Contribute_ReturnsBadRequest_WhenArgumentExceptionFromService()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetFundByIdAsync(2)).ReturnsAsync(new FundResponseDto { FundId = 2, ClubId = 1 });
+            _fundService.Setup(s => s.CreateContributionAsync(_userId, It.IsAny<ContributeRequestDto>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new ArgumentException("amount"));
+
+            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 5000 }, CancellationToken.None);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task Contribute_ReturnsBadRequest_WhenInvalidOperationFromService()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetFundByIdAsync(2)).ReturnsAsync(new FundResponseDto { FundId = 2, ClubId = 1 });
+            _fundService.Setup(s => s.CreateContributionAsync(_userId, It.IsAny<ContributeRequestDto>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("pay"));
+
+            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 5000 }, CancellationToken.None);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task Contribute_ReturnsBadRequest_WhenGenericExceptionFromService()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetFundByIdAsync(2)).ReturnsAsync(new FundResponseDto { FundId = 2, ClubId = 1 });
+            _fundService.Setup(s => s.CreateContributionAsync(_userId, It.IsAny<ContributeRequestDto>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new Exception("surprise"));
+
+            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 5000 }, CancellationToken.None);
+
+            Assert.IsType<BadRequestObjectResult>(result);
         }
 
         [Fact]
@@ -603,6 +743,17 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         [Fact]
+        public async Task GetPayOsContributionReturn_ReturnsUnauthorized_WhenServiceThrows()
+        {
+            _fundService.Setup(s => s.GetContributionPaymentStatusByOrderCodeAsync(_userId, 55))
+                .ThrowsAsync(new UnauthorizedAccessException());
+
+            var result = await _controller.GetPayOsContributionReturn(55);
+
+            Assert.IsType<UnauthorizedObjectResult>(result);
+        }
+
+        [Fact]
         public async Task GetContributionPaymentStatus_Returns403_WhenNotMember()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(false);
@@ -634,6 +785,18 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         [Fact]
+        public async Task GetContributionPaymentStatus_ReturnsUnauthorized_WhenServiceThrows()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetContributionPaymentStatusAsync(_userId, 1, 9))
+                .ThrowsAsync(new UnauthorizedAccessException());
+
+            var result = await _controller.GetContributionPaymentStatus(1, 9);
+
+            Assert.IsType<UnauthorizedObjectResult>(result);
+        }
+
+        [Fact]
         public async Task SimulatePayOsPaidForDevelopment_ReturnsNotFound_WhenNotDevelopment()
         {
             _environment.Setup(e => e.EnvironmentName).Returns(Environments.Production);
@@ -654,6 +817,44 @@ namespace UNIC.ControllerTest.Controllers
             var result = await _controller.SimulatePayOsPaidForDevelopment(1, 2);
 
             Assert.IsType<OkObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task SimulatePayOsPaidForDevelopment_Returns403_WhenNotMember()
+        {
+            _environment.Setup(e => e.EnvironmentName).Returns(Environments.Development);
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(false);
+
+            var result = await _controller.SimulatePayOsPaidForDevelopment(1, 2);
+
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(403, obj.StatusCode);
+        }
+
+        [Fact]
+        public async Task SimulatePayOsPaidForDevelopment_ReturnsBadRequest_WhenServiceReturnsFalse()
+        {
+            _environment.Setup(e => e.EnvironmentName).Returns(Environments.Development);
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.TryCompleteOwnPendingContributionForDevelopmentAsync(_userId, 1, 2))
+                .ReturnsAsync(false);
+
+            var result = await _controller.SimulatePayOsPaidForDevelopment(1, 2);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task SimulatePayOsPaidForDevelopment_ReturnsUnauthorized_WhenServiceThrows()
+        {
+            _environment.Setup(e => e.EnvironmentName).Returns(Environments.Development);
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.TryCompleteOwnPendingContributionForDevelopmentAsync(_userId, 1, 2))
+                .ThrowsAsync(new UnauthorizedAccessException());
+
+            var result = await _controller.SimulatePayOsPaidForDevelopment(1, 2);
+
+            Assert.IsType<UnauthorizedObjectResult>(result);
         }
 
         #endregion
@@ -798,6 +999,26 @@ namespace UNIC.ControllerTest.Controllers
             Assert.Equal(500, obj.StatusCode);
         }
 
+        [Fact]
+        public async Task PayOSWebhook_ReturnsOk_WhenSuccessPropertyMissing()
+        {
+            SetJsonBody("{\"code\":\"00\"}");
+
+            var result = await _controller.PayOSWebhookClubScoped(CancellationToken.None);
+
+            Assert.IsType<OkObjectResult>(result);
+            _fundService.Verify(s => s.ProcessPayOSPaymentSuccessAsync(It.IsAny<int>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task PayOSWebhook_ReturnsBadRequest_WhenSignatureJsonNull()
+        {
+            SetJsonBody("{\"code\":\"00\",\"success\":true,\"data\":{\"orderCode\":1},\"signature\":null}");
+            var result = await _controller.PayOSWebhookClubScoped(CancellationToken.None);
+            Assert.IsType<BadRequestObjectResult>(result);
+            _payOSService.Verify(p => p.VerifyWebhookSignature(It.IsAny<string>(), It.IsAny<System.Text.Json.JsonElement>()), Times.Never);
+        }
+
         private void SetJsonBody(string json)
         {
             var bytes = Encoding.UTF8.GetBytes(json);
@@ -812,6 +1033,50 @@ namespace UNIC.ControllerTest.Controllers
         public async Task GetHistory_ReturnsBadRequest_WhenPageInvalid()
         {
             var result = await _controller.GetHistory(1, 1, null, null, 0, 10);
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task GetHistory_ReturnsBadRequest_WhenPageSizeTooLarge()
+        {
+            var result = await _controller.GetHistory(1, 1, null, null, 1, 101);
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task GetHistory_ReturnsUnauthorized_WhenServiceThrowsUnauthorized()
+        {
+            _fundService.Setup(s => s.GetFundByIdAsync(3)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 8)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetFundHistoryPagedAsync(3, null, null, _userId, 1, 10))
+                .ThrowsAsync(new UnauthorizedAccessException());
+
+            var result = await _controller.GetHistory(8, 3, null, null, 1, 10);
+
+            Assert.IsType<UnauthorizedObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task GetHistory_ReturnsBadRequest_WhenServiceThrowsGenericException()
+        {
+            _fundService.Setup(s => s.GetFundByIdAsync(3)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 8)).ReturnsAsync(true);
+            _fundService.Setup(s => s.GetFundHistoryPagedAsync(3, null, null, _userId, 1, 10))
+                .ThrowsAsync(new Exception("db"));
+
+            var result = await _controller.GetHistory(8, 3, null, null, 1, 10);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task GetHistory_ReturnsBadRequest_WhenPageSizeZero()
+        {
+            _fundService.Setup(s => s.GetFundByIdAsync(3)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 8)).ReturnsAsync(true);
+
+            var result = await _controller.GetHistory(8, 3, null, null, 1, 0);
+
             Assert.IsType<BadRequestObjectResult>(result);
         }
 
