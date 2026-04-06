@@ -1,7 +1,8 @@
-using BusinessLogic.DTOs;
+﻿using BusinessLogic.DTOs;
 using BusinessLogic.Services.Implementation;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
+using FluentAssertions.Common;
 using Moq;
 using System;
 using System.Collections.Generic;
@@ -23,13 +24,30 @@ namespace UNIC.ServiceTest.Services
         {
             _mockClubRoleRepository = new Mock<IClubRoleRepository>();
             _mockDepartmentRepository = new Mock<IDepartmentRepository>();
-            
+
             _clubRoleService = new ClubRoleService(
                 _mockClubRoleRepository.Object,
                 _mockDepartmentRepository.Object
             );
         }
+        #region getById
+        [Fact]
+        public async Task GetByIdAsync_WhenFound_ReturnsDto()
+        {
+            var clubRole = new ClubRole
+            {
+                ClubRoleId = 1,
+                RoleName = "Admin"
+            };
 
+            _mockClubRoleRepository.Setup(r => r.GetByIdAsync(1, 1))
+                     .ReturnsAsync(clubRole);
+
+            var result = await _clubRoleService.GetByIdAsync(1, 1);
+
+            Assert.NotNull(result);
+            Assert.Equal("Admin", result.RoleName);
+        }
         [Fact]
         public async Task GetByIdAsync_ShouldReturnNull_WhenRoleNotFound()
         {
@@ -43,7 +61,29 @@ namespace UNIC.ServiceTest.Services
             // Assert
             Assert.Null(result);
         }
+        #endregion
+        #region GetAll
+        [Fact]
+        public async Task GetAllAsync_WhenDataExists_ReturnsDtoList()
+        {
+            var roles = new List<ClubRole>
+    {
+        new ClubRole { ClubRoleId = 1, RoleName = "Admin" },
+        new ClubRole { ClubRoleId = 2, RoleName = "Member" }
+    };
 
+            _mockClubRoleRepository.Setup(r => r.GetAllAsync(10))
+                     .ReturnsAsync(roles);
+
+            var result = await _clubRoleService.GetAllAsync(10);
+
+            Assert.NotNull(result);
+            Assert.Equal(2, result.Count());
+            Assert.Contains(result, r => r.RoleName == "Admin");
+        }
+
+        #endregion
+        #region Create
         [Fact]
         public async Task CreateAsync_ShouldThrowException_WhenRoleNameExists()
         {
@@ -62,7 +102,7 @@ namespace UNIC.ServiceTest.Services
             // Arrange
             var createDto = new CreateClubRoleDto { RoleName = "New Role", policies = new List<int>() };
             var createdRole = new ClubRole { ClubRoleId = 1, RoleName = "New Role", ClubId = 1 };
-            
+
             _mockClubRoleRepository.Setup(repo => repo.RoleNameExistsAsync(createDto.RoleName, 1))
                                    .ReturnsAsync(false);
             _mockClubRoleRepository.Setup(repo => repo.CreateAsync(It.IsAny<ClubRole>()))
@@ -78,7 +118,8 @@ namespace UNIC.ServiceTest.Services
             Assert.Equal("New Role", result.RoleName);
             _mockClubRoleRepository.Verify(repo => repo.CreateAsync(It.IsAny<ClubRole>()), Times.Once);
         }
-
+        #endregion
+        #region Update
         [Fact]
         public async Task UpdateAsync_ShouldReturnNull_WhenRoleNotFound()
         {
@@ -92,7 +133,130 @@ namespace UNIC.ServiceTest.Services
             // Assert
             Assert.Null(result);
         }
+        [Fact]
+        public async Task UpdateAsync_WhenRoleNameExists_ThrowsException()
+        {
+            var role = new ClubRole { ClubRoleId = 1, RoleName = "Old" };
 
+            var dto = new UpdateClubRoleDto
+            {
+                RoleName = "New"
+            };
+
+            _mockClubRoleRepository.Setup(r => r.GetByIdAsync(1, 1)).ReturnsAsync(role);
+            _mockClubRoleRepository.Setup(r => r.RoleNameExistsAsync(dto.RoleName, 1))
+                     .ReturnsAsync(true);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _clubRoleService.UpdateAsync(1, dto, 1)
+            );
+        }
+        [Fact]
+        public async Task UpdateAsync_WhenSameRoleName_DoesNotCheckDuplicate()
+        {
+            var role = new ClubRole { ClubRoleId = 1, RoleName = "Same" };
+
+            var dto = new UpdateClubRoleDto
+            {
+                RoleName = "Same"
+            };
+
+            _mockClubRoleRepository.Setup(r => r.GetByIdAsync(1, 1)).ReturnsAsync(role);
+            _mockClubRoleRepository.Setup(r => r.UpdateAsync(It.IsAny<ClubRole>()))
+                     .ReturnsAsync(true);
+            _mockClubRoleRepository.Setup(r => r.GetByIdAsync(1, 1)).ReturnsAsync(role);
+
+            var result = await _clubRoleService.UpdateAsync(1, dto, 1);
+
+            Assert.NotNull(result);
+
+            _mockClubRoleRepository.Verify(r => r.RoleNameExistsAsync(It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+        }
+        [Fact]
+        public async Task UpdateAsync_WithoutPolicies_DoesNotCallSetPolicies()
+        {
+            var role = new ClubRole { ClubRoleId = 1, RoleName = "Old" };
+
+            var dto = new UpdateClubRoleDto
+            {
+                Description = "New Desc"
+            };
+
+            _mockClubRoleRepository.Setup(r => r.GetByIdAsync(1, 1)).ReturnsAsync(role);
+            _mockClubRoleRepository.Setup(r => r.UpdateAsync(It.IsAny<ClubRole>()))
+                     .ReturnsAsync(true);
+            _mockClubRoleRepository.Setup(r => r.GetByIdAsync(1, 1)).ReturnsAsync(role);
+
+            var result = await _clubRoleService.UpdateAsync(1, dto, 1);
+
+            Assert.NotNull(result);
+
+            _mockClubRoleRepository.Verify(r => r.SetPoliciesAsync(It.IsAny<int>(), It.IsAny<List<int>>()), Times.Never);
+        }
+        [Fact]
+        public async Task UpdateAsync_WithPolicies_CallsSetPolicies()
+        {
+            var role = new ClubRole { ClubRoleId = 1, RoleName = "Old" };
+
+            var dto = new UpdateClubRoleDto
+            {
+                PolicyIds = new List<int> { 1, 2 }
+            };
+
+            _mockClubRoleRepository.Setup(r => r.GetByIdAsync(1, 1)).ReturnsAsync(role);
+            _mockClubRoleRepository.Setup(r => r.UpdateAsync(It.IsAny<ClubRole>()))
+                     .ReturnsAsync(true);
+            _mockClubRoleRepository.Setup(r => r.GetByIdAsync(1, 1)).ReturnsAsync(role);
+
+            await _clubRoleService.UpdateAsync(1, dto, 1);
+
+            _mockClubRoleRepository.Verify(r => r.SetPoliciesAsync(1, dto.PolicyIds), Times.Once);
+        }
+        [Fact]
+        public async Task UpdateAsync_WhenDepartmentIdNull_ShouldSetNull()
+        {
+            var role = new ClubRole { ClubRoleId = 1, DepartmentId = 5 };
+
+            var dto = new UpdateClubRoleDto
+            {
+                DepartmentId = null
+            };
+
+            _mockClubRoleRepository.Setup(r => r.GetByIdAsync(1, 1)).ReturnsAsync(role);
+            _mockClubRoleRepository.Setup(r => r.UpdateAsync(It.IsAny<ClubRole>()))
+                     .ReturnsAsync(true);
+            _mockClubRoleRepository.Setup(r => r.GetByIdAsync(1, 1)).ReturnsAsync(role);
+
+            await _clubRoleService.UpdateAsync(1, dto, 1);
+
+            Assert.Null(role.DepartmentId);
+        }
+
+        #endregion
+
+        #region UpdatePolicy
+        [Fact]
+        public async Task UpdatePoliciesAsync_Should_Call_SetPoliciesAsync()
+        {
+            // Arrange
+            int clubRoleId = 1;
+            var policyIds = new List<int> { 1, 2, 3 };
+
+            _mockClubRoleRepository
+                .Setup(x => x.SetPoliciesAsync(clubRoleId, policyIds))
+                .Returns(Task.CompletedTask);
+
+            // Act
+            await _clubRoleService.UpdatePoliciesAsync(clubRoleId, policyIds);
+
+            // Assert
+            _mockClubRoleRepository.Verify(
+                x => x.SetPoliciesAsync(clubRoleId, policyIds),
+                Times.Once
+            );
+        }
+        #endregion
+        #region Delete
         [Fact]
         public async Task DeleteAsync_ShouldDeleteDepartmentAndRoles_WhenRoleIsManager()
         {
@@ -134,28 +298,9 @@ namespace UNIC.ServiceTest.Services
             _mockClubRoleRepository.Verify(repo => repo.DeleteAsync(roleId), Times.Once);
             _mockDepartmentRepository.Verify(repo => repo.DeleteAsync(It.IsAny<int>()), Times.Never);
         }
+        #endregion
 
-        [Fact]
-        public async Task AssignRoleAsync_ShouldUpdate_WhenUserRoleExists()
-        {
-            // Arrange
-            var dto = new AssignClubRoleDto { UserId = Guid.NewGuid(), ClubId = 1, ClubRoleId = 2 };
-            var existingUserRole = new UserClubRole { UserId = dto.UserId, ClubId = dto.ClubId, ClubRoleId = 1 };
-
-            _mockClubRoleRepository.Setup(repo => repo.GetUserClubRoleAsync(dto.UserId, dto.ClubId))
-                                   .ReturnsAsync(existingUserRole);
-            _mockClubRoleRepository.Setup(repo => repo.UpdateUserClubRoleAsync(existingUserRole))
-                                   .ReturnsAsync(true);
-
-            // Act
-            var result = await _clubRoleService.AssignRoleAsync(dto);
-
-            // Assert
-            Assert.True(result);
-            Assert.Equal(2, existingUserRole.ClubRoleId);
-            _mockClubRoleRepository.Verify(repo => repo.UpdateUserClubRoleAsync(existingUserRole), Times.Once);
-        }
-        
+        #region GetClubStructure
         [Fact]
         public async Task GetClubStructureAsync_ShouldReturnGroupedRoles()
         {
@@ -182,7 +327,7 @@ namespace UNIC.ServiceTest.Services
             Assert.NotNull(result);
             Assert.Single(result.StandaloneRoles);
             Assert.Single(result.Departments);
-            
+
             var dept = result.Departments.First();
             Assert.Equal("IT Dept", dept.DepartmentName);
             Assert.NotNull(dept.Manager);
@@ -190,5 +335,137 @@ namespace UNIC.ServiceTest.Services
             Assert.Single(dept.Roles); // Member Role
             Assert.Equal(3, dept.Roles.First().ClubRoleId);
         }
+        #endregion
+        #region AssignRole
+        [Fact]
+        public async Task AssignRoleAsync_ShouldUpdate_WhenUserRoleExists()
+        {
+            // Arrange
+            var dto = new AssignClubRoleDto { UserId = Guid.NewGuid(), ClubId = 1, ClubRoleId = 2 };
+            var existingUserRole = new UserClubRole { UserId = dto.UserId, ClubId = dto.ClubId, ClubRoleId = 1 };
+
+            _mockClubRoleRepository.Setup(repo => repo.GetUserClubRoleAsync(dto.UserId, dto.ClubId))
+                                   .ReturnsAsync(existingUserRole);
+            _mockClubRoleRepository.Setup(repo => repo.UpdateUserClubRoleAsync(existingUserRole))
+                                   .ReturnsAsync(true);
+
+            // Act
+            var result = await _clubRoleService.AssignRoleAsync(dto);
+
+            // Assert
+            Assert.True(result);
+            Assert.Equal(2, existingUserRole.ClubRoleId);
+            _mockClubRoleRepository.Verify(repo => repo.UpdateUserClubRoleAsync(existingUserRole), Times.Once);
+        }
+        [Fact]
+        public async Task AssignRoleAsync_WhenUserRoleNotExists_ShouldCreateNew()
+        {
+            // Arrange
+            var dto = new AssignClubRoleDto
+            {
+                UserId = Guid.NewGuid(),
+                ClubId = 100,
+                ClubRoleId = 5
+            };
+
+            _mockClubRoleRepository
+                .Setup(x => x.GetUserClubRoleAsync(dto.UserId, dto.ClubId))
+                .ReturnsAsync((UserClubRole)null);
+
+            _mockClubRoleRepository
+                .Setup(x => x.AddUserClubRoleAsync(It.IsAny<UserClubRole>()))
+                .ReturnsAsync(true);
+
+            // Act
+            var result = await _clubRoleService.AssignRoleAsync(dto);
+
+            // Assert
+            Assert.True(result);
+
+            _mockClubRoleRepository.Verify(x =>
+                x.AddUserClubRoleAsync(It.Is<UserClubRole>(u =>
+                    u.UserId == dto.UserId &&
+                    u.ClubId == dto.ClubId &&
+                    u.ClubRoleId == dto.ClubRoleId &&
+                    u.Status == "ACTIVE"
+                )),
+                Times.Once);
+
+            _mockClubRoleRepository.Verify(x =>
+                x.UpdateUserClubRoleAsync(It.IsAny<UserClubRole>()),
+                Times.Never);
+        }
+        #endregion
+        #region GetUserClubRole
+        [Fact]
+        public async Task GetUserClubRoleAsync_ShouldReturnDataFromRepository()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+            int clubId = 1;
+
+            var expected = new UserClubRole
+            {
+                UserId = userId,
+                ClubId = clubId,
+                ClubRoleId = 5
+            };
+
+            _mockClubRoleRepository
+                .Setup(x => x.GetUserClubRoleAsync(userId, clubId))
+                .ReturnsAsync(expected);
+
+            // Act
+            var result = await _clubRoleService.GetUserClubRoleAsync(userId, clubId);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.Equal(expected, result);
+
+            _mockClubRoleRepository.Verify(x =>
+                x.GetUserClubRoleAsync(userId, clubId),
+                Times.Once);
+        }
+        #endregion
+        #region ManagedClub
+        [Fact]
+        public async Task GetManagedClubsAsync_WhenClubsExist_ShouldReturnMappedDtos()
+        {
+            // Arrange
+            var userId = Guid.NewGuid();
+
+            var clubs = new List<Club>
+    {
+        new Club
+        {
+            ClubId = 1,
+            ClubName = "Club A",
+            Description = "Desc A"
+        },
+        new Club
+        {
+            ClubId = 2,
+            ClubName = "Club B",
+            Description = "Desc B"
+        }
+    };
+
+            _mockClubRoleRepository
+                .Setup(x => x.GetManagedClubsAsync(userId))
+                .ReturnsAsync(clubs);
+
+            // Act
+            var result = await _clubRoleService.GetManagedClubsAsync(userId);
+
+            // Assert
+            Assert.Equal(2, result.Count);
+
+            Assert.Equal("Club A", result[0].ClubName);
+            Assert.Equal("Club B", result[1].ClubName);
+
+            _mockClubRoleRepository.Verify(x =>
+                x.GetManagedClubsAsync(userId), Times.Once);
+        }
+        #endregion
     }
 }

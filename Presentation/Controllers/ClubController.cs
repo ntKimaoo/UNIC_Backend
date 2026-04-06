@@ -28,6 +28,17 @@ namespace Presentation.Controllers
         //[RequirePolicy("ViewClubs")]
         public async Task<IActionResult> GetAll(int pageSize, string? searchQuery, string pageIndex)
         {
+<<<<<<< HEAD
+            try
+            {
+                var clubs = await _service.GetAllAsync();
+                return Ok(new { success = true, data = clubs });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+=======
             var clubs = await _service.GetAllAsync();
 
             if (!string.IsNullOrEmpty(searchQuery))
@@ -67,6 +78,7 @@ namespace Presentation.Controllers
                 totalPages = 1,
                 totalCount = clubs.Count()
             });
+>>>>>>> origin/kien_dev
         }
 
         /// <summary>
@@ -75,6 +87,17 @@ namespace Presentation.Controllers
         [HttpGet("active")]
         public async Task<IActionResult> GetActiveClubs(int pageSize, string? searchQuery, string pageIndex)
         {
+<<<<<<< HEAD
+            try
+            {
+                var clubs = await _service.GetActiveClubsAsync();
+                return Ok(new { success = true, data = clubs });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+=======
             var clubs = await _service.GetActiveClubsAsync();
             if (!string.IsNullOrEmpty(searchQuery))
             {
@@ -113,6 +136,7 @@ namespace Presentation.Controllers
                 totalPages = 1,
                 totalCount = clubs.Count()
             });
+>>>>>>> origin/kien_dev
         }
 
         /// <summary>
@@ -121,12 +145,19 @@ namespace Presentation.Controllers
         [HttpGet("public")]
         public async Task<IActionResult> GetPublicClubs()
         {
-            var clubs = await _service.GetPublicClubsAsync();
-            return Ok(new
+            try
             {
-                success = true,
-                data = clubs
-            });
+                var clubs = await _service.GetPublicClubsAsync();
+                return Ok(new
+                {
+                    success = true,
+                    data = clubs
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
         }
 
         /// <summary>
@@ -135,21 +166,32 @@ namespace Presentation.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var club = await _service.GetByIdAsync(id);
-            if (club == null)
+            try
             {
-                return NotFound(new
+                var club = await _service.GetByIdAsync(id);
+                if (club == null)
                 {
-                    success = false,
-                    message = "Club not found"
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "Club not found"
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    data = club
                 });
             }
-
-            return Ok(new
+            catch (Exception ex)
             {
-                success = true,
-                data = club
-            });
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = ex.Message
+                });
+            }
         }
 
         /// <summary>
@@ -269,14 +311,6 @@ namespace Presentation.Controllers
                     message = "Club updated successfully",
                 });
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = ex.Message
-                });
-            }
             catch (Exception ex)
             {
                 return StatusCode(500, new
@@ -294,21 +328,33 @@ namespace Presentation.Controllers
         [HttpDelete("{id}/soft")]
         public async Task<IActionResult> SoftDelete(int id)
         {
-            var result = await _service.SoftDeleteAsync(id);
-            if (!result)
+            try
             {
-                return NotFound(new
+                var result = await _service.SoftDeleteAsync(id);
+                if (!result)
                 {
-                    success = false,
-                    message = "Club not found"
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "Club not found"
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Club soft deleted successfully"
                 });
             }
-
-            return Ok(new
+            catch (Exception ex)
             {
-                success = true,
-                message = "Club soft deleted successfully"
-            });
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "An error occurred while updating the club",
+                    error = ex.Message
+                });
+            }
         }
 
         /// <summary>
@@ -317,21 +363,33 @@ namespace Presentation.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var result = await _service.DeleteAsync(id);
-            if (!result)
+            try
             {
-                return NotFound(new
+                var result = await _service.DeleteAsync(id);
+                if (!result)
                 {
-                    success = false,
-                    message = "Club not found"
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "Club not found"
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Club deleted permanently"
                 });
             }
-
-            return Ok(new
+            catch (Exception ex)
             {
-                success = true,
-                message = "Club deleted permanently"
-            });
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "An error occurred while updating the club",
+                    error = ex.Message
+                });
+            }
         }
 
         /// <summary>
@@ -341,22 +399,33 @@ namespace Presentation.Controllers
         [HttpGet("{clubId}/club-structure")]
         public async Task<IActionResult> GetClubStructure(int clubId)
         {
-            var club = await _service.GetByIdAsync(clubId);
-            if (club == null)
+            try
             {
-                return NotFound(new
+                var club = await _service.GetByIdAsync(clubId);
+                if (club == null)
                 {
-                    success = false,
-                    message = "Club not found"
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "Club not found"
+                    });
+                }
+
+                var structure = await _clubRoleService.GetClubStructureAsync(clubId);
+                return Ok(new
+                {
+                    success = true,
+                    data = structure
                 });
             }
-
-            var structure = await _clubRoleService.GetClubStructureAsync(clubId);
-            return Ok(new
-            {
-                success = true,
-                data = structure
-            });
+            catch (Exception ex) {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "An error occurred while updating the club",
+                    error = ex.Message
+                });
+            }
         }
     }
 }

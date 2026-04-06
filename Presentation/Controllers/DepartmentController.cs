@@ -1,3 +1,4 @@
+using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
@@ -81,14 +82,6 @@ namespace UNIC.Presentation.Controllers
                     new { success = true, data = createdDepartment }
                 );
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = ex.Message
-                });
-            }
             catch (Exception ex)
             {
                 return StatusCode(500, new
@@ -137,14 +130,7 @@ namespace UNIC.Presentation.Controllers
                     data = updatedDepartment 
                 });
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = ex.Message
-                });
-            }
+            
             catch (Exception ex)
             {
                 return StatusCode(500, new
@@ -200,6 +186,24 @@ namespace UNIC.Presentation.Controllers
                 success = true,
                 data = members
             });
+        }
+        ///<summary>
+        ///Add member to department
+        /// </summary>
+        [HttpPost("{departmentId}/members/{memberId}/add")]
+        public async Task<IActionResult> AddMemberToDepartment(int clubId,int departmentId,Guid userId)
+        {
+            var member = await _departmentService.AddMemberTodepartment(clubId, userId, departmentId);
+            return Ok(member);
+        }
+        ///<summary>
+        ///Remove member from department
+        /// </summary>
+        [HttpDelete("{departmentId}/members/{memberId}/remove}")]
+        public async Task<IActionResult> RemoveMemberFromDepartment(int clubId, int departmentId, Guid userId)
+        {
+            var member = await _departmentService.RemoveMemberFromDepartment(clubId, userId, departmentId);
+            return Ok(member);
         }
     }
 }
