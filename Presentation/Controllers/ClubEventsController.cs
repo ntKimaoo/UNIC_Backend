@@ -72,29 +72,8 @@ namespace UNIC.Presentation.Controllers
             catch { return false; }
         }
 
-        /// <summary>
-        /// Check permission: Admin > Club Manager > EventCollaborator(policy names)
-        /// </summary>
-        private async Task<bool> HasEventPermission(int clubId, int eventId, params string[] requiredPolicies)
-        {
-            if (User.IsInRole("Admin")) return true;
-            if (IsClubManager(clubId)) return true;
 
-            var userId = GetCurrentUserId();
-            if (userId == null) return false;
 
-            var collab = await _unitOfWork.EventMembers.GetByEventAndUserAsync(eventId, userId.Value);
-            if (collab == null) return false;
-
-            // If no specific policies required, just check that user is a collaborator
-            if (requiredPolicies.Length == 0) return true;
-
-            var rolePolicies = collab.EventRole?.EventRolePolicies?.Select(p => p.Policy?.Name) ?? Enumerable.Empty<string>();
-            var memberPolicies = collab.EventMemberPolicies?.Select(p => p.Policy?.Name) ?? Enumerable.Empty<string>();
-            var allUserPolicies = rolePolicies.Union(memberPolicies).Where(p => p != null).ToList();
-
-            return requiredPolicies.Any(p => allUserPolicies.Contains(p, StringComparer.OrdinalIgnoreCase));
-        }
 
         /// <summary>
         /// Check that user is any collaborator (no specific policy needed)

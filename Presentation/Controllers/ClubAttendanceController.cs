@@ -40,61 +40,8 @@ namespace UNIC.Presentation.Controllers
             _unitOfWork = unitOfWork;
         }
 
-        #region Permission Helpers
 
-        private class ClubRoleClaimDto
-        {
-            public int ClubId { get; set; }
-            public string RoleName { get; set; } = string.Empty;
-            public int Level { get; set; }
-        }
 
-        private Guid? GetCurrentUserId()
-        {
-            var sub = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                   ?? User.FindFirst("sub")?.Value
-                   ?? User.FindFirst("UserId")?.Value;
-            return Guid.TryParse(sub, out var id) ? id : null;
-        }
-
-        private bool IsClubManager(int clubId)
-        {
-            if (User.IsInRole("Admin")) return true;
-            var clubRolesClaim = User.FindFirst("club_roles")?.Value;
-            if (string.IsNullOrEmpty(clubRolesClaim)) return false;
-            try
-            {
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                var roles = JsonSerializer.Deserialize<List<ClubRoleClaimDto>>(clubRolesClaim, options);
-                return roles != null && roles.Any(r => r.ClubId == clubId && (r.RoleName.Equals("Manager", StringComparison.OrdinalIgnoreCase) || r.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase)));
-            }
-            catch { return false; }
-        }
-
-        private async Task<bool> HasEventPermission(int clubId, int eventId, params string[] requiredPolicies)
-        {
-            if (User.IsInRole("Admin")) return true;
-            if (IsClubManager(clubId)) return true;
-
-            var userId = GetCurrentUserId();
-            if (userId == null) return false;
-
-            var collab = await _unitOfWork.EventMembers.GetByEventAndUserAsync(eventId, userId.Value);
-            if (collab == null) return false;
-
-            if (requiredPolicies.Length == 0) return true;
-
-            var rolePolicies = collab.EventRole?.EventRolePolicies?.Select(p => p.Policy?.Name) ?? Enumerable.Empty<string>();
-            var memberPolicies = collab.EventMemberPolicies?.Select(p => p.Policy?.Name) ?? Enumerable.Empty<string>();
-            var allUserPolicies = rolePolicies.Union(memberPolicies).Where(p => p != null).ToList();
-
-            return requiredPolicies.Any(p => allUserPolicies.Contains(p, StringComparer.OrdinalIgnoreCase));
-        }
-
-        private ObjectResult Forbidden(string message = "Bạn không có quyền thực hiện hành động này.")
-            => StatusCode(StatusCodes.Status403Forbidden, new { error = message });
-
-        #endregion
 
         /// <summary>
         /// Approve registration — CREATOR, MANAGER, COORDINATOR
