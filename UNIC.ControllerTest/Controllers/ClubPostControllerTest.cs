@@ -45,7 +45,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubPostService.Setup(s => s.GetByClubIdAsync(1))
                                 .ReturnsAsync(posts);
 
-            var result = await _controller.GetAll(1);
+            var result = await _controller.GetAll();
 
             Assert.IsType<OkObjectResult>(result);
         }
@@ -62,7 +62,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubPostService.Setup(s => s.GetByIdAsync(1))
                                 .ReturnsAsync(post);
 
-            var result = await _controller.GetById(1, 1);
+            var result = await _controller.GetById(1);
 
             Assert.IsType<OkObjectResult>(result);
         }
@@ -73,7 +73,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubPostService.Setup(s => s.GetByIdAsync(99))
                                 .ReturnsAsync((ClubPostResponseDto?)null);
 
-            var result = await _controller.GetById(1, 99);
+            var result = await _controller.GetById(99);
 
             Assert.IsType<NotFoundObjectResult>(result);
         }
@@ -94,7 +94,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubPostService.Setup(s => s.GetByUserIdAsync(userId))
                                 .ReturnsAsync(posts);
 
-            var result = await _controller.GetByUserId(1, userId);
+            var result = await _controller.GetByUserId(userId);
 
             Assert.IsType<OkObjectResult>(result);
         }
@@ -112,7 +112,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubPostService.Setup(s => s.CreateAsync(dto, null))
                                 .ReturnsAsync(created);
 
-            var result = await _controller.Create(1, dto, null);
+            var result = await _controller.Create(dto, null);
 
             Assert.IsType<CreatedAtActionResult>(result);
         }
@@ -125,7 +125,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubPostService.Setup(s => s.CreateAsync(dto, null))
                                 .ThrowsAsync(new Exception("Creation failed"));
 
-            var result = await _controller.Create(1, dto, null);
+            var result = await _controller.Create(dto, null);
 
             Assert.IsType<BadRequestObjectResult>(result);
         }
@@ -143,7 +143,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubPostService.Setup(s => s.UpdateAsync(1, dto, null))
                                 .ReturnsAsync(updated);
 
-            var result = await _controller.Update(1, 1, dto, null);
+            var result = await _controller.Update(1, dto, null);
 
             Assert.IsType<OkObjectResult>(result);
         }
@@ -156,7 +156,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubPostService.Setup(s => s.UpdateAsync(99, dto, null))
                                 .ReturnsAsync((ClubPostResponseDto?)null);
 
-            var result = await _controller.Update(1, 99, dto, null);
+            var result = await _controller.Update(99, dto, null);
 
             Assert.IsType<NotFoundObjectResult>(result);
         }
@@ -171,7 +171,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubPostService.Setup(s => s.DeleteAsync(1))
                                 .ReturnsAsync(true);
 
-            var result = await _controller.Delete(1, 1);
+            var result = await _controller.Delete(1);
 
             Assert.IsType<OkObjectResult>(result);
         }
@@ -182,7 +182,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubPostService.Setup(s => s.DeleteAsync(99))
                                 .ReturnsAsync(false);
 
-            var result = await _controller.Delete(1, 99);
+            var result = await _controller.Delete(99);
 
             Assert.IsType<NotFoundObjectResult>(result);
         }
@@ -194,7 +194,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task UploadEditorImage_ReturnsBadRequest_WhenNoFile()
         {
-            var result = await _controller.UploadEditorImage(1, null!);
+            var result = await _controller.UploadEditorImage(null!);
 
             Assert.IsType<BadRequestObjectResult>(result);
         }
@@ -209,7 +209,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockFileStorageService.Setup(s => s.SaveFileAsync(mockFile.Object, "clubposts"))
                                    .ReturnsAsync("https://storage.example.com/image.png");
 
-            var result = await _controller.UploadEditorImage(1, mockFile.Object);
+            var result = await _controller.UploadEditorImage(mockFile.Object);
 
             Assert.IsType<OkObjectResult>(result);
         }

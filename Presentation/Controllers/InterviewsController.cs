@@ -17,10 +17,6 @@ namespace Presentation.Controllers
             _service = service;
         }
 
-        // ═══════════════════════════════════════════════════════════
-        //  Interview Schedule CRUD
-        // ═══════════════════════════════════════════════════════════
-
         /// <summary>
         /// POST /api/interviews – Tạo lịch phỏng vấn từ ApplicationId
         /// </summary>
@@ -259,5 +255,182 @@ namespace Presentation.Controllers
 
             return Ok(new { success = true, data = summary });
         }
+
+        // ═══════════════════════════════════════════════════════════
+        //  Evaluation Criteria
+        // ═══════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// GET /api/interviews/campaign/{campaignId}/criteria – Lấy bộ tiêu chí (auto-seed default nếu chưa có)
+        /// </summary>
+        [HttpGet("campaign/{campaignId}/criteria")]
+        public async Task<IActionResult> GetCampaignCriteria(int campaignId)
+        {
+            var criteria = await _service.GetCampaignCriteriaAsync(campaignId);
+            return Ok(new { success = true, data = criteria });
+        }
+
+        /// <summary>
+        /// POST /api/interviews/campaign/{campaignId}/criteria – Thêm tiêu chí mới
+        /// </summary>
+        [HttpPost("campaign/{campaignId}/criteria")]
+        public async Task<IActionResult> CreateCriterion(int campaignId, [FromBody] CreateEvaluationCriterionDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
+
+            var result = await _service.CreateCriterionAsync(campaignId, dto);
+            return Ok(new { success = true, message = "Criterion created", data = result });
+        }
+
+        /// <summary>
+        /// PUT /api/interviews/criteria/{criterionId} – Sửa tiêu chí
+        /// </summary>
+        [HttpPut("criteria/{criterionId}")]
+        public async Task<IActionResult> UpdateCriterion(int criterionId, [FromBody] UpdateEvaluationCriterionDto dto)
+        {
+            var result = await _service.UpdateCriterionAsync(criterionId, dto);
+            if (result == null)
+                return NotFound(new { success = false, message = "Criterion not found" });
+
+            return Ok(new { success = true, message = "Criterion updated", data = result });
+        }
+
+        /// <summary>
+        /// DELETE /api/interviews/criteria/{criterionId} – Xoá tiêu chí
+        /// </summary>
+        [HttpDelete("criteria/{criterionId}")]
+        public async Task<IActionResult> DeleteCriterion(int criterionId)
+        {
+            var ok = await _service.DeleteCriterionAsync(criterionId);
+            if (!ok)
+                return NotFound(new { success = false, message = "Criterion not found" });
+
+            return Ok(new { success = true, message = "Criterion deleted" });
+        }
+
+        /// <summary>
+        /// PUT /api/interviews/{id}/assignments/{assignmentId}/criteria – Phân tiêu chí cho PV viên
+        /// </summary>
+        [HttpPut("{id}/assignments/{assignmentId}/criteria")]
+        public async Task<IActionResult> AssignCriteria(int id, int assignmentId, [FromBody] AssignCriteriaDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
+
+            var ok = await _service.AssignCriteriaToInterviewerAsync(id, assignmentId, dto);
+            if (!ok)
+                return NotFound(new { success = false, message = "Assignment not found" });
+
+            return Ok(new { success = true, message = "Criteria assigned" });
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  Criteria-based Feedback & Evaluation
+        // ═══════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// POST /api/interviews/{id}/assignments/{assignmentId}/criteria-feedback – Gửi đánh giá theo tiêu chí
+        /// </summary>
+        [HttpPost("{id}/assignments/{assignmentId}/criteria-feedback")]
+        public async Task<IActionResult> SubmitCriteriaFeedback(int id, int assignmentId, [FromBody] SubmitCriteriaFeedbackDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
+
+            try
+            {
+                var ok = await _service.SubmitCriteriaFeedbackAsync(id, assignmentId, dto);
+                if (!ok)
+                    return NotFound(new { success = false, message = "Assignment not found" });
+
+                return Ok(new { success = true, message = "Criteria feedback submitted" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// GET /api/interviews/{id}/evaluation-summary – Tổng hợp đánh giá theo tiêu chí
+        /// </summary>
+        [HttpGet("{id}/evaluation-summary")]
+        public async Task<IActionResult> GetEvaluationSummary(int id)
+        {
+            var summary = await _service.GetEvaluationSummaryAsync(id);
+            if (summary == null)
+                return NotFound(new { success = false, message = "Interview schedule not found" });
+
+            return Ok(new { success = true, data = summary });
+        }
+
+        /// <summary>
+        /// GET /api/interviews/campaign/{campaignId}/comparison – So sánh ứng viên
+        /// </summary>
+        [HttpGet("campaign/{campaignId}/comparison")]
+        public async Task<IActionResult> GetCampaignComparison(int campaignId)
+        {
+            var comparison = await _service.GetCampaignComparisonAsync(campaignId);
+            return Ok(new { success = true, data = comparison });
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  Decisions & Publish
+        // ═══════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// POST /api/interviews/campaign/{campaignId}/decisions – Gửi quyết định Accept/Reject/Waitlist
+        /// </summary>
+        [HttpPost("campaign/{campaignId}/decisions")]
+        public async Task<IActionResult> SubmitDecisions(int campaignId, [FromBody] SubmitDecisionsDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
+
+            try
+            {
+                var result = await _service.SubmitDecisionsAsync(campaignId, dto);
+                return Ok(new { success = true, message = "Decisions submitted", data = result });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// POST /api/interviews/campaign/{campaignId}/publish – Công bố / lên lịch công bố kết quả
+        /// </summary>
+        [HttpPost("campaign/{campaignId}/publish")]
+        public async Task<IActionResult> PublishResults(int campaignId, [FromBody] PublishResultDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
+
+            try
+            {
+                var result = await _service.PublishResultsAsync(campaignId, dto);
+                return Ok(new { success = true, message = "Results published", data = result });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// GET /api/interviews/campaign/{campaignId}/publish-status – Trạng thái công bố
+        /// </summary>
+        [HttpGet("campaign/{campaignId}/publish-status")]
+        public async Task<IActionResult> GetPublishStatus(int campaignId)
+        {
+            var status = await _service.GetPublishStatusAsync(campaignId);
+            if (status == null)
+                return NotFound(new { success = false, message = "No decisions found for this campaign" });
+
+            return Ok(new { success = true, data = status });
+        }
     }
 }
+

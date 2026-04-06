@@ -32,6 +32,12 @@ namespace BusinessLogic.DTOs
         public bool IsPublic { get; set; } = true;
 
         public bool IsOnline { get; set; } = false;
+
+        [MaxLength(500)]
+        public string? MeetLink { get; set; }
+
+        [Range(1, int.MaxValue, ErrorMessage = "So luong nguoi phai lon hon 0")]
+        public int? MaxAttendees { get; set; }
     }
 
     /// <summary>
@@ -61,6 +67,12 @@ namespace BusinessLogic.DTOs
         public bool RequiresApproval { get; set; }
 
         public bool IsOnline { get; set; } = false;
+
+        [MaxLength(500)]
+        public string? MeetLink { get; set; }
+
+        [Range(1, int.MaxValue, ErrorMessage = "So luong nguoi phai lon hon 0")]
+        public int? MaxAttendees { get; set; }
     }
 
     /// <summary>
@@ -77,10 +89,12 @@ namespace BusinessLogic.DTOs
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         public bool IsPublic { get; set; }
+        public bool IsOnline { get; set; }
         public string? MeetLink { get; set; }
         public string Status { get; set; } = null!;
         public DateTime CreatedAt { get; set; }
         public int? MaxAttendees { get; set; }
+        public int? AvailableSlots { get; set; }
         public int CurrentAttendees { get; set; }
         public bool RequiresApproval { get; set; }
         public DateTime? RegistrationStartDate { get; set; }
@@ -109,6 +123,31 @@ namespace BusinessLogic.DTOs
         public string? Description { get; set; }
 
         public string? Location { get; set; }
+
+        /// <summary>"main" | "setup" | "break" — default: "main"</summary>
+        public string SessionType { get; set; } = "main";
+    }
+
+    /// <summary>
+    /// DTO for updating an existing session
+    /// </summary>
+    public class UpdateSessionRequest
+    {
+        public int ScheduleId { get; set; }
+        public int EventId    { get; set; }
+
+        [Required(ErrorMessage = "Session name is required")]
+        [MaxLength(100, ErrorMessage = "Session name cannot exceed 100 characters")]
+        public string SessionName { get; set; } = null!;
+
+        public DateTime StartTime { get; set; }
+        public DateTime EndTime   { get; set; }
+
+        public string? Description { get; set; }
+        public string? Location    { get; set; }
+
+        /// <summary>"main" | "setup" | "break"</summary>
+        public string? SessionType { get; set; }
     }
 
     /// <summary>
@@ -140,5 +179,6 @@ namespace BusinessLogic.DTOs
         public DateTime? EndTime { get; set; }
         public string? Location { get; set; }
         public string? Description { get; set; }
+        public string SessionType { get; set; } = "main";
     }
 }

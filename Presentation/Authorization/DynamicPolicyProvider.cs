@@ -15,6 +15,7 @@ namespace Presentation.Authorization
         private readonly DefaultAuthorizationPolicyProvider _fallbackPolicyProvider;
         private const string POLICY_PREFIX = "Policy_";
         private const string CLUB_POLICY_PREFIX = "ClubPolicy_";
+        private const string EVENT_POLICY_PREFIX = "EventPolicy_";
 
         public DynamicPolicyProvider(IOptions<AuthorizationOptions> options)
         {
@@ -29,6 +30,19 @@ namespace Presentation.Authorization
 
         public Task<AuthorizationPolicy?> GetPolicyAsync(string policyName)
         {
+            // Event-scoped policy: EventPolicy_<policyTitle>
+            if (policyName.StartsWith(EVENT_POLICY_PREFIX))
+            {
+                var policyTitle = policyName.Substring(EVENT_POLICY_PREFIX.Length);
+
+                var policy = new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .AddRequirements(new EventPermissionRequirement(policyTitle))
+                    .Build();
+
+                return Task.FromResult<AuthorizationPolicy?>(policy);
+            }
+
             // Club-scoped policy: ClubPolicy_<policyTitle>
             if (policyName.StartsWith(CLUB_POLICY_PREFIX))
             {

@@ -12,6 +12,7 @@ using DataAccess.Repositories.Interface;
 using DataAccess.Seed;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.OData;
@@ -27,6 +28,7 @@ using UNIC.BusinessLogic.Services.Interface;
 using UNIC.DataAccess.Repositories.Implementation;
 using UNIC.DataAccess.Repositories.Interface;
 using UNIC.DataAccess.Seed;
+using UNIC.Presentation.Helpers;
 using UNIC.Presentation.Hubs;
 using BusinessLogic.Hubs;
 using Presentation.Hubs;
@@ -126,6 +128,7 @@ builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<INotificationHubContext, NotificationHubContext>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventReminderService>();
+builder.Services.AddHostedService<BusinessLogic.Services.Background.EventStatusSyncService>();
 
 // Unit of Work and Repositories
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IUnitOfWork, DataAccess.Repositories.Implementation.UnitOfWork>();
@@ -149,9 +152,17 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    // Luôn serialize DateTime với suffix 'Z' để frontend (UTC+7) parse đúng giờ
+    options.JsonSerializerOptions.Converters.Add(new DateTimeUtcJsonConverter());
+    options.JsonSerializerOptions.Converters.Add(new NullableDateTimeUtcJsonConverter());
 }); ;
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    c.IncludeXmlComments(xmlPath);
+});
 //signalR
 builder.Services.AddSignalR();
 //jwt
@@ -182,6 +193,9 @@ builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
 // Register club-scoped authorization handler
 builder.Services.AddScoped<IAuthorizationHandler, ClubMemberAuthorizationHandler>();
 
+// Register event-scoped authorization handler
+builder.Services.AddScoped<IAuthorizationHandler, EventPermissionAuthorizationHandler>();
+
 // Register dynamic policy provider
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 
@@ -189,6 +203,18 @@ builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvide
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
     options.MultipartBodyLengthLimit = 10 * 1024 * 1024; // 10MB
+});
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+        | ForwardedHeaders.XForwardedProto
+        | ForwardedHeaders.XForwardedHost;
+    if (builder.Environment.IsDevelopment())
+    {
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    }
 });
 
 //builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
@@ -239,11 +265,14 @@ app.UseExceptionHandler(appError =>
     });
 });
 
+app.UseForwardedHeaders();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
 app.UseCors("AllowFE");
 app.UseStaticFiles(); // Enable serving files from wwwroot
 app.MapHub<WebRtcHub>("/webrtc");
@@ -253,5 +282,11 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+if (app.Environment.IsDevelopment())
+{
+    // Tránh 404 khi mở base URL qua ngrok (GET / không có controller).
+    app.MapGet("/", () => Results.Redirect("/swagger"));
+}
 
 app.Run();

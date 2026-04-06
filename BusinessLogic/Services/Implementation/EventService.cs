@@ -2,6 +2,7 @@ using AutoMapper;
 using BusinessLogic.DTOs;
 using BusinessLogic.Exceptions;
 using BusinessLogic.Services.Interface;
+using BusinessLogic.Services.Background;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using DataAccess.Enums;
@@ -44,7 +45,7 @@ namespace BusinessLogic.Services.Implementation
             _attendanceService = attendanceService;
         }
 
-        public async Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null)
+        public async Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null, Guid? creatorUserId = null)
         {
             // Validate input
             var validationResult = await _createValidator.ValidateAsync(request);
@@ -70,6 +71,39 @@ namespace BusinessLogic.Services.Implementation
             // Add to repository
             await _unitOfWork.Events.AddAsync(eventEntity);
             await _unitOfWork.SaveChangesAsync();
+
+            // Auto-assign CREATOR role to event creator
+            if (creatorUserId.HasValue)
+            {
+                var role = new EventRole
+                {
+                    EventId = eventEntity.EventId,
+                    RoleName = "Trưởng ban tổ chức",
+                    Description = "Người tạo sự kiện, toàn quyền quản trị",
+                    Level = 1
+                };
+                await _unitOfWork.EventRoles.CreateAsync(role);
+                // Get all Event policies from Policy table
+                var allEventPolicyNames = await _unitOfWork.EventRoles.GetEventPolicyNamesAsync();
+                
+                // Assign to user
+                var collaborator = new UserEventRole
+                {
+                    EventId = eventEntity.EventId,
+                    UserId = creatorUserId.Value,
+                    EventRole = role,
+                    JoinDate = DateTime.Now,
+                    AssignedBy = creatorUserId.Value
+                };
+                await _unitOfWork.EventMembers.AddAsync(collaborator);
+                await _unitOfWork.SaveChangesAsync();
+                
+                // Seed policies for Trưởng ban (all event policies)
+                if (allEventPolicyNames.Any())
+                {
+                    await _unitOfWork.EventRoles.SetPoliciesAsync(role.EventRoleId, allEventPolicyNames);
+                }
+            }
 
             return _mapper.Map<EventDetailDto>(eventEntity);
         }
@@ -99,24 +133,26 @@ namespace BusinessLogic.Services.Implementation
             // Map updates
             existingEvent.EventName = request.EventName;
             existingEvent.Description = request.Description;
-            
+            existingEvent.IsOnline = request.IsOnline;
+            existingEvent.MeetLink = request.MeetLink;
+
             // Handle Type switch (Offline <-> Online)
             if (request.IsOnline)
             {
-                // If switching to or staying Online, ensure we have a WebRTC link
-                if (string.IsNullOrEmpty(existingEvent.Location) || !existingEvent.Location.StartsWith("/webrtc/"))
+                // Online event: use provided MeetLink; generate internal room code if none provided
+                if (string.IsNullOrWhiteSpace(request.MeetLink))
                 {
-                    existingEvent.Location = $"/webrtc/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+                    if (string.IsNullOrEmpty(existingEvent.MeetLink))
+                        existingEvent.MeetLink = $"/event-room/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
                 }
+                // Location is optional for online events (clear it or keep as-is)
             }
             else
             {
-                // If staying or switching to Offline, ensure they provided a physical location
-                if (string.IsNullOrWhiteSpace(request.Location))
-                {
-                    throw new DomainException("Location is required for offline events.");
-                }
-                existingEvent.Location = request.Location;
+                // Offline event: clear MeetLink, require Location
+                existingEvent.MeetLink = null;
+                if (!string.IsNullOrWhiteSpace(request.Location))
+                    existingEvent.Location = request.Location;
             }
             
             existingEvent.StartDate = request.StartDate;
@@ -170,6 +206,42 @@ namespace BusinessLogic.Services.Implementation
             return _mapper.Map<SessionDto>(schedule);
         }
 
+        public async Task<SessionDto> UpdateSessionAsync(UpdateSessionRequest request)
+        {
+            var schedule = await _unitOfWork.EventSchedules.GetByIdAsync(request.ScheduleId);
+            if (schedule == null)
+                throw new NotFoundException("Session", request.ScheduleId);
+
+            if (schedule.EventId != request.EventId)
+                throw new DomainException("Session does not belong to this event.");
+
+            schedule.ScheduleName = request.SessionName;
+            schedule.StartTime    = request.StartTime;
+            schedule.EndTime      = request.EndTime;
+            schedule.Location     = request.Location;
+            schedule.Description  = request.Description;
+            if (request.SessionType != null)
+                schedule.SessionType = request.SessionType;
+
+            _unitOfWork.EventSchedules.Update(schedule);
+            await _unitOfWork.SaveChangesAsync();
+
+            return _mapper.Map<SessionDto>(schedule);
+        }
+
+        public async Task DeleteSessionAsync(int scheduleId, int eventId)
+        {
+            var schedule = await _unitOfWork.EventSchedules.GetByIdAsync(scheduleId);
+            if (schedule == null)
+                throw new NotFoundException("Session", scheduleId);
+
+            if (schedule.EventId != eventId)
+                throw new DomainException("Session does not belong to this event.");
+
+            _unitOfWork.EventSchedules.Delete(schedule);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
         public async Task<EventDetailDto> OpenRegistrationAsync(OpenRegistrationRequest request)
         {
             // Validate input
@@ -203,6 +275,9 @@ namespace BusinessLogic.Services.Implementation
             eventEntity.RegistrationStartDate = request.RegistrationStartDate;
             eventEntity.RegistrationEndDate = request.RegistrationEndDate;
             eventEntity.MaxAttendees = request.MaxAttendees;
+            // Sync AvailableSlots = MaxAttendees khi mở đăng ký (bắt đầu đếm slot)
+            if (request.MaxAttendees.HasValue)
+                eventEntity.AvailableSlots = request.MaxAttendees.Value;
 
             _unitOfWork.Events.Update(eventEntity);
             await _unitOfWork.SaveChangesAsync();
@@ -280,7 +355,14 @@ namespace BusinessLogic.Services.Implementation
                 var user = await _unitOfWork.Users.GetByIdAsync(att.UserId);
                 if (user != null)
                 {
-                    _ = _emailService.SendEventCheckInCodeAsync(user.Email, user.FullName, eventEntity.EventName, generatedCode);
+                    EmailQueueService.EnqueueEmail(new EmailQueueItem
+                    {
+                        ToEmail = user.Email,
+                        FullName = user.FullName,
+                        EmailType = EmailType.EventCheckIn,
+                        EventName = eventEntity.EventName,
+                        CheckInCode = generatedCode
+                    });
                 }
             }
 

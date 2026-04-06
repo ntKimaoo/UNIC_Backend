@@ -2,6 +2,7 @@ using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Presentation.Authorization;
 using System;
 using System.Collections.Generic;
 using System.Security.Claims;
@@ -21,7 +22,6 @@ namespace Presentation.Controllers
             _service = service;
             _policyService = policyService;
         }
-
         private Guid? GetCurrentUserId()
         {
             var claim = User.FindFirst(ClaimTypes.NameIdentifier)

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,12 +13,19 @@ namespace BusinessLogic.DTOs
         public string? Token { get; set; }
         public EmailType EmailType { get; set; }
         public int RetryCount { get; set; } = 0;
+
+        // Event-specific fields
+        public string? EventName { get; set; }
+        public DateTime? StartDate { get; set; }
+        public string? CheckInCode { get; set; }
     }
 
     public enum EmailType
     {
         Verification,
         PasswordReset,
-        Welcome
+        Welcome,
+        EventRegistration,
+        EventCheckIn
     }
 }

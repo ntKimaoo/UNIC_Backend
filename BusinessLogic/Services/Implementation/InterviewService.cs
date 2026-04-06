@@ -45,6 +45,11 @@ namespace BusinessLogic.Services.Implementation
             var room = new MeetingRoom
             {
                 InterviewScheduleId = created.Id,
+                RoomType            = RoomType.Interview,
+                Title               = dto.Title,
+                CreatedByUserId     = dto.CreatedByUserId,
+                ScheduledStartAt    = dto.ScheduledAt,
+                ScheduledEndAt      = dto.ScheduledAt.AddMinutes(dto.DurationMinutes),
                 RoomCode            = GenerateRoomCode(),
                 Status              = RoomStatus.Idle,
                 CreatedAt           = DateTime.UtcNow
@@ -235,6 +240,44 @@ namespace BusinessLogic.Services.Implementation
         {
             var room = await _repo.GetRoomByScheduleIdAsync(scheduleId);
             return room == null ? null : MapRoomToDto(room);
+        }
+
+        public async Task<MeetingRoomResponseDto?> GetRoomByIdAsync(int roomId)
+        {
+            var room = await _repo.GetRoomByIdAsync(roomId);
+            return room == null ? null : MapRoomToDto(room);
+        }
+
+        public async Task<MeetingRoomResponseDto?> GetRoomByCodeAsync(string roomCode)
+        {
+            var room = await _repo.GetRoomByCodeAsync(roomCode);
+            return room == null ? null : MapRoomToDto(room);
+        }
+
+        public async Task<MeetingRoomResponseDto> CreateStandaloneRoomAsync(CreateMeetingRoomDto dto)
+        {
+            if (!Enum.TryParse<RoomType>(dto.RoomType, true, out var roomType))
+                roomType = RoomType.General;
+
+            var room = new MeetingRoom
+            {
+                RoomType            = roomType,
+                Title               = dto.Title,
+                Description         = dto.Description,
+                CreatedByUserId     = dto.CreatedByUserId,
+                ScheduledStartAt    = dto.ScheduledStartAt,
+                ScheduledEndAt      = dto.ScheduledEndAt,
+                InterviewScheduleId = dto.InterviewScheduleId,
+                RoomCode            = GenerateRoomCode(),
+                MaxParticipants     = dto.MaxParticipants,
+                IsWaitingRoomEnabled = dto.IsWaitingRoomEnabled,
+                IsRecordingEnabled  = dto.IsRecordingEnabled,
+                Status              = RoomStatus.Idle,
+                CreatedAt           = DateTime.UtcNow
+            };
+
+            var created = await _repo.CreateRoomAsync(room);
+            return MapRoomToDto(created);
         }
 
         public async Task<JoinRoomResponseDto> JoinRoomAsync(string roomCode, JoinRoomDto dto)
@@ -459,6 +502,12 @@ namespace BusinessLogic.Services.Implementation
             return new MeetingRoomResponseDto
             {
                 Id                     = r.Id,
+                RoomType               = r.RoomType.ToString(),
+                Title                  = r.Title,
+                Description            = r.Description,
+                CreatedByUserId        = r.CreatedByUserId,
+                ScheduledStartAt       = r.ScheduledStartAt,
+                ScheduledEndAt         = r.ScheduledEndAt,
                 InterviewScheduleId    = r.InterviewScheduleId,
                 RoomCode               = r.RoomCode,
                 StunServerUri          = r.StunServerUri,
@@ -503,5 +552,392 @@ namespace BusinessLogic.Services.Implementation
                 OccurredAt    = e.OccurredAt
             };
         }
+
+        // ═══════════════════════════════════════════════════════════
+        //  Evaluation Criteria
+        // ═══════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// 5 tiêu chí mặc định – tự tạo khi campaign chưa có tiêu chí nào.
+        /// </summary>
+        private static readonly List<(string Name, string Desc, int Weight, int Order)> DefaultCriteria = new()
+        {
+            ("Kiến thức chuyên môn",       "Đánh giá kiến thức nền tảng, chuyên ngành liên quan", 25, 1),
+            ("Kỹ năng giao tiếp",          "Khả năng trình bày, tương tác, diễn đạt ý tưởng",    20, 2),
+            ("Tư duy & giải quyết vấn đề", "Khả năng phân tích, tư duy logic, đề xuất giải pháp", 20, 3),
+            ("Phù hợp văn hóa CLB",        "Mức độ phù hợp với giá trị, phong cách hoạt động CLB", 20, 4),
+            ("Kinh nghiệm & thành tích",   "Kinh nghiệm hoạt động, thành tích cá nhân, kỹ năng mềm", 15, 5),
+        };
+
+        public async Task<List<EvaluationCriterionDto>> GetCampaignCriteriaAsync(int campaignId)
+        {
+            var criteria = await _repo.GetCriteriaByCampaignIdAsync(campaignId);
+            var list = criteria.ToList();
+
+            // Nếu chưa có tiêu chí → seed 5 default
+            if (list.Count == 0)
+            {
+                foreach (var (name, desc, weight, order) in DefaultCriteria)
+                {
+                    var c = new EvaluationCriterion
+                    {
+                        CampaignId   = campaignId,
+                        Name         = name,
+                        Description  = desc,
+                        Weight       = weight,
+                        DisplayOrder = order,
+                        IsDefault    = true,
+                        CreatedAt    = DateTime.UtcNow
+                    };
+                    var created = await _repo.CreateCriterionAsync(c);
+                    list.Add(created);
+                }
+            }
+
+            return list.Select(MapCriterionToDto).ToList();
+        }
+
+        public async Task<EvaluationCriterionDto> CreateCriterionAsync(int campaignId, CreateEvaluationCriterionDto dto)
+        {
+            var criterion = new EvaluationCriterion
+            {
+                CampaignId   = campaignId,
+                Name         = dto.Name,
+                Description  = dto.Description,
+                Weight       = dto.Weight,
+                DisplayOrder = dto.DisplayOrder,
+                IsDefault    = false,
+                CreatedAt    = DateTime.UtcNow
+            };
+
+            var created = await _repo.CreateCriterionAsync(criterion);
+            return MapCriterionToDto(created);
+        }
+
+        public async Task<EvaluationCriterionDto?> UpdateCriterionAsync(int criterionId, UpdateEvaluationCriterionDto dto)
+        {
+            var criterion = await _repo.GetCriterionByIdAsync(criterionId);
+            if (criterion == null) return null;
+
+            if (!string.IsNullOrEmpty(dto.Name))
+                criterion.Name = dto.Name;
+            if (dto.Description != null)
+                criterion.Description = dto.Description;
+            if (dto.Weight.HasValue)
+                criterion.Weight = dto.Weight.Value;
+            if (dto.DisplayOrder.HasValue)
+                criterion.DisplayOrder = dto.DisplayOrder.Value;
+
+            await _repo.UpdateCriterionAsync(criterion);
+            return MapCriterionToDto(criterion);
+        }
+
+        public async Task<bool> DeleteCriterionAsync(int criterionId)
+        {
+            return await _repo.DeleteCriterionAsync(criterionId);
+        }
+
+        public async Task<bool> AssignCriteriaToInterviewerAsync(int scheduleId, int assignmentId, AssignCriteriaDto dto)
+        {
+            var assignment = await _repo.GetAssignmentByIdAsync(assignmentId);
+            if (assignment == null || assignment.InterviewScheduleId != scheduleId)
+                return false;
+
+            assignment.AssignedCriteriaIds = string.Join(",", dto.CriteriaIds);
+            return await _repo.UpdateAssignmentAsync(assignment);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  Criteria-based Feedback
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<bool> SubmitCriteriaFeedbackAsync(int scheduleId, int assignmentId, SubmitCriteriaFeedbackDto dto)
+        {
+            var assignment = await _repo.GetAssignmentByIdAsync(assignmentId);
+            if (assignment == null || assignment.InterviewScheduleId != scheduleId)
+                return false;
+
+            // Lưu điểm từng tiêu chí
+            foreach (var item in dto.Scores)
+            {
+                var score = new CriteriaScore
+                {
+                    InterviewAssignmentId  = assignmentId,
+                    EvaluationCriterionId  = item.CriterionId,
+                    Score                  = item.Score,
+                    Note                   = item.Note,
+                    CreatedAt              = DateTime.UtcNow
+                };
+                await _repo.CreateCriteriaScoreAsync(score);
+            }
+
+            // Cập nhật feedback tổng hợp vào assignment (tương thích feedback cũ)
+            if (!Enum.TryParse<InterviewResult>(dto.Result, true, out var result))
+                throw new ArgumentException($"Invalid result: {dto.Result}");
+
+            // Tính điểm /100 từ tiêu chí (lấy criteria của campaign)
+            var schedule = await _repo.GetScheduleByIdAsync(scheduleId);
+            if (schedule == null) return false;
+
+            var criteria = (await _repo.GetCriteriaByCampaignIdAsync(schedule.CampaignId)).ToList();
+            var totalWeight = criteria.Sum(c => c.Weight);
+            double weightedScore = 0;
+
+            foreach (var item in dto.Scores)
+            {
+                var criterion = criteria.FirstOrDefault(c => c.Id == item.CriterionId);
+                if (criterion != null && totalWeight > 0)
+                {
+                    weightedScore += (item.Score / 5.0) * 100 * ((double)criterion.Weight / totalWeight);
+                }
+            }
+
+            assignment.FeedbackNotes = dto.FeedbackNotes;
+            assignment.Result = result;
+            assignment.Score = (int)Math.Round(weightedScore);
+            assignment.FeedbackSubmittedAt = DateTime.UtcNow;
+
+            return await _repo.UpdateAssignmentAsync(assignment);
+        }
+
+        public async Task<EvaluationSummaryDto?> GetEvaluationSummaryAsync(int scheduleId)
+        {
+            var schedule = await _repo.GetScheduleByIdAsync(scheduleId);
+            if (schedule == null) return null;
+
+            var criteria = (await _repo.GetCriteriaByCampaignIdAsync(schedule.CampaignId)).ToList();
+            var allScores = (await _repo.GetCriteriaScoresByScheduleIdAsync(scheduleId)).ToList();
+
+            var criteriaSummaries = criteria.Select(c =>
+            {
+                var scoresForCriterion = allScores.Where(s => s.EvaluationCriterionId == c.Id).ToList();
+                var avg = scoresForCriterion.Any() ? scoresForCriterion.Average(s => s.Score) : 0;
+
+                return new CriteriaSummaryItemDto
+                {
+                    CriterionId    = c.Id,
+                    CriterionName  = c.Name,
+                    Weight         = c.Weight,
+                    AverageScore   = Math.Round(avg, 2),
+                    IndividualScores = scoresForCriterion.Select(s => new CriteriaScoreResultDto
+                    {
+                        CriterionId       = c.Id,
+                        CriterionName     = c.Name,
+                        Weight            = c.Weight,
+                        Score             = s.Score,
+                        Note              = s.Note,
+                        InterviewerUserId = s.InterviewAssignment.InterviewerUserId,
+                        InterviewerRole   = s.InterviewAssignment.Role.ToString()
+                    }).ToList()
+                };
+            }).ToList();
+
+            var totalWeight = criteria.Sum(c => c.Weight);
+            double totalScore = 0;
+            if (totalWeight > 0)
+            {
+                totalScore = criteriaSummaries.Sum(cs =>
+                    (cs.AverageScore / 5.0) * 100 * ((double)cs.Weight / totalWeight));
+            }
+
+            var suggested = totalScore >= 70 ? "Pass" : totalScore >= 50 ? "OnHold" : "Fail";
+
+            return new EvaluationSummaryDto
+            {
+                InterviewScheduleId = schedule.Id,
+                Title               = schedule.Title,
+                CandidateUserId     = schedule.CandidateUserId,
+                CampaignId          = schedule.CampaignId,
+                CriteriaSummaries   = criteriaSummaries,
+                TotalScore          = Math.Round(totalScore, 2),
+                SuggestedResult     = suggested,
+                Feedbacks           = schedule.Assignments?.Select(MapAssignmentToDto).ToList() ?? new()
+            };
+        }
+
+        public async Task<List<CandidateComparisonItemDto>> GetCampaignComparisonAsync(int campaignId)
+        {
+            var schedules = (await _repo.GetSchedulesAsync(campaignId, null, null, null)).ToList();
+            var criteria = (await _repo.GetCriteriaByCampaignIdAsync(campaignId)).ToList();
+            var totalWeight = criteria.Sum(c => c.Weight);
+
+            var items = new List<CandidateComparisonItemDto>();
+
+            foreach (var schedule in schedules)
+            {
+                var allScores = (await _repo.GetCriteriaScoresByScheduleIdAsync(schedule.Id)).ToList();
+
+                var criteriaScoresDict = new Dictionary<int, double>();
+                double totalScore = 0;
+
+                foreach (var c in criteria)
+                {
+                    var scoresForCriterion = allScores.Where(s => s.EvaluationCriterionId == c.Id).ToList();
+                    var avg = scoresForCriterion.Any() ? scoresForCriterion.Average(s => s.Score) : 0;
+                    criteriaScoresDict[c.Id] = Math.Round(avg, 2);
+
+                    if (totalWeight > 0)
+                        totalScore += (avg / 5.0) * 100 * ((double)c.Weight / totalWeight);
+                }
+
+                var suggested = totalScore >= 70 ? "Pass" : totalScore >= 50 ? "OnHold" : "Fail";
+
+                items.Add(new CandidateComparisonItemDto
+                {
+                    InterviewScheduleId = schedule.Id,
+                    CandidateUserId     = schedule.CandidateUserId,
+                    Title               = schedule.Title,
+                    CriteriaScores      = criteriaScoresDict,
+                    TotalScore          = Math.Round(totalScore, 2),
+                    SuggestedResult     = suggested
+                });
+            }
+
+            // Xếp hạng theo tổng điểm
+            var ranked = items.OrderByDescending(i => i.TotalScore).ToList();
+            for (int i = 0; i < ranked.Count; i++)
+                ranked[i].Rank = i + 1;
+
+            return ranked;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  Decisions & Publish
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<List<CampaignDecisionResponseDto>> SubmitDecisionsAsync(int campaignId, SubmitDecisionsDto dto)
+        {
+            var results = new List<CampaignDecisionResponseDto>();
+
+            foreach (var item in dto.Decisions)
+            {
+                if (!Enum.TryParse<DecisionResult>(item.Decision, true, out var decision))
+                    throw new ArgumentException($"Invalid decision: {item.Decision}");
+
+                // Kiểm tra xem đã có decision chưa → update
+                var existing = await _repo.GetDecisionByScheduleIdAsync(item.InterviewScheduleId);
+                if (existing != null)
+                {
+                    existing.Decision = decision;
+                    existing.DecidedByUserId = dto.DecidedByUserId;
+                    existing.DecidedAt = DateTime.UtcNow;
+                    await _repo.UpdateDecisionAsync(existing);
+                    results.Add(MapDecisionToDto(existing));
+                }
+                else
+                {
+                    var d = new CampaignDecision
+                    {
+                        CampaignId          = campaignId,
+                        InterviewScheduleId = item.InterviewScheduleId,
+                        CandidateUserId     = item.CandidateUserId,
+                        Decision            = decision,
+                        DecidedByUserId     = dto.DecidedByUserId,
+                        DecidedAt           = DateTime.UtcNow,
+                        PublishStatus       = PublishStatus.Draft
+                    };
+                    var created = await _repo.CreateDecisionAsync(d);
+                    results.Add(MapDecisionToDto(created));
+                }
+            }
+
+            return results;
+        }
+
+        public async Task<PublishStatusResponseDto> PublishResultsAsync(int campaignId, PublishResultDto dto)
+        {
+            var decisions = (await _repo.GetDecisionsByCampaignIdAsync(campaignId)).ToList();
+
+            if (decisions.Count == 0)
+                throw new InvalidOperationException("Chưa có quyết định nào cho campaign này.");
+
+            foreach (var d in decisions)
+            {
+                if (dto.Mode.Equals("Now", StringComparison.OrdinalIgnoreCase))
+                {
+                    d.PublishStatus = PublishStatus.Published;
+                    d.PublishedAt = DateTime.UtcNow;
+                }
+                else // Schedule
+                {
+                    if (!dto.ScheduledAt.HasValue)
+                        throw new ArgumentException("ScheduledAt bắt buộc khi Mode = Schedule.");
+
+                    d.PublishStatus = PublishStatus.Scheduled;
+                    d.ScheduledPublishAt = dto.ScheduledAt.Value;
+                }
+
+                d.NotificationChannels = dto.NotificationChannels;
+                await _repo.UpdateDecisionAsync(d);
+            }
+
+            return BuildPublishStatus(campaignId, decisions);
+        }
+
+        public async Task<PublishStatusResponseDto?> GetPublishStatusAsync(int campaignId)
+        {
+            var decisions = (await _repo.GetDecisionsByCampaignIdAsync(campaignId)).ToList();
+            if (decisions.Count == 0) return null;
+
+            return BuildPublishStatus(campaignId, decisions);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  New Helpers
+        // ═══════════════════════════════════════════════════════════
+
+        private static EvaluationCriterionDto MapCriterionToDto(EvaluationCriterion c)
+        {
+            return new EvaluationCriterionDto
+            {
+                Id           = c.Id,
+                CampaignId   = c.CampaignId,
+                Name         = c.Name,
+                Description  = c.Description,
+                Weight       = c.Weight,
+                DisplayOrder = c.DisplayOrder,
+                IsDefault    = c.IsDefault
+            };
+        }
+
+        private static CampaignDecisionResponseDto MapDecisionToDto(CampaignDecision d)
+        {
+            return new CampaignDecisionResponseDto
+            {
+                Id                  = d.Id,
+                CampaignId          = d.CampaignId,
+                InterviewScheduleId = d.InterviewScheduleId,
+                CandidateUserId     = d.CandidateUserId,
+                Decision            = d.Decision.ToString(),
+                DecidedByUserId     = d.DecidedByUserId,
+                DecidedAt           = d.DecidedAt,
+                PublishStatus       = d.PublishStatus.ToString(),
+                ScheduledPublishAt  = d.ScheduledPublishAt,
+                PublishedAt         = d.PublishedAt
+            };
+        }
+
+        private static PublishStatusResponseDto BuildPublishStatus(int campaignId, List<CampaignDecision> decisions)
+        {
+            var overallStatus = "Draft";
+            if (decisions.All(d => d.PublishStatus == PublishStatus.Published))
+                overallStatus = "Published";
+            else if (decisions.Any(d => d.PublishStatus == PublishStatus.Scheduled))
+                overallStatus = "Scheduled";
+
+            return new PublishStatusResponseDto
+            {
+                CampaignId         = campaignId,
+                OverallStatus      = overallStatus,
+                TotalDecisions     = decisions.Count,
+                AcceptCount        = decisions.Count(d => d.Decision == DecisionResult.Accept),
+                RejectCount        = decisions.Count(d => d.Decision == DecisionResult.Reject),
+                WaitlistCount      = decisions.Count(d => d.Decision == DecisionResult.Waitlist),
+                ScheduledPublishAt = decisions.FirstOrDefault(d => d.ScheduledPublishAt.HasValue)?.ScheduledPublishAt,
+                PublishedAt        = decisions.FirstOrDefault(d => d.PublishedAt.HasValue)?.PublishedAt,
+                Decisions          = decisions.Select(MapDecisionToDto).ToList()
+            };
+        }
     }
 }
+

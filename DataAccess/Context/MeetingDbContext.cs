@@ -14,6 +14,9 @@ public class MeetingDbContext : DbContext
     public DbSet<MeetingRoom>         MeetingRooms         { get; set; }
     public DbSet<RoomParticipant>     RoomParticipants     { get; set; }
     public DbSet<RoomEvent>           RoomEvents           { get; set; }
+    public DbSet<EvaluationCriterion> EvaluationCriteria   { get; set; }
+    public DbSet<CriteriaScore>       CriteriaScores       { get; set; }
+    public DbSet<CampaignDecision>    CampaignDecisions    { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -52,6 +55,7 @@ public class MeetingDbContext : DbContext
             e.Property(a => a.Role).HasConversion<string>().HasMaxLength(50);
             e.Property(a => a.Result).HasConversion<string>().HasMaxLength(50);
             e.Property(a => a.InterviewerUserId).IsRequired();
+            e.Property(a => a.AssignedCriteriaIds).HasMaxLength(500);
             e.HasIndex(a => a.InterviewerUserId);
 
             e.HasOne(a => a.InterviewSchedule)
@@ -66,6 +70,13 @@ public class MeetingDbContext : DbContext
             e.ToTable("MeetingRooms");
             e.HasKey(r => r.Id);
 
+            // Phân loại & thông tin chung
+            e.Property(r => r.RoomType).HasConversion<string>().HasMaxLength(50);
+            e.Property(r => r.Title).IsRequired().HasMaxLength(300);
+            e.Property(r => r.Description).HasMaxLength(2000);
+            e.Property(r => r.CreatedByUserId).IsRequired();
+            e.HasIndex(r => r.CreatedByUserId);
+
             e.Property(r => r.RoomCode).IsRequired().HasMaxLength(20);
             e.HasIndex(r => r.RoomCode).IsUnique();          // Lookup /room/{code}
 
@@ -75,11 +86,12 @@ public class MeetingDbContext : DbContext
             e.Property(r => r.TurnUsername).HasMaxLength(200);
             e.Property(r => r.TurnCredential).HasMaxLength(200);
 
-            // 1-1 với InterviewSchedule
+            // 1-0..1 với InterviewSchedule (optional)
             e.HasOne(r => r.InterviewSchedule)
              .WithOne(s => s.MeetingRoom)
              .HasForeignKey<MeetingRoom>(r => r.InterviewScheduleId)
-             .OnDelete(DeleteBehavior.Cascade);
+             .IsRequired(false)
+             .OnDelete(DeleteBehavior.SetNull);
         });
 
         // ── RoomParticipant ───────────────────────────────────────
@@ -117,5 +129,67 @@ public class MeetingDbContext : DbContext
              .HasForeignKey(ev => ev.MeetingRoomId)
              .OnDelete(DeleteBehavior.Cascade);
         });
+
+        // ── EvaluationCriterion ───────────────────────────────────
+        modelBuilder.Entity<EvaluationCriterion>(e =>
+        {
+            e.ToTable("EvaluationCriteria");
+            e.HasKey(c => c.Id);
+
+            e.Property(c => c.Name).IsRequired().HasMaxLength(200);
+            e.Property(c => c.Description).HasMaxLength(1000);
+            e.Property(c => c.CampaignId).IsRequired();
+
+            e.HasIndex(c => c.CampaignId);
+            e.HasIndex(c => new { c.CampaignId, c.DisplayOrder });
+        });
+
+        // ── CriteriaScore ─────────────────────────────────────────
+        modelBuilder.Entity<CriteriaScore>(e =>
+        {
+            e.ToTable("CriteriaScores");
+            e.HasKey(cs => cs.Id);
+
+            // Unique: 1 interviewer chỉ chấm 1 lần cho 1 tiêu chí
+            e.HasIndex(cs => new { cs.InterviewAssignmentId, cs.EvaluationCriterionId }).IsUnique();
+
+            e.Property(cs => cs.Note).HasMaxLength(1000);
+
+            e.HasOne(cs => cs.InterviewAssignment)
+             .WithMany(a => a.CriteriaScores)
+             .HasForeignKey(cs => cs.InterviewAssignmentId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(cs => cs.EvaluationCriterion)
+             .WithMany(c => c.CriteriaScores)
+             .HasForeignKey(cs => cs.EvaluationCriterionId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── CampaignDecision ──────────────────────────────────────
+        modelBuilder.Entity<CampaignDecision>(e =>
+        {
+            e.ToTable("CampaignDecisions");
+            e.HasKey(d => d.Id);
+
+            // Unique: 1 ứng viên chỉ có 1 quyết định trong 1 campaign
+            e.HasIndex(d => new { d.CampaignId, d.CandidateUserId }).IsUnique();
+
+            e.Property(d => d.Decision).HasConversion<string>().HasMaxLength(50);
+            e.Property(d => d.PublishStatus).HasConversion<string>().HasMaxLength(50);
+            e.Property(d => d.NotificationChannels).HasMaxLength(200);
+
+            e.Property(d => d.CampaignId).IsRequired();
+            e.Property(d => d.CandidateUserId).IsRequired();
+            e.Property(d => d.DecidedByUserId).IsRequired();
+
+            e.HasIndex(d => d.CampaignId);
+
+            e.HasOne(d => d.InterviewSchedule)
+             .WithMany()
+             .HasForeignKey(d => d.InterviewScheduleId)
+             .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 }
+
