@@ -91,6 +91,23 @@ namespace UNIC.ServiceTest.Services
             await InvokeProcessRemindersAsync();
 
             // Assert: email was sent
+            //
+            // Implementation sends email via fire-and-forget Task.Run, so we need to wait
+            // briefly for the invocation to happen before verifying.
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _mockEmailService
+                .Setup(e => e.SendEventRegistrationSuccessAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string?>()))
+                .Callback(() => tcs.TrySetResult(true))
+                .ReturnsAsync(true);
+
+            await Task.WhenAny(tcs.Task, Task.Delay(TimeSpan.FromSeconds(2)));
+
             _mockEmailService.Verify(
                 e => e.SendEventRegistrationSuccessAsync(
                     It.Is<string>(s => s == "user@test.com"),
@@ -98,7 +115,7 @@ namespace UNIC.ServiceTest.Services
                     It.Is<string>(s => s.Contains("Tech Talk")),
                     It.IsAny<DateTime?>(),
                     It.IsAny<string>(),
-                    It.IsAny<string>()),
+                    It.IsAny<string?>()),
                 Times.Once);
         }
 
@@ -123,7 +140,7 @@ namespace UNIC.ServiceTest.Services
             _mockEmailService.Verify(
                 e => e.SendEventRegistrationSuccessAsync(
                     It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<DateTime?>(), It.IsAny<string>(), It.IsAny<string>()),
+                    It.IsAny<DateTime?>(), It.IsAny<string>(), It.IsAny<string?>()),
                 Times.Never);
         }
 
@@ -148,7 +165,7 @@ namespace UNIC.ServiceTest.Services
             _mockEmailService.Verify(
                 e => e.SendEventRegistrationSuccessAsync(
                     It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<DateTime?>(), It.IsAny<string>(), It.IsAny<string>()),
+                    It.IsAny<DateTime?>(), It.IsAny<string>(), It.IsAny<string?>()),
                 Times.Never);
         }
 
@@ -173,7 +190,7 @@ namespace UNIC.ServiceTest.Services
             _mockEmailService.Verify(
                 e => e.SendEventRegistrationSuccessAsync(
                     It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<DateTime?>(), It.IsAny<string>(), It.IsAny<string>()),
+                    It.IsAny<DateTime?>(), It.IsAny<string>(), It.IsAny<string?>()),
                 Times.Never);
         }
 
@@ -205,7 +222,7 @@ namespace UNIC.ServiceTest.Services
             _mockEmailService.Verify(
                 e => e.SendEventRegistrationSuccessAsync(
                     It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<DateTime?>(), It.IsAny<string>(), It.IsAny<string>()),
+                    It.IsAny<DateTime?>(), It.IsAny<string>(), It.IsAny<string?>()),
                 Times.Never);
         }
 
@@ -221,7 +238,7 @@ namespace UNIC.ServiceTest.Services
             _mockEmailService.Verify(
                 e => e.SendEventRegistrationSuccessAsync(
                     It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
-                    It.IsAny<DateTime?>(), It.IsAny<string>(), It.IsAny<string>()),
+                    It.IsAny<DateTime?>(), It.IsAny<string>(), It.IsAny<string?>()),
                 Times.Never);
         }
     }
