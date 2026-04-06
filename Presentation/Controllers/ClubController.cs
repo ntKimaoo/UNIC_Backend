@@ -26,8 +26,9 @@ namespace Presentation.Controllers
         /// </summary>
         [HttpGet]
         //[RequirePolicy("ViewClubs")]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(int pageSize, string? searchQuery, string pageIndex)
         {
+<<<<<<< HEAD
             try
             {
                 var clubs = await _service.GetAllAsync();
@@ -37,14 +38,56 @@ namespace Presentation.Controllers
             {
                 return StatusCode(500, new { success = false, message = ex.Message });
             }
+=======
+            var clubs = await _service.GetAllAsync();
+
+            if (!string.IsNullOrEmpty(searchQuery))
+            {
+                var searchLower = searchQuery.ToLower();
+                clubs = clubs.Where(c =>
+                    c.ClubName.ToLower().Contains(searchLower) ||
+                    c.ShortName.ToLower().Contains(searchLower)
+                );
+            }
+
+            if (pageIndex.ToLower() != "all")
+            {
+                var totalCount = clubs.Count();
+                var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+                if (int.TryParse(pageIndex, out int pageInt))
+                {
+                    clubs = clubs
+                        .Skip((pageInt - 1) * pageSize)
+                        .Take(pageSize);
+
+                    return Ok(new
+                    {
+                        success = true,
+                        data = clubs,
+                        totalPages = totalPages,
+                        totalCount = totalCount
+                    });
+                }
+            }
+
+            return Ok(new
+            {
+                success = true,
+                data = clubs,
+                totalPages = 1,
+                totalCount = clubs.Count()
+            });
+>>>>>>> origin/kien_dev
         }
 
         /// <summary>
         /// Get all active clubs
         /// </summary>
         [HttpGet("active")]
-        public async Task<IActionResult> GetActiveClubs()
+        public async Task<IActionResult> GetActiveClubs(int pageSize, string? searchQuery, string pageIndex)
         {
+<<<<<<< HEAD
             try
             {
                 var clubs = await _service.GetActiveClubsAsync();
@@ -54,6 +97,46 @@ namespace Presentation.Controllers
             {
                 return StatusCode(500, new { success = false, message = ex.Message });
             }
+=======
+            var clubs = await _service.GetActiveClubsAsync();
+            if (!string.IsNullOrEmpty(searchQuery))
+            {
+                var searchLower = searchQuery.ToLower();
+                clubs = clubs.Where(c =>
+                    c.ClubName.ToLower().Contains(searchLower) ||
+                    c.ShortName.ToLower().Contains(searchLower)
+                );
+            }
+
+            if (pageIndex.ToLower() != "all")
+            {
+                var totalCount = clubs.Count();
+                var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+                if (int.TryParse(pageIndex, out int pageInt))
+                {
+                    clubs = clubs
+                        .Skip((pageInt - 1) * pageSize)
+                        .Take(pageSize);
+
+                    return Ok(new
+                    {
+                        success = true,
+                        data = clubs,
+                        totalPages = totalPages,
+                        totalCount = totalCount
+                    });
+                }
+            }
+
+            return Ok(new
+            {
+                success = true,
+                data = clubs,
+                totalPages = 1,
+                totalCount = clubs.Count()
+            });
+>>>>>>> origin/kien_dev
         }
 
         /// <summary>

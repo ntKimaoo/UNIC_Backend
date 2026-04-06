@@ -83,14 +83,11 @@ namespace UNIC.DataAccess.Repositories.Implementation
 
         // ================= FILTER =================
 
-        public async Task<IEnumerable<Application>> GetByUserIdAsync(Guid userId, int clubId)
+        // change
+        public async Task<IEnumerable<Application>> GetByUserIdAsync(Guid userId)
         {
             return await _context.Applications
-                .Include(a => a.ApplicationForm)
-                    .ThenInclude(f => f.RecruitmentCampaign)
-                .Where(a =>
-                    a.UserId == userId &&
-                    a.ApplicationForm.RecruitmentCampaign.ClubId == clubId)
+                .Where(a => a.UserId == userId)
                 .ToListAsync();
         }
 
@@ -116,15 +113,11 @@ namespace UNIC.DataAccess.Repositories.Implementation
                 .ToListAsync();
         }
 
-        public async Task<Application?> GetByUserIdAndFormIdAsync(Guid userId, int formId, int clubId)
+        // change
+        public async Task<Application?> GetByUserIdAndFormIdAsync(Guid userId, int formId)
         {
             return await _context.Applications
-                .Include(a => a.ApplicationForm)
-                    .ThenInclude(f => f.RecruitmentCampaign)
-                .FirstOrDefaultAsync(a =>
-                    a.UserId == userId &&
-                    a.FormId == formId &&
-                    a.ApplicationForm.RecruitmentCampaign.ClubId == clubId);
+                .FirstOrDefaultAsync(a => a.UserId == userId && a.FormId == formId);
         }
 
         public async Task<IEnumerable<Application>> GetByCampaignIdAsync(int campaignId, int clubId, string? status = null)
@@ -176,13 +169,12 @@ namespace UNIC.DataAccess.Repositories.Implementation
                 .ToListAsync();
         }
 
-        public async Task<ApplicationForm?> GetFormByIdAsync(int formId, int clubId)
+        // change
+        public async Task<ApplicationForm?> GetFormByIdAsync(int formId)
         {
             return await _context.ApplicationForms
                 .Include(f => f.RecruitmentCampaign)
-                .FirstOrDefaultAsync(f =>
-                    f.FormId == formId &&
-                    f.RecruitmentCampaign.ClubId == clubId);
+                .FirstOrDefaultAsync(f => f.FormId == formId);
         }
 
         public async Task<ApplicationForm> CreateFormAsync(ApplicationForm form)
@@ -233,14 +225,11 @@ namespace UNIC.DataAccess.Repositories.Implementation
                 .ToListAsync();
         }
 
-        public async Task<IEnumerable<ApplicationQuestion>> GetQuestionsByFormIdAsync(int formId, int clubId)
+        // change
+        public async Task<IEnumerable<ApplicationQuestion>> GetQuestionsByFormIdAsync(int formId)
         {
             return await _context.ApplicationQuestions
-                .Include(q => q.ApplicationForm)
-                    .ThenInclude(f => f.RecruitmentCampaign)
-                .Where(q =>
-                    q.FormId == formId &&
-                    q.ApplicationForm.RecruitmentCampaign.ClubId == clubId)
+                .Where(q => q.FormId == formId)
                 .ToListAsync();
         }
 

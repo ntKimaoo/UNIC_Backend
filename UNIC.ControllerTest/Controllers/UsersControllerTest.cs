@@ -268,5 +268,156 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         #endregion
+
+        #region UploadAvatar
+
+        [Fact]
+        public async Task UploadAvatar_ReturnsOk_WhenSuccess()
+        {
+            var userId = Guid.NewGuid();
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.Length).Returns(1024);
+            mockFile.Setup(f => f.FileName).Returns("avatar.jpg");
+
+            _mockFileStorageService.Setup(s => s.SaveFileAsync(mockFile.Object, "uniclub/avatars"))
+                                   .ReturnsAsync("http://img.com/avatar.jpg");
+            _mockUserService.Setup(s => s.UpdateUserAsync(userId, It.IsAny<UpdateUserDto>()))
+                            .ReturnsAsync(true);
+
+            var result = await _controller.UploadAvatar(userId, mockFile.Object);
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task UploadAvatar_ReturnsBadRequest_WhenNoFile()
+        {
+            var result = await _controller.UploadAvatar(Guid.NewGuid(), null!);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task UploadAvatar_ReturnsBadRequest_WhenEmptyFile()
+        {
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.Length).Returns(0);
+
+            var result = await _controller.UploadAvatar(Guid.NewGuid(), mockFile.Object);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task UploadAvatar_ReturnsNotFound_WhenUserMissing()
+        {
+            var userId = Guid.NewGuid();
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.Length).Returns(1024);
+
+            _mockFileStorageService.Setup(s => s.SaveFileAsync(mockFile.Object, "uniclub/avatars"))
+                                   .ReturnsAsync("http://img.com/avatar.jpg");
+            _mockUserService.Setup(s => s.UpdateUserAsync(userId, It.IsAny<UpdateUserDto>()))
+                            .ReturnsAsync(false);
+
+            var result = await _controller.UploadAvatar(userId, mockFile.Object);
+
+            Assert.IsType<NotFoundObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task UploadAvatar_ReturnsBadRequest_WhenServiceThrows()
+        {
+            var userId = Guid.NewGuid();
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.Length).Returns(1024);
+
+            _mockFileStorageService.Setup(s => s.SaveFileAsync(mockFile.Object, "uniclub/avatars"))
+                                   .ThrowsAsync(new InvalidOperationException("Invalid file"));
+
+            var result = await _controller.UploadAvatar(userId, mockFile.Object);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        #endregion
+
+        #region GetUserDepartmentsInClub
+
+        [Fact]
+        public async Task GetUserDepartmentsInClub_ReturnsUnauthorized_WhenNotAuthenticated()
+        {
+            _controller.ControllerContext.HttpContext.User = new System.Security.Claims.ClaimsPrincipal(
+                new System.Security.Claims.ClaimsIdentity());
+
+            var result = await _controller.GetUserDepartmentsInClub(1);
+
+            Assert.IsType<UnauthorizedObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task GetUserDepartmentsInClub_ReturnsOk_WhenFound()
+        {
+            var userId = Guid.NewGuid();
+            var claims = new List<System.Security.Claims.Claim>
+            {
+                new System.Security.Claims.Claim("UserId", userId.ToString())
+            };
+            var identity = new System.Security.Claims.ClaimsIdentity(claims, "TestAuth");
+            _controller.ControllerContext.HttpContext.User = new System.Security.Claims.ClaimsPrincipal(identity);
+
+            var depts = new List<UNIC.BusinessLogic.DTOs.UserDepartmentDto>
+            {
+                new UNIC.BusinessLogic.DTOs.UserDepartmentDto { DepartmentId = 1, DepartmentName = "IT" }
+            };
+
+            _mockUserService.Setup(s => s.GetUserDepartmentsInClubAsync(userId, 1))
+                            .ReturnsAsync(depts);
+
+            var result = await _controller.GetUserDepartmentsInClub(1);
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task GetUserDepartmentsInClub_ReturnsNotFound_WhenNotMember()
+        {
+            var userId = Guid.NewGuid();
+            var claims = new List<System.Security.Claims.Claim>
+            {
+                new System.Security.Claims.Claim("UserId", userId.ToString())
+            };
+            var identity = new System.Security.Claims.ClaimsIdentity(claims, "TestAuth");
+            _controller.ControllerContext.HttpContext.User = new System.Security.Claims.ClaimsPrincipal(identity);
+
+            _mockUserService.Setup(s => s.GetUserDepartmentsInClubAsync(userId, 99))
+                            .ReturnsAsync((IEnumerable<UNIC.BusinessLogic.DTOs.UserDepartmentDto>?)null);
+
+            var result = await _controller.GetUserDepartmentsInClub(99);
+
+            Assert.IsType<NotFoundObjectResult>(result);
+        }
+
+        #endregion
+
+        #region GetAll_EdgeCases
+
+        [Fact]
+        public async Task GetAll_ReturnsBadRequest_WhenPageSizeIsZero()
+        {
+            var result = await _controller.GetAll(1, 0);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task GetAll_ReturnsBadRequest_WhenPageIsNegative()
+        {
+            var result = await _controller.GetAll(-1, 10);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        #endregion
     }
 }
