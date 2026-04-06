@@ -1,4 +1,5 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.Services.Background;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models.Meeting;
 using DataAccess.Models.Meeting.Enums;
@@ -13,10 +14,12 @@ namespace BusinessLogic.Services.Implementation
     public class InterviewService : IInterviewService
     {
         private readonly IInterviewRepository _repo;
+        private readonly IUserRepository _userRepo;
 
-        public InterviewService(IInterviewRepository repo)
+        public InterviewService(IInterviewRepository repo, IUserRepository userRepo)
         {
             _repo = repo;
+            _userRepo = userRepo;
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -96,6 +99,10 @@ namespace BusinessLogic.Services.Implementation
 
             // Reload with navigation
             var full = await _repo.GetScheduleByIdAsync(created.Id);
+
+            // Gửi email thông báo lịch phỏng vấn mới cho ứng viên
+            await EnqueueInterviewStatusEmailAsync(created, InterviewStatus.Scheduled.ToString());
+
             return MapScheduleToDto(full!);
         }
 
@@ -180,7 +187,15 @@ namespace BusinessLogic.Services.Implementation
             schedule.Status = newStatus;
             schedule.UpdatedAt = DateTime.UtcNow;
 
-            return await _repo.UpdateScheduleAsync(schedule);
+            var updated = await _repo.UpdateScheduleAsync(schedule);
+
+            // Gửi email thông báo thay đổi trạng thái cho ứng viên
+            if (updated)
+            {
+                await EnqueueInterviewStatusEmailAsync(schedule, newStatus.ToString(), dto.CancelReason);
+            }
+
+            return updated;
         }
 
         public async Task<bool> DeleteScheduleAsync(int id)
@@ -244,6 +259,10 @@ namespace BusinessLogic.Services.Implementation
             }
 
             var full = await _repo.GetScheduleByIdAsync(scheduleId);
+
+            // Gửi email thông báo xác nhận lịch phỏng vấn
+            await EnqueueInterviewStatusEmailAsync(schedule, InterviewStatus.Confirmed.ToString());
+
             return MapScheduleToDto(full!);
         }
 
@@ -529,6 +548,56 @@ namespace BusinessLogic.Services.Implementation
             return $"{part1}-{part2}";
         }
 
+        /// <summary>
+        /// Enqueue email thông báo thay đổi trạng thái phỏng vấn cho candidate.
+        /// Nếu không tìm thấy user (cross-DB) thì bỏ qua, không throw.
+        /// </summary>
+        private async Task EnqueueInterviewStatusEmailAsync(
+            InterviewSchedule schedule, string status, string? cancelReason = null)
+        {
+            try
+            {
+                var user = await _userRepo.GetByIdAsync(schedule.CandidateUserId);
+                if (user == null) return; // user không tồn tại hoặc cross-DB
+
+                // Tính deadline xác nhận: 24h trước giờ phỏng vấn
+                string? confirmDeadline = null;
+                if (status == InterviewStatus.Scheduled.ToString() 
+                    || status == InterviewStatus.Rescheduled.ToString())
+                {
+                    var deadline = schedule.ScheduledAt.AddHours(-24);
+                    if (deadline > DateTime.UtcNow)
+                    {
+                        confirmDeadline = deadline.ToString("dd/MM/yyyy HH:mm");
+                    }
+                    else
+                    {
+                        // Nếu phỏng vấn trong vòng 24h, đặt deadline là 4h trước
+                        var urgentDeadline = schedule.ScheduledAt.AddHours(-4);
+                        if (urgentDeadline > DateTime.UtcNow)
+                            confirmDeadline = urgentDeadline.ToString("dd/MM/yyyy HH:mm");
+                    }
+                }
+
+                EmailQueueService.EnqueueEmail(new EmailQueueItem
+                {
+                    ToEmail                 = user.Email,
+                    FullName                = user.FullName,
+                    EmailType               = EmailType.InterviewStatusChange,
+                    InterviewTitle          = schedule.Title,
+                    InterviewStatus         = status,
+                    InterviewScheduledAt    = schedule.ScheduledAt,
+                    InterviewDurationMinutes = schedule.DurationMinutes,
+                    CancelReason            = cancelReason,
+                    ConfirmDeadline         = confirmDeadline
+                });
+            }
+            catch (Exception)
+            {
+                // Không để lỗi gửi email ảnh hưởng đến flow chính
+            }
+        }
+
         private static InterviewScheduleResponseDto MapScheduleToDto(InterviewSchedule s)
         {
             return new InterviewScheduleResponseDto
@@ -793,6 +862,22 @@ namespace BusinessLogic.Services.Implementation
             assignment.FeedbackSubmittedAt = DateTime.UtcNow;
 
             return await _repo.UpdateAssignmentAsync(assignment);
+        }
+
+        public async Task<List<CriteriaScoreResponseDto>> GetCriteriaScoresByAssignmentAsync(int scheduleId, int assignmentId)
+        {
+            var assignment = await _repo.GetAssignmentByIdAsync(assignmentId);
+            if (assignment == null || assignment.InterviewScheduleId != scheduleId)
+                throw new KeyNotFoundException("Assignment not found or does not belong to this schedule.");
+
+            var scores = await _repo.GetCriteriaScoresByAssignmentIdAsync(assignmentId);
+            return scores.Select(cs => new CriteriaScoreResponseDto
+            {
+                Id                    = cs.Id,
+                EvaluationCriterionId = cs.EvaluationCriterionId,
+                Note                  = cs.Note,
+                CreatedAt             = cs.CreatedAt
+            }).ToList();
         }
 
         public async Task<EvaluationSummaryDto?> GetEvaluationSummaryAsync(int scheduleId)

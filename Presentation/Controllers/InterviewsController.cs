@@ -378,6 +378,27 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
+        /// GET /api/interviews/{id}/assignments/{assignmentId}/criteria-scores – Lấy danh sách điểm tiêu chí đã chấm
+        /// </summary>
+        [HttpGet("{id}/assignments/{assignmentId}/criteria-scores")]
+        public async Task<IActionResult> GetCriteriaScores(int id, int assignmentId)
+        {
+            try
+            {
+                var scores = await _service.GetCriteriaScoresByAssignmentAsync(id, assignmentId);
+                return Ok(new { success = true, data = scores });
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { success = false, message = "Assignment not found" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// GET /api/interviews/{id}/evaluation-summary – Tổng hợp đánh giá theo tiêu chí
         /// </summary>
         [HttpGet("{id}/evaluation-summary")]

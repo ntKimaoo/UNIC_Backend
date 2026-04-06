@@ -49,6 +49,7 @@ namespace BusinessLogic.Services.Interface
 
         // ── Criteria-based Feedback ──────────────────────────────
         Task<bool> SubmitCriteriaFeedbackAsync(int scheduleId, int assignmentId, SubmitCriteriaFeedbackDto dto);
+        Task<List<CriteriaScoreResponseDto>> GetCriteriaScoresByAssignmentAsync(int scheduleId, int assignmentId);
         Task<EvaluationSummaryDto?> GetEvaluationSummaryAsync(int scheduleId);
         Task<List<CandidateComparisonItemDto>> GetCampaignComparisonAsync(int campaignId);
 

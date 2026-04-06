@@ -1,5 +1,6 @@
-using UNIC.BusinessLogic.Services;
 using BusinessLogic.DTOs;
+using BusinessLogic.Hubs;
+using BusinessLogic.Options;
 using BusinessLogic.Services;
 using BusinessLogic.Services.Background;
 using BusinessLogic.Services.Implementation;
@@ -12,17 +13,19 @@ using DataAccess.Repositories.Interface;
 using DataAccess.Seed;
 using FluentValidation;
 using FluentValidation.AspNetCore;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
 using Presentation.Authorization;
+using Presentation.Hubs;
 using System;
 using System.Text;
+using UNIC.BusinessLogic.Services;
 using UNIC.BusinessLogic.Services.Implementation;
 using UNIC.BusinessLogic.Services.Interface;
 using UNIC.DataAccess.Repositories.Implementation;
@@ -30,8 +33,6 @@ using UNIC.DataAccess.Repositories.Interface;
 using UNIC.DataAccess.Seed;
 using UNIC.Presentation.Helpers;
 using UNIC.Presentation.Hubs;
-using BusinessLogic.Hubs;
-using Presentation.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -143,7 +144,7 @@ builder.Services.AddScoped<BusinessLogic.Services.Interface.IQRCodeGeneratorServ
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<BusinessLogic.Validators.CreateEventRequestValidator>();
-
+builder.Services.Configure<OpenRouterOptions>(builder.Configuration.GetSection("OpenRouter"));
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(BusinessLogic.Mappings.EventMappingProfile).Assembly);
 

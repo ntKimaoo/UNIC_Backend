@@ -209,10 +209,9 @@ namespace BusinessLogic.Services.Implementation
                 temperature = 0.3,
                 max_tokens = 4000
             };
-
+            Console.WriteLine(_options.ApiKey);
             var json = JsonSerializer.Serialize(requestBody, JsonOpts);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-
             var request = new HttpRequestMessage(HttpMethod.Post, $"{_options.BaseUrl}/chat/completions");
             request.Headers.Add("Authorization", $"Bearer {_options.ApiKey}");
             request.Headers.Add("HTTP-Referer", "https://uniclub.app");

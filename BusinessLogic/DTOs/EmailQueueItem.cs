@@ -18,6 +18,14 @@ namespace BusinessLogic.DTOs
         public string? EventName { get; set; }
         public DateTime? StartDate { get; set; }
         public string? CheckInCode { get; set; }
+
+        // Interview-specific fields
+        public string? InterviewTitle { get; set; }
+        public string? InterviewStatus { get; set; }
+        public DateTime? InterviewScheduledAt { get; set; }
+        public int InterviewDurationMinutes { get; set; }
+        public string? CancelReason { get; set; }
+        public string? ConfirmDeadline { get; set; }
     }
 
     public enum EmailType
@@ -26,6 +34,7 @@ namespace BusinessLogic.DTOs
         PasswordReset,
         Welcome,
         EventRegistration,
-        EventCheckIn
+        EventCheckIn,
+        InterviewStatusChange
     }
 }

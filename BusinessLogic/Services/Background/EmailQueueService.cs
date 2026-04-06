@@ -83,6 +83,10 @@ namespace BusinessLogic.Services.Background
                         item.ToEmail, item.FullName, item.EventName!, item.StartDate, item.Token),
                     EmailType.EventCheckIn => await emailService.SendEventCheckInCodeAsync(
                         item.ToEmail, item.FullName, item.EventName!, item.CheckInCode!),
+                    EmailType.InterviewStatusChange => await emailService.SendInterviewStatusChangeEmailAsync(
+                        item.ToEmail, item.FullName, item.InterviewTitle!, item.InterviewStatus!,
+                        item.InterviewScheduledAt ?? DateTime.UtcNow, item.InterviewDurationMinutes,
+                        item.CancelReason, item.ConfirmDeadline),
                     _ => false
                 };
 
