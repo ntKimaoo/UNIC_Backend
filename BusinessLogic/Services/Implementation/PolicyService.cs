@@ -53,4 +53,4 @@ namespace BusinessLogic.Services.Implementation
         public async Task<bool> HasMemberPolicyInClubAsync(Guid userId, int clubId, string policyTitle)
             => await _policyRepository.HasMemberPolicyInClubAsync(userId, clubId, policyTitle);
     }
-}
+}

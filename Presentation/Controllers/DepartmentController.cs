@@ -82,14 +82,6 @@ namespace UNIC.Presentation.Controllers
                     new { success = true, data = createdDepartment }
                 );
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = ex.Message
-                });
-            }
             catch (Exception ex)
             {
                 return StatusCode(500, new
@@ -138,14 +130,7 @@ namespace UNIC.Presentation.Controllers
                     data = updatedDepartment 
                 });
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = ex.Message
-                });
-            }
+            
             catch (Exception ex)
             {
                 return StatusCode(500, new

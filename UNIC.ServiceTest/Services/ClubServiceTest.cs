@@ -2,6 +2,7 @@ using BusinessLogic.DTOs;
 using BusinessLogic.Services.Implementation;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
+using FluentAssertions.Common;
 using Moq;
 using System;
 using System.Collections.Generic;
@@ -21,7 +22,7 @@ namespace UNIC.ServiceTest.Services
             _mockClubRepository = new Mock<IClubRepository>();
             _clubService = new ClubService(_mockClubRepository.Object);
         }
-
+        #region GetById
         [Fact]
         public async Task GetByIdAsync_ShouldReturnNull_WhenClubNotFound()
         {
@@ -52,6 +53,8 @@ namespace UNIC.ServiceTest.Services
             Assert.Equal(1, result.ClubId);
             Assert.Equal("Test Club", result.ClubName);
         }
+        #endregion
+        #region GetAll
 
         [Fact]
         public async Task GetAllAsync_ShouldReturnListOfClubs()
@@ -72,7 +75,46 @@ namespace UNIC.ServiceTest.Services
             Assert.NotNull(result);
             Assert.Equal(2, result.Count());
         }
+        #endregion
+        #region GetActive
+        [Fact]
+        public async Task GetActiveClubsAsync_WhenDataExists_ReturnsDtoList()
+        {
+            var clubs = new List<Club>
+            {
+                new Club { ClubId = 1, ClubName = "Club 1",IsActive=true,IsDeleted=false },
+            };
+            _mockClubRepository.Setup(repo => repo.GetActiveClubsAsync())
+                               .ReturnsAsync(clubs);
 
+
+            var result = await _clubService.GetActiveClubsAsync();
+
+            Assert.NotNull(result);
+            Assert.Equal(1, result.Count());
+
+        }
+        #endregion
+        #region GetPublic
+        [Fact]
+        public async Task GetPublicClubsAsync_WhenDataExists_ReturnsDtoList()
+        {
+            var clubs = new List<Club>
+            {
+                new Club { ClubId = 1, ClubName = "Club 1",IsPublic=true },
+            };
+            _mockClubRepository.Setup(repo => repo.GetPublicClubsAsync())
+                               .ReturnsAsync(clubs);
+
+
+            var result = await _clubService.GetPublicClubsAsync();
+
+            Assert.NotNull(result);
+            Assert.Equal(1,result.Count());
+           
+        }
+        #endregion
+        #region Create
         [Fact]
         public async Task CreateAsync_ShouldThrowException_WhenClubNameExists()
         {
@@ -84,6 +126,7 @@ namespace UNIC.ServiceTest.Services
             // Act & Assert
             await Assert.ThrowsAsync<InvalidOperationException>(() => _clubService.CreateAsync(createDto));
         }
+
 
         [Fact]
         public async Task CreateAsync_ShouldReturnClubDto_WhenSuccessful()
@@ -107,6 +150,8 @@ namespace UNIC.ServiceTest.Services
             _mockClubRepository.Verify(repo => repo.CreateAsync(It.IsAny<Club>()), Times.Once);
         }
 
+        #endregion
+        #region Update
         [Fact]
         public async Task UpdateAsync_ShouldReturnNull_WhenClubNotFound()
         {
@@ -160,7 +205,8 @@ namespace UNIC.ServiceTest.Services
             Assert.Equal("Updated Desc", result.Description);
             _mockClubRepository.Verify(repo => repo.UpdateAsync(It.IsAny<Club>()), Times.Once);
         }
-
+        #endregion
+        #region Delete
         [Fact]
         public async Task DeleteAsync_ShouldReturnTrue_WhenSuccessful()
         {
@@ -175,7 +221,8 @@ namespace UNIC.ServiceTest.Services
             Assert.True(result);
             _mockClubRepository.Verify(repo => repo.DeleteAsync(1), Times.Once);
         }
-        
+        #endregion
+        #region SoftDelete
         [Fact]
         public async Task SoftDeleteAsync_ShouldReturnTrue_WhenSuccessful()
         {
@@ -189,5 +236,18 @@ namespace UNIC.ServiceTest.Services
             // Assert
             Assert.True(result);
         }
+        #endregion
+        #region ChangeStatus
+        [Fact]
+        public async Task ChangeStatusClub_ShouldCallRepositoryOnce()
+        {
+            _mockClubRepository.Setup(r => r.ChangeStatusClub(1))
+                     .Returns(Task.CompletedTask);
+
+            await _clubService.ChangeStatusClub(1);
+
+            _mockClubRepository.Verify(r => r.ChangeStatusClub(1), Times.Once);
+        }
+        #endregion
     }
 }
