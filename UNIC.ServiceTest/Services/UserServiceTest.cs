@@ -205,5 +205,221 @@ namespace UNIC.ServiceTest.Services
             Assert.True(result);
             _mockUserRepository.Verify(repo => repo.DeleteAsync(userId), Times.Once);
         }
+
+        #region GetPagedUsersAsync
+
+        [Fact]
+        public async Task GetPagedUsersAsync_ReturnsPagedResult()
+        {
+            var users = new List<User>
+            {
+                new User { UserId = Guid.NewGuid(), Email = "a@test.com", FullName = "A" },
+                new User { UserId = Guid.NewGuid(), Email = "b@test.com", FullName = "B" }
+            };
+
+            _mockUserRepository.Setup(r => r.GetPagedAsync(1, 10))
+                               .ReturnsAsync((users.AsEnumerable(), 20));
+
+            var result = await _userService.GetPagedUsersAsync(1, 10);
+
+            Assert.Equal(2, result.Items.Count());
+            Assert.Equal(20, result.TotalCount);
+            Assert.Equal(2, result.TotalPages);
+            Assert.False(result.HasPreviousPage);
+            Assert.True(result.HasNextPage);
+        }
+
+        [Fact]
+        public async Task GetPagedUsersAsync_ReturnsEmpty_WhenNoUsers()
+        {
+            _mockUserRepository.Setup(r => r.GetPagedAsync(1, 10))
+                               .ReturnsAsync((Enumerable.Empty<User>(), 0));
+
+            var result = await _userService.GetPagedUsersAsync(1, 10);
+
+            Assert.Empty(result.Items);
+            Assert.Equal(0, result.TotalCount);
+            Assert.Equal(0, result.TotalPages);
+        }
+
+        [Fact]
+        public async Task GetPagedUsersAsync_HasPreviousPage_WhenPage2()
+        {
+            var users = new List<User> { new User { UserId = Guid.NewGuid(), Email = "a@t.com", FullName = "A" } };
+            _mockUserRepository.Setup(r => r.GetPagedAsync(2, 10))
+                               .ReturnsAsync((users.AsEnumerable(), 15));
+
+            var result = await _userService.GetPagedUsersAsync(2, 10);
+
+            Assert.True(result.HasPreviousPage);
+            Assert.False(result.HasNextPage);
+        }
+
+        #endregion
+
+        #region GetAllClubsById
+
+        [Fact]
+        public async Task GetAllClubsById_ReturnsClubs()
+        {
+            var userId = Guid.NewGuid();
+            var clubs = new List<Club> { new Club { ClubId = 1, ClubName = "Test" } };
+            _mockUserRepository.Setup(r => r.GetAllClubByUser(userId)).ReturnsAsync(clubs);
+
+            var result = await _userService.GetAllClubsById(userId);
+
+            Assert.Single(result);
+        }
+
+        [Fact]
+        public async Task GetAllClubsById_ReturnsEmpty_WhenNoClubs()
+        {
+            var userId = Guid.NewGuid();
+            _mockUserRepository.Setup(r => r.GetAllClubByUser(userId)).ReturnsAsync(new List<Club>());
+
+            var result = await _userService.GetAllClubsById(userId);
+
+            Assert.Empty(result);
+        }
+
+        #endregion
+
+        #region GetUserDepartmentsInClubAsync
+
+        [Fact]
+        public async Task GetUserDepartmentsInClubAsync_ReturnsNull_WhenNotMember()
+        {
+            var userId = Guid.NewGuid();
+            _mockUserRepository.Setup(r => r.GetAllClubByUser(userId))
+                               .ReturnsAsync(new List<Club>());
+
+            var result = await _userService.GetUserDepartmentsInClubAsync(userId, 1);
+
+            Assert.Null(result);
+        }
+
+        [Fact]
+        public async Task GetUserDepartmentsInClubAsync_ReturnsDepartments_WhenMember()
+        {
+            var userId = Guid.NewGuid();
+            var clubs = new List<Club> { new Club { ClubId = 1 } };
+            _mockUserRepository.Setup(r => r.GetAllClubByUser(userId)).ReturnsAsync(clubs);
+
+            var dept = new Department { DepartmentId = 10, DepartmentName = "IT", ClubRoles = new List<ClubRole>() };
+            var deptData = new List<(Department Department, ClubRole? DepartmentRole, int MemberCount)>
+            {
+                (dept, null, 5)
+            };
+            _mockUserRepository.Setup(r => r.GetDepartmentsByUserAndClubAsync(userId, 1)).ReturnsAsync(deptData);
+
+            var result = await _userService.GetUserDepartmentsInClubAsync(userId, 1);
+
+            Assert.NotNull(result);
+            Assert.Single(result!);
+            var first = result!.First();
+            Assert.Equal(10, first.DepartmentId);
+            Assert.Null(first.DepartmentRole);
+        }
+
+        [Fact]
+        public async Task GetUserDepartmentsInClubAsync_IncludesRole_WhenPresent()
+        {
+            var userId = Guid.NewGuid();
+            var clubs = new List<Club> { new Club { ClubId = 1 } };
+            _mockUserRepository.Setup(r => r.GetAllClubByUser(userId)).ReturnsAsync(clubs);
+
+            var dept = new Department { DepartmentId = 10, DepartmentName = "IT", ClubRoles = new List<ClubRole>() };
+            var role = new ClubRole { ClubRoleId = 1, RoleName = "Lead", Level = 2, Description = "Dept Lead" };
+            var deptData = new List<(Department Department, ClubRole? DepartmentRole, int MemberCount)>
+            {
+                (dept, role, 3)
+            };
+            _mockUserRepository.Setup(r => r.GetDepartmentsByUserAndClubAsync(userId, 1)).ReturnsAsync(deptData);
+
+            var result = await _userService.GetUserDepartmentsInClubAsync(userId, 1);
+
+            Assert.NotNull(result);
+            var first = result!.First();
+            Assert.NotNull(first.DepartmentRole);
+            Assert.Equal("Lead", first.DepartmentRole!.RoleName);
+        }
+
+        #endregion
+
+        #region UpdateUserAsync_AllFields
+
+        [Fact]
+        public async Task UpdateUserAsync_UpdatesAllFields()
+        {
+            var userId = Guid.NewGuid();
+            var user = new User { UserId = userId, FullName = "Old" };
+            var request = new UpdateUserDto
+            {
+                FullName = "New",
+                PhoneNumber = "0912345678",
+                DateOfBirth = new DateOnly(2000, 1, 1),
+                Gender = "Male",
+                Address = "123 Street",
+                Avatar = "http://img.com/a.jpg",
+                Major = "CS",
+                StudentId = "S001"
+            };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(user);
+            _mockUserRepository.Setup(r => r.StudentIdExistsAsync("S001")).ReturnsAsync(false);
+            _mockUserRepository.Setup(r => r.UpdateAsync(user)).ReturnsAsync(true);
+
+            var result = await _userService.UpdateUserAsync(userId, request);
+
+            Assert.True(result);
+            Assert.Equal("New", user.FullName);
+            Assert.Equal("0912345678", user.PhoneNumber);
+            Assert.Equal("Male", user.Gender);
+            Assert.Equal("CS", user.Major);
+            Assert.Equal("S001", user.StudentId);
+        }
+
+        [Fact]
+        public async Task UpdateUserAsync_SkipsStudentIdCheck_WhenSameAsExisting()
+        {
+            var userId = Guid.NewGuid();
+            var user = new User { UserId = userId, StudentId = "SAME-ID" };
+            var request = new UpdateUserDto { StudentId = "SAME-ID" };
+
+            _mockUserRepository.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(user);
+            _mockUserRepository.Setup(r => r.UpdateAsync(user)).ReturnsAsync(true);
+
+            var result = await _userService.UpdateUserAsync(userId, request);
+
+            Assert.True(result);
+            _mockUserRepository.Verify(r => r.StudentIdExistsAsync(It.IsAny<string>()), Times.Never);
+        }
+
+        #endregion
+
+        #region CreateUserAsync_Additional
+
+        [Fact]
+        public async Task CreateUserAsync_WithoutStudentId()
+        {
+            var request = new CreateUserDto
+            {
+                Email = "new@test.com",
+                Password = "pwd",
+                FullName = "No Student"
+            };
+
+            _mockUserRepository.Setup(r => r.EmailExistsAsync(request.Email)).ReturnsAsync(false);
+            _mockUserRepository.Setup(r => r.CreateAsync(It.IsAny<User>()))
+                               .ReturnsAsync((User u) => u);
+
+            var result = await _userService.CreateUserAsync(request);
+
+            Assert.NotNull(result);
+            Assert.Equal("new@test.com", result.Email);
+            _mockUserRepository.Verify(r => r.StudentIdExistsAsync(It.IsAny<string>()), Times.Never);
+        }
+
+        #endregion
     }
 }

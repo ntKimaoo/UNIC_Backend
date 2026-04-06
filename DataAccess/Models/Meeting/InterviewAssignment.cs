@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DataAccess.Models.Meeting.Enums;
 
 namespace DataAccess.Models.Meeting;
@@ -29,8 +30,10 @@ public class InterviewAssignment
     // ── Feedback & kết quả ───────────────────────────────────────
     public string?          FeedbackNotes        { get; set; }
     public InterviewResult? Result               { get; set; }   // null = chưa đánh giá
-    public int?             Score                { get; set; }   // 0–100
 
     public DateTime  AssignedAt          { get; set; } = DateTime.UtcNow;
     public DateTime? FeedbackSubmittedAt { get; set; }
+
+    // ── Navigation ───────────────────────────────────────────────
+    public ICollection<CriteriaScore> CriteriaScores { get; set; } = new List<CriteriaScore>();
 }

@@ -1,4 +1,6 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.Hubs;
+using BusinessLogic.Options;
 using BusinessLogic.Services;
 using BusinessLogic.Services.Background;
 using BusinessLogic.Services.Implementation;
@@ -11,17 +13,19 @@ using DataAccess.Repositories.Interface;
 using DataAccess.Seed;
 using FluentValidation;
 using FluentValidation.AspNetCore;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
 using Presentation.Authorization;
+using Presentation.Hubs;
 using System;
 using System.Text;
+using UNIC.BusinessLogic.Services;
 using UNIC.BusinessLogic.Services.Implementation;
 using UNIC.BusinessLogic.Services.Interface;
 using UNIC.DataAccess.Repositories.Implementation;
@@ -29,8 +33,6 @@ using UNIC.DataAccess.Repositories.Interface;
 using UNIC.DataAccess.Seed;
 using UNIC.Presentation.Helpers;
 using UNIC.Presentation.Hubs;
-using BusinessLogic.Hubs;
-using Presentation.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -85,7 +87,7 @@ builder.Services.AddScoped<IInterviewRepository, InterviewRepository>();
 builder.Services.AddScoped<IInterviewService, InterviewService>();
 builder.Services.AddScoped<IClubCreationRequestRepository, ClubCreationRequestRepository>();
 builder.Services.AddScoped<IClubCreationRequestService, ClubCreationRequestService>();
-
+builder.Services.AddScoped<IAiAnalysisService,AiAnalysisService>();
 // Register Cloudinary as a singleton
 builder.Services.AddSingleton(sp =>
 {
@@ -127,6 +129,7 @@ builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<INotificationHubContext, NotificationHubContext>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventReminderService>();
+builder.Services.AddHostedService<BusinessLogic.Services.Background.EventStatusSyncService>();
 
 // Unit of Work and Repositories
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IUnitOfWork, DataAccess.Repositories.Implementation.UnitOfWork>();
@@ -141,7 +144,7 @@ builder.Services.AddScoped<BusinessLogic.Services.Interface.IQRCodeGeneratorServ
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<BusinessLogic.Validators.CreateEventRequestValidator>();
-
+builder.Services.Configure<OpenRouterOptions>(builder.Configuration.GetSection("OpenRouter"));
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(BusinessLogic.Mappings.EventMappingProfile).Assembly);
 
@@ -155,7 +158,12 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new NullableDateTimeUtcJsonConverter());
 }); ;
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    c.IncludeXmlComments(xmlPath);
+});
 //signalR
 builder.Services.AddSignalR();
 //jwt
@@ -180,10 +188,16 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(key)
     };
 });
-// Single handler: club-scoped policy check OR UserRole claim check (OR logic)
-builder.Services.AddScoped<IAuthorizationHandler, ClubPolicyOrRoleHandler>();
+// Register authorization handler
+builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
 
-// Dynamic policy provider (ClubPolicy_ / Role_ / ClubPolicyOrRole_ prefixes)
+// Register club-scoped authorization handler
+builder.Services.AddScoped<IAuthorizationHandler, ClubMemberAuthorizationHandler>();
+
+// Register event-scoped authorization handler
+builder.Services.AddScoped<IAuthorizationHandler, EventPermissionAuthorizationHandler>();
+
+// Register dynamic policy provider
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 
 // Configure file upload size limits

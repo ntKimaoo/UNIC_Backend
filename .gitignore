@@ -433,3 +433,4 @@ EmailTemplates/cache/
 # Migration scripts (temporary)
 *.migration.sql
 /sql-query
+/report

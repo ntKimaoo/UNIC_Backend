@@ -13,6 +13,8 @@ namespace DataAccess.Repositories.Implementation
         private IAttendanceRepository? _attendances;
         private IEventScheduleRepository? _eventSchedules;
         private IUserRepository? _users;
+        private IUserEventRoleRepository? _eventMembers;
+        private IEventRoleRepository? _eventRoles;
 
         public UnitOfWork(UnicContext context)
         {
@@ -30,6 +32,12 @@ namespace DataAccess.Repositories.Implementation
 
         public IUserRepository Users => 
             _users ??= new UserRepository(_context);
+
+        public IUserEventRoleRepository EventMembers => 
+            _eventMembers ??= new UserEventRoleRepository(_context);
+
+        public IEventRoleRepository EventRoles => 
+            _eventRoles ??= new EventRoleRepository(_context);
 
         public async Task<int> SaveChangesAsync()
         {

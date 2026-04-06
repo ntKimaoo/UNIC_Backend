@@ -48,7 +48,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Create a new club role
         /// </summary>
-        [RequireClubPolicy("CreateRole")]
+        [RequireClubPolicyOrRole("CreateRole", "Admin")]
         [HttpPost("api/club/{clubId}/role")]
         public async Task<IActionResult> Create([FromBody] CreateClubRoleDto dto, int clubId)
         {
@@ -104,7 +104,7 @@ namespace Presentation.Controllers
             }
         }
         [HttpPut("api/club/{clubId}/role/{id}/policies")]
-        [RequireClubPolicy("EditRole")]
+        [RequireClubPolicyOrRole("EditRole", "Admin")]
         public async Task<IActionResult> UpdatePolicies(int id, List<int> policyIds,int clubId)
         {
             if (!ModelState.IsValid)
@@ -128,7 +128,7 @@ namespace Presentation.Controllers
         /// Delete a club role
         /// </summary>
         [HttpDelete("api/club/{clubId}/role/{id}")]
-        [RequireClubPolicy("DeleteRole")]
+        [RequireClubPolicyOrRole("DeleteRole", "Admin")]
         public async Task<IActionResult> Delete(int clubId, int id)
         {
             var result = await _service.DeleteAsync(id);

@@ -7,7 +7,7 @@ namespace DataAccess.Enums
         WAITLIST,
         CANCELLED,
         PRESENT,
-        CHECKED_IN,   // alias for PRESENT — legacy DB value
+        CHECKED_IN,
         ABSENT,
         REJECTED
     }
