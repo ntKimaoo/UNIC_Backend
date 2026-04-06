@@ -199,7 +199,7 @@ namespace UNIC.Presentation.Controllers
         ///<summary>
         ///Remove member from department
         /// </summary>
-        [HttpDelete("{departmentId}/members/{memberId}/remove}")]
+        [HttpDelete("{departmentId}/members/{memberId}/remove")]
         public async Task<IActionResult> RemoveMemberFromDepartment(int clubId, int departmentId, Guid userId)
         {
             var member = await _departmentService.RemoveMemberFromDepartment(clubId, userId, departmentId);
