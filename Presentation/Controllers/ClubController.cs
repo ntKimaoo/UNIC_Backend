@@ -3,6 +3,7 @@ using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Mvc;
 using Presentation.Authorization;
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Presentation.Controllers
@@ -28,57 +29,52 @@ namespace Presentation.Controllers
         //[RequirePolicy("ViewClubs")]
         public async Task<IActionResult> GetAll(int pageSize, string? searchQuery, string pageIndex)
         {
-<<<<<<< HEAD
             try
             {
                 var clubs = await _service.GetAllAsync();
-                return Ok(new { success = true, data = clubs });
+
+                if (!string.IsNullOrEmpty(searchQuery))
+                {
+                    var searchLower = searchQuery.ToLower();
+                    clubs = clubs.Where(c =>
+                        c.ClubName.ToLower().Contains(searchLower) ||
+                        c.ShortName.ToLower().Contains(searchLower)
+                    );
+                }
+
+                if (pageIndex.ToLower() != "all")
+                {
+                    var totalCount = clubs.Count();
+                    var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+                    if (int.TryParse(pageIndex, out int pageInt))
+                    {
+                        clubs = clubs
+                            .Skip((pageInt - 1) * pageSize)
+                            .Take(pageSize);
+
+                        return Ok(new
+                        {
+                            success = true,
+                            data = clubs,
+                            totalPages = totalPages,
+                            totalCount = totalCount
+                        });
+                    }
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    data = clubs,
+                    totalPages = 1,
+                    totalCount = clubs.Count()
+                });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { success = false, message = ex.Message });
             }
-=======
-            var clubs = await _service.GetAllAsync();
-
-            if (!string.IsNullOrEmpty(searchQuery))
-            {
-                var searchLower = searchQuery.ToLower();
-                clubs = clubs.Where(c =>
-                    c.ClubName.ToLower().Contains(searchLower) ||
-                    c.ShortName.ToLower().Contains(searchLower)
-                );
-            }
-
-            if (pageIndex.ToLower() != "all")
-            {
-                var totalCount = clubs.Count();
-                var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
-
-                if (int.TryParse(pageIndex, out int pageInt))
-                {
-                    clubs = clubs
-                        .Skip((pageInt - 1) * pageSize)
-                        .Take(pageSize);
-
-                    return Ok(new
-                    {
-                        success = true,
-                        data = clubs,
-                        totalPages = totalPages,
-                        totalCount = totalCount
-                    });
-                }
-            }
-
-            return Ok(new
-            {
-                success = true,
-                data = clubs,
-                totalPages = 1,
-                totalCount = clubs.Count()
-            });
->>>>>>> origin/kien_dev
         }
 
         /// <summary>
@@ -87,56 +83,52 @@ namespace Presentation.Controllers
         [HttpGet("active")]
         public async Task<IActionResult> GetActiveClubs(int pageSize, string? searchQuery, string pageIndex)
         {
-<<<<<<< HEAD
             try
             {
                 var clubs = await _service.GetActiveClubsAsync();
-                return Ok(new { success = true, data = clubs });
+
+                if (!string.IsNullOrEmpty(searchQuery))
+                {
+                    var searchLower = searchQuery.ToLower();
+                    clubs = clubs.Where(c =>
+                        c.ClubName.ToLower().Contains(searchLower) ||
+                        c.ShortName.ToLower().Contains(searchLower)
+                    );
+                }
+
+                if (pageIndex.ToLower() != "all")
+                {
+                    var totalCount = clubs.Count();
+                    var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+                    if (int.TryParse(pageIndex, out int pageInt))
+                    {
+                        clubs = clubs
+                            .Skip((pageInt - 1) * pageSize)
+                            .Take(pageSize);
+
+                        return Ok(new
+                        {
+                            success = true,
+                            data = clubs,
+                            totalPages = totalPages,
+                            totalCount = totalCount
+                        });
+                    }
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    data = clubs,
+                    totalPages = 1,
+                    totalCount = clubs.Count()
+                });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { success = false, message = ex.Message });
             }
-=======
-            var clubs = await _service.GetActiveClubsAsync();
-            if (!string.IsNullOrEmpty(searchQuery))
-            {
-                var searchLower = searchQuery.ToLower();
-                clubs = clubs.Where(c =>
-                    c.ClubName.ToLower().Contains(searchLower) ||
-                    c.ShortName.ToLower().Contains(searchLower)
-                );
-            }
-
-            if (pageIndex.ToLower() != "all")
-            {
-                var totalCount = clubs.Count();
-                var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
-
-                if (int.TryParse(pageIndex, out int pageInt))
-                {
-                    clubs = clubs
-                        .Skip((pageInt - 1) * pageSize)
-                        .Take(pageSize);
-
-                    return Ok(new
-                    {
-                        success = true,
-                        data = clubs,
-                        totalPages = totalPages,
-                        totalCount = totalCount
-                    });
-                }
-            }
-
-            return Ok(new
-            {
-                success = true,
-                data = clubs,
-                totalPages = 1,
-                totalCount = clubs.Count()
-            });
->>>>>>> origin/kien_dev
         }
 
         /// <summary>
@@ -296,11 +288,12 @@ namespace Presentation.Controllers
                 });
             }
         }
+
         /// <summary>
-        /// Chang status of a club (active/inactive)
+        /// Change status of a club (active/inactive)
         /// </summary>
         [HttpPut("changeStatus/{id}")]
-        public async Task<IActionResult> changStatus(int id)
+        public async Task<IActionResult> ChangeStatus(int id)
         {
             try
             {
@@ -308,7 +301,7 @@ namespace Presentation.Controllers
                 return Ok(new
                 {
                     success = true,
-                    message = "Club updated successfully",
+                    message = "Club status updated successfully",
                 });
             }
             catch (Exception ex)
@@ -316,7 +309,7 @@ namespace Presentation.Controllers
                 return StatusCode(500, new
                 {
                     success = false,
-                    message = "An error occurred while updating the club",
+                    message = "An error occurred while updating the club status",
                     error = ex.Message
                 });
             }
@@ -351,7 +344,7 @@ namespace Presentation.Controllers
                 return StatusCode(500, new
                 {
                     success = false,
-                    message = "An error occurred while updating the club",
+                    message = "An error occurred while soft deleting the club",
                     error = ex.Message
                 });
             }
@@ -386,7 +379,7 @@ namespace Presentation.Controllers
                 return StatusCode(500, new
                 {
                     success = false,
-                    message = "An error occurred while updating the club",
+                    message = "An error occurred while deleting the club",
                     error = ex.Message
                 });
             }
@@ -418,11 +411,12 @@ namespace Presentation.Controllers
                     data = structure
                 });
             }
-            catch (Exception ex) {
+            catch (Exception ex)
+            {
                 return StatusCode(500, new
                 {
                     success = false,
-                    message = "An error occurred while updating the club",
+                    message = "An error occurred while retrieving the club structure",
                     error = ex.Message
                 });
             }

@@ -65,7 +65,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Lấy thông tin một member theo ID
         /// </summary>
-        [HttpGet("api/clubs/{clubId}/members{memberId}")]
+        [HttpGet("api/clubs/{clubId}/members/{memberId}")]
        
         public async Task<IActionResult> GetMember(int clubId, int memberId)
         {
