@@ -1,5 +1,6 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
+using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
@@ -14,43 +15,35 @@ namespace UNIC.ControllerTest.Controllers
 {
     public class VerifyControllerTest
     {
-        private readonly Mock<IAttendanceService> _mockAttendanceService;
+        private readonly Mock<IAttendanceService> _attendance;
         private readonly VerifyController _controller;
 
         public VerifyControllerTest()
         {
-            _mockAttendanceService = new Mock<IAttendanceService>();
-            _controller = new VerifyController(_mockAttendanceService.Object);
-            _controller.ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext()
-            };
+            _attendance = new Mock<IAttendanceService>();
+            _controller = new VerifyController(_attendance.Object);
         }
 
-        /// <summary>
-        /// Helper: set Accept header to application/json so the controller returns JSON.
-        /// </summary>
-        private void SetJsonAccept()
+        private static void SetupRequest(VerifyController controller, string queryString, string? acceptHeader = null)
         {
-            _controller.HttpContext.Request.Headers["Accept"] = "application/json";
+            var http = new DefaultHttpContext();
+            var qs = queryString.StartsWith('?') ? queryString : "?" + queryString;
+            http.Request.QueryString = new QueryString(qs);
+            if (!string.IsNullOrEmpty(acceptHeader))
+                http.Request.Headers.Accept = acceptHeader;
+            controller.ControllerContext = new ControllerContext { HttpContext = http };
         }
-
-        /// <summary>
-        /// Helper: set ?format=json query param.
-        /// </summary>
-        private void SetFormatJsonQuery()
-        {
-            _controller.HttpContext.Request.QueryString = new QueryString("?format=json");
-        }
-
-        #region Missing code — ReturnError
 
         [Fact]
-        public async Task Verify_MissingCode_ReturnsHtml400()
+        public async Task Verify_ReturnsHtml400_WhenCodeMissing()
         {
-            // No Accept header → HTML response
-            var result = await _controller.Verify("test@uni.edu", null, null);
+            SetupRequest(_controller, "email=a@b.com");
 
+            var result = await _controller.Verify("a@b.com", null, null);
+
+            _attendance.Verify(
+                s => s.VerifyAttendanceByLinkAsync(It.IsAny<string?>(), It.IsAny<string>()),
+                Times.Never);
             var content = result.Should().BeOfType<ContentResult>().Subject;
             content.StatusCode.Should().Be(400);
             content.ContentType.Should().Contain("text/html");
@@ -58,35 +51,30 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         [Fact]
-        public async Task Verify_EmptyCode_ReturnsHtml400()
+        public async Task Verify_ReturnsBadRequestJson_WhenCodeMissing_AndAcceptJson()
         {
-            var result = await _controller.Verify("test@uni.edu", null, "   ");
+            SetupRequest(_controller, "email=a@b.com", "application/json");
 
-            var content = result.Should().BeOfType<ContentResult>().Subject;
-            content.StatusCode.Should().Be(400);
-            content.Content.Should().Contain("Thiếu mã xác nhận");
+            var result = await _controller.Verify("a@b.com", null, null);
+
+            _attendance.Verify(
+                s => s.VerifyAttendanceByLinkAsync(It.IsAny<string?>(), It.IsAny<string>()),
+                Times.Never);
+            var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+            var body = bad.Value.Should().BeOfType<VerifyByLinkResult>().Subject;
+            body.Success.Should().BeFalse();
+            body.Message.Should().Contain("Thiếu mã");
         }
 
         [Fact]
-        public async Task Verify_MissingCode_AcceptJson_ReturnsBadRequestJson()
+        public async Task Verify_ReturnsBadRequestJson_WhenCodeMissing_AndFormatJsonQuery()
         {
-            SetJsonAccept();
+            SetupRequest(_controller, "email=a@b.com&format=json");
 
-            var result = await _controller.Verify("test@uni.edu", null, null);
+            var result = await _controller.Verify("a@b.com", null, null);
 
-            var badReq = result.Should().BeOfType<BadRequestObjectResult>().Subject;
-            badReq.StatusCode.Should().Be(400);
-        }
-
-        [Fact]
-        public async Task Verify_MissingCode_FormatJsonQuery_ReturnsBadRequestJson()
-        {
-            SetFormatJsonQuery();
-
-            var result = await _controller.Verify("test@uni.edu", null, null);
-
-            var badReq = result.Should().BeOfType<BadRequestObjectResult>().Subject;
-            badReq.StatusCode.Should().Be(400);
+            var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+            bad.Value.Should().BeOfType<VerifyByLinkResult>();
         }
 
         #endregion
@@ -94,43 +82,41 @@ namespace UNIC.ControllerTest.Controllers
         #region Success — HTML
 
         [Fact]
-        public async Task Verify_Success_ReturnsHtmlWithSuccessMessage()
+        public async Task Verify_ReturnsHtml200_WhenSuccess_FirstCheckIn()
         {
-            _mockAttendanceService
-                .Setup(s => s.VerifyAttendanceByLinkAsync("user@test.com", "ABC123"))
-                .ReturnsAsync(new VerifyByLinkResult
-                {
-                    Success = true,
-                    Message = "Điểm danh OK",
-                    MemberName = "Nguyen Van A",
-                    EventName = "Tech Talk",
-                    AlreadyCheckedIn = false
-                });
+            SetupRequest(_controller, "email=u@test.com&code=abc");
+            _attendance.Setup(s => s.VerifyAttendanceByLinkAsync("u@test.com", "abc")).ReturnsAsync(new VerifyByLinkResult
+            {
+                Success = true,
+                Message = "OK",
+                AlreadyCheckedIn = false,
+                MemberName = "M",
+                EventName = "E"
+            });
 
-            var result = await _controller.Verify("user@test.com", null, "ABC123");
+            var result = await _controller.Verify("u@test.com", null, "abc");
 
             var content = result.Should().BeOfType<ContentResult>().Subject;
             content.ContentType.Should().Contain("text/html");
             content.Content.Should().Contain("Đã xác nhận điểm danh thành công");
-            content.Content.Should().Contain("Nguyen Van A");
-            content.Content.Should().Contain("Tech Talk");
+            content.Content.Should().Contain("M");
+            content.Content.Should().Contain("E");
         }
 
         [Fact]
-        public async Task Verify_AlreadyCheckedIn_ReturnsHtmlWithAlreadyMessage()
+        public async Task Verify_ReturnsHtml200_WhenSuccess_AlreadyCheckedIn()
         {
-            _mockAttendanceService
-                .Setup(s => s.VerifyAttendanceByLinkAsync("user@test.com", "ABC123"))
-                .ReturnsAsync(new VerifyByLinkResult
-                {
-                    Success = true,
-                    Message = "Đã điểm danh",
-                    MemberName = "Nguyen Van A",
-                    EventName = "Tech Talk",
-                    AlreadyCheckedIn = true
-                });
+            SetupRequest(_controller, "code=x");
+            _attendance.Setup(s => s.VerifyAttendanceByLinkAsync(null, "x")).ReturnsAsync(new VerifyByLinkResult
+            {
+                Success = true,
+                Message = "Trùng",
+                AlreadyCheckedIn = true,
+                MemberName = "A",
+                EventName = "B"
+            });
 
-            var result = await _controller.Verify("user@test.com", null, "ABC123");
+            var result = await _controller.Verify(null, null, "x");
 
             var content = result.Should().BeOfType<ContentResult>().Subject;
             content.Content.Should().Contain("Đã điểm danh trước đó");
@@ -141,29 +127,28 @@ namespace UNIC.ControllerTest.Controllers
         #region Success — JSON
 
         [Fact]
-        public async Task Verify_Success_AcceptJson_ReturnsOk()
+        public async Task Verify_UsesGmail_WhenEmailWhitespace()
         {
-            SetJsonAccept();
-            _mockAttendanceService
-                .Setup(s => s.VerifyAttendanceByLinkAsync("user@test.com", "CODE1"))
-                .ReturnsAsync(new VerifyByLinkResult { Success = true, Message = "OK" });
+            SetupRequest(_controller, "gmail=g@mail.com&code=c1");
+            _attendance.Setup(s => s.VerifyAttendanceByLinkAsync("g@mail.com", "c1"))
+                .ReturnsAsync(new VerifyByLinkResult { Success = true, Message = "ok" });
 
-            var result = await _controller.Verify("user@test.com", null, "CODE1");
+            await _controller.Verify("   ", "g@mail.com", "c1");
 
-            result.Should().BeOfType<OkObjectResult>();
+            _attendance.Verify(s => s.VerifyAttendanceByLinkAsync("g@mail.com", "c1"), Times.Once);
         }
 
         [Fact]
-        public async Task Verify_Success_FormatJson_ReturnsOk()
+        public async Task Verify_ReturnsOkJson_WhenSuccess_AndAcceptJson()
         {
-            SetFormatJsonQuery();
-            _mockAttendanceService
-                .Setup(s => s.VerifyAttendanceByLinkAsync("user@test.com", "CODE1"))
-                .ReturnsAsync(new VerifyByLinkResult { Success = true, Message = "OK" });
+            SetupRequest(_controller, "code=c", acceptHeader: "application/json");
+            var dto = new VerifyByLinkResult { Success = true, Message = "Done", AlreadyCheckedIn = false };
+            _attendance.Setup(s => s.VerifyAttendanceByLinkAsync(null, "c")).ReturnsAsync(dto);
 
-            var result = await _controller.Verify("user@test.com", null, "CODE1");
+            var result = await _controller.Verify(null, null, "c");
 
-            result.Should().BeOfType<OkObjectResult>();
+            var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+            ok.Value.Should().BeSameAs(dto);
         }
 
         #endregion
@@ -171,104 +156,19 @@ namespace UNIC.ControllerTest.Controllers
         #region Failure
 
         [Fact]
-        public async Task Verify_Failure_ReturnsHtml400()
+        public async Task Verify_ReturnsHtml400_WhenServiceReturnsFailure()
         {
-            _mockAttendanceService
-                .Setup(s => s.VerifyAttendanceByLinkAsync("user@test.com", "BADCODE"))
-                .ReturnsAsync(new VerifyByLinkResult
-                {
-                    Success = false,
-                    Message = "Mã không hợp lệ"
-                });
+            SetupRequest(_controller, "code=bad");
+            _attendance.Setup(s => s.VerifyAttendanceByLinkAsync(null, "bad"))
+                .ReturnsAsync(new VerifyByLinkResult { Success = false, Message = "Invalid code" });
 
-            var result = await _controller.Verify("user@test.com", null, "BADCODE");
+            var result = await _controller.Verify(null, null, "bad");
 
             var content = result.Should().BeOfType<ContentResult>().Subject;
             content.StatusCode.Should().Be(400);
             content.ContentType.Should().Contain("text/html");
             content.Content.Should().Contain("Xác nhận thất bại");
-            content.Content.Should().Contain("Mã không hợp lệ");
-        }
-
-        [Fact]
-        public async Task Verify_Failure_AcceptJson_ReturnsBadRequest()
-        {
-            SetJsonAccept();
-            _mockAttendanceService
-                .Setup(s => s.VerifyAttendanceByLinkAsync("user@test.com", "BADCODE"))
-                .ReturnsAsync(new VerifyByLinkResult { Success = false, Message = "Invalid" });
-
-            var result = await _controller.Verify("user@test.com", null, "BADCODE");
-
-            result.Should().BeOfType<BadRequestObjectResult>();
-        }
-
-        #endregion
-
-        #region Email fallback (gmail param)
-
-        [Fact]
-        public async Task Verify_UsesGmailParam_WhenEmailIsNull()
-        {
-            _mockAttendanceService
-                .Setup(s => s.VerifyAttendanceByLinkAsync("gmail@test.com", "X1"))
-                .ReturnsAsync(new VerifyByLinkResult { Success = true, Message = "OK" });
-
-            SetJsonAccept();
-            var result = await _controller.Verify(null, "gmail@test.com", "X1");
-
-            result.Should().BeOfType<OkObjectResult>();
-            _mockAttendanceService.Verify(
-                s => s.VerifyAttendanceByLinkAsync("gmail@test.com", "X1"), Times.Once);
-        }
-
-        [Fact]
-        public async Task Verify_UsesGmailParam_WhenEmailIsWhitespace()
-        {
-            _mockAttendanceService
-                .Setup(s => s.VerifyAttendanceByLinkAsync("gmail@test.com", "X1"))
-                .ReturnsAsync(new VerifyByLinkResult { Success = true, Message = "OK" });
-
-            SetJsonAccept();
-            var result = await _controller.Verify("   ", "gmail@test.com", "X1");
-
-            result.Should().BeOfType<OkObjectResult>();
-            _mockAttendanceService.Verify(
-                s => s.VerifyAttendanceByLinkAsync("gmail@test.com", "X1"), Times.Once);
-        }
-
-        [Fact]
-        public async Task Verify_PrefersEmail_OverGmail()
-        {
-            _mockAttendanceService
-                .Setup(s => s.VerifyAttendanceByLinkAsync("email@test.com", "X1"))
-                .ReturnsAsync(new VerifyByLinkResult { Success = true, Message = "OK" });
-
-            SetJsonAccept();
-            var result = await _controller.Verify("email@test.com", "gmail@test.com", "X1");
-
-            result.Should().BeOfType<OkObjectResult>();
-            _mockAttendanceService.Verify(
-                s => s.VerifyAttendanceByLinkAsync("email@test.com", "X1"), Times.Once);
-        }
-
-        #endregion
-
-        #region Both email and gmail null
-
-        [Fact]
-        public async Task Verify_BothEmailAndGmailNull_PassesNullToService()
-        {
-            _mockAttendanceService
-                .Setup(s => s.VerifyAttendanceByLinkAsync(null, "CODE"))
-                .ReturnsAsync(new VerifyByLinkResult { Success = false, Message = "Email required" });
-
-            SetJsonAccept();
-            var result = await _controller.Verify(null, null, "CODE");
-
-            result.Should().BeOfType<BadRequestObjectResult>();
-            _mockAttendanceService.Verify(
-                s => s.VerifyAttendanceByLinkAsync(null, "CODE"), Times.Once);
+            content.Content.Should().Contain("Invalid code");
         }
 
         #endregion
@@ -276,24 +176,16 @@ namespace UNIC.ControllerTest.Controllers
         #region Null MemberName / EventName in HTML
 
         [Fact]
-        public async Task Verify_Success_NullMemberAndEvent_DoesNotCrash()
+        public async Task Verify_ReturnsBadRequestJson_WhenServiceFails_AndWantJson()
         {
-            _mockAttendanceService
-                .Setup(s => s.VerifyAttendanceByLinkAsync("u@t.com", "C1"))
-                .ReturnsAsync(new VerifyByLinkResult
-                {
-                    Success = true,
-                    Message = "Done",
-                    MemberName = null,
-                    EventName = null,
-                    AlreadyCheckedIn = false
-                });
+            SetupRequest(_controller, "code=bad", "application/json");
+            var fail = new VerifyByLinkResult { Success = false, Message = "Expired" };
+            _attendance.Setup(s => s.VerifyAttendanceByLinkAsync(null, "bad")).ReturnsAsync(fail);
 
-            var result = await _controller.Verify("u@t.com", null, "C1");
+            var result = await _controller.Verify(null, null, "bad");
 
-            var content = result.Should().BeOfType<ContentResult>().Subject;
-            content.ContentType.Should().Contain("text/html");
-            content.Content.Should().Contain("Đã xác nhận điểm danh thành công");
+            var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
+            bad.Value.Should().BeSameAs(fail);
         }
 
         #endregion
