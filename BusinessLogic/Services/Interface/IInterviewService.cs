@@ -15,6 +15,10 @@ namespace BusinessLogic.Services.Interface
         Task<bool> UpdateScheduleStatusAsync(int id, UpdateInterviewStatusDto dto);
         Task<bool> DeleteScheduleAsync(int id);
 
+        // ── Proposed Time Slots ──────────────────────────────────
+        Task<List<ProposedTimeSlotResponseDto>> GetTimeSlotsAsync(int scheduleId);
+        Task<InterviewScheduleResponseDto> ConfirmTimeSlotAsync(int scheduleId, ConfirmTimeSlotDto dto);
+
         // ── Interviewer Assignment ────────────────────────────────
         Task<List<InterviewAssignmentResponseDto>> AssignInterviewersAsync(int scheduleId, AssignInterviewersDto dto);
         Task<IEnumerable<InterviewAssignmentResponseDto>> GetAssignmentsAsync(int scheduleId);
@@ -45,6 +49,7 @@ namespace BusinessLogic.Services.Interface
 
         // ── Criteria-based Feedback ──────────────────────────────
         Task<bool> SubmitCriteriaFeedbackAsync(int scheduleId, int assignmentId, SubmitCriteriaFeedbackDto dto);
+        Task<List<CriteriaScoreResponseDto>> GetCriteriaScoresByAssignmentAsync(int scheduleId, int assignmentId);
         Task<EvaluationSummaryDto?> GetEvaluationSummaryAsync(int scheduleId);
         Task<List<CandidateComparisonItemDto>> GetCampaignComparisonAsync(int campaignId);
 

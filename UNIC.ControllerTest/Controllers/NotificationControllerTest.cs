@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Moq;
 using Presentation.Controllers;
 
-namespace UNIC.ServiceTest.Controllers
+namespace UNIC.ControllerTest.Controllers
 {
 
     public class NotificationControllerTest

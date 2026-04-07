@@ -289,14 +289,24 @@ namespace UNIC.DataAccess.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FundId"));
 
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("ClubId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<decimal>("CurrentBalance")
                         .HasColumnType("decimal(15,2)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<DateTime?>("ExpiresAt")
                         .HasColumnType("date");
@@ -305,6 +315,13 @@ namespace UNIC.DataAccess.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RejectReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("RejectedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -750,11 +767,16 @@ namespace UNIC.DataAccess.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int?>("ClubId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("CategoryId");
+
+                    b.HasIndex("ClubId");
 
                     b.ToTable("FundCategories");
                 });
@@ -1152,6 +1174,21 @@ namespace UNIC.DataAccess.Migrations
                     b.ToTable("UserClubRoles");
                 });
 
+            modelBuilder.Entity("DataAccess.Models.UserClubRoleDepartment", b =>
+                {
+                    b.Property<int>("ClubMemberId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DepartmentId")
+                        .HasColumnType("int");
+
+                    b.HasKey("ClubMemberId", "DepartmentId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.ToTable("UserClubRoleDepartments");
+                });
+
             modelBuilder.Entity("DataAccess.Models.UserEventRole", b =>
                 {
                     b.Property<int>("EventMemberId")
@@ -1355,36 +1392,6 @@ namespace UNIC.DataAccess.Migrations
                     b.HasKey("PolicyGroupId");
 
                     b.ToTable("PolicyGroups");
-                });
-
-            modelBuilder.Entity("UNIC.DataAccess.Models.UserPolicy", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("PolicyId")
-                        .HasColumnType("int");
-
-                    b.HasKey("UserId", "PolicyId");
-
-                    b.HasIndex("PolicyId");
-
-                    b.ToTable("UserPolicies");
-                });
-
-            modelBuilder.Entity("UNIC.DataAccess.Models.UserRolePolicy", b =>
-                {
-                    b.Property<int>("RoleId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("PolicyId")
-                        .HasColumnType("int");
-
-                    b.HasKey("RoleId", "PolicyId");
-
-                    b.HasIndex("PolicyId");
-
-                    b.ToTable("UserRolePolicies");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Application", b =>
@@ -1633,6 +1640,16 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("Event");
                 });
 
+            modelBuilder.Entity("DataAccess.Models.FundCategory", b =>
+                {
+                    b.HasOne("DataAccess.Models.Club", "Club")
+                        .WithMany()
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Club");
+                });
+
             modelBuilder.Entity("DataAccess.Models.FundTransaction", b =>
                 {
                     b.HasOne("DataAccess.Models.FundCategory", "FundCategory")
@@ -1779,6 +1796,25 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("DataAccess.Models.UserClubRoleDepartment", b =>
+                {
+                    b.HasOne("DataAccess.Models.UserClubRole", "ClubMember")
+                        .WithMany("MemberDepartments")
+                        .HasForeignKey("ClubMemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DataAccess.Models.Department", "Department")
+                        .WithMany("DepartmentMembers")
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ClubMember");
+
+                    b.Navigation("Department");
+                });
+
             modelBuilder.Entity("DataAccess.Models.UserRole", b =>
                 {
                     b.HasOne("DataAccess.Models.User", "User")
@@ -1855,44 +1891,6 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("PolicyGroup");
                 });
 
-            modelBuilder.Entity("UNIC.DataAccess.Models.UserPolicy", b =>
-                {
-                    b.HasOne("UNIC.DataAccess.Models.Policy", "Policy")
-                        .WithMany("UserPolicies")
-                        .HasForeignKey("PolicyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("UserPolicies")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Policy");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("UNIC.DataAccess.Models.UserRolePolicy", b =>
-                {
-                    b.HasOne("UNIC.DataAccess.Models.Policy", "Policy")
-                        .WithMany("UserRolePolicies")
-                        .HasForeignKey("PolicyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DataAccess.Models.UserRole", "Role")
-                        .WithMany("UserRolePolicies")
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Policy");
-
-                    b.Navigation("Role");
-                });
-
             modelBuilder.Entity("DataAccess.Models.Application", b =>
                 {
                     b.Navigation("ApplicationAnswers");
@@ -1944,6 +1942,8 @@ namespace UNIC.DataAccess.Migrations
             modelBuilder.Entity("DataAccess.Models.Department", b =>
                 {
                     b.Navigation("ClubRoles");
+
+                    b.Navigation("DepartmentMembers");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Event", b =>
@@ -2003,46 +2003,38 @@ namespace UNIC.DataAccess.Migrations
 
                     b.Navigation("RefreshTokens");
 
-                    b.Navigation("UserPolicies");
-
                     b.Navigation("UserRoles");
                 });
 
             modelBuilder.Entity("DataAccess.Models.UserClubRole", b =>
                 {
                     b.Navigation("ClubMemberPolicies");
+
+                    b.Navigation("MemberDepartments");
+                    modelBuilder.Entity("DataAccess.Models.UserEventRole", b =>
+                        {
+                            b.Navigation("EventMemberPolicies");
+                        });
+
+                    
+                    modelBuilder.Entity("UNIC.DataAccess.Models.Policy", b =>
+                        {
+                            b.Navigation("ClubMemberPolicies");
+
+                            b.Navigation("ClubRolePolicies");
+
+                            b.Navigation("EventMemberPolicies");
+
+                            b.Navigation("EventRolePolicies");
+
+                        });
+
+                    modelBuilder.Entity("UNIC.DataAccess.Models.PolicyGroup", b =>
+                        {
+                            b.Navigation("Policies");
+                        });
+
                 });
-
-            modelBuilder.Entity("DataAccess.Models.UserEventRole", b =>
-                {
-                    b.Navigation("EventMemberPolicies");
-                });
-
-            modelBuilder.Entity("DataAccess.Models.UserRole", b =>
-                {
-                    b.Navigation("UserRolePolicies");
-                });
-
-            modelBuilder.Entity("UNIC.DataAccess.Models.Policy", b =>
-                {
-                    b.Navigation("ClubMemberPolicies");
-
-                    b.Navigation("ClubRolePolicies");
-
-                    b.Navigation("EventMemberPolicies");
-
-                    b.Navigation("EventRolePolicies");
-
-                    b.Navigation("UserPolicies");
-
-                    b.Navigation("UserRolePolicies");
-                });
-
-            modelBuilder.Entity("UNIC.DataAccess.Models.PolicyGroup", b =>
-                {
-                    b.Navigation("Policies");
-                });
-#pragma warning restore 612, 618
         }
     }
 }

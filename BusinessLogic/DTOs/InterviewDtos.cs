@@ -5,6 +5,34 @@ using System.ComponentModel.DataAnnotations;
 namespace BusinessLogic.DTOs
 {
     // ═══════════════════════════════════════════════════════════════
+    //  PROPOSED TIME SLOTS
+    // ═══════════════════════════════════════════════════════════════
+
+    public class ProposedTimeSlotItemDto
+    {
+        [Required]
+        public string Date { get; set; } = null!;  // "2026-04-01"
+
+        [Required]
+        public string Time { get; set; } = null!;  // "09:00"
+    }
+
+    public class ProposedTimeSlotResponseDto
+    {
+        public int Id { get; set; }
+        public int InterviewScheduleId { get; set; }
+        public DateTime ProposedAt { get; set; }
+        public bool IsSelected { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class ConfirmTimeSlotDto
+    {
+        [Required]
+        public int TimeSlotId { get; set; }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     //  INTERVIEW SCHEDULE
     // ═══════════════════════════════════════════════════════════════
 
@@ -37,6 +65,13 @@ namespace BusinessLogic.DTOs
         /// Danh sách interviewer assign ngay khi tạo lịch (tuỳ chọn).
         /// </summary>
         public List<AssignInterviewerItemDto>? Interviewers { get; set; }
+
+        /// <summary>
+        /// Danh sách khung giờ đề xuất cho ứng viên chọn (tuỳ chọn).
+        /// Nếu chỉ có 1 slot thì dùng luôn ScheduledAt.
+        /// Nếu nhiều slot thì ứng viên sẽ chọn.
+        /// </summary>
+        public List<ProposedTimeSlotItemDto>? ProposedTimeSlots { get; set; }
     }
 
     public class UpdateInterviewScheduleDto
@@ -82,6 +117,7 @@ namespace BusinessLogic.DTOs
         public DateTime? UpdatedAt { get; set; }
         public List<InterviewAssignmentResponseDto> Assignments { get; set; } = new();
         public MeetingRoomResponseDto? MeetingRoom { get; set; }
+        public List<ProposedTimeSlotResponseDto> ProposedTimeSlots { get; set; } = new();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -114,9 +150,17 @@ namespace BusinessLogic.DTOs
         public bool HasConfirmed { get; set; }
         public string? FeedbackNotes { get; set; }
         public string? Result { get; set; }
-        public int? Score { get; set; }
         public DateTime AssignedAt { get; set; }
         public DateTime? FeedbackSubmittedAt { get; set; }
+        public List<CriteriaScoreResponseDto> CriteriaScores { get; set; } = new();
+    }
+
+    public class CriteriaScoreResponseDto
+    {
+        public int Id { get; set; }
+        public int EvaluationCriterionId { get; set; }
+        public string? Note { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -247,12 +291,6 @@ namespace BusinessLogic.DTOs
         /// </summary>
         [Required]
         public string Result { get; set; } = null!;
-
-        /// <summary>
-        /// 0–100
-        /// </summary>
-        [Range(0, 100)]
-        public int? Score { get; set; }
     }
 
     public class FeedbackSummaryResponseDto
@@ -273,7 +311,6 @@ namespace BusinessLogic.DTOs
         public string Name { get; set; } = null!;
         public string? Description { get; set; }
         public int Weight { get; set; }
-        public int DisplayOrder { get; set; }
         public bool IsDefault { get; set; }
     }
 
@@ -288,8 +325,6 @@ namespace BusinessLogic.DTOs
         [Required]
         [Range(1, 100)]
         public int Weight { get; set; }
-
-        public int DisplayOrder { get; set; }
     }
 
     public class UpdateEvaluationCriterionDto
@@ -300,11 +335,10 @@ namespace BusinessLogic.DTOs
 
         [Range(1, 100)]
         public int? Weight { get; set; }
-        public int? DisplayOrder { get; set; }
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  CRITERIA ASSIGNMENT & SCORING
+    //  CRITERIA ASSIGNMENT & FEEDBACK
     // ═══════════════════════════════════════════════════════════════
 
     public class AssignCriteriaDto
@@ -316,14 +350,10 @@ namespace BusinessLogic.DTOs
         public List<int> CriteriaIds { get; set; } = new();
     }
 
-    public class CriteriaScoreItemDto
+    public class CriteriaNoteItemDto
     {
         [Required]
         public int CriterionId { get; set; }
-
-        [Required]
-        [Range(1, 5)]
-        public int Score { get; set; }
 
         public string? Note { get; set; }
     }
@@ -331,10 +361,10 @@ namespace BusinessLogic.DTOs
     public class SubmitCriteriaFeedbackDto
     {
         /// <summary>
-        /// Điểm theo từng tiêu chí (1–5 sao).
+        /// Nhận xét theo từng tiêu chí.
         /// </summary>
         [Required]
-        public List<CriteriaScoreItemDto> Scores { get; set; } = new();
+        public List<CriteriaNoteItemDto> Notes { get; set; } = new();
 
         public string? FeedbackNotes { get; set; }
 
@@ -346,21 +376,20 @@ namespace BusinessLogic.DTOs
     }
 
     /// <summary>
-    /// Kết quả chấm 1 tiêu chí bởi 1 interviewer.
+    /// Nhận xét 1 tiêu chí bởi 1 interviewer.
     /// </summary>
-    public class CriteriaScoreResultDto
+    public class CriteriaNoteResultDto
     {
         public int CriterionId { get; set; }
         public string CriterionName { get; set; } = null!;
         public int Weight { get; set; }
-        public int Score { get; set; }
         public string? Note { get; set; }
         public Guid InterviewerUserId { get; set; }
         public string InterviewerRole { get; set; } = null!;
     }
 
     /// <summary>
-    /// Tổng hợp đánh giá cho 1 buổi PV: điểm TB mỗi tiêu chí, tổng điểm, đề xuất.
+    /// Tổng hợp đánh giá cho 1 buổi PV: nhận xét từng tiêu chí.
     /// </summary>
     public class EvaluationSummaryDto
     {
@@ -370,19 +399,9 @@ namespace BusinessLogic.DTOs
         public int CampaignId { get; set; }
 
         /// <summary>
-        /// Danh sách tiêu chí + điểm từng người chấm.
+        /// Danh sách tiêu chí + nhận xét từng người.
         /// </summary>
         public List<CriteriaSummaryItemDto> CriteriaSummaries { get; set; } = new();
-
-        /// <summary>
-        /// Điểm tổng (0–100), tính theo trọng số.
-        /// </summary>
-        public double TotalScore { get; set; }
-
-        /// <summary>
-        /// Đề xuất tự động: Pass / OnHold / Fail
-        /// </summary>
-        public string SuggestedResult { get; set; } = null!;
 
         public List<InterviewAssignmentResponseDto> Feedbacks { get; set; } = new();
     }
@@ -394,14 +413,9 @@ namespace BusinessLogic.DTOs
         public int Weight { get; set; }
 
         /// <summary>
-        /// Điểm trung bình (mean of all interviewers).
+        /// Nhận xét từng interviewer cho tiêu chí này.
         /// </summary>
-        public double AverageScore { get; set; }
-
-        /// <summary>
-        /// Chi tiết điểm từng interviewer.
-        /// </summary>
-        public List<CriteriaScoreResultDto> IndividualScores { get; set; } = new();
+        public List<CriteriaNoteResultDto> IndividualNotes { get; set; } = new();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -415,14 +429,14 @@ namespace BusinessLogic.DTOs
         public string Title { get; set; } = null!;
 
         /// <summary>
-        /// Điểm từng tiêu chí (đã lấy trung bình).
-        /// Key = CriterionId, Value = AverageScore
+        /// Nhận xét tổng hợp từ các interviewer.
         /// </summary>
-        public Dictionary<int, double> CriteriaScores { get; set; } = new();
+        public List<string> FeedbackNotes { get; set; } = new();
 
-        public double TotalScore { get; set; }
-        public int Rank { get; set; }
-        public string SuggestedResult { get; set; } = null!;
+        /// <summary>
+        /// Nhận xét từng tiêu chí.
+        /// </summary>
+        public List<CriteriaSummaryItemDto> CriteriaSummaries { get; set; } = new();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -497,6 +511,104 @@ namespace BusinessLogic.DTOs
         public DateTime? ScheduledPublishAt { get; set; }
         public DateTime? PublishedAt { get; set; }
         public List<CampaignDecisionResponseDto> Decisions { get; set; } = new();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  AI ANALYSIS (OpenRouter AI Model)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Phân tích AI cho 1 ứng viên — trả về từ backend AI model.
+    /// </summary>
+    public class AiCandidateAnalysisDto
+    {
+        public int InterviewScheduleId { get; set; }
+        public Guid CandidateUserId { get; set; }
+        public string CandidateName { get; set; } = null!;
+
+        /// <summary> StrongFit, MediumFit, WeakFit, NoData </summary>
+        public string FitLevel { get; set; } = "NoData";
+
+        /// <summary> Accept, Reject, Waitlist, Undecided </summary>
+        public string SuggestedResult { get; set; } = "Undecided";
+
+        /// <summary> AI-generated summary text. </summary>
+        public string SummaryText { get; set; } = string.Empty;
+
+        public List<AiCriteriaSentimentDto> CriteriaSentiments { get; set; } = new();
+        public List<string> Strengths { get; set; } = new();
+        public List<string> Weaknesses { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Sentiment AI cho 1 tiêu chí của ứng viên.
+    /// </summary>
+    public class AiCriteriaSentimentDto
+    {
+        public int CriterionId { get; set; }
+        public string CriterionName { get; set; } = null!;
+
+        /// <summary> positive, negative, neutral </summary>
+        public string Sentiment { get; set; } = "neutral";
+
+        /// <summary> Confidence 0–1. </summary>
+        public double Confidence { get; set; }
+
+        public string? Explanation { get; set; }
+    }
+
+    /// <summary>
+    /// Response tổng cho AI campaign analysis.
+    /// </summary>
+    public class AiCampaignAnalysisResponseDto
+    {
+        public int CampaignId { get; set; }
+        public string AnalyzedAt { get; set; } = null!;
+        public List<AiCandidateAnalysisDto> Candidates { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Request body cho AI search — ngôn ngữ tự nhiên.
+    /// </summary>
+    public class AiSearchRequestDto
+    {
+        /// <summary> Natural language query. VD: "ứng viên giỏi code nhất" </summary>
+        [Required]
+        public string Query { get; set; } = null!;
+
+        /// <summary> Max kết quả trả về. </summary>
+        public int TopK { get; set; } = 10;
+    }
+
+    /// <summary>
+    /// Kết quả AI search cho 1 ứng viên.
+    /// </summary>
+    public class AiSearchCandidateDto
+    {
+        public int InterviewScheduleId { get; set; }
+        public Guid CandidateUserId { get; set; }
+        public string CandidateName { get; set; } = null!;
+
+        /// <summary> Relevance score 0–1. </summary>
+        public double RelevanceScore { get; set; }
+
+        /// <summary> AI explanation tại sao match. </summary>
+        public string MatchReason { get; set; } = string.Empty;
+
+        public string SuggestedResult { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Response tổng cho AI search.
+    /// </summary>
+    public class AiSearchResponseDto
+    {
+        public string Query { get; set; } = null!;
+        public List<AiSearchCandidateDto> Results { get; set; } = new();
+        public int TotalFound { get; set; }
+
+        /// <summary> Overall AI explanation. </summary>
+        public string AiExplanation { get; set; } = string.Empty;
     }
 }
 

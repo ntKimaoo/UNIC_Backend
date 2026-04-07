@@ -17,6 +17,7 @@ public class MeetingDbContext : DbContext
     public DbSet<EvaluationCriterion> EvaluationCriteria   { get; set; }
     public DbSet<CriteriaScore>       CriteriaScores       { get; set; }
     public DbSet<CampaignDecision>    CampaignDecisions    { get; set; }
+    public DbSet<ProposedTimeSlot>   ProposedTimeSlots    { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -43,6 +44,23 @@ public class MeetingDbContext : DbContext
             e.HasIndex(s => s.CreatedByUserId);
         });
 
+        // ── ProposedTimeSlot ─────────────────────────────────────
+        modelBuilder.Entity<ProposedTimeSlot>(e =>
+        {
+            e.ToTable("ProposedTimeSlots");
+            e.HasKey(t => t.Id);
+
+            e.Property(t => t.ProposedAt).IsRequired();
+            e.Property(t => t.IsSelected).HasDefaultValue(false);
+
+            e.HasIndex(t => t.InterviewScheduleId);
+
+            e.HasOne(t => t.InterviewSchedule)
+             .WithMany(s => s.ProposedTimeSlots)
+             .HasForeignKey(t => t.InterviewScheduleId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // ── InterviewAssignment ───────────────────────────────────
         modelBuilder.Entity<InterviewAssignment>(e =>
         {
@@ -55,7 +73,6 @@ public class MeetingDbContext : DbContext
             e.Property(a => a.Role).HasConversion<string>().HasMaxLength(50);
             e.Property(a => a.Result).HasConversion<string>().HasMaxLength(50);
             e.Property(a => a.InterviewerUserId).IsRequired();
-            e.Property(a => a.AssignedCriteriaIds).HasMaxLength(500);
             e.HasIndex(a => a.InterviewerUserId);
 
             e.HasOne(a => a.InterviewSchedule)
@@ -141,7 +158,6 @@ public class MeetingDbContext : DbContext
             e.Property(c => c.CampaignId).IsRequired();
 
             e.HasIndex(c => c.CampaignId);
-            e.HasIndex(c => new { c.CampaignId, c.DisplayOrder });
         });
 
         // ── CriteriaScore ─────────────────────────────────────────

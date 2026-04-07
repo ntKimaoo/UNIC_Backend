@@ -1,4 +1,5 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.Services.Background;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models.Meeting;
 using DataAccess.Models.Meeting.Enums;
@@ -13,10 +14,12 @@ namespace BusinessLogic.Services.Implementation
     public class InterviewService : IInterviewService
     {
         private readonly IInterviewRepository _repo;
+        private readonly IUserRepository _userRepo;
 
-        public InterviewService(IInterviewRepository repo)
+        public InterviewService(IInterviewRepository repo, IUserRepository userRepo)
         {
             _repo = repo;
+            _userRepo = userRepo;
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -40,6 +43,25 @@ namespace BusinessLogic.Services.Implementation
             };
 
             var created = await _repo.CreateScheduleAsync(schedule);
+
+            // Add Proposed Time Slots
+            if (dto.ProposedTimeSlots != null && dto.ProposedTimeSlots.Count > 0)
+            {
+                foreach (var slot in dto.ProposedTimeSlots)
+                {
+                    if (DateTime.TryParse($"{slot.Date}T{slot.Time}", out var proposedAt))
+                    {
+                        var timeSlot = new ProposedTimeSlot
+                        {
+                            InterviewScheduleId = created.Id,
+                            ProposedAt          = proposedAt,
+                            IsSelected          = false,
+                            CreatedAt           = DateTime.UtcNow
+                        };
+                        await _repo.CreateTimeSlotAsync(timeSlot);
+                    }
+                }
+            }
 
             // Auto-create MeetingRoom
             var room = new MeetingRoom
@@ -77,6 +99,10 @@ namespace BusinessLogic.Services.Implementation
 
             // Reload with navigation
             var full = await _repo.GetScheduleByIdAsync(created.Id);
+
+            // Gửi email thông báo lịch phỏng vấn mới cho ứng viên
+            await EnqueueInterviewStatusEmailAsync(created, InterviewStatus.Scheduled.ToString());
+
             return MapScheduleToDto(full!);
         }
 
@@ -161,7 +187,15 @@ namespace BusinessLogic.Services.Implementation
             schedule.Status = newStatus;
             schedule.UpdatedAt = DateTime.UtcNow;
 
-            return await _repo.UpdateScheduleAsync(schedule);
+            var updated = await _repo.UpdateScheduleAsync(schedule);
+
+            // Gửi email thông báo thay đổi trạng thái cho ứng viên
+            if (updated)
+            {
+                await EnqueueInterviewStatusEmailAsync(schedule, newStatus.ToString(), dto.CancelReason);
+            }
+
+            return updated;
         }
 
         public async Task<bool> DeleteScheduleAsync(int id)
@@ -173,6 +207,63 @@ namespace BusinessLogic.Services.Implementation
                 throw new InvalidOperationException("Chỉ có thể xoá lịch ở trạng thái Scheduled.");
 
             return await _repo.DeleteScheduleAsync(id);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  Proposed Time Slots
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<List<ProposedTimeSlotResponseDto>> GetTimeSlotsAsync(int scheduleId)
+        {
+            var slots = await _repo.GetTimeSlotsByScheduleIdAsync(scheduleId);
+            return slots.Select(MapProposedTimeSlotToDto).ToList();
+        }
+
+        public async Task<InterviewScheduleResponseDto> ConfirmTimeSlotAsync(int scheduleId, ConfirmTimeSlotDto dto)
+        {
+            var schedule = await _repo.GetScheduleByIdAsync(scheduleId);
+            if (schedule == null)
+                throw new KeyNotFoundException("Interview schedule not found.");
+
+            if (schedule.Status != InterviewStatus.Scheduled && schedule.Status != InterviewStatus.Rescheduled)
+                throw new InvalidOperationException("Chỉ có thể xác nhận giờ cho lịch đang ở trạng thái Scheduled hoặc Rescheduled.");
+
+            var slots = (await _repo.GetTimeSlotsByScheduleIdAsync(scheduleId)).ToList();
+            var selectedSlot = slots.FirstOrDefault(s => s.Id == dto.TimeSlotId);
+
+            if (selectedSlot == null)
+                throw new ArgumentException("Time slot không hợp lệ hoặc không thuộc về lịch phỏng vấn này.");
+
+            // Đánh dấu slot được chọn, các slot khác bỏ chọn
+            foreach (var slot in slots)
+            {
+                slot.IsSelected = (slot.Id == dto.TimeSlotId);
+                await _repo.UpdateTimeSlotAsync(slot);
+            }
+
+            // Cập nhật ScheduledAt của InterviewSchedule
+            schedule.ScheduledAt = selectedSlot.ProposedAt;
+            // Workflow: Confirm slot xong sẽ coi như lịch đã chốt giờ => chuyển status sang Confirmed, 
+            // giống như frontend gọi api update status sang Confirmed
+            schedule.Status = InterviewStatus.Confirmed;
+            schedule.UpdatedAt = DateTime.UtcNow;
+
+            await _repo.UpdateScheduleAsync(schedule);
+
+            // Cập nhật lại thời gian MeetingRoom nếu có báo phòng
+            if (schedule.MeetingRoom != null)
+            {
+                schedule.MeetingRoom.ScheduledStartAt = selectedSlot.ProposedAt;
+                schedule.MeetingRoom.ScheduledEndAt = selectedSlot.ProposedAt.AddMinutes(schedule.DurationMinutes);
+                await _repo.UpdateRoomAsync(schedule.MeetingRoom);
+            }
+
+            var full = await _repo.GetScheduleByIdAsync(scheduleId);
+
+            // Gửi email thông báo xác nhận lịch phỏng vấn
+            await EnqueueInterviewStatusEmailAsync(schedule, InterviewStatus.Confirmed.ToString());
+
+            return MapScheduleToDto(full!);
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -428,7 +519,6 @@ namespace BusinessLogic.Services.Implementation
 
             assignment.FeedbackNotes = dto.FeedbackNotes;
             assignment.Result = result;
-            assignment.Score = dto.Score;
             assignment.FeedbackSubmittedAt = DateTime.UtcNow;
 
             return await _repo.UpdateAssignmentAsync(assignment);
@@ -458,6 +548,56 @@ namespace BusinessLogic.Services.Implementation
             return $"{part1}-{part2}";
         }
 
+        /// <summary>
+        /// Enqueue email thông báo thay đổi trạng thái phỏng vấn cho candidate.
+        /// Nếu không tìm thấy user (cross-DB) thì bỏ qua, không throw.
+        /// </summary>
+        private async Task EnqueueInterviewStatusEmailAsync(
+            InterviewSchedule schedule, string status, string? cancelReason = null)
+        {
+            try
+            {
+                var user = await _userRepo.GetByIdAsync(schedule.CandidateUserId);
+                if (user == null) return; // user không tồn tại hoặc cross-DB
+
+                // Tính deadline xác nhận: 24h trước giờ phỏng vấn
+                string? confirmDeadline = null;
+                if (status == InterviewStatus.Scheduled.ToString() 
+                    || status == InterviewStatus.Rescheduled.ToString())
+                {
+                    var deadline = schedule.ScheduledAt.AddHours(-24);
+                    if (deadline > DateTime.UtcNow)
+                    {
+                        confirmDeadline = deadline.ToString("dd/MM/yyyy HH:mm");
+                    }
+                    else
+                    {
+                        // Nếu phỏng vấn trong vòng 24h, đặt deadline là 4h trước
+                        var urgentDeadline = schedule.ScheduledAt.AddHours(-4);
+                        if (urgentDeadline > DateTime.UtcNow)
+                            confirmDeadline = urgentDeadline.ToString("dd/MM/yyyy HH:mm");
+                    }
+                }
+
+                EmailQueueService.EnqueueEmail(new EmailQueueItem
+                {
+                    ToEmail                 = user.Email,
+                    FullName                = user.FullName,
+                    EmailType               = EmailType.InterviewStatusChange,
+                    InterviewTitle          = schedule.Title,
+                    InterviewStatus         = status,
+                    InterviewScheduledAt    = schedule.ScheduledAt,
+                    InterviewDurationMinutes = schedule.DurationMinutes,
+                    CancelReason            = cancelReason,
+                    ConfirmDeadline         = confirmDeadline
+                });
+            }
+            catch (Exception)
+            {
+                // Không để lỗi gửi email ảnh hưởng đến flow chính
+            }
+        }
+
         private static InterviewScheduleResponseDto MapScheduleToDto(InterviewSchedule s)
         {
             return new InterviewScheduleResponseDto
@@ -476,7 +616,20 @@ namespace BusinessLogic.Services.Implementation
                 CreatedAt       = s.CreatedAt,
                 UpdatedAt       = s.UpdatedAt,
                 Assignments     = s.Assignments?.Select(MapAssignmentToDto).ToList() ?? new(),
-                MeetingRoom     = s.MeetingRoom != null ? MapRoomToDto(s.MeetingRoom) : null
+                MeetingRoom     = s.MeetingRoom != null ? MapRoomToDto(s.MeetingRoom) : null,
+                ProposedTimeSlots = s.ProposedTimeSlots?.Select(MapProposedTimeSlotToDto).ToList() ?? new()
+            };
+        }
+
+        private static ProposedTimeSlotResponseDto MapProposedTimeSlotToDto(ProposedTimeSlot t)
+        {
+            return new ProposedTimeSlotResponseDto
+            {
+                Id                  = t.Id,
+                InterviewScheduleId = t.InterviewScheduleId,
+                ProposedAt          = t.ProposedAt,
+                IsSelected          = t.IsSelected,
+                CreatedAt           = t.CreatedAt
             };
         }
 
@@ -491,9 +644,15 @@ namespace BusinessLogic.Services.Implementation
                 HasConfirmed        = a.HasConfirmed,
                 FeedbackNotes       = a.FeedbackNotes,
                 Result              = a.Result?.ToString(),
-                Score               = a.Score,
                 AssignedAt          = a.AssignedAt,
-                FeedbackSubmittedAt = a.FeedbackSubmittedAt
+                FeedbackSubmittedAt = a.FeedbackSubmittedAt,
+                CriteriaScores      = a.CriteriaScores?.Select(cs => new CriteriaScoreResponseDto
+                {
+                    Id                    = cs.Id,
+                    EvaluationCriterionId = cs.EvaluationCriterionId,
+                    Note                  = cs.Note,
+                    CreatedAt             = cs.CreatedAt
+                }).ToList() ?? new()
             };
         }
 
@@ -560,13 +719,13 @@ namespace BusinessLogic.Services.Implementation
         /// <summary>
         /// 5 tiêu chí mặc định – tự tạo khi campaign chưa có tiêu chí nào.
         /// </summary>
-        private static readonly List<(string Name, string Desc, int Weight, int Order)> DefaultCriteria = new()
+        private static readonly List<(string Name, string Desc, int Weight)> DefaultCriteria = new()
         {
-            ("Kiến thức chuyên môn",       "Đánh giá kiến thức nền tảng, chuyên ngành liên quan", 25, 1),
-            ("Kỹ năng giao tiếp",          "Khả năng trình bày, tương tác, diễn đạt ý tưởng",    20, 2),
-            ("Tư duy & giải quyết vấn đề", "Khả năng phân tích, tư duy logic, đề xuất giải pháp", 20, 3),
-            ("Phù hợp văn hóa CLB",        "Mức độ phù hợp với giá trị, phong cách hoạt động CLB", 20, 4),
-            ("Kinh nghiệm & thành tích",   "Kinh nghiệm hoạt động, thành tích cá nhân, kỹ năng mềm", 15, 5),
+            ("Kiến thức chuyên môn",       "Đánh giá kiến thức nền tảng, chuyên ngành liên quan", 25),
+            ("Kỹ năng giao tiếp",          "Khả năng trình bày, tương tác, diễn đạt ý tưởng",    20),
+            ("Tư duy & giải quyết vấn đề", "Khả năng phân tích, tư duy logic, đề xuất giải pháp", 20),
+            ("Phù hợp văn hóa CLB",        "Mức độ phù hợp với giá trị, phong cách hoạt động CLB", 20),
+            ("Kinh nghiệm & thành tích",   "Kinh nghiệm hoạt động, thành tích cá nhân, kỹ năng mềm", 15),
         };
 
         public async Task<List<EvaluationCriterionDto>> GetCampaignCriteriaAsync(int campaignId)
@@ -577,7 +736,7 @@ namespace BusinessLogic.Services.Implementation
             // Nếu chưa có tiêu chí → seed 5 default
             if (list.Count == 0)
             {
-                foreach (var (name, desc, weight, order) in DefaultCriteria)
+                foreach (var (name, desc, weight) in DefaultCriteria)
                 {
                     var c = new EvaluationCriterion
                     {
@@ -585,7 +744,6 @@ namespace BusinessLogic.Services.Implementation
                         Name         = name,
                         Description  = desc,
                         Weight       = weight,
-                        DisplayOrder = order,
                         IsDefault    = true,
                         CreatedAt    = DateTime.UtcNow
                     };
@@ -605,7 +763,6 @@ namespace BusinessLogic.Services.Implementation
                 Name         = dto.Name,
                 Description  = dto.Description,
                 Weight       = dto.Weight,
-                DisplayOrder = dto.DisplayOrder,
                 IsDefault    = false,
                 CreatedAt    = DateTime.UtcNow
             };
@@ -625,8 +782,6 @@ namespace BusinessLogic.Services.Implementation
                 criterion.Description = dto.Description;
             if (dto.Weight.HasValue)
                 criterion.Weight = dto.Weight.Value;
-            if (dto.DisplayOrder.HasValue)
-                criterion.DisplayOrder = dto.DisplayOrder.Value;
 
             await _repo.UpdateCriterionAsync(criterion);
             return MapCriterionToDto(criterion);
@@ -643,8 +798,23 @@ namespace BusinessLogic.Services.Implementation
             if (assignment == null || assignment.InterviewScheduleId != scheduleId)
                 return false;
 
-            assignment.AssignedCriteriaIds = string.Join(",", dto.CriteriaIds);
-            return await _repo.UpdateAssignmentAsync(assignment);
+            // Xoá CriteriaScore cũ của assignment này
+            await _repo.DeleteCriteriaScoresByAssignmentIdAsync(assignmentId);
+
+            // Tạo CriteriaScore mới cho từng tiêu chí được phân công
+            foreach (var criterionId in dto.CriteriaIds)
+            {
+                var score = new CriteriaScore
+                {
+                    InterviewAssignmentId = assignmentId,
+                    EvaluationCriterionId = criterionId,
+                    Note                  = null,
+                    CreatedAt             = DateTime.UtcNow
+                };
+                await _repo.CreateCriteriaScoreAsync(score);
+            }
+
+            return true;
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -657,47 +827,57 @@ namespace BusinessLogic.Services.Implementation
             if (assignment == null || assignment.InterviewScheduleId != scheduleId)
                 return false;
 
-            // Lưu điểm từng tiêu chí
-            foreach (var item in dto.Scores)
+            // Lưu / cập nhật nhận xét từng tiêu chí (upsert)
+            foreach (var item in dto.Notes)
             {
-                var score = new CriteriaScore
+                // Kiểm tra xem đã có CriteriaScore chưa (tạo từ bước Assign Criteria)
+                var existing = await _repo.GetCriteriaScoreAsync(assignmentId, item.CriterionId);
+                if (existing != null)
                 {
-                    InterviewAssignmentId  = assignmentId,
-                    EvaluationCriterionId  = item.CriterionId,
-                    Score                  = item.Score,
-                    Note                   = item.Note,
-                    CreatedAt              = DateTime.UtcNow
-                };
-                await _repo.CreateCriteriaScoreAsync(score);
-            }
-
-            // Cập nhật feedback tổng hợp vào assignment (tương thích feedback cũ)
-            if (!Enum.TryParse<InterviewResult>(dto.Result, true, out var result))
-                throw new ArgumentException($"Invalid result: {dto.Result}");
-
-            // Tính điểm /100 từ tiêu chí (lấy criteria của campaign)
-            var schedule = await _repo.GetScheduleByIdAsync(scheduleId);
-            if (schedule == null) return false;
-
-            var criteria = (await _repo.GetCriteriaByCampaignIdAsync(schedule.CampaignId)).ToList();
-            var totalWeight = criteria.Sum(c => c.Weight);
-            double weightedScore = 0;
-
-            foreach (var item in dto.Scores)
-            {
-                var criterion = criteria.FirstOrDefault(c => c.Id == item.CriterionId);
-                if (criterion != null && totalWeight > 0)
+                    // Cập nhật note vào record đã tồn tại
+                    existing.Note = item.Note;
+                    existing.CreatedAt = DateTime.UtcNow;
+                    await _repo.UpdateCriteriaScoreAsync(existing);
+                }
+                else
                 {
-                    weightedScore += (item.Score / 5.0) * 100 * ((double)criterion.Weight / totalWeight);
+                    // Tạo mới nếu chưa được phân tiêu chí trước đó
+                    var note = new CriteriaScore
+                    {
+                        InterviewAssignmentId = assignmentId,
+                        EvaluationCriterionId = item.CriterionId,
+                        Note                  = item.Note,
+                        CreatedAt             = DateTime.UtcNow
+                    };
+                    await _repo.CreateCriteriaScoreAsync(note);
                 }
             }
 
-            assignment.FeedbackNotes = dto.FeedbackNotes;
-            assignment.Result = result;
-            assignment.Score = (int)Math.Round(weightedScore);
+            // Cập nhật feedback tổng hợp vào assignment
+            if (!Enum.TryParse<InterviewResult>(dto.Result, true, out var result))
+                throw new ArgumentException($"Invalid result: {dto.Result}");
+
+            assignment.FeedbackNotes       = dto.FeedbackNotes;
+            assignment.Result              = result;
             assignment.FeedbackSubmittedAt = DateTime.UtcNow;
 
             return await _repo.UpdateAssignmentAsync(assignment);
+        }
+
+        public async Task<List<CriteriaScoreResponseDto>> GetCriteriaScoresByAssignmentAsync(int scheduleId, int assignmentId)
+        {
+            var assignment = await _repo.GetAssignmentByIdAsync(assignmentId);
+            if (assignment == null || assignment.InterviewScheduleId != scheduleId)
+                throw new KeyNotFoundException("Assignment not found or does not belong to this schedule.");
+
+            var scores = await _repo.GetCriteriaScoresByAssignmentIdAsync(assignmentId);
+            return scores.Select(cs => new CriteriaScoreResponseDto
+            {
+                Id                    = cs.Id,
+                EvaluationCriterionId = cs.EvaluationCriterionId,
+                Note                  = cs.Note,
+                CreatedAt             = cs.CreatedAt
+            }).ToList();
         }
 
         public async Task<EvaluationSummaryDto?> GetEvaluationSummaryAsync(int scheduleId)
@@ -706,41 +886,28 @@ namespace BusinessLogic.Services.Implementation
             if (schedule == null) return null;
 
             var criteria = (await _repo.GetCriteriaByCampaignIdAsync(schedule.CampaignId)).ToList();
-            var allScores = (await _repo.GetCriteriaScoresByScheduleIdAsync(scheduleId)).ToList();
+            var allNotes = (await _repo.GetCriteriaScoresByScheduleIdAsync(scheduleId)).ToList();
 
             var criteriaSummaries = criteria.Select(c =>
             {
-                var scoresForCriterion = allScores.Where(s => s.EvaluationCriterionId == c.Id).ToList();
-                var avg = scoresForCriterion.Any() ? scoresForCriterion.Average(s => s.Score) : 0;
+                var notesForCriterion = allNotes.Where(s => s.EvaluationCriterionId == c.Id).ToList();
 
                 return new CriteriaSummaryItemDto
                 {
-                    CriterionId    = c.Id,
-                    CriterionName  = c.Name,
-                    Weight         = c.Weight,
-                    AverageScore   = Math.Round(avg, 2),
-                    IndividualScores = scoresForCriterion.Select(s => new CriteriaScoreResultDto
+                    CriterionId   = c.Id,
+                    CriterionName = c.Name,
+                    Weight        = c.Weight,
+                    IndividualNotes = notesForCriterion.Select(s => new CriteriaNoteResultDto
                     {
                         CriterionId       = c.Id,
                         CriterionName     = c.Name,
                         Weight            = c.Weight,
-                        Score             = s.Score,
                         Note              = s.Note,
                         InterviewerUserId = s.InterviewAssignment.InterviewerUserId,
                         InterviewerRole   = s.InterviewAssignment.Role.ToString()
                     }).ToList()
                 };
             }).ToList();
-
-            var totalWeight = criteria.Sum(c => c.Weight);
-            double totalScore = 0;
-            if (totalWeight > 0)
-            {
-                totalScore = criteriaSummaries.Sum(cs =>
-                    (cs.AverageScore / 5.0) * 100 * ((double)cs.Weight / totalWeight));
-            }
-
-            var suggested = totalScore >= 70 ? "Pass" : totalScore >= 50 ? "OnHold" : "Fail";
 
             return new EvaluationSummaryDto
             {
@@ -749,8 +916,6 @@ namespace BusinessLogic.Services.Implementation
                 CandidateUserId     = schedule.CandidateUserId,
                 CampaignId          = schedule.CampaignId,
                 CriteriaSummaries   = criteriaSummaries,
-                TotalScore          = Math.Round(totalScore, 2),
-                SuggestedResult     = suggested,
                 Feedbacks           = schedule.Assignments?.Select(MapAssignmentToDto).ToList() ?? new()
             };
         }
@@ -758,47 +923,50 @@ namespace BusinessLogic.Services.Implementation
         public async Task<List<CandidateComparisonItemDto>> GetCampaignComparisonAsync(int campaignId)
         {
             var schedules = (await _repo.GetSchedulesAsync(campaignId, null, null, null)).ToList();
-            var criteria = (await _repo.GetCriteriaByCampaignIdAsync(campaignId)).ToList();
-            var totalWeight = criteria.Sum(c => c.Weight);
+            var criteria  = (await _repo.GetCriteriaByCampaignIdAsync(campaignId)).ToList();
 
             var items = new List<CandidateComparisonItemDto>();
 
             foreach (var schedule in schedules)
             {
-                var allScores = (await _repo.GetCriteriaScoresByScheduleIdAsync(schedule.Id)).ToList();
+                var allNotes = (await _repo.GetCriteriaScoresByScheduleIdAsync(schedule.Id)).ToList();
 
-                var criteriaScoresDict = new Dictionary<int, double>();
-                double totalScore = 0;
-
-                foreach (var c in criteria)
+                var criteriaSummaries = criteria.Select(c =>
                 {
-                    var scoresForCriterion = allScores.Where(s => s.EvaluationCriterionId == c.Id).ToList();
-                    var avg = scoresForCriterion.Any() ? scoresForCriterion.Average(s => s.Score) : 0;
-                    criteriaScoresDict[c.Id] = Math.Round(avg, 2);
+                    var notesForCriterion = allNotes.Where(n => n.EvaluationCriterionId == c.Id).ToList();
+                    return new CriteriaSummaryItemDto
+                    {
+                        CriterionId   = c.Id,
+                        CriterionName = c.Name,
+                        Weight        = c.Weight,
+                        IndividualNotes = notesForCriterion.Select(n => new CriteriaNoteResultDto
+                        {
+                            CriterionId       = c.Id,
+                            CriterionName     = c.Name,
+                            Weight            = c.Weight,
+                            Note              = n.Note,
+                            InterviewerUserId = n.InterviewAssignment.InterviewerUserId,
+                            InterviewerRole   = n.InterviewAssignment.Role.ToString()
+                        }).ToList()
+                    };
+                }).ToList();
 
-                    if (totalWeight > 0)
-                        totalScore += (avg / 5.0) * 100 * ((double)c.Weight / totalWeight);
-                }
-
-                var suggested = totalScore >= 70 ? "Pass" : totalScore >= 50 ? "OnHold" : "Fail";
+                var feedbackNotes = schedule.Assignments
+                    .Where(a => !string.IsNullOrEmpty(a.FeedbackNotes))
+                    .Select(a => a.FeedbackNotes!)
+                    .ToList();
 
                 items.Add(new CandidateComparisonItemDto
                 {
                     InterviewScheduleId = schedule.Id,
                     CandidateUserId     = schedule.CandidateUserId,
                     Title               = schedule.Title,
-                    CriteriaScores      = criteriaScoresDict,
-                    TotalScore          = Math.Round(totalScore, 2),
-                    SuggestedResult     = suggested
+                    FeedbackNotes       = feedbackNotes,
+                    CriteriaSummaries   = criteriaSummaries
                 });
             }
 
-            // Xếp hạng theo tổng điểm
-            var ranked = items.OrderByDescending(i => i.TotalScore).ToList();
-            for (int i = 0; i < ranked.Count; i++)
-                ranked[i].Rank = i + 1;
-
-            return ranked;
+            return items;
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -895,7 +1063,6 @@ namespace BusinessLogic.Services.Implementation
                 Name         = c.Name,
                 Description  = c.Description,
                 Weight       = c.Weight,
-                DisplayOrder = c.DisplayOrder,
                 IsDefault    = c.IsDefault
             };
         }

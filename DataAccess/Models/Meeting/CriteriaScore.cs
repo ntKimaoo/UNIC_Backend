@@ -3,8 +3,8 @@ using System;
 namespace DataAccess.Models.Meeting;
 
 /// <summary>
-/// Điểm đánh giá theo từng tiêu chí của một interviewer.
-/// Mỗi dòng = 1 interviewer chấm 1 tiêu chí cho 1 buổi PV.
+/// Nhận xét theo từng tiêu chí của một interviewer.
+/// Mỗi dòng = 1 interviewer nhận xét 1 tiêu chí cho 1 buổi PV.
 ///
 /// FK: InterviewAssignmentId → InterviewAssignment.Id
 /// FK: EvaluationCriterionId → EvaluationCriterion.Id
@@ -20,11 +20,6 @@ public class CriteriaScore
     // ── FK sang EvaluationCriterion ──────────────────────────────
     public int EvaluationCriterionId { get; set; }
     public EvaluationCriterion EvaluationCriterion { get; set; } = null!;
-
-    /// <summary>
-    /// Điểm 1–5 (thang sao).
-    /// </summary>
-    public int Score { get; set; }
 
     /// <summary>
     /// Nhận xét riêng cho tiêu chí này.

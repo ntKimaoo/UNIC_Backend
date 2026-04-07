@@ -47,14 +47,24 @@ namespace DataAccess.Repositories.Interface
 
         // ── CriteriaScore ────────────────────────────────────────
         Task<CriteriaScore> CreateCriteriaScoreAsync(CriteriaScore score);
+        Task<CriteriaScore?> GetCriteriaScoreAsync(int assignmentId, int criterionId);
+        Task<bool> UpdateCriteriaScoreAsync(CriteriaScore score);
         Task<IEnumerable<CriteriaScore>> GetCriteriaScoresByAssignmentIdAsync(int assignmentId);
         Task<IEnumerable<CriteriaScore>> GetCriteriaScoresByScheduleIdAsync(int scheduleId);
+        Task DeleteCriteriaScoresByAssignmentIdAsync(int assignmentId);
 
         // ── CampaignDecision ─────────────────────────────────────
         Task<IEnumerable<CampaignDecision>> GetDecisionsByCampaignIdAsync(int campaignId);
         Task<CampaignDecision?> GetDecisionByScheduleIdAsync(int scheduleId);
         Task<CampaignDecision> CreateDecisionAsync(CampaignDecision decision);
         Task<bool> UpdateDecisionAsync(CampaignDecision decision);
+
+        // ── ProposedTimeSlot ────────────────────────────────────
+        Task<IEnumerable<ProposedTimeSlot>> GetTimeSlotsByScheduleIdAsync(int scheduleId);
+        Task<ProposedTimeSlot?> GetTimeSlotByIdAsync(int id);
+        Task<ProposedTimeSlot> CreateTimeSlotAsync(ProposedTimeSlot slot);
+        Task<bool> UpdateTimeSlotAsync(ProposedTimeSlot slot);
+        Task DeleteTimeSlotsByScheduleIdAsync(int scheduleId);
     }
 }
 

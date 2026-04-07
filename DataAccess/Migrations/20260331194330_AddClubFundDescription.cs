@@ -1,20 +1,20 @@
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace DataAccess.Migrations
 {
     /// <inheritdoc />
-    public partial class AddFundTransactionPaymentLinkId : Migration
+    public partial class AddClubFundDescription : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "PaymentLinkId",
-                table: "FundTransactions",
-                type: "nvarchar(100)",
-                maxLength: 100,
+                name: "Description",
+                table: "ClubFunds",
+                type: "nvarchar(1000)",
+                maxLength: 1000,
                 nullable: true);
         }
 
@@ -22,8 +22,8 @@ namespace DataAccess.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "PaymentLinkId",
-                table: "FundTransactions");
+                name: "Description",
+                table: "ClubFunds");
         }
     }
 }

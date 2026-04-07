@@ -27,6 +27,62 @@ namespace DataAccess.Repositories.Implementation
                 .ToListAsync();
         }
 
+        public async Task<(IEnumerable<UserClubRole> Items, int TotalCount)> GetMembersByClubIdAsync(
+            int clubId, int? pagination, int? page, string? filter, bool? ascending, string? sortBy)
+        {
+            var query = _context.UserClubRoles
+                .Include(m => m.User)
+                .Include(m => m.ClubRole)
+                .Where(m => m.ClubId == clubId)
+                .AsQueryable();
+
+            // Filter
+            if (!string.IsNullOrWhiteSpace(filter))
+            {
+                var keyword = filter.Trim().ToLower();
+                query = query.Where(m =>
+                    (m.User != null && m.User.FullName != null && m.User.FullName.ToLower().Contains(keyword)) ||
+                    (m.User != null && m.User.Email != null && m.User.Email.ToLower().Contains(keyword)) ||
+                    (m.User != null && m.User.StudentId != null && m.User.StudentId.ToLower().Contains(keyword)) ||
+                    (m.ClubRole != null && m.ClubRole.RoleName != null && m.ClubRole.RoleName.ToLower().Contains(keyword)) ||
+                    (m.Status != null && m.Status.ToLower().Contains(keyword)));
+            }
+
+            var totalCount = await query.CountAsync();
+
+            // Sort
+            bool isAscending = ascending ?? true;
+            if (!string.IsNullOrWhiteSpace(sortBy))
+            {
+                query = sortBy.Trim().ToLower() switch
+                {
+                    "fullname" => isAscending ? query.OrderBy(m => m.User!.FullName) : query.OrderByDescending(m => m.User!.FullName),
+                    "email" => isAscending ? query.OrderBy(m => m.User!.Email) : query.OrderByDescending(m => m.User!.Email),
+                    "studentid" => isAscending ? query.OrderBy(m => m.User!.StudentId) : query.OrderByDescending(m => m.User!.StudentId),
+                    "rolename" => isAscending ? query.OrderBy(m => m.ClubRole!.RoleName) : query.OrderByDescending(m => m.ClubRole!.RoleName),
+                    "joindate" => isAscending ? query.OrderBy(m => m.JoinDate) : query.OrderByDescending(m => m.JoinDate),
+                    "status" => isAscending ? query.OrderBy(m => m.Status) : query.OrderByDescending(m => m.Status),
+                    _ => query.OrderBy(m => m.JoinDate) // Default fallback
+                };
+            }
+            else
+            {
+                // Default sort if none provided
+                query = isAscending ? query.OrderBy(m => m.JoinDate) : query.OrderByDescending(m => m.JoinDate);
+            }
+
+            // Pagination
+            if (pagination.HasValue && pagination.Value > 0)
+            {
+                int currentPage = page ?? 1;
+                int pageSize = pagination.Value;
+                query = query.Skip((currentPage - 1) * pageSize).Take(pageSize);
+            }
+
+            var items = await query.ToListAsync();
+            return (items, totalCount);
+        }
+
         public async Task<UserClubRole?> GetMemberByIdAsync(int clubMemberId)
         {
             return await _context.UserClubRoles

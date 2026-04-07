@@ -11,10 +11,12 @@ namespace Presentation.Controllers
     public class InterviewsController : ControllerBase
     {
         private readonly IInterviewService _service;
+        private readonly IAiAnalysisService _aiService;
 
-        public InterviewsController(IInterviewService service)
+        public InterviewsController(IInterviewService service, IAiAnalysisService aiService)
         {
             _service = service;
+            _aiService = aiService;
         }
 
         /// <summary>
@@ -135,9 +137,46 @@ namespace Presentation.Controllers
             }
         }
 
-        // ═══════════════════════════════════════════════════════════
-        //  Interviewer Assignment
-        // ═══════════════════════════════════════════════════════════
+        /// <summary>
+        /// GET /api/interviews/{id}/time-slots – Lấy danh sách time slots đề xuất
+        /// </summary>
+        [HttpGet("{id}/time-slots")]
+        public async Task<IActionResult> GetTimeSlots(int id)
+        {
+            try
+            {
+                var slots = await _service.GetTimeSlotsAsync(id);
+                return Ok(new { success = true, data = slots });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// POST /api/interviews/{id}/confirm-time-slot – Candidate chọn và xác nhận time slot
+        /// </summary>
+        [HttpPost("{id}/confirm-time-slot")]
+        public async Task<IActionResult> ConfirmTimeSlot(int id, [FromBody] ConfirmTimeSlotDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
+
+            try
+            {
+                var result = await _service.ConfirmTimeSlotAsync(id, dto);
+                return Ok(new { success = true, message = "Time slot confirmed", data = result });
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { success = false, message = "Interview schedule not found" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
 
         /// <summary>
         /// POST /api/interviews/{id}/assignments – Assign interviewer(s)
@@ -199,10 +238,6 @@ namespace Presentation.Controllers
             return Ok(new { success = true, message = "Confirmed" });
         }
 
-        // ═══════════════════════════════════════════════════════════
-        //  Meeting Room (by schedule)
-        // ═══════════════════════════════════════════════════════════
-
         /// <summary>
         /// GET /api/interviews/{id}/room – Lấy thông tin phòng
         /// </summary>
@@ -215,10 +250,6 @@ namespace Presentation.Controllers
 
             return Ok(new { success = true, data = room });
         }
-
-        // ═══════════════════════════════════════════════════════════
-        //  Feedback
-        // ═══════════════════════════════════════════════════════════
 
         /// <summary>
         /// POST /api/interviews/{id}/assignments/{assignmentId}/feedback – Submit feedback
@@ -256,9 +287,6 @@ namespace Presentation.Controllers
             return Ok(new { success = true, data = summary });
         }
 
-        // ═══════════════════════════════════════════════════════════
-        //  Evaluation Criteria
-        // ═══════════════════════════════════════════════════════════
 
         /// <summary>
         /// GET /api/interviews/campaign/{campaignId}/criteria – Lấy bộ tiêu chí (auto-seed default nếu chưa có)
@@ -325,9 +353,6 @@ namespace Presentation.Controllers
             return Ok(new { success = true, message = "Criteria assigned" });
         }
 
-        // ═══════════════════════════════════════════════════════════
-        //  Criteria-based Feedback & Evaluation
-        // ═══════════════════════════════════════════════════════════
 
         /// <summary>
         /// POST /api/interviews/{id}/assignments/{assignmentId}/criteria-feedback – Gửi đánh giá theo tiêu chí
@@ -345,6 +370,27 @@ namespace Presentation.Controllers
                     return NotFound(new { success = false, message = "Assignment not found" });
 
                 return Ok(new { success = true, message = "Criteria feedback submitted" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// GET /api/interviews/{id}/assignments/{assignmentId}/criteria-scores – Lấy danh sách điểm tiêu chí đã chấm
+        /// </summary>
+        [HttpGet("{id}/assignments/{assignmentId}/criteria-scores")]
+        public async Task<IActionResult> GetCriteriaScores(int id, int assignmentId)
+        {
+            try
+            {
+                var scores = await _service.GetCriteriaScoresByAssignmentAsync(id, assignmentId);
+                return Ok(new { success = true, data = scores });
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { success = false, message = "Assignment not found" });
             }
             catch (Exception ex)
             {
@@ -375,9 +421,6 @@ namespace Presentation.Controllers
             return Ok(new { success = true, data = comparison });
         }
 
-        // ═══════════════════════════════════════════════════════════
-        //  Decisions & Publish
-        // ═══════════════════════════════════════════════════════════
 
         /// <summary>
         /// POST /api/interviews/campaign/{campaignId}/decisions – Gửi quyết định Accept/Reject/Waitlist
@@ -430,6 +473,43 @@ namespace Presentation.Controllers
                 return NotFound(new { success = false, message = "No decisions found for this campaign" });
 
             return Ok(new { success = true, data = status });
+        }
+
+        /// <summary>
+        /// GET /api/interviews/campaign/{campaignId}/ai-analysis – Phân tích AI toàn bộ ứng viên
+        /// </summary>
+        [HttpGet("campaign/{campaignId}/ai-analysis")]
+        public async Task<IActionResult> GetAiAnalysis(int campaignId)
+        {
+            try
+            {
+                var result = await _aiService.AnalyzeCampaignCandidatesAsync(campaignId);
+                return Ok(new { success = true, data = result });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// POST /api/interviews/campaign/{campaignId}/ai-search – Tìm kiếm ứng viên bằng AI
+        /// </summary>
+        [HttpPost("campaign/{campaignId}/ai-search")]
+        public async Task<IActionResult> AiSearchCandidates(int campaignId, [FromBody] AiSearchRequestDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
+
+            try
+            {
+                var result = await _aiService.SearchCandidatesAsync(campaignId, dto);
+                return Ok(new { success = true, data = result });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
         }
     }
 }

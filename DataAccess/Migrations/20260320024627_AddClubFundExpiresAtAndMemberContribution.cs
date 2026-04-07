@@ -24,7 +24,6 @@ namespace DataAccess.Migrations
                 type: "date",
                 nullable: true);
 
-            // Giao dịch nộp tiền qua PayOS trước khi có cờ IsMemberContribution
             migrationBuilder.Sql("""
                 UPDATE FundTransactions
                 SET IsMemberContribution = 1

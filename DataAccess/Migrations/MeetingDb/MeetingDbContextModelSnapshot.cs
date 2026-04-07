@@ -98,9 +98,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<int>("Score")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
                     b.HasIndex("EvaluationCriterionId");
@@ -129,9 +126,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
 
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsDefault")
                         .HasColumnType("bit");
 
@@ -147,8 +141,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
 
                     b.HasIndex("CampaignId");
 
-                    b.HasIndex("CampaignId", "DisplayOrder");
-
                     b.ToTable("EvaluationCriteria", (string)null);
                 });
 
@@ -162,10 +154,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
 
                     b.Property<DateTime>("AssignedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("AssignedCriteriaIds")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("FeedbackNotes")
                         .HasColumnType("nvarchar(max)");
@@ -190,9 +178,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
-
-                    b.Property<int?>("Score")
-                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -360,6 +345,35 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.ToTable("MeetingRooms", (string)null);
                 });
 
+            modelBuilder.Entity("DataAccess.Models.Meeting.ProposedTimeSlot", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("InterviewScheduleId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsSelected")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime>("ProposedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InterviewScheduleId");
+
+                    b.ToTable("ProposedTimeSlots", (string)null);
+                });
+
             modelBuilder.Entity("DataAccess.Models.Meeting.RoomEvent", b =>
                 {
                     b.Property<int>("Id")
@@ -493,6 +507,17 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.Navigation("InterviewSchedule");
                 });
 
+            modelBuilder.Entity("DataAccess.Models.Meeting.ProposedTimeSlot", b =>
+                {
+                    b.HasOne("DataAccess.Models.Meeting.InterviewSchedule", "InterviewSchedule")
+                        .WithMany("ProposedTimeSlots")
+                        .HasForeignKey("InterviewScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("InterviewSchedule");
+                });
+
             modelBuilder.Entity("DataAccess.Models.Meeting.RoomEvent", b =>
                 {
                     b.HasOne("DataAccess.Models.Meeting.MeetingRoom", "MeetingRoom")
@@ -530,6 +555,8 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.Navigation("Assignments");
 
                     b.Navigation("MeetingRoom");
+
+                    b.Navigation("ProposedTimeSlots");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Meeting.MeetingRoom", b =>

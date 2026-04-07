@@ -8,6 +8,8 @@ namespace BusinessLogic.Services.Interface
     public interface IClubMemberService
     {
         Task<IEnumerable<ClubMemberResponseDto>> GetMembersByClubAsync(int clubId);
+        Task<PagedResultDto<ClubMemberResponseDto>> GetMembersByClubAsync(
+            int clubId, int? pagination, int? page, string? filter, bool? ascending, string? sortBy);
         Task<ClubMemberResponseDto?> GetMemberByIdAsync(int clubMemberId);
         Task<ClubMemberResponseDto> AddUserToClubAsync(int clubId, AddUserToClubDto dto, Guid? assignedBy);
         Task<ClubMemberResponseDto?> UpdateMemberRoleAsync(int clubMemberId, UpdateMemberRoleDto dto);

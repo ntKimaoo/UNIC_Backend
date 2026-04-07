@@ -48,4 +48,48 @@ namespace UNIC.BusinessLogic.DTOs
         
         public int? ManagerRoleId { get; set; }
     }
+
+    /// <summary>
+    /// One department entry returned for a user's department list in a club.
+    /// </summary>
+    public class UserDepartmentDto
+    {
+        public int DepartmentId { get; set; }
+        public string DepartmentName { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        /// <summary>The user's own role inside this department (null if not a role-holder).</summary>
+        public DepartmentMemberRoleDto? DepartmentRole { get; set; }
+        /// <summary>All roles that belong to this department.</summary>
+        public List<DepartmentMemberRoleDto> Roles { get; set; } = new();
+        /// <summary>Total number of members in this department.</summary>
+        public int MemberCount { get; set; }
+    }
+
+    /// <summary>
+    /// Role info of a member inside a department.
+    /// </summary>
+    public class DepartmentMemberRoleDto
+    {
+        public int ClubRoleId { get; set; }
+        public string RoleName { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public int Level { get; set; }
+    }
+
+    /// <summary>
+    /// One member entry returned by GET club/{clubId}/department/{departmentId}/all-members.
+    /// </summary>
+    public class DepartmentMemberDto
+    {
+        public int ClubMemberId { get; set; }
+        public Guid UserId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string? Avatar { get; set; }
+        public string? StudentId { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public DateTime JoinDate { get; set; }
+        /// <summary>The member's club-wide role (ClubRole assigned via UserClubRole).</summary>
+        public DepartmentMemberRoleDto? DepartmentRole { get; set; }
+    }
 }

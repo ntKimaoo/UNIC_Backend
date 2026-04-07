@@ -12,7 +12,7 @@ namespace Presentation.Controllers
 {
     [Route("api/clubs/{clubId:int}/funds")]
     [ApiController]
-    [Authorize]
+    //[Authorize]
     public class ClubFundController : ControllerBase
     {
         private readonly IClubFundService _clubFundService;
@@ -34,7 +34,7 @@ namespace Presentation.Controllers
         }
 
         [HttpPost]
-        [RequireMemberPolicy("createfinance")]
+        [RequireClubPolicy("createfinance")]
         public async Task<IActionResult> CreateFund(int clubId, [FromBody] CreateFundDto dto)
         {
             try
@@ -66,6 +66,81 @@ namespace Presentation.Controllers
             return Ok(new { success = true, data = clubs });
         }
 
+        [HttpGet("report-summary")]
+        [RequireClubPolicy("viewfinance")]
+        public async Task<IActionResult> GetFundReportSummary(
+            int clubId,
+            [FromQuery] DateTime? fromUtc,
+            [FromQuery] DateTime? toUtc)
+        {
+            if (!IsValidDateRange(fromUtc, toUtc))
+                return BuildBadRequest(
+                    "INVALID_DATE_RANGE",
+                    "Từ ngày không được lớn hơn đến ngày.",
+                    new { fromField = "fromUtc", toField = "toUtc" });
+
+            var userId = GetCurrentUserId();
+            if (!await CanAccessClubAsync(userId, clubId))
+                return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
+            var data = await _clubFundService.GetClubFundReportSummaryAsync(clubId, fromUtc, toUtc);
+            return Ok(new { success = true, data });
+        }
+
+        [HttpGet("transactions")]
+        [RequireClubPolicy("viewfinance")]
+        public async Task<IActionResult> GetClubFundTransactions(
+            int clubId,
+            [FromQuery] int? fundId,
+            [FromQuery] string? status,
+            [FromQuery] string? scope,
+            [FromQuery] DateTime? fromUtc,
+            [FromQuery] DateTime? toUtc,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
+        {
+            try
+            {
+                if (page < 1)
+                    return BuildBadRequest("INVALID_PAGE", "Page phải >= 1.");
+                if (pageSize < 1 || pageSize > 100)
+                    return BuildBadRequest("INVALID_PAGE_SIZE", "PageSize từ 1 đến 100.");
+                if (!IsValidDateRange(fromUtc, toUtc))
+                    return BuildBadRequest(
+                        "INVALID_DATE_RANGE",
+                        "Từ ngày không được lớn hơn đến ngày.",
+                        new { fromField = "fromUtc", toField = "toUtc" });
+
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
+
+                if (fundId.HasValue)
+                {
+                    var fund = await _clubFundService.GetFundByIdAsync(fundId.Value);
+                    if (fund == null)
+                        return NotFound(new { success = false, message = "Quỹ không tồn tại." });
+                    if (fund.ClubId != clubId)
+                        return BuildBadRequest("INVALID_FUND_ID", "Quỹ không thuộc câu lạc bộ này.");
+                }
+
+                var data = await _clubFundService.GetClubFundTransactionsPagedAsync(
+                    clubId, fundId, status, scope, userId, fromUtc, toUtc, page, pageSize);
+                return Ok(new { success = true, data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BuildBadRequest("INVALID_REQUEST", ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return BuildBadRequest("TRANSACTION_QUERY_ERROR", ex.Message);
+            }
+        }
+
         [HttpGet("capabilities")]
         public async Task<IActionResult> GetFundCapabilities(int clubId)
         {
@@ -83,8 +158,26 @@ namespace Presentation.Controllers
             }
         }
 
+        [HttpGet("categories")]
+        [RequireClubPolicy("viewfinance")]
+        public async Task<IActionResult> GetFundCategories(int clubId)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+                var data = await _clubFundService.GetFundCategoriesForClubAsync(clubId);
+                return Ok(new { success = true, data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { success = false, message = ex.Message });
+            }
+        }
+
         [HttpGet("{fundId}")]
-        [RequireMemberPolicy("viewfinance")]
+        [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFund(int fundId)
         {
             var fund = await _clubFundService.GetFundByIdAsync(fundId);
@@ -96,14 +189,15 @@ namespace Presentation.Controllers
             return Ok(new { success = true, data = fund });
         }
 
-        /// <param name="page">Trang, từ 1.</param>
-        /// <param name="pageSize">1–100, mặc định 10.</param>
         [HttpGet]
-        [RequireMemberPolicy("viewfinance")]
+        [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFundsByClub(
             int clubId,
+            [FromQuery] string? status,
+            [FromQuery] string? search,
+            [FromQuery] string? sort,
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 10)
+            [FromQuery] int pageSize = 9)
         {
             if (page < 1)
                 return BadRequest(new { success = false, message = "Page phải >= 1." });
@@ -112,8 +206,42 @@ namespace Presentation.Controllers
             var userId = GetCurrentUserId();
             if (!await CanAccessClubAsync(userId, clubId))
                 return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
-            var paged = await _clubFundService.GetFundsByClubIdPagedAsync(clubId, page, pageSize);
+            var isSystemAdmin = User.IsInRole("Admin");
+            var paged = await _clubFundService.GetFundsByClubIdPagedAsync(
+                clubId, userId, isSystemAdmin, status, search, sort, page, pageSize);
             return Ok(new { success = true, data = paged });
+        }
+
+        [HttpGet("my")]
+        [RequireClubPolicy("viewfinance")]
+        public async Task<IActionResult> GetMyFunds(
+            int clubId,
+            [FromQuery] string? mineType,
+            [FromQuery] string? status,
+            [FromQuery] string? search,
+            [FromQuery] string? sort,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 9)
+        {
+            try
+            {
+                if (page < 1)
+                    return BadRequest(new { success = false, message = "Page phải >= 1." });
+                if (pageSize < 1 || pageSize > 100)
+                    return BadRequest(new { success = false, message = "PageSize từ 1 đến 100." });
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
+
+                var paged = await _clubFundService.GetMyFundsByClubIdPagedAsync(
+                    clubId, userId, mineType, status, search, sort, page, pageSize);
+
+                return Ok(new { success = true, data = paged });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
         }
 
         [HttpPost("contribute")]
@@ -211,7 +339,7 @@ namespace Presentation.Controllers
         }
 
         [HttpPost("approve")]
-        [RequireMemberPolicy("editfinance")]
+        [RequireClubPolicy("editfinance")]
         public async Task<IActionResult> ApproveFund([FromBody] ApproveFundDto dto)
         {
             try
@@ -294,8 +422,9 @@ namespace Presentation.Controllers
         /// <param name="status">Mặc định (bỏ trống): APPROVED — chỉ các lần nộp đã thanh toán thành công. PENDING / REJECTED / ALL (mọi trạng thái).</param>
         /// <param name="scope">mine = chỉ các lần nộp của tôi.</param>
         [HttpGet("history/{fundId}")]
-        [RequireMemberPolicy("viewfinance")]
+        //[RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetHistory(
+            int clubId,
             int fundId,
             [FromQuery] string? status,
             [FromQuery] string? scope,
@@ -311,6 +440,8 @@ namespace Presentation.Controllers
                 var fund = await _clubFundService.GetFundByIdAsync(fundId);
                 if (fund == null)
                     return NotFound(new { success = false, message = "Quỹ không tồn tại." });
+                if (fund.ClubId != clubId)
+                    return StatusCode(403, new { success = false, message = "Quỹ không thuộc câu lạc bộ này." });
                 var userId = GetCurrentUserId();
                 if (!await CanAccessClubAsync(userId, fund.ClubId))
                     return StatusCode(403, new { success = false, message = "Bạn không có quyền xem lịch sử quỹ của câu lạc bộ này." });
@@ -329,7 +460,7 @@ namespace Presentation.Controllers
 
 
         [HttpGet("~/api/funds/{fundId}/location")]
-        [RequireMemberPolicy("viewfinance")]
+        [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFundLocation(int fundId)
         {
             var fund = await _clubFundService.GetFundByIdAsync(fundId);
@@ -360,6 +491,25 @@ namespace Presentation.Controllers
             if (User.IsInRole("Admin"))
                 return true;
             return await _clubMemberService.IsMemberAsync(userId, clubId);
+        }
+
+        private static bool IsValidDateRange(DateTime? fromUtc, DateTime? toUtc)
+        {
+            if (!fromUtc.HasValue || !toUtc.HasValue)
+                return true;
+
+            return fromUtc.Value <= toUtc.Value;
+        }
+
+        private BadRequestObjectResult BuildBadRequest(string errorCode, string message, object? details = null)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                errorCode,
+                message,
+                details
+            });
         }
 
         private Guid GetCurrentUserId()
