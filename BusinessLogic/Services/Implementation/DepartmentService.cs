@@ -1,5 +1,6 @@
 using BusinessLogic.DTOs;
 using DataAccess.Models;
+using DataAccess.Repositories.Implementation;
 using DataAccess.Repositories.Interface;
 using System;
 using System.Collections.Generic;
@@ -17,15 +18,17 @@ namespace UNIC.BusinessLogic.Services.Implementation
         private readonly IDepartmentRepository _departmentRepository;
         private readonly IClubRepository _clubRepository;
         private readonly IClubRoleRepository _clubRoleRepository;
-
+        private readonly IClubMemberRepository _clubMemberRepository;
         public DepartmentService(
             IDepartmentRepository departmentRepository,
             IClubRepository clubRepository,
-            IClubRoleRepository clubRoleRepository)
+            IClubRoleRepository clubRoleRepository,
+            IClubMemberRepository clubMemberRepository)
         {
             _departmentRepository = departmentRepository;
             _clubRepository = clubRepository;
             _clubRoleRepository = clubRoleRepository;
+            _clubMemberRepository = clubMemberRepository;
         }
 
         private DepartmentResponseDto MapToDto(Department department)
@@ -204,6 +207,31 @@ namespace UNIC.BusinessLogic.Services.Implementation
                     }
                     : null
             });
+        }
+        public async Task<UserClubRoleDepartment> AddMemberTodepartment(int clubId,Guid userId,int departmentId)
+        {
+            var clubMember = await _clubMemberRepository.GetMemberAsync(userId, clubId);
+            if (clubMember == null) throw new KeyNotFoundException("User not a club member!");
+            var member = new UserClubRoleDepartment
+            {
+                ClubMemberId=clubMember.ClubMemberId,
+                DepartmentId=departmentId
+            };
+
+            var created = await _departmentRepository.AddMemberTodepartment(member);
+            return created;
+        }
+        public async Task<UserClubRoleDepartment> RemoveMemberFromDepartment(int clubId, Guid userId, int departmentId)
+        {
+            var clubMember = await _clubMemberRepository.GetMemberAsync(userId, clubId);
+            if (clubMember == null) throw new KeyNotFoundException("User not a club member!");
+            var member = new UserClubRoleDepartment
+            {
+                ClubMemberId = clubMember.ClubMemberId,
+                DepartmentId = departmentId
+            };
+            var deleted= await _departmentRepository.RemoveMemberFromDepartment(member);
+            return deleted;
         }
     }
 }
