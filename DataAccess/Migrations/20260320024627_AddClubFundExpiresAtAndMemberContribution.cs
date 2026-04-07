@@ -28,8 +28,9 @@ namespace DataAccess.Migrations
             migrationBuilder.Sql("""
                 UPDATE FundTransactions
                 SET IsMemberContribution = 1
-                WHERE PaymentLinkId IS NOT NULL AND TransactionType = 'INCOME'
+                WHERE TransactionType = 'INCOME'
                 """);
+            // sua lai neu ko chay duoc doan sql tren WHERE PaymentLinkId IS NOT NULL AND TransactionType = 'INCOME'
         }
 
         /// <inheritdoc />
