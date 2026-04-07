@@ -23,6 +23,7 @@ namespace UNIC.ServiceTest.Services
         private readonly Mock<IClubMemberRepository> _memberRepo;
         private readonly Mock<IPayOSService> _payOS;
         private readonly Mock<IPolicyService> _policy;
+        private readonly Mock<IClubPayOSSettingsRepository> _paySettingsRepo;
         private readonly ClubFundService _service;
 
         public ClubFundServiceTest()
@@ -31,6 +32,7 @@ namespace UNIC.ServiceTest.Services
             _memberRepo = new Mock<IClubMemberRepository>();
             _payOS = new Mock<IPayOSService>();
             _policy = new Mock<IPolicyService>();
+            _paySettingsRepo = new Mock<IClubPayOSSettingsRepository>();
             _fundRepo.Setup(r => r.ExistsNonRejectedFundNameInClubAsync(It.IsAny<int>(), It.IsAny<string>()))
                 .ReturnsAsync(false);
 
@@ -40,6 +42,7 @@ namespace UNIC.ServiceTest.Services
                 _memberRepo.Object,
                 _payOS.Object,
                 _policy.Object,
+                _paySettingsRepo.Object,
                 payOpts);
         }
 
@@ -222,7 +225,7 @@ namespace UNIC.ServiceTest.Services
                 _service.CreateContributionAsync(Guid.NewGuid(), new ContributeRequestDto
                 {
                     FundId = 1,
-                    Amount = 500
+                    Amount = 5000
                 }, CancellationToken.None));
         }
 
@@ -235,7 +238,7 @@ namespace UNIC.ServiceTest.Services
                 _service.CreateContributionAsync(Guid.NewGuid(), new ContributeRequestDto
                 {
                     FundId = 99,
-                    Amount = 5000
+                    Amount = 10_000
                 }, CancellationToken.None));
         }
 
@@ -254,7 +257,7 @@ namespace UNIC.ServiceTest.Services
                 _service.CreateContributionAsync(Guid.NewGuid(), new ContributeRequestDto
                 {
                     FundId = 1,
-                    Amount = 5000
+                    Amount = 10_000
                 }, CancellationToken.None));
         }
 
@@ -274,7 +277,7 @@ namespace UNIC.ServiceTest.Services
                 _service.CreateContributionAsync(Guid.NewGuid(), new ContributeRequestDto
                 {
                     FundId = 1,
-                    Amount = 5000
+                    Amount = 10_000
                 }, CancellationToken.None));
         }
 
@@ -290,12 +293,20 @@ namespace UNIC.ServiceTest.Services
                 FundName = "F"
             });
             _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+            _paySettingsRepo.Setup(r => r.GetByClubIdAsync(2)).ReturnsAsync(new ClubPayOSSettings
+            {
+                ClubId = 2,
+                ClientId = "c",
+                ApiKey = "a",
+                ChecksumKey = "k",
+                IsEnabled = true
+            });
 
             _fundRepo.Setup(r => r.AddTransactionAsync(It.IsAny<FundTransaction>()))
                 .Callback<FundTransaction>(t => t.TransactionId = 100)
                 .Returns(Task.CompletedTask);
 
-            _payOS.Setup(p => p.CreatePaymentLinkAsync(100, 10_000m, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            _payOS.Setup(p => p.CreatePaymentLinkAsync(It.IsAny<PayOSMerchantCredential>(), 100, 10_000m, It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new PayOSPaymentLinkResult
                 {
                     CheckoutUrl = "https://pay.test",
@@ -315,7 +326,7 @@ namespace UNIC.ServiceTest.Services
             Assert.Equal(100, result.TransactionId);
             Assert.Equal("https://pay.test", result.CheckoutUrl);
             Assert.Equal("pl_1", result.PaymentLinkId);
-            _payOS.Verify(p => p.CreatePaymentLinkAsync(100, 10_000m, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+            _payOS.Verify(p => p.CreatePaymentLinkAsync(It.IsAny<PayOSMerchantCredential>(), 100, 10_000m, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
@@ -337,7 +348,7 @@ namespace UNIC.ServiceTest.Services
                 {
                     FundId = 1,
                     CategoryId = 99,
-                    Amount = 5000
+                    Amount = 10_000
                 }, CancellationToken.None));
         }
 
@@ -366,7 +377,7 @@ namespace UNIC.ServiceTest.Services
                 {
                     FundId = 1,
                     CategoryId = 5,
-                    Amount = 5000
+                    Amount = 10_000
                 }, CancellationToken.None));
         }
 
@@ -382,6 +393,14 @@ namespace UNIC.ServiceTest.Services
                 FundName = "F"
             });
             _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+            _paySettingsRepo.Setup(r => r.GetByClubIdAsync(2)).ReturnsAsync(new ClubPayOSSettings
+            {
+                ClubId = 2,
+                ClientId = "c",
+                ApiKey = "a",
+                ChecksumKey = "k",
+                IsEnabled = true
+            });
             _fundRepo.Setup(r => r.GetFundCategoryByIdAsync(5)).ReturnsAsync(new FundCategory
             {
                 CategoryId = 5,
@@ -392,7 +411,7 @@ namespace UNIC.ServiceTest.Services
             _fundRepo.Setup(r => r.AddTransactionAsync(It.IsAny<FundTransaction>()))
                 .Callback<FundTransaction>(t => t.TransactionId = 200)
                 .Returns(Task.CompletedTask);
-            _payOS.Setup(p => p.CreatePaymentLinkAsync(200, 5000m, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            _payOS.Setup(p => p.CreatePaymentLinkAsync(It.IsAny<PayOSMerchantCredential>(), 200, 10_000m, It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new PayOSPaymentLinkResult { CheckoutUrl = "u", QrCode = "q", PaymentLinkId = "p" });
             _fundRepo.Setup(r => r.UpdateTransactionAsync(It.IsAny<FundTransaction>())).Returns(Task.CompletedTask);
 
@@ -400,7 +419,7 @@ namespace UNIC.ServiceTest.Services
             {
                 FundId = 1,
                 CategoryId = 5,
-                Amount = 5000
+                Amount = 10_000
             }, CancellationToken.None);
 
             _fundRepo.Verify(r => r.GetFundCategoryByIdAsync(5), Times.Once);
@@ -418,17 +437,25 @@ namespace UNIC.ServiceTest.Services
                 FundName = "F"
             });
             _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+            _paySettingsRepo.Setup(r => r.GetByClubIdAsync(2)).ReturnsAsync(new ClubPayOSSettings
+            {
+                ClubId = 2,
+                ClientId = "c",
+                ApiKey = "a",
+                ChecksumKey = "k",
+                IsEnabled = true
+            });
             _fundRepo.Setup(r => r.AddTransactionAsync(It.IsAny<FundTransaction>()))
                 .Callback<FundTransaction>(t => t.TransactionId = 300)
                 .Returns(Task.CompletedTask);
-            _payOS.Setup(p => p.CreatePaymentLinkAsync(300, It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            _payOS.Setup(p => p.CreatePaymentLinkAsync(It.IsAny<PayOSMerchantCredential>(), 300, It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new InvalidOperationException("payos down"));
 
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 _service.CreateContributionAsync(uid, new ContributeRequestDto
                 {
                     FundId = 1,
-                    Amount = 5000
+                    Amount = 10_000
                 }, CancellationToken.None));
 
             _fundRepo.Verify(r => r.DeleteTransactionByIdAsync(300), Times.Once);

@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using BusinessLogic.Options;
 using BusinessLogic.Services.Implementation;
+using BusinessLogic.Services.Interface;
 using Microsoft.Extensions.Options;
 using Moq;
 using Moq.Protected;
@@ -18,9 +19,6 @@ namespace UNIC.ServiceTest.Services
         {
             var o = new PayOSOptions
             {
-                ClientId = "client-id",
-                ApiKey = "api-key",
-                ChecksumKey = "checksum-secret",
                 ReturnUrl = "https://app.test/return/",
                 CancelUrl = "https://app.test/cancel/",
                 LinkExpirationMinutes = 45,
@@ -28,6 +26,18 @@ namespace UNIC.ServiceTest.Services
             };
             configure?.Invoke(o);
             return o;
+        }
+
+        private static PayOSMerchantCredential Merchant(Action<PayOSMerchantCredential>? configure = null)
+        {
+            var m = new PayOSMerchantCredential
+            {
+                ClientId = "client-id",
+                ApiKey = "api-key",
+                ChecksumKey = "checksum-secret"
+            };
+            configure?.Invoke(m);
+            return m;
         }
 
         private static PayOSService CreateSut(HttpClient http, PayOSOptions options) =>
@@ -81,7 +91,7 @@ namespace UNIC.ServiceTest.Services
             var sut = CreateSut(http, BaseOptions(o => o.UseMock = true));
 
             var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-                sut.CreatePaymentLinkAsync(10, 0m, "desc", default));
+                sut.CreatePaymentLinkAsync(Merchant(), 10, 0m, "desc", default));
             Assert.Contains("Số tiền", ex.Message);
         }
 
@@ -92,7 +102,7 @@ namespace UNIC.ServiceTest.Services
             var sut = CreateSut(http, BaseOptions(o => o.UseMock = true));
 
             await Assert.ThrowsAsync<ArgumentException>(() =>
-                sut.CreatePaymentLinkAsync(10, -1m, "desc", default));
+                sut.CreatePaymentLinkAsync(Merchant(), 10, -1m, "desc", default));
         }
 
         [Fact]
@@ -101,7 +111,7 @@ namespace UNIC.ServiceTest.Services
             using var http = new HttpClient(new HttpClientHandler());
             var sut = CreateSut(http, BaseOptions(o => o.UseMock = true));
 
-            var r = await sut.CreatePaymentLinkAsync(7, 100.6m, "d", default);
+            var r = await sut.CreatePaymentLinkAsync(Merchant(), 7, 100.6m, "d", default);
 
             Assert.Contains("7", r.CheckoutUrl, StringComparison.Ordinal);
             Assert.Equal("mock-7", r.PaymentLinkId);
@@ -117,7 +127,7 @@ namespace UNIC.ServiceTest.Services
                 o.MockCheckoutUrlTemplate = "https://pay.test/{orderCode}/t/{transactionId}";
             }));
 
-            var r = await sut.CreatePaymentLinkAsync(42, 5000m, "x", default);
+            var r = await sut.CreatePaymentLinkAsync(Merchant(), 42, 5000m, "x", default);
 
             Assert.Equal("https://pay.test/42/t/42", r.CheckoutUrl);
             Assert.Equal("https://pay.test/42/t/42", r.QrCode);
@@ -134,7 +144,7 @@ namespace UNIC.ServiceTest.Services
                 o.ReturnUrl = "https://return.test/cb/";
             }));
 
-            var r = await sut.CreatePaymentLinkAsync(99, 1000m, "x", default);
+            var r = await sut.CreatePaymentLinkAsync(Merchant(), 99, 1000m, "x", default);
 
             Assert.Equal("https://return.test/cb?mockTransactionId=99", r.CheckoutUrl);
         }
@@ -151,7 +161,7 @@ namespace UNIC.ServiceTest.Services
                 o.CancelUrl = "";
             }));
 
-            var r = await sut.CreatePaymentLinkAsync(3, 1000m, "x", default);
+            var r = await sut.CreatePaymentLinkAsync(Merchant(), 3, 1000m, "x", default);
 
             Assert.Equal("about:blank#mock-pay-txn-3", r.CheckoutUrl);
         }
@@ -163,11 +173,10 @@ namespace UNIC.ServiceTest.Services
             var sut = CreateSut(http, BaseOptions(o =>
             {
                 o.UseMock = false;
-                o.ClientId = "";
             }));
 
             var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                sut.CreatePaymentLinkAsync(1, 1000m, "x", default));
+                sut.CreatePaymentLinkAsync(Merchant(m => m.ClientId = ""), 1, 1000m, "x", default));
             Assert.Contains("PayOS", ex.Message, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -183,7 +192,7 @@ namespace UNIC.ServiceTest.Services
             });
             var sut = CreateSut(http, BaseOptions());
 
-            var r = await sut.CreatePaymentLinkAsync(55, 10_000m, "  Nộp quỹ  ", default);
+            var r = await sut.CreatePaymentLinkAsync(Merchant(), 55, 10_000m, "  Nộp quỹ  ", default);
 
             Assert.Equal("https://checkout", r.CheckoutUrl);
             Assert.Equal("qr-data", r.QrCode);
@@ -207,7 +216,7 @@ namespace UNIC.ServiceTest.Services
             });
             var sut = CreateSut(http, BaseOptions());
 
-            await sut.CreatePaymentLinkAsync(1, 1000m, null!, default);
+            await sut.CreatePaymentLinkAsync(Merchant(), 1, 1000m, null!, default);
 
             Assert.NotNull(capturedBody);
             Assert.Contains("Nop quy", capturedBody, StringComparison.Ordinal);
@@ -231,7 +240,7 @@ namespace UNIC.ServiceTest.Services
             var sut = CreateSut(http, BaseOptions());
             var longDesc = new string('x', 300);
 
-            await sut.CreatePaymentLinkAsync(1, 1000m, longDesc, default);
+            await sut.CreatePaymentLinkAsync(Merchant(), 1, 1000m, longDesc, default);
 
             Assert.NotNull(capturedBody);
             using var doc = JsonDocument.Parse(capturedBody);
@@ -248,7 +257,7 @@ namespace UNIC.ServiceTest.Services
             var sut = CreateSut(http, BaseOptions());
 
             var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                sut.CreatePaymentLinkAsync(1, 1000m, "d", default));
+                sut.CreatePaymentLinkAsync(Merchant(), 1, 1000m, "d", default));
             Assert.Contains("BadRequest", ex.Message, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -262,7 +271,7 @@ namespace UNIC.ServiceTest.Services
             var sut = CreateSut(http, BaseOptions());
 
             var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                sut.CreatePaymentLinkAsync(1, 1000m, "d", default));
+                sut.CreatePaymentLinkAsync(Merchant(), 1, 1000m, "d", default));
             Assert.Contains("Sai thông tin", ex.Message);
         }
 
@@ -274,10 +283,10 @@ namespace UNIC.ServiceTest.Services
         public void VerifyWebhookSignature_ReturnsFalse_WhenChecksumKeyEmpty()
         {
             using var http = new HttpClient(new HttpClientHandler());
-            var sut = CreateSut(http, BaseOptions(o => o.ChecksumKey = ""));
+            var sut = CreateSut(http, BaseOptions());
             using var doc = JsonDocument.Parse("""{"orderCode":1}""");
 
-            Assert.False(sut.VerifyWebhookSignature("abc", doc.RootElement));
+            Assert.False(sut.VerifyWebhookSignature("", "abc", doc.RootElement));
         }
 
         [Fact]
@@ -287,8 +296,8 @@ namespace UNIC.ServiceTest.Services
             var sut = CreateSut(http, BaseOptions());
             using var doc = JsonDocument.Parse("""{"orderCode":1}""");
 
-            Assert.False(sut.VerifyWebhookSignature("", doc.RootElement));
-            Assert.False(sut.VerifyWebhookSignature("   ", doc.RootElement));
+            Assert.False(sut.VerifyWebhookSignature("k", "", doc.RootElement));
+            Assert.False(sut.VerifyWebhookSignature("k", "   ", doc.RootElement));
         }
 
         [Fact]
@@ -301,10 +310,10 @@ namespace UNIC.ServiceTest.Services
             var sig = HmacSha256Hex(key, dataStr);
 
             using var http = new HttpClient(new HttpClientHandler());
-            var sut = CreateSut(http, BaseOptions(o => o.ChecksumKey = key));
+            var sut = CreateSut(http, BaseOptions());
             using var doc = JsonDocument.Parse(payload);
 
-            Assert.True(sut.VerifyWebhookSignature(sig, doc.RootElement));
+            Assert.True(sut.VerifyWebhookSignature(key, sig, doc.RootElement));
         }
 
         [Fact]
@@ -317,9 +326,9 @@ namespace UNIC.ServiceTest.Services
             var sigUpper = sigLower.ToUpperInvariant();
 
             using var http = new HttpClient(new HttpClientHandler());
-            var sut = CreateSut(http, BaseOptions(o => o.ChecksumKey = key));
+            var sut = CreateSut(http, BaseOptions());
 
-            Assert.True(sut.VerifyWebhookSignature(sigUpper, doc.RootElement));
+            Assert.True(sut.VerifyWebhookSignature(key, sigUpper, doc.RootElement));
         }
 
         [Fact]
@@ -330,9 +339,9 @@ namespace UNIC.ServiceTest.Services
             var badSig = HmacSha256Hex(key, "a=2");
 
             using var http = new HttpClient(new HttpClientHandler());
-            var sut = CreateSut(http, BaseOptions(o => o.ChecksumKey = key));
+            var sut = CreateSut(http, BaseOptions());
 
-            Assert.False(sut.VerifyWebhookSignature(badSig, doc.RootElement));
+            Assert.False(sut.VerifyWebhookSignature(key, badSig, doc.RootElement));
         }
 
         #endregion

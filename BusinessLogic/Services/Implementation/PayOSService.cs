@@ -25,6 +25,7 @@ namespace BusinessLogic.Services.Implementation
         }
 
         public async Task<PayOSPaymentLinkResult> CreatePaymentLinkAsync(
+            PayOSMerchantCredential merchant,
             long orderCode,
             decimal amountVnd,
             string description,
@@ -45,8 +46,11 @@ namespace BusinessLogic.Services.Implementation
                 };
             }
 
-            if (string.IsNullOrEmpty(_options.ClientId) || string.IsNullOrEmpty(_options.ApiKey) || string.IsNullOrEmpty(_options.ChecksumKey))
-                throw new InvalidOperationException("PayOS chưa được cấu hình (ClientId, ApiKey, ChecksumKey). Bật PayOS:UseMock=true trong appsettings.Development.json để test local không cần credential.");
+            if (merchant == null)
+                throw new ArgumentNullException(nameof(merchant));
+
+            if (string.IsNullOrEmpty(merchant.ClientId) || string.IsNullOrEmpty(merchant.ApiKey) || string.IsNullOrEmpty(merchant.ChecksumKey))
+                throw new InvalidOperationException("PayOS chưa được cấu hình cho CLB này (ClientId, ApiKey, ChecksumKey).");
 
             var desc = description?.Trim() ?? "Nop quy";
             if (desc.Length > 255) desc = desc[..255];
@@ -57,7 +61,7 @@ namespace BusinessLogic.Services.Implementation
             var expiredAt = DateTimeOffset.UtcNow.AddMinutes(_options.LinkExpirationMinutes).ToUnixTimeSeconds();
 
             var dataStr = $"amount={amountInt}&cancelUrl={cancelUrl}&description={desc}&orderCode={orderCode}&returnUrl={returnUrl}";
-            var signature = ComputeHmacSha256Hex(_options.ChecksumKey, dataStr);
+            var signature = ComputeHmacSha256Hex(merchant.ChecksumKey, dataStr);
 
             var body = new
             {
@@ -71,8 +75,8 @@ namespace BusinessLogic.Services.Implementation
             };
 
             var request = new HttpRequestMessage(HttpMethod.Post, "v2/payment-requests");
-            request.Headers.Add("x-client-id", _options.ClientId);
-            request.Headers.Add("x-api-key", _options.ApiKey);
+            request.Headers.Add("x-client-id", merchant.ClientId);
+            request.Headers.Add("x-api-key", merchant.ApiKey);
             request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
 
             var response = await _httpClient.SendAsync(request, cancellationToken);
@@ -120,13 +124,13 @@ namespace BusinessLogic.Services.Implementation
             return $"about:blank#mock-pay-txn-{orderCode}";
         }
 
-        public bool VerifyWebhookSignature(string receivedSignature, JsonElement dataElement)
+        public bool VerifyWebhookSignature(string checksumKey, string receivedSignature, JsonElement dataElement)
         {
-            if (string.IsNullOrEmpty(_options.ChecksumKey) || string.IsNullOrEmpty(receivedSignature))
+            if (string.IsNullOrEmpty(checksumKey) || string.IsNullOrEmpty(receivedSignature))
                 return false;
 
             var dataStr = BuildSortedKeyValueString(dataElement);
-            var computed = ComputeHmacSha256Hex(_options.ChecksumKey, dataStr);
+            var computed = ComputeHmacSha256Hex(checksumKey, dataStr);
             return string.Equals(computed, receivedSignature, StringComparison.OrdinalIgnoreCase);
         }
 

@@ -16,25 +16,28 @@ namespace BusinessLogic.Services.Implementation
         private readonly IClubMemberRepository _clubMemberRepository;
         private readonly IPayOSService _payOSService;
         private readonly IPolicyService _policyService;
+        private readonly IClubPayOSSettingsRepository _clubPayOSSettingsRepository;
         private readonly PayOSOptions _payOSOptions;
         private const string STATUS_PENDING = "PENDING";
         private const string STATUS_APPROVED = "APPROVED";
         private const string STATUS_REJECTED = "REJECTED";
         private const string TYPE_INCOME = "INCOME";
         private const string MEMBER_STATUS_ACTIVE = "ACTIVE";
-        private const decimal MinTransactionAmountVnd = 1000m;
+        private const decimal MinTransactionAmountVnd = 10000m;
 
         public ClubFundService(
             IFundRepository fundRepository,
             IClubMemberRepository clubMemberRepository,
             IPayOSService payOSService,
             IPolicyService policyService,
+            IClubPayOSSettingsRepository clubPayOSSettingsRepository,
             IOptions<PayOSOptions> payOSOptions)
         {
             _fundRepository = fundRepository;
             _clubMemberRepository = clubMemberRepository;
             _payOSService = payOSService;
             _policyService = policyService;
+            _clubPayOSSettingsRepository = clubPayOSSettingsRepository;
             _payOSOptions = payOSOptions.Value;
         }
 
@@ -57,7 +60,7 @@ namespace BusinessLogic.Services.Implementation
 
             var member = await _clubMemberRepository.GetMemberAsync(userId, dto.ClubId);
             if (member == null)
-                throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
+                throw new UnauthorizedAccessException("Bạn không phải thành viên của câu lạc bộ này.");
             if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
                 throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được tạo quỹ.");
             if (!HasManagerOrViceLevel(member.ClubRole))
@@ -133,10 +136,12 @@ namespace BusinessLogic.Services.Implementation
 
             try
             {
+                var merchant = await ResolvePayOSMerchantCredentialForClubAsync(fund.ClubId);
                 var payOsResult = await _payOSService.CreatePaymentLinkAsync(
+                    merchant,
                     transaction.TransactionId,
                     transaction.Amount,
-                    transaction.Description ?? "Nop quy",
+                    transaction.Description ?? "Nộp quỹ",
                     cancellationToken);
 
                 transaction.PaymentLinkId = payOsResult.PaymentLinkId;
@@ -160,6 +165,32 @@ namespace BusinessLogic.Services.Implementation
                 await _fundRepository.DeleteTransactionByIdAsync(transaction.TransactionId);
                 throw;
             }
+        }
+
+        private async Task<PayOSMerchantCredential> ResolvePayOSMerchantCredentialForClubAsync(int clubId)
+        {
+            if (_payOSOptions.UseMock)
+            {
+                return new PayOSMerchantCredential { ClientId = "mock", ApiKey = "mock", ChecksumKey = "mock" };
+            }
+
+            var s = await _clubPayOSSettingsRepository.GetByClubIdAsync(clubId);
+            if (s == null || !s.IsEnabled)
+                throw new InvalidOperationException("Câu lạc bộ chưa liên kết PayOS hoặc đã tắt liên kết.");
+
+            if (string.IsNullOrWhiteSpace(s.ClientId)
+                || string.IsNullOrWhiteSpace(s.ApiKey)
+                || string.IsNullOrWhiteSpace(s.ChecksumKey))
+            {
+                throw new InvalidOperationException("PayOS của câu lạc bộ chưa được cấu hình đầy đủ (ClientId/ApiKey/ChecksumKey).");
+            }
+
+            return new PayOSMerchantCredential
+            {
+                ClientId = s.ClientId.Trim(),
+                ApiKey = s.ApiKey.Trim(),
+                ChecksumKey = s.ChecksumKey.Trim()
+            };
         }
 
         public async Task<ContributionPaymentStatusDto?> GetContributionPaymentStatusAsync(Guid userId, int clubId, int transactionId)

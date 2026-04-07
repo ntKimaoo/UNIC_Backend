@@ -61,7 +61,7 @@ namespace BusinessLogic.DTOs
         public int FundId { get; set; }
         public int? CategoryId { get; set; }
         [Required]
-        [Range(1000, double.MaxValue, ErrorMessage = "Số tiền tối thiểu 1.000 ₫")]
+        [Range(10000, double.MaxValue, ErrorMessage = "Số tiền tối thiểu 10.000 ₫")]
         public decimal Amount { get; set; }
         [MaxLength(255)]
         public string? Description { get; set; }
