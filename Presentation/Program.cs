@@ -275,7 +275,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFE");
-app.UseStaticFiles(); // Enable serving files from wwwroot
+app.UseStaticFiles(); 
 app.MapHub<WebRtcHub>("/webrtc");
 app.MapHub<NotificationHub>("/notifications");
 app.UseHttpsRedirection();
@@ -283,11 +283,5 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
-if (app.Environment.IsDevelopment())
-{
-    // Tránh 404 khi mở base URL qua ngrok (GET / không có controller).
-    app.MapGet("/", () => Results.Redirect("/swagger"));
-}
 
 app.Run();

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -14,7 +14,7 @@ namespace BusinessLogic.DTOs
 
         [Required(ErrorMessage = "New password is required")]
         [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be at least 6 characters")]
-        [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]",
+        [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$",
             ErrorMessage = "Password must contain at least one uppercase letter, one lowercase letter, one number and one special character")]
         public string NewPassword { get; set; } = null!;
 

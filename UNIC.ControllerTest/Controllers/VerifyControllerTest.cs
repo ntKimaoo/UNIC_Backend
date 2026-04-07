@@ -1,5 +1,6 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
+using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
@@ -99,13 +100,13 @@ namespace UNIC.ControllerTest.Controllers
             _mockAttendanceService
                 .Setup(s => s.VerifyAttendanceByLinkAsync("user@test.com", "ABC123"))
                 .ReturnsAsync(new VerifyByLinkResult
-                {
-                    Success = true,
+            {
+                Success = true,
                     Message = "Điểm danh OK",
                     MemberName = "Nguyen Van A",
                     EventName = "Tech Talk",
                     AlreadyCheckedIn = false
-                });
+            });
 
             var result = await _controller.Verify("user@test.com", null, "ABC123");
 
@@ -122,13 +123,13 @@ namespace UNIC.ControllerTest.Controllers
             _mockAttendanceService
                 .Setup(s => s.VerifyAttendanceByLinkAsync("user@test.com", "ABC123"))
                 .ReturnsAsync(new VerifyByLinkResult
-                {
-                    Success = true,
+            {
+                Success = true,
                     Message = "Đã điểm danh",
                     MemberName = "Nguyen Van A",
                     EventName = "Tech Talk",
                     AlreadyCheckedIn = true
-                });
+            });
 
             var result = await _controller.Verify("user@test.com", null, "ABC123");
 
@@ -176,7 +177,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockAttendanceService
                 .Setup(s => s.VerifyAttendanceByLinkAsync("user@test.com", "BADCODE"))
                 .ReturnsAsync(new VerifyByLinkResult
-                {
+        {
                     Success = false,
                     Message = "Mã không hợp lệ"
                 });
@@ -281,7 +282,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockAttendanceService
                 .Setup(s => s.VerifyAttendanceByLinkAsync("u@t.com", "C1"))
                 .ReturnsAsync(new VerifyByLinkResult
-                {
+        {
                     Success = true,
                     Message = "Done",
                     MemberName = null,

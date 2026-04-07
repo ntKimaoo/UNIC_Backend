@@ -381,7 +381,7 @@ namespace Presentation.Controllers
         [HttpPost("verify-email")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> VerifyEmail([FromQuery] VerifyEmailRequestDto request)
+        public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequestDto request)
         {
             if (!ModelState.IsValid)
             {

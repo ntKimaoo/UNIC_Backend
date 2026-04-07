@@ -191,18 +191,18 @@ namespace UNIC.Presentation.Controllers
         ///Add member to department
         /// </summary>
         [HttpPost("{departmentId}/members/{memberId}/add")]
-        public async Task<IActionResult> AddMemberToDepartment(int clubId,int departmentId,Guid userId)
+        public async Task<IActionResult> AddMemberToDepartment(int clubId, int departmentId, Guid memberId)
         {
-            var member = await _departmentService.AddMemberTodepartment(clubId, userId, departmentId);
+            var member = await _departmentService.AddMemberTodepartment(clubId, memberId, departmentId);
             return Ok(member);
         }
         ///<summary>
         ///Remove member from department
         /// </summary>
-        [HttpDelete("{departmentId}/members/{memberId}/remove}")]
-        public async Task<IActionResult> RemoveMemberFromDepartment(int clubId, int departmentId, Guid userId)
+        [HttpDelete("{departmentId}/members/{memberId}/remove")]
+        public async Task<IActionResult> RemoveMemberFromDepartment(int clubId, int departmentId, Guid memberId)
         {
-            var member = await _departmentService.RemoveMemberFromDepartment(clubId, userId, departmentId);
+            var member = await _departmentService.RemoveMemberFromDepartment(clubId, memberId, departmentId);
             return Ok(member);
         }
     }
