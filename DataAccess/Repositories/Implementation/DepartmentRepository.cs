@@ -135,5 +135,42 @@ namespace UNIC.DataAccess.Repositories.Implementation
             await _context.SaveChangesAsync();
             return departMember;
         }
+
+        public async Task<IEnumerable<UserClubRole>> GetClubMembersNotInDepartmentAsync(int clubId, int departmentId)
+        {
+            var memberIdsInDepartment = await _context.UserClubRoleDepartments
+                .Where(ud => ud.DepartmentId == departmentId)
+                .Select(ud => ud.ClubMemberId)
+                .ToListAsync();
+
+            return await _context.UserClubRoles
+                .Where(ucr => ucr.ClubId == clubId && !memberIdsInDepartment.Contains(ucr.ClubMemberId))
+                .Include(ucr => ucr.User)
+                .Include(ucr => ucr.ClubRole)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Department>> GetDepartmentsJoinedByMemberAsync(int clubId, int clubMemberId)
+        {
+            return await _context.UserClubRoleDepartments
+                .Where(ud => ud.ClubMemberId == clubMemberId && ud.Department.ClubId == clubId)
+                .Include(ud => ud.Department)
+                    .ThenInclude(d => d.ManagerRole)
+                .Select(ud => ud.Department)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Department>> GetDepartmentsNotJoinedByMemberAsync(int clubId, int clubMemberId)
+        {
+            var joinedDepartmentIds = await _context.UserClubRoleDepartments
+                .Where(ud => ud.ClubMemberId == clubMemberId)
+                .Select(ud => ud.DepartmentId)
+                .ToListAsync();
+
+            return await _context.Departments
+                .Where(d => d.ClubId == clubId && !joinedDepartmentIds.Contains(d.DepartmentId))
+                .Include(d => d.ManagerRole)
+                .ToListAsync();
+        }
     }
 }

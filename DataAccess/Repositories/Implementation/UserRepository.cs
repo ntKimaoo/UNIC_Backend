@@ -140,7 +140,7 @@ namespace DataAccess.Repositories.Implementation
             GetDepartmentsByUserAndClubAsync(Guid userId, int clubId)
         {
             bool isAdmin = await _context.UserRoles
-               .AnyAsync(m => m.UserId == userId && m.RoleName == "Admin");
+               .AnyAsync(m => m.UserId == userId && (m.RoleName == "Admin"||m.RoleName == "Club Manager"));
             if (isAdmin)
             {
                 var departments = await _context.Departments
@@ -186,6 +186,26 @@ namespace DataAccess.Repositories.Implementation
                 .ToListAsync();
 
             return rows.Select(r => (r.Department, (ClubRole?)r.DepartmentRole, r.MemberCount));
+        }
+
+        public async Task<bool> AssignUserRole(Guid userId, string roleName)
+        {
+            var userRole = new UserRole
+            {
+                UserId = userId,
+                RoleName = roleName,
+                AssignedAt = DateTime.UtcNow
+            };
+            await _context.UserRoles.AddAsync(userRole);
+            return await _context.SaveChangesAsync() > 0;
+        }
+
+        public async Task<string> GetUserRole(Guid userId)
+        {
+            return await _context.UserRoles
+                .Where(ur => ur.UserId == userId)
+                .Select(ur => ur.RoleName)
+                .FirstOrDefaultAsync() ?? "User";
         }
     }
 }

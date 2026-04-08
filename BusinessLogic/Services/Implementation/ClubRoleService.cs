@@ -210,6 +210,17 @@ namespace BusinessLogic.Services.Implementation
             if (exist != null)
             {
                 exist.ClubRoleId = dto.ClubRoleId;
+                if (await _repository.CheckDepartementRole(dto.ClubRoleId))
+                {
+                    var clubRole = await _repository.GetByIdAsync(dto.ClubRoleId, dto.ClubId);
+                    var departMember = new UserClubRoleDepartment
+                    {
+                        ClubMemberId = exist.ClubMemberId,
+                        DepartmentId = clubRole?.DepartmentId ?? 0,
+                    };
+                    await _departmentRepository.AddMemberTodepartment(departMember);
+                }
+
                 return await _repository.UpdateUserClubRoleAsync(exist);
             }
 

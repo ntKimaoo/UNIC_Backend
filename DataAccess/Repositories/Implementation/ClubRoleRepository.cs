@@ -159,6 +159,15 @@ namespace DataAccess.Repositories.Implementation
                 .Distinct()
                 .ToListAsync();
         }
-
+        public async Task<bool> CheckDepartementRole(int roleId)
+        {
+            var role = await _context.ClubRoles.Include(r => r.Department).FirstOrDefaultAsync(cr => cr.ClubRoleId == roleId);
+            if (role == null) return false;
+            return role.DepartmentId != null;
+        }
+        public async Task<UserClubRole> GetUserClubRoleByIdAsync(int clubId)
+        {
+            return await _context.UserClubRoles.FirstOrDefaultAsync(ucr => ucr.ClubRoleId == clubId);
+        }
     }
 }

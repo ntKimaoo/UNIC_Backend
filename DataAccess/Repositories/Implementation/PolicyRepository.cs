@@ -68,7 +68,7 @@ namespace DataAccess.Repositories.Implementation
         public async Task<bool> HasMemberPolicyInClubAsync(Guid userId, int clubId, string policyTitle)
         {
             var normalizedTitle = policyTitle.ToLower().Trim();
-            var isClubManager= await _context.UserClubRoles.AnyAsync(ucr=>ucr.UserId==userId&&ucr.ClubRole.Level==0);
+            var isClubManager = await _context.UserClubRoles.AnyAsync(ucr => ucr.UserId == userId && ucr.ClubRole.Level == 0);
             if (isClubManager) return true;
             // Check policy from club role (within this specific club)
             var hasRolePolicy = await _context.UserClubRoles
@@ -178,7 +178,7 @@ namespace DataAccess.Repositories.Implementation
                     _context.Add(cmp);
                 }
             }
-            
+
             await _context.SaveChangesAsync();
         }
     }

@@ -7,20 +7,23 @@ using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using UNIC.BusinessLogic.Services.Interface;
 
 namespace Presentation.Controllers
 {
     [ApiController]
-    
+
     public class ClubMemberController : ControllerBase
     {
         private readonly IClubMemberService _service;
         private readonly IPolicyService _policyService;
+        private readonly IDepartmentService _departmentService;
 
-        public ClubMemberController(IClubMemberService service, IPolicyService policyService)
+        public ClubMemberController(IClubMemberService service, IPolicyService policyService, IDepartmentService departmentService)
         {
             _service = service;
             _policyService = policyService;
+            _departmentService = departmentService;
         }
         private Guid? GetCurrentUserId()
         {
@@ -244,6 +247,32 @@ namespace Presentation.Controllers
                 return NotFound(new { success = false, message = "Policy not assigned to this member" });
 
             return Ok(new { success = true, message = "Policy revoked successfully" });
+        }
+
+        /// <summary>
+        /// Lấy danh sách phòng ban mà thành viên ĐÃ tham gia (dùng cho modal xóa khỏi phòng ban)
+        /// GET /api/clubs/{clubId}/members/{memberId}/departments/joined
+        /// </summary>
+        [HttpGet("api/clubs/{clubId}/members/{memberId}/departments/joined")]
+        public async Task<IActionResult> GetJoinedDepartments(int clubId, int memberId)
+        {
+            var departments = await _departmentService.GetDepartmentsJoinedByMemberAsync(clubId, memberId);
+            if (departments == null)
+                return NotFound(new { success = false, message = "Member not found in this club" });
+            return Ok(new { success = true, data = departments });
+        }
+
+        /// <summary>
+        /// Lấy danh sách phòng ban mà thành viên CHƯA tham gia (dùng cho modal thêm vào phòng ban)
+        /// GET /api/clubs/{clubId}/members/{memberId}/departments/not-joined
+        /// </summary>
+        [HttpGet("api/clubs/{clubId}/members/{memberId}/departments/not-joined")]
+        public async Task<IActionResult> GetNotJoinedDepartments(int clubId, int memberId)
+        {
+            var departments = await _departmentService.GetDepartmentsNotJoinedByMemberAsync(clubId, memberId);
+            if (departments == null)
+                return NotFound(new { success = false, message = "Member not found in this club" });
+            return Ok(new { success = true, data = departments });
         }
     }
 }
