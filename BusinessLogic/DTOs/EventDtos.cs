@@ -33,9 +33,6 @@ namespace BusinessLogic.DTOs
 
         public bool IsOnline { get; set; } = false;
 
-        [MaxLength(500)]
-        public string? MeetLink { get; set; }
-
         [Range(1, int.MaxValue, ErrorMessage = "So luong nguoi phai lon hon 0")]
         public int? MaxAttendees { get; set; }
     }
@@ -68,9 +65,6 @@ namespace BusinessLogic.DTOs
 
         public bool IsOnline { get; set; } = false;
 
-        [MaxLength(500)]
-        public string? MeetLink { get; set; }
-
         [Range(1, int.MaxValue, ErrorMessage = "So luong nguoi phai lon hon 0")]
         public int? MaxAttendees { get; set; }
     }
@@ -89,7 +83,6 @@ namespace BusinessLogic.DTOs
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         public bool IsPublic { get; set; }
-        public bool IsOnline { get; set; }
         public string? MeetLink { get; set; }
         public string Status { get; set; } = null!;
         public DateTime CreatedAt { get; set; }

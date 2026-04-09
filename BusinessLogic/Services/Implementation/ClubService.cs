@@ -83,58 +83,41 @@ namespace BusinessLogic.Services.Implementation
             if (club == null)
                 return null;
 
-            // Update only provided fields
-            if (!string.IsNullOrEmpty(dto.ClubName))
-            {
-                // Check if new name already exists (excluding current club)
+            
                 var nameExists = await _repository.ClubNameExistsAsync(dto.ClubName);
                 if (nameExists && club.ClubName != dto.ClubName)
                 {
                     throw new InvalidOperationException("Club name already exists");
                 }
                 club.ClubName = dto.ClubName;
-            }
 
-            if (dto.ShortName != null)
                 club.ShortName = dto.ShortName;
 
-            if (dto.Description != null)
                 club.Description = dto.Description;
 
-            if (dto.FoundedDate.HasValue)
                 club.FoundedDate = dto.FoundedDate;
 
-            if (!string.IsNullOrEmpty(dto.Status))
                 club.Status = dto.Status;
-
             if (dto.IsPublic.HasValue)
                 club.IsPublic = dto.IsPublic.Value;
 
-            if (dto.LogoUrl != null)
                 club.LogoUrl = dto.LogoUrl;
 
-            if (dto.CoverImageUrl != null)
                 club.CoverImageUrl = dto.CoverImageUrl;
 
-            if (dto.Email != null)
                 club.Email = dto.Email;
 
-            if (dto.PhoneNumber != null)
                 club.PhoneNumber = dto.PhoneNumber;
 
-            if (dto.FacebookUrl != null)
                 club.FacebookUrl = dto.FacebookUrl;
 
-            if (dto.WebsiteUrl != null)
                 club.WebsiteUrl = dto.WebsiteUrl;
 
-            if (dto.Address != null)
                 club.Address = dto.Address;
-
-            if (dto.IsActive.HasValue)
+            if(dto.IsActive.HasValue)
                 club.IsActive = dto.IsActive.Value;
-
-            club.UpdatedAt = DateTime.UtcNow;
+            
+                club.UpdatedAt = DateTime.UtcNow;
 
             var updated = await _repository.UpdateAsync(club);
             if (!updated)

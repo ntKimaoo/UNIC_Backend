@@ -52,7 +52,7 @@ namespace DataAccess.Repositories
             _context.ClubCreationRequests.Update(request);
             await _context.SaveChangesAsync();
         }
-
+       
         public async Task DeleteAsync(int id)
         {
             var entity = await _context.ClubCreationRequests.FindAsync(id);

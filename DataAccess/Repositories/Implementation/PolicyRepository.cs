@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 
 namespace DataAccess.Repositories.Implementation
 {
@@ -20,22 +21,10 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<IEnumerable<Policy>> GetUserPoliciesAsync(Guid userId)
         {
-            // Get policies from direct user assignment
-            var directUserPolicies = await _context.UserPolicies
-                .Where(cmp => cmp.UserId == userId)
-                .Select(cmp => cmp.Policy)
-                .ToListAsync();
-
             // Get policies from user's club roles
             var clubRolePolicies = await _context.UserClubRoles
                 .Where(ucr => ucr.UserId == userId)
                 .SelectMany(ucr => ucr.ClubRole.ClubRolePolicies)
-                .Select(crp => crp.Policy)
-                .ToListAsync();
-            // Get policies from user's roles
-            var userRolePolicies = await _context.UserRoles
-                .Where(ucr => ucr.UserId == userId)
-                .SelectMany(ucr => ucr.UserRolePolicies)
                 .Select(crp => crp.Policy)
                 .ToListAsync();
             // Get policies from club member's policies
@@ -45,9 +34,7 @@ namespace DataAccess.Repositories.Implementation
                 .Select(crp => crp.Policy)
                 .ToListAsync();
             // Combine and return distinct policies
-            return directUserPolicies
-                .Concat(clubRolePolicies)
-                .Concat(userRolePolicies)
+            return clubRolePolicies
                 .Concat(clubMemberPolicies)
                 .DistinctBy(p => p.Id)
                 .ToList();
@@ -61,13 +48,6 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<bool> HasUserPolicyAsync(Guid userId, string policyTitle)
         {
-            // Check direct user policy assignment
-            var hasDirectPolicy = await _context.UserPolicies
-                .AnyAsync(cmp => cmp.UserId == userId && cmp.Policy.Name.ToLower().Trim() == policyTitle);
-
-            if (hasDirectPolicy)
-                return true;
-
             // Check club member-based policy assignment
             var hasClubMemberPolicy = await _context.UserClubRoles
                 .Where(ucr => ucr.UserId == userId)
@@ -86,62 +66,11 @@ namespace DataAccess.Repositories.Implementation
                 .Where(p => p.PolicyGroupId == groupId)
                 .ToListAsync();
         }
-
-        public async Task<IEnumerable<Policy>> GetUserDirectPoliciesAsync(Guid userId)
-        {
-            return await _context.UserPolicies
-                .Where(cmp => cmp.UserId == userId)
-                .Include(cmp => cmp.Policy)
-                .Select(cmp => cmp.Policy)
-                .ToListAsync();
-        }
-
-        public async Task AssignPoliciesToUserAsync(Guid userId, IEnumerable<int> policyIds)
-        {
-            var existingIds = await _context.UserPolicies
-                .Where(cmp => cmp.UserId == userId)
-                .Select(cmp => cmp.PolicyId)
-                .ToListAsync();
-
-            var toAdd = policyIds.Distinct()
-                .Where(id => !existingIds.Contains(id))
-                .Select(id => new UserPolicy { UserId = userId, PolicyId = id });
-
-            await _context.UserPolicies.AddRangeAsync(toAdd);
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task<bool> RevokePolicyFromUserAsync(Guid userId, int policyId)
-        {
-            var entry = await _context.UserPolicies
-                .FirstOrDefaultAsync(cmp => cmp.UserId == userId && cmp.PolicyId == policyId);
-
-            if (entry == null) return false;
-
-            _context.UserPolicies.Remove(entry);
-            await _context.SaveChangesAsync();
-            return true;
-        }
-
-        public async Task SetUserPoliciesAsync(Guid userId, IEnumerable<int> policyIds)
-        {
-            var existing = await _context.UserPolicies
-                .Where(cmp => cmp.UserId == userId)
-                .ToListAsync();
-
-            _context.UserPolicies.RemoveRange(existing);
-
-            var newEntries = policyIds.Distinct()
-                .Select(id => new UserPolicy { UserId = userId, PolicyId = id });
-
-            await _context.UserPolicies.AddRangeAsync(newEntries);
-            await _context.SaveChangesAsync();
-        }
-
         public async Task<bool> HasMemberPolicyInClubAsync(Guid userId, int clubId, string policyTitle)
         {
             var normalizedTitle = policyTitle.ToLower().Trim();
-
+            var isClubManager = await _context.UserClubRoles.AnyAsync(ucr => ucr.UserId == userId && ucr.ClubRole.Level == 0);
+            if (isClubManager) return true;
             // Check policy from club role (within this specific club)
             var hasRolePolicy = await _context.UserClubRoles
                 .Where(ucr => ucr.UserId == userId && ucr.ClubId == clubId)
@@ -150,13 +79,116 @@ namespace DataAccess.Repositories.Implementation
 
             if (hasRolePolicy) return true;
 
-            // Check direct club member policy (within this specific club)
             var hasMemberPolicy = await _context.UserClubRoles
                 .Where(ucr => ucr.UserId == userId && ucr.ClubId == clubId)
                 .SelectMany(ucr => ucr.ClubMemberPolicies!)
                 .AnyAsync(cmp => cmp.Policy.Name == normalizedTitle);
 
             return hasMemberPolicy;
+        }
+
+        public async Task<IEnumerable<Policy>> GetUserDirectPoliciesAsync(Guid userId)
+        {
+            return await _context.UserClubRoles
+                .Where(ucr => ucr.UserId == userId)
+                .SelectMany(ucr => ucr.ClubMemberPolicies)
+                .Select(cmp => cmp.Policy)
+                .Distinct()
+                .ToListAsync();
+        }
+
+        public async Task AssignPoliciesToUserAsync(Guid userId, IEnumerable<int> policyIds)
+        {
+            var userRoles = await _context.UserClubRoles
+                .Include(ucr => ucr.ClubMemberPolicies)
+                .Where(ucr => ucr.UserId == userId)
+                .ToListAsync();
+
+            if (!userRoles.Any()) return;
+
+            foreach (var userRole in userRoles)
+            {
+                var existingPolicyIds = userRole.ClubMemberPolicies?.Select(p => p.PolicyId).ToHashSet() ?? new HashSet<int>();
+                foreach (var policyId in policyIds)
+                {
+                    if (!existingPolicyIds.Contains(policyId))
+                    {
+                        var cmp = new ClubMemberPolicy
+                        {
+                            ClubMemberId = userRole.ClubMemberId,
+                            PolicyId = policyId
+                        };
+                        _context.Add(cmp);
+                    }
+                }
+            }
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<bool> RevokePolicyFromUserAsync(Guid userId, int policyId)
+        {
+            var userRoles = await _context.UserClubRoles
+                .Include(ucr => ucr.ClubMemberPolicies)
+                .Where(ucr => ucr.UserId == userId)
+                .ToListAsync();
+
+            if (!userRoles.Any()) return false;
+
+            var removedAny = false;
+            foreach (var userRole in userRoles)
+            {
+                var policyToRemove = userRole.ClubMemberPolicies?.FirstOrDefault(p => p.PolicyId == policyId);
+                if (policyToRemove != null)
+                {
+                    _context.Remove(policyToRemove);
+                    removedAny = true;
+                }
+            }
+
+            if (removedAny)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            return removedAny;
+        }
+
+        public async Task SetUserPoliciesAsync(Guid userId, IEnumerable<int> policyIds)
+        {
+            var userRoles = await _context.UserClubRoles
+                .Include(ucr => ucr.ClubMemberPolicies)
+                .Where(ucr => ucr.UserId == userId)
+                .ToListAsync();
+
+            if (!userRoles.Any()) return;
+
+            foreach (var userRole in userRoles)
+            {
+                if (userRole.ClubMemberPolicies != null)
+                {
+                    _context.RemoveRange(userRole.ClubMemberPolicies);
+                }
+
+                foreach (var policyId in policyIds)
+                {
+                    var cmp = new ClubMemberPolicy
+                    {
+                        ClubMemberId = userRole.ClubMemberId,
+                        PolicyId = policyId
+                    };
+                    _context.Add(cmp);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+        }
+        public async Task<List<string>> GetUserRoleAsync(Guid userId)
+        {
+            var userRoles = await _context.UserRoles
+                .Where(ur => ur.UserId == userId)
+                .Select(ur => ur.RoleName)
+                .ToListAsync();
+            return userRoles;
         }
     }
 }

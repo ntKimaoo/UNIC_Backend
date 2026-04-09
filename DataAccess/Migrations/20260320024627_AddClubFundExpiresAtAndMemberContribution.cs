@@ -24,11 +24,9 @@ namespace DataAccess.Migrations
                 type: "date",
                 nullable: true);
 
-            // Giao dịch nộp tiền qua PayOS trước khi có cờ IsMemberContribution
             migrationBuilder.Sql("""
-                UPDATE FundTransactions
-                SET IsMemberContribution = 1
-                WHERE PaymentLinkId IS NOT NULL AND TransactionType = 'INCOME'
+                IF COL_LENGTH('dbo.FundTransactions', 'PaymentLinkId') IS NOT NULL
+                    EXEC(N'UPDATE dbo.FundTransactions SET IsMemberContribution = 1 WHERE PaymentLinkId IS NOT NULL AND TransactionType = N''INCOME''');
                 """);
         }
 

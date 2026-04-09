@@ -2,6 +2,7 @@ using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.Formats.Asn1;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -107,6 +108,32 @@ namespace UNIC.DataAccess.Repositories.Implementation
             return await _context.Departments
                 .Include(d => d.ClubRoles)
                 .FirstOrDefaultAsync(d => d.ManagerRoleId == managerRoleId);
+        }
+
+        public async Task<IEnumerable<UserClubRole>> GetMembersWithRolesByDepartmentAsync(
+            int clubId, int departmentId)
+        {
+            return await _context.UserClubRoleDepartments
+                .Where(ud => ud.DepartmentId == departmentId
+                          && ud.ClubMember.ClubId == clubId)
+                .Include(ud => ud.ClubMember)
+                    .ThenInclude(ucr => ucr.User)
+                .Include(ud => ud.ClubMember)
+                    .ThenInclude(ucr => ucr.ClubRole)
+                .Select(ud => ud.ClubMember)
+                .ToListAsync();
+        }
+        public async Task<UserClubRoleDepartment> AddMemberTodepartment(UserClubRoleDepartment departMember)
+        {
+            await _context.UserClubRoleDepartments.AddAsync(departMember);
+            await _context.SaveChangesAsync();
+            return departMember;
+        }
+        public async Task<UserClubRoleDepartment> RemoveMemberFromDepartment(UserClubRoleDepartment departMember)
+        {
+            _context.UserClubRoleDepartments.Remove(departMember);
+            await _context.SaveChangesAsync();
+            return departMember;
         }
     }
 }

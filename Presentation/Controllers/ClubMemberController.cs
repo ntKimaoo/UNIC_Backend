@@ -32,20 +32,40 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
-        /// Lấy danh sách members của club
+        /// Lấy danh sách members của club (hỗ trợ phân trang, lọc, sắp xếp)
         /// </summary>
         [HttpGet("api/clubs/{clubId}/members")]
         
-        public async Task<IActionResult> GetMembers(int clubId)
+        public async Task<IActionResult> GetMembers(
+            int clubId,
+            [FromQuery] int? pagination,
+            [FromQuery] int? page,
+            [FromQuery] string? filter,
+            [FromQuery] bool? ascending,
+            [FromQuery] string? sortBy)
         {
-            var members = await _service.GetMembersByClubAsync(clubId);
-            return Ok(new { success = true, data = members });
+            var pagedResult = await _service.GetMembersByClubAsync(clubId, pagination, page, filter, ascending, sortBy);
+
+            if (pagination.HasValue && pagination.Value > 0)
+            {
+                return Ok(new
+                {
+                    success = true,
+                    totalItems = pagedResult.TotalCount,
+                    totalPages = pagedResult.TotalPages,
+                    currentPage = pagedResult.PageNumber,
+                    pageSize = pagedResult.PageSize,
+                    data = pagedResult.Items
+                });
+            }
+
+            return Ok(new { success = true, totalItems = pagedResult.TotalCount, data = pagedResult.Items });
         }
 
         /// <summary>
         /// Lấy thông tin một member theo ID
         /// </summary>
-        [HttpGet("api/clubs/{clubId}/members{memberId}")]
+        [HttpGet("api/clubs/{clubId}/members/{memberId}")]
        
         public async Task<IActionResult> GetMember(int clubId, int memberId)
         {

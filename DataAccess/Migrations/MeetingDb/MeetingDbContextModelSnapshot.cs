@@ -22,136 +22,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("DataAccess.Models.Meeting.CampaignDecision", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("CampaignId")
-                        .HasColumnType("int");
-
-                    b.Property<Guid>("CandidateUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("DecidedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("DecidedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Decision")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<int>("InterviewScheduleId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("NotificationChannels")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("PublishStatus")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateTime?>("PublishedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("ScheduledPublishAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CampaignId");
-
-                    b.HasIndex("InterviewScheduleId");
-
-                    b.HasIndex("CampaignId", "CandidateUserId")
-                        .IsUnique();
-
-                    b.ToTable("CampaignDecisions", (string)null);
-                });
-
-            modelBuilder.Entity("DataAccess.Models.Meeting.CriteriaScore", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("EvaluationCriterionId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("InterviewAssignmentId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<int>("Score")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EvaluationCriterionId");
-
-                    b.HasIndex("InterviewAssignmentId", "EvaluationCriterionId")
-                        .IsUnique();
-
-                    b.ToTable("CriteriaScores", (string)null);
-                });
-
-            modelBuilder.Entity("DataAccess.Models.Meeting.EvaluationCriterion", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("CampaignId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsDefault")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<int>("Weight")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CampaignId");
-
-                    b.HasIndex("CampaignId", "DisplayOrder");
-
-                    b.ToTable("EvaluationCriteria", (string)null);
-                });
-
             modelBuilder.Entity("DataAccess.Models.Meeting.InterviewAssignment", b =>
                 {
                     b.Property<int>("Id")
@@ -162,10 +32,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
 
                     b.Property<DateTime>("AssignedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("AssignedCriteriaIds")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("FeedbackNotes")
                         .HasColumnType("nvarchar(max)");
@@ -276,17 +142,10 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
                     b.Property<DateTime?>("EndedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("InterviewScheduleId")
+                    b.Property<int>("InterviewScheduleId")
                         .HasColumnType("int");
 
                     b.Property<bool>("IsRecordingEnabled")
@@ -303,17 +162,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
-                    b.Property<string>("RoomType")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateTime?>("ScheduledEndAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("ScheduledStartAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("datetime2");
 
@@ -325,11 +173,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.Property<string>("StunServerUri")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
 
                     b.Property<string>("TurnCredential")
                         .HasMaxLength(200)
@@ -348,11 +191,8 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedByUserId");
-
                     b.HasIndex("InterviewScheduleId")
-                        .IsUnique()
-                        .HasFilter("[InterviewScheduleId] IS NOT NULL");
+                        .IsUnique();
 
                     b.HasIndex("RoomCode")
                         .IsUnique();
@@ -442,36 +282,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.ToTable("RoomParticipants", (string)null);
                 });
 
-            modelBuilder.Entity("DataAccess.Models.Meeting.CampaignDecision", b =>
-                {
-                    b.HasOne("DataAccess.Models.Meeting.InterviewSchedule", "InterviewSchedule")
-                        .WithMany()
-                        .HasForeignKey("InterviewScheduleId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("InterviewSchedule");
-                });
-
-            modelBuilder.Entity("DataAccess.Models.Meeting.CriteriaScore", b =>
-                {
-                    b.HasOne("DataAccess.Models.Meeting.EvaluationCriterion", "EvaluationCriterion")
-                        .WithMany("CriteriaScores")
-                        .HasForeignKey("EvaluationCriterionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DataAccess.Models.Meeting.InterviewAssignment", "InterviewAssignment")
-                        .WithMany("CriteriaScores")
-                        .HasForeignKey("InterviewAssignmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("EvaluationCriterion");
-
-                    b.Navigation("InterviewAssignment");
-                });
-
             modelBuilder.Entity("DataAccess.Models.Meeting.InterviewAssignment", b =>
                 {
                     b.HasOne("DataAccess.Models.Meeting.InterviewSchedule", "InterviewSchedule")
@@ -488,7 +298,8 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.HasOne("DataAccess.Models.Meeting.InterviewSchedule", "InterviewSchedule")
                         .WithOne("MeetingRoom")
                         .HasForeignKey("DataAccess.Models.Meeting.MeetingRoom", "InterviewScheduleId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("InterviewSchedule");
                 });
@@ -513,16 +324,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                         .IsRequired();
 
                     b.Navigation("MeetingRoom");
-                });
-
-            modelBuilder.Entity("DataAccess.Models.Meeting.EvaluationCriterion", b =>
-                {
-                    b.Navigation("CriteriaScores");
-                });
-
-            modelBuilder.Entity("DataAccess.Models.Meeting.InterviewAssignment", b =>
-                {
-                    b.Navigation("CriteriaScores");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Meeting.InterviewSchedule", b =>

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Presentation.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/club/{clubId}/recruitment-campaign")]
     public class RecruitmentCampaignController : ControllerBase
     {
         private readonly IRecruitmentCampaignService _service;
@@ -17,24 +17,10 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
-        /// Get all recruitment campaigns (all clubs)
-        /// </summary>
-        [HttpGet]
-        public async Task<IActionResult> GetAll()
-        {
-            var campaigns = await _service.GetAllAsync();
-            return Ok(new
-            {
-                success = true,
-                data = campaigns
-            });
-        }
-
-        /// <summary>
         /// Get all recruitment campaigns for a specific club
         /// </summary>
-        [HttpGet("club/{clubId}")]
-        public async Task<IActionResult> GetAllByClubId(int clubId)
+        [HttpGet]
+        public async Task<IActionResult> GetAll(int clubId)
         {
             var campaigns = await _service.GetByClubIdAsync(clubId);
             return Ok(new
@@ -48,7 +34,7 @@ namespace Presentation.Controllers
         /// Get recruitment campaign by ID
         /// </summary>
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
+        public async Task<IActionResult> GetById(int clubId, int id)
         {
             var campaign = await _service.GetByIdAsync(id);
             if (campaign == null)
@@ -71,7 +57,7 @@ namespace Presentation.Controllers
         /// Create a new recruitment campaign
         /// </summary>
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreateRecruitmentCampaignDto dto)
+        public async Task<IActionResult> Create(int clubId, [FromBody] CreateRecruitmentCampaignDto dto)
         {
             if (!ModelState.IsValid)
             {
@@ -88,7 +74,7 @@ namespace Presentation.Controllers
                 var campaign = await _service.CreateAsync(dto);
                 return CreatedAtAction(
                     nameof(GetById),
-                    new { id = campaign.CampaignId },
+                    new { clubId = clubId, id = campaign.CampaignId },
                     new
                     {
                         success = true,
@@ -110,7 +96,7 @@ namespace Presentation.Controllers
         /// Update an existing recruitment campaign
         /// </summary>
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] UpdateRecruitmentCampaignDto dto)
+        public async Task<IActionResult> Update(int clubId, int id, [FromBody] UpdateRecruitmentCampaignDto dto)
         {
             if (!ModelState.IsValid)
             {
@@ -155,7 +141,7 @@ namespace Presentation.Controllers
         /// Delete a recruitment campaign
         /// </summary>
         [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> Delete(int clubId, int id)
         {
             var result = await _service.DeleteAsync(id);
             if (!result)
@@ -175,3 +161,4 @@ namespace Presentation.Controllers
         }
     }
 }
+

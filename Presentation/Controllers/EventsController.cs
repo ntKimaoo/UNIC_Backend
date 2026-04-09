@@ -1,11 +1,12 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Exceptions;
 using BusinessLogic.Services.Interface;
-using Microsoft.AspNetCore.Mvc;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
-using System.Collections.Generic;
+using Microsoft.AspNetCore.Mvc;
+using Presentation.Authorization;
 using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace UNIC.Presentation.Controllers
 {

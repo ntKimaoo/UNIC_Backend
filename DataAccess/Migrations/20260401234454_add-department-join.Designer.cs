@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    [Migration("20260330085632_AddCollaboratorPoliciesColumn")]
-    partial class AddCollaboratorPoliciesColumn
+    [Migration("20260401234454_add-department-join")]
+    partial class adddepartmentjoin
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -531,9 +531,6 @@ namespace DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool>("IsOnline")
-                        .HasColumnType("bit");
-
                     b.Property<bool>("IsPublic")
                         .HasColumnType("bit");
 
@@ -544,10 +541,6 @@ namespace DataAccess.Migrations
 
                     b.Property<int?>("MaxAttendees")
                         .HasColumnType("int");
-
-                    b.Property<string>("MeetLink")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<DateTime?>("RegistrationEndDate")
                         .HasColumnType("datetime2");
@@ -608,44 +601,6 @@ namespace DataAccess.Migrations
                     b.HasIndex("EventId");
 
                     b.ToTable("EventBudgets");
-                });
-
-            modelBuilder.Entity("DataAccess.Models.EventCollaborator", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("AssignedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid?>("AssignedBy")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("EventId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Policies")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("EventId", "UserId")
-                        .IsUnique();
-
-                    b.ToTable("EventCollaborators");
                 });
 
             modelBuilder.Entity("DataAccess.Models.EventImage", b =>
@@ -1133,6 +1088,21 @@ namespace DataAccess.Migrations
                     b.ToTable("UserClubRoles");
                 });
 
+            modelBuilder.Entity("DataAccess.Models.UserClubRoleDepartment", b =>
+                {
+                    b.Property<int>("ClubMemberId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DepartmentId")
+                        .HasColumnType("int");
+
+                    b.HasKey("ClubMemberId", "DepartmentId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.ToTable("UserClubRoleDepartments");
+                });
+
             modelBuilder.Entity("DataAccess.Models.UserRole", b =>
                 {
                     b.Property<int>("RoleId")
@@ -1294,36 +1264,6 @@ namespace DataAccess.Migrations
                     b.HasKey("PolicyGroupId");
 
                     b.ToTable("PolicyGroups");
-                });
-
-            modelBuilder.Entity("UNIC.DataAccess.Models.UserPolicy", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("PolicyId")
-                        .HasColumnType("int");
-
-                    b.HasKey("UserId", "PolicyId");
-
-                    b.HasIndex("PolicyId");
-
-                    b.ToTable("UserPolicies");
-                });
-
-            modelBuilder.Entity("UNIC.DataAccess.Models.UserRolePolicy", b =>
-                {
-                    b.Property<int>("RoleId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("PolicyId")
-                        .HasColumnType("int");
-
-                    b.HasKey("RoleId", "PolicyId");
-
-                    b.HasIndex("PolicyId");
-
-                    b.ToTable("UserRolePolicies");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Application", b =>
@@ -1501,25 +1441,6 @@ namespace DataAccess.Migrations
                     b.Navigation("Event");
                 });
 
-            modelBuilder.Entity("DataAccess.Models.EventCollaborator", b =>
-                {
-                    b.HasOne("DataAccess.Models.Event", "Event")
-                        .WithMany("Collaborators")
-                        .HasForeignKey("EventId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.Navigation("Event");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("DataAccess.Models.EventImage", b =>
                 {
                     b.HasOne("DataAccess.Models.Event", "Event")
@@ -1656,6 +1577,25 @@ namespace DataAccess.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("DataAccess.Models.UserClubRoleDepartment", b =>
+                {
+                    b.HasOne("DataAccess.Models.UserClubRole", "ClubMember")
+                        .WithMany("MemberDepartments")
+                        .HasForeignKey("ClubMemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DataAccess.Models.Department", "Department")
+                        .WithMany("DepartmentMembers")
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ClubMember");
+
+                    b.Navigation("Department");
+                });
+
             modelBuilder.Entity("DataAccess.Models.UserRole", b =>
                 {
                     b.HasOne("DataAccess.Models.User", "User")
@@ -1732,44 +1672,6 @@ namespace DataAccess.Migrations
                     b.Navigation("PolicyGroup");
                 });
 
-            modelBuilder.Entity("UNIC.DataAccess.Models.UserPolicy", b =>
-                {
-                    b.HasOne("UNIC.DataAccess.Models.Policy", "Policy")
-                        .WithMany("UserPolicies")
-                        .HasForeignKey("PolicyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany("UserPolicies")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Policy");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("UNIC.DataAccess.Models.UserRolePolicy", b =>
-                {
-                    b.HasOne("UNIC.DataAccess.Models.Policy", "Policy")
-                        .WithMany("UserRolePolicies")
-                        .HasForeignKey("PolicyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DataAccess.Models.UserRole", "Role")
-                        .WithMany("UserRolePolicies")
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Policy");
-
-                    b.Navigation("Role");
-                });
-
             modelBuilder.Entity("DataAccess.Models.Application", b =>
                 {
                     b.Navigation("ApplicationAnswers");
@@ -1821,13 +1723,13 @@ namespace DataAccess.Migrations
             modelBuilder.Entity("DataAccess.Models.Department", b =>
                 {
                     b.Navigation("ClubRoles");
+
+                    b.Navigation("DepartmentMembers");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Event", b =>
                 {
                     b.Navigation("Attendances");
-
-                    b.Navigation("Collaborators");
 
                     b.Navigation("EventBudgets");
 
@@ -1869,19 +1771,14 @@ namespace DataAccess.Migrations
 
                     b.Navigation("RefreshTokens");
 
-                    b.Navigation("UserPolicies");
-
                     b.Navigation("UserRoles");
                 });
 
             modelBuilder.Entity("DataAccess.Models.UserClubRole", b =>
                 {
                     b.Navigation("ClubMemberPolicies");
-                });
 
-            modelBuilder.Entity("DataAccess.Models.UserRole", b =>
-                {
-                    b.Navigation("UserRolePolicies");
+                    b.Navigation("MemberDepartments");
                 });
 
             modelBuilder.Entity("UNIC.DataAccess.Models.Policy", b =>
@@ -1889,10 +1786,6 @@ namespace DataAccess.Migrations
                     b.Navigation("ClubMemberPolicies");
 
                     b.Navigation("ClubRolePolicies");
-
-                    b.Navigation("UserPolicies");
-
-                    b.Navigation("UserRolePolicies");
                 });
 
             modelBuilder.Entity("UNIC.DataAccess.Models.PolicyGroup", b =>

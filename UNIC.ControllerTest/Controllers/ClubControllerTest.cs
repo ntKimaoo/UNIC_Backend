@@ -44,7 +44,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubService.Setup(s => s.GetAllAsync())
                             .ReturnsAsync(clubs);
 
-            var result = await _controller.GetAll(10, null, "1");
+            var result = await _controller.GetAll();
 
             var okResult = Assert.IsType<OkObjectResult>(result);
             Assert.Equal(200, okResult.StatusCode);
@@ -56,32 +56,64 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubService.Setup(s => s.GetAllAsync())
                             .ReturnsAsync(new List<ClubResponseDto>());
 
-            var result = await _controller.GetAll(10, null, "1");
+            var result = await _controller.GetAll();
 
             Assert.IsType<OkObjectResult>(result);
         }
+        [Fact]
+        public async Task GetAll_WhenException_Returns500()
+        {
+            _mockClubService.Setup(s => s.GetAllAsync())
+                            .ThrowsAsync(new Exception("Error"));
 
+            var result = await _controller.GetAll();
+
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(500, obj.StatusCode);
+        }
         #endregion
 
         #region GetActiveClubs
 
         [Fact]
-        public async Task GetActiveClubs_ReturnsOk_WithActiveClubs()
+        public async Task GetActiveClubs_ReturnsOk_WithData()
         {
             var clubs = new List<ClubResponseDto>
-            {
-                new ClubResponseDto { ClubId = 1, ClubName = "Active Club", IsActive = true }
-            };
+    {
+        new ClubResponseDto { ClubId = 1, ClubName = "Club A" }
+    };
 
             _mockClubService.Setup(s => s.GetActiveClubsAsync())
                             .ReturnsAsync(clubs);
 
-            var result = await _controller.GetActiveClubs(10, null, "1");
+            var result = await _controller.GetActiveClubs();
 
             var okResult = Assert.IsType<OkObjectResult>(result);
             Assert.Equal(200, okResult.StatusCode);
         }
+        [Fact]
+        public async Task GetActiveClubs_ReturnsOk_WithEmptyList()
+        {
+            var clubs = new List<ClubResponseDto>();
 
+            _mockClubService.Setup(s => s.GetActiveClubsAsync())
+                            .ReturnsAsync(clubs);
+
+            var result = await _controller.GetActiveClubs();
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+        [Fact]
+        public async Task GetActiveClubs_WhenException_Returns500()
+        {
+            _mockClubService.Setup(s => s.GetActiveClubsAsync())
+                            .ThrowsAsync(new Exception("DB error"));
+
+            var result = await _controller.GetActiveClubs();
+
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(500, obj.StatusCode);
+        }
         #endregion
 
         #region GetPublicClubs
@@ -99,18 +131,43 @@ namespace UNIC.ControllerTest.Controllers
 
             var result = await _controller.GetPublicClubs();
 
-            var okResult = Assert.IsType<OkObjectResult>(result);
-            Assert.Equal(200, okResult.StatusCode);
+            Assert.IsType<OkObjectResult>(result);
         }
+        [Fact]
+        public async Task GetPublicClubs_ReturnsOk_WithEmptyList()
+        {
+            var clubs = new List<ClubResponseDto>();
 
+            _mockClubService.Setup(s => s.GetPublicClubsAsync())
+                            .ReturnsAsync(clubs);
+
+            var result = await _controller.GetPublicClubs();
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+        [Fact]
+        public async Task GetPublicClubs_WhenException_Returns500()
+        {
+            _mockClubService.Setup(s => s.GetPublicClubsAsync())
+                            .ThrowsAsync(new Exception("DB error"));
+
+            var result = await _controller.GetPublicClubs();
+
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(500, obj.StatusCode);
+        }
         #endregion
 
         #region GetById
 
         [Fact]
-        public async Task GetById_ReturnsOk_WhenClubExists()
+        public async Task GetById_WhenClubExists_ReturnsOk()
         {
-            var club = new ClubResponseDto { ClubId = 1, ClubName = "Club A" };
+            var club = new ClubResponseDto
+            {
+                ClubId = 1,
+                ClubName = "Club A"
+            };
 
             _mockClubService.Setup(s => s.GetByIdAsync(1))
                             .ReturnsAsync(club);
@@ -118,70 +175,166 @@ namespace UNIC.ControllerTest.Controllers
             var result = await _controller.GetById(1);
 
             var okResult = Assert.IsType<OkObjectResult>(result);
-            Assert.Equal(200, okResult.StatusCode);
+
+            var value = okResult.Value!;
+            var type = value.GetType();
+
+            Assert.True((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.NotNull(type.GetProperty("data")!.GetValue(value));
         }
 
         [Fact]
-        public async Task GetById_ReturnsNotFound_WhenClubNotExists()
+        public async Task GetById_WhenNotFound_Returns404()
         {
             _mockClubService.Setup(s => s.GetByIdAsync(99))
                             .ReturnsAsync((ClubResponseDto?)null);
 
-            var result = await _controller.GetById(99);
+            var result = await _controller.GetById(1);
 
-            Assert.IsType<NotFoundObjectResult>(result);
+            var notFound = Assert.IsType<NotFoundObjectResult>(result);
+
+            var value = notFound.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("Club not found",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
         }
+        [Fact]
+        public async Task GetById_WhenException_Returns500()
+        {
+            _mockClubService.Setup(s => s.GetByIdAsync(1))
+                            .ThrowsAsync(new Exception("DB error"));
 
+            var result = await _controller.GetById(1);
+
+            var objectResult = Assert.IsType<ObjectResult>(result);
+
+            Assert.Equal(500, objectResult.StatusCode);
+
+            var value = objectResult.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("DB error",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
         #endregion
 
         #region Create
 
         [Fact]
-        public async Task Create_ReturnsCreated_WhenSuccess()
+        public async Task Create_WhenModelStateInvalid_ReturnsBadRequest()
         {
-            var dto = new CreateClubDto { ClubName = "New Club" };
-            var created = new ClubResponseDto { ClubId = 1, ClubName = "New Club" };
+            _controller.ModelState.AddModelError("ClubName", "Required");
+
+            var dto = new CreateClubDto();
+
+            var result = await _controller.Create(dto);
+
+            var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+
+            var value = badRequest.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("Invalid data",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
+
+        [Fact]
+        public async Task Create_WhenValid_ReturnsCreated()
+        {
+            var dto = new CreateClubDto
+            {
+                ClubName = "New Club"
+            };
+
+            var club = new ClubResponseDto
+            {
+                ClubId = 1,
+                ClubName = "New Club"
+            };
 
             _mockClubService.Setup(s => s.CreateAsync(dto))
-                            .ReturnsAsync(created);
+                            .ReturnsAsync(club);
 
             var result = await _controller.Create(dto);
 
             var createdResult = Assert.IsType<CreatedAtActionResult>(result);
-            Assert.Equal(201, createdResult.StatusCode);
+
+            Assert.Equal(nameof(_controller.GetById), createdResult.ActionName);
+            Assert.Equal(1, createdResult.RouteValues!["id"]);
+
+            var value = createdResult.Value!;
+            var type = value.GetType();
+
+            Assert.True((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("Club created successfully",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
         }
 
         [Fact]
-        public async Task Create_ReturnsBadRequest_WhenInvalidOperation()
+        public async Task Create_WhenInvalidOperationException_ReturnsBadRequest()
         {
-            var dto = new CreateClubDto { ClubName = "Duplicate Club" };
+            var dto = new CreateClubDto { ClubName = "Club A" };
 
             _mockClubService.Setup(s => s.CreateAsync(dto))
-                            .ThrowsAsync(new InvalidOperationException("Club with this name already exists"));
+                            .ThrowsAsync(new InvalidOperationException("Club already exists"));
 
             var result = await _controller.Create(dto);
 
-            Assert.IsType<BadRequestObjectResult>(result);
-        }
+            var badRequest = Assert.IsType<BadRequestObjectResult>(result);
 
+            var value = badRequest.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("Club already exists",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
         [Fact]
-        public async Task Create_Returns500_WhenUnexpectedException()
+        public async Task Create_WhenException_Returns500()
         {
-            var dto = new CreateClubDto { ClubName = "Error Club" };
+            var dto = new CreateClubDto { ClubName = "Club A" };
 
             _mockClubService.Setup(s => s.CreateAsync(dto))
-                            .ThrowsAsync(new Exception("Unexpected error"));
+                            .ThrowsAsync(new Exception("DB error"));
 
             var result = await _controller.Create(dto);
 
-            var statusResult = Assert.IsType<ObjectResult>(result);
-            Assert.Equal(500, statusResult.StatusCode);
-        }
+            var objectResult = Assert.IsType<ObjectResult>(result);
 
+            Assert.Equal(500, objectResult.StatusCode);
+
+            var value = objectResult.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("An error occurred while creating the club",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
         #endregion
 
         #region Update
+        [Fact]
+        public async Task Update_WhenModelInvalid_ReturnsBadRequest()
+        {
+            _controller.ModelState.AddModelError("ClubName", "Required");
 
+            var dto = new UpdateClubDto();
+
+            var result = await _controller.Update(1, dto);
+
+            var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+
+            var value = badRequest.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("Invalid data",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
         [Fact]
         public async Task Update_ReturnsOk_WhenSuccess()
         {
@@ -252,18 +405,6 @@ namespace UNIC.ControllerTest.Controllers
             var okResult = Assert.IsType<OkObjectResult>(result);
             Assert.Equal(200, okResult.StatusCode);
         }
-
-        [Fact]
-        public async Task ChangeStatus_ReturnsBadRequest_WhenInvalidOperation()
-        {
-            _mockClubService.Setup(s => s.ChangeStatusClub(99))
-                            .ThrowsAsync(new InvalidOperationException("Club not found"));
-
-            var result = await _controller.changStatus(99);
-
-            Assert.IsType<BadRequestObjectResult>(result);
-        }
-
         [Fact]
         public async Task ChangeStatus_Returns500_WhenUnexpectedException()
         {
@@ -302,7 +443,25 @@ namespace UNIC.ControllerTest.Controllers
 
             Assert.IsType<NotFoundObjectResult>(result);
         }
+        [Fact]
+        public async Task SoftDelete_WhenException_Returns500()
+        {
+            _mockClubService.Setup(s => s.SoftDeleteAsync(1))
+                            .ThrowsAsync(new Exception("DB error"));
 
+            var result = await _controller.SoftDelete(1);
+
+            var objectResult = Assert.IsType<ObjectResult>(result);
+
+            Assert.Equal(500, objectResult.StatusCode);
+
+            var value = objectResult.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("An error occurred while updating the club",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
         #endregion
 
         #region Delete
@@ -329,7 +488,25 @@ namespace UNIC.ControllerTest.Controllers
 
             Assert.IsType<NotFoundObjectResult>(result);
         }
+        [Fact]
+        public async Task Delete_WhenException_Returns500()
+        {
+            _mockClubService.Setup(s => s.DeleteAsync(1))
+                            .ThrowsAsync(new Exception("DB error"));
 
+            var result = await _controller.Delete(1);
+
+            var objectResult = Assert.IsType<ObjectResult>(result);
+
+            Assert.Equal(500, objectResult.StatusCode);
+
+            var value = objectResult.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("An error occurred while updating the club",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
         #endregion
 
         #region GetClubStructure
@@ -365,7 +542,25 @@ namespace UNIC.ControllerTest.Controllers
 
             Assert.IsType<NotFoundObjectResult>(result);
         }
+        [Fact]
+        public async Task GetClubStructure_WhenException_Returns500()
+        {
+            _mockClubService.Setup(s => s.GetByIdAsync(1))
+                            .ThrowsAsync(new Exception("DB error"));
 
+            var result = await _controller.GetClubStructure(1);
+
+            var objectResult = Assert.IsType<ObjectResult>(result);
+
+            Assert.Equal(500, objectResult.StatusCode);
+
+            var value = objectResult.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("An error occurred while updating the club",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
         #endregion
     }
 }

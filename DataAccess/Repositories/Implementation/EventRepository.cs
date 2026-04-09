@@ -89,31 +89,25 @@ namespace DataAccess.Repositories.Implementation
 
         // Atomic Direct-Promote: chuyển người WAITLIST lâu nhất thành targetStatus
         // KHÔNG nhả slot vào pool — chống Slot Stealing & Double Cancel
-        // Retry loop chống race condition khi 2+ cancel cùng lúc
         public async Task<bool> TryDirectPromoteOldestWaitlistAsync(int eventId, string targetStatus)
         {
-            for (int attempt = 0; attempt < 3; attempt++)
-            {
-                var oldestId = await _context.Attendances
-                    .Where(a => a.EventId == eventId
-                             && a.AttendanceStatus == nameof(AttendanceStatus.WAITLIST))
-                    .OrderBy(a => a.RegistrationDate)
-                    .Select(a => (int?)a.AttendId)
-                    .FirstOrDefaultAsync();
+            var oldestId = await _context.Attendances
+                .Where(a => a.EventId == eventId
+                         && a.AttendanceStatus == nameof(AttendanceStatus.WAITLIST))
+                .OrderBy(a => a.RegistrationDate)
+                .Select(a => (int?)a.AttendId)
+                .FirstOrDefaultAsync();
 
-                if (oldestId == null) return false; // Không còn ai WAITLIST
+            if (oldestId == null) return false;
 
-                // Guard condition: chỉ update nếu vẫn còn WAITLIST (chống double promote)
-                var rows = await _context.Attendances
-                    .Where(a => a.AttendId == oldestId.Value
-                             && a.AttendanceStatus == nameof(AttendanceStatus.WAITLIST))
-                    .ExecuteUpdateAsync(s =>
-                        s.SetProperty(a => a.AttendanceStatus, targetStatus));
+            // Guard condition chống Double Cancel: chỉ update nếu vẫn còn WAITLIST
+            var rows = await _context.Attendances
+                .Where(a => a.AttendId == oldestId.Value
+                         && a.AttendanceStatus == nameof(AttendanceStatus.WAITLIST))
+                .ExecuteUpdateAsync(s =>
+                    s.SetProperty(a => a.AttendanceStatus, targetStatus));
 
-                if (rows == 1) return true; // Promote thành công
-                // rows == 0: người này đã bị promote bởi thread khác → retry với người tiếp theo
-            }
-            return false; // Sau 3 lần vẫn race → fallback increment slot
+            return rows == 1;
         }
 
         // Cộng slot lại — chỉ gọi khi không có ai ở WAITLIST
@@ -135,7 +129,7 @@ namespace DataAccess.Repositories.Implementation
             _context.Events.Update(@event);
         }
 
-        // Proactive batch status sync — gọi bởi Background Service
+        // Proactive batch status sync — called by Background Service
         public async Task<int> BulkSyncStatusAsync()
         {
             var now = DateTime.Now;

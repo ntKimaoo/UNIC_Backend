@@ -124,10 +124,68 @@ namespace DataAccess.Repositories.Implementation
         }
         public async Task<IEnumerable<Club>> GetAllClubByUser(Guid userId)
         {
+            bool isAdmin = await _context.UserRoles
+                .AnyAsync(m => m.UserId == userId && m.RoleName == "Admin");
+            if (isAdmin)
+            {
+                return await _context.Clubs.ToListAsync();
+            }
             return await _context.UserClubRoles
                 .Where(cm => cm.UserId == userId)
                 .Select(cm => cm.Club)
                 .ToListAsync();
+        }
+
+        public async Task<IEnumerable<(Department Department, ClubRole? DepartmentRole, int MemberCount)>>
+            GetDepartmentsByUserAndClubAsync(Guid userId, int clubId)
+        {
+            bool isAdmin = await _context.UserRoles
+               .AnyAsync(m => m.UserId == userId && m.RoleName == "Admin");
+            if (isAdmin)
+            {
+                var departments = await _context.Departments
+                    .Where(d => d.ClubId == clubId)
+                    .Include(d => d.ClubRoles)
+                    .Select(d => new
+                    {
+                        Department  = d,
+                        MemberCount = _context.UserClubRoleDepartments
+                            .Count(ud => ud.DepartmentId == d.DepartmentId)
+                    })
+                    .ToListAsync();
+
+                return departments.Select(x => (x.Department, (ClubRole?)null, x.MemberCount));
+            }
+
+            // Find the member entry for this user in this club
+            var member = await _context.UserClubRoles
+                .FirstOrDefaultAsync(ucr => ucr.UserId == userId && ucr.ClubId == clubId);
+
+            if (member == null)
+                return Enumerable.Empty<(Department, ClubRole?, int)>();
+
+            // Load all departments the member belongs to via the junction table,
+            // including all ClubRoles that belong to each department + member count
+            var rows = await _context.UserClubRoleDepartments
+                .Where(ud => ud.ClubMemberId == member.ClubMemberId)
+                .Include(ud => ud.Department)
+                    .ThenInclude(d => d.ClubRoles)      // ← all roles in the department
+                .Include(ud => ud.ClubMember)
+                    .ThenInclude(ucr => ucr.ClubRole)
+                .Select(ud => new
+                {
+                    ud.Department,
+                    // Only surface the user's own role when it belongs to this department
+                    DepartmentRole = ud.ClubMember.ClubRole != null
+                        && ud.ClubMember.ClubRole.DepartmentId == ud.DepartmentId
+                        ? ud.ClubMember.ClubRole
+                        : null,
+                    MemberCount = _context.UserClubRoleDepartments
+                        .Count(x => x.DepartmentId == ud.DepartmentId)
+                })
+                .ToListAsync();
+
+            return rows.Select(r => (r.Department, (ClubRole?)r.DepartmentRole, r.MemberCount));
         }
     }
 }

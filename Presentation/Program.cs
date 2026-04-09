@@ -1,4 +1,3 @@
-using UNIC.BusinessLogic.Services;
 using BusinessLogic.DTOs;
 using BusinessLogic.Services;
 using BusinessLogic.Services.Background;
@@ -157,12 +156,7 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new NullableDateTimeUtcJsonConverter());
 }); ;
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    c.IncludeXmlComments(xmlPath);
-});
+builder.Services.AddSwaggerGen();
 //signalR
 builder.Services.AddSignalR();
 //jwt
@@ -187,16 +181,10 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(key)
     };
 });
-// Register authorization handler
-builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
+// Single handler: club-scoped policy check OR UserRole claim check (OR logic)
+builder.Services.AddScoped<IAuthorizationHandler, ClubPolicyOrRoleHandler>();
 
-// Register club-scoped authorization handler
-builder.Services.AddScoped<IAuthorizationHandler, ClubMemberAuthorizationHandler>();
-
-// Register event-scoped authorization handler
-builder.Services.AddScoped<IAuthorizationHandler, EventPermissionAuthorizationHandler>();
-
-// Register dynamic policy provider
+// Dynamic policy provider (ClubPolicy_ / Role_ / ClubPolicyOrRole_ prefixes)
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 
 // Configure file upload size limits

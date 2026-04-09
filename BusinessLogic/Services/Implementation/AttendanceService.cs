@@ -2,7 +2,6 @@ using AutoMapper;
 using BusinessLogic.DTOs;
 using BusinessLogic.Exceptions;
 using BusinessLogic.Services.Interface;
-using BusinessLogic.Services.Background;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using DataAccess.Enums;
@@ -136,17 +135,13 @@ namespace BusinessLogic.Services.Implementation
                 await _unitOfWork.SaveChangesAsync();
                 await txn.CommitAsync();
 
-                // Gửi email qua queue — retry tự động, không block transaction
+                // Email ngoài transaction — lỗi email KHÔNG rollback DB
                 if (status == nameof(AttendanceStatus.REGISTERED))
                 {
-                    EmailQueueService.EnqueueEmail(new EmailQueueItem
+                    _ = Task.Run(async () =>
                     {
-                        ToEmail = user.Email,
-                        FullName = user.FullName,
-                        EmailType = EmailType.EventRegistration,
-                        EventName = eventEntity.EventName,
-                        StartDate = eventEntity.StartDate,
-                        Token = attendance.CheckInToken
+                        try { await _emailService.SendEventRegistrationSuccessAsync(user.Email, user.FullName, eventEntity.EventName, eventEntity.StartDate, attendance.CheckInToken); }
+                        catch (Exception ex) { Console.WriteLine($"[Email] SendRegistration failed: {ex.Message}"); }
                     });
                 }
             }
@@ -412,21 +407,19 @@ namespace BusinessLogic.Services.Implementation
             _unitOfWork.Attendances.Update(attendance);
             await _unitOfWork.SaveChangesAsync();
 
-            // Gửi email qua queue — retry tự động
-            var user = attendance.User;
-            var ev = attendance.Event;
-            if (user != null && ev != null)
+            // Gửi email riêng, lỗi email KHÔNG rollback DB
+            _ = Task.Run(async () =>
             {
-                EmailQueueService.EnqueueEmail(new EmailQueueItem
+                try
                 {
-                    ToEmail = user.Email,
-                    FullName = user.FullName,
-                    EmailType = EmailType.EventRegistration,
-                    EventName = ev.EventName,
-                    StartDate = ev.StartDate,
-                    Token = attendance.CheckInToken
-                });
-            }
+                    var user = attendance.User;
+                    var ev = attendance.Event;
+                    if (user != null && ev != null)
+                        await _emailService.SendEventRegistrationSuccessAsync(
+                            user.Email, user.FullName, ev.EventName, ev.StartDate, attendance.CheckInToken);
+                }
+                catch (Exception ex) { Console.WriteLine($"[Email] ApproveRegistration email failed: {ex.Message}"); }
+            });
         }
 
         public async Task<int> BulkApproveAsync(int eventId, List<Guid> userIds)

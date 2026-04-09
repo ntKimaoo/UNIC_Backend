@@ -1,6 +1,8 @@
+using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
+using Presentation.Authorization;
 using UNIC.BusinessLogic.DTOs;
 using UNIC.BusinessLogic.Services.Interface;
 
@@ -58,6 +60,7 @@ namespace UNIC.Presentation.Controllers
         /// Create a new department for a club
         /// </summary>
         [HttpPost]
+        [RequireClubPolicyOrRole("createdepartment")]
         public async Task<IActionResult> CreateDepartment(int clubId, [FromBody] CreateDepartmentDto request)
         {
             if (!ModelState.IsValid)
@@ -79,14 +82,6 @@ namespace UNIC.Presentation.Controllers
                     new { success = true, data = createdDepartment }
                 );
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = ex.Message
-                });
-            }
             catch (Exception ex)
             {
                 return StatusCode(500, new
@@ -102,6 +97,8 @@ namespace UNIC.Presentation.Controllers
         /// Update a department in a club
         /// </summary>
         [HttpPut("{id}")]
+        [RequireClubPolicyOrRole("editdepartment")]
+
         public async Task<IActionResult> UpdateDepartment(int clubId, int id, [FromBody] UpdateDepartmentDto request)
         {
             if (!ModelState.IsValid)
@@ -133,14 +130,7 @@ namespace UNIC.Presentation.Controllers
                     data = updatedDepartment 
                 });
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = ex.Message
-                });
-            }
+            
             catch (Exception ex)
             {
                 return StatusCode(500, new
@@ -173,6 +163,47 @@ namespace UNIC.Presentation.Controllers
                 message = "Department deleted successfully",
                 data = new { id } 
             });
+        }
+
+        /// <summary>
+        /// Get all members (and their club-wide role) that belong to a specific department.
+        /// Route: GET api/club/{clubId}/department/{departmentId}/all-members
+        /// </summary>
+        [HttpGet("{departmentId}/all-members")]
+        public async Task<IActionResult> GetDepartmentMembers(int clubId, int departmentId)
+        {
+            var members = await _departmentService.GetDepartmentMembersAsync(clubId, departmentId);
+
+            if (members == null)
+                return NotFound(new
+                {
+                    success = false,
+                    message = "Department not found in this club"
+                });
+
+            return Ok(new
+            {
+                success = true,
+                data = members
+            });
+        }
+        ///<summary>
+        ///Add member to department
+        /// </summary>
+        [HttpPost("{departmentId}/members/{memberId}/add")]
+        public async Task<IActionResult> AddMemberToDepartment(int clubId,int departmentId,Guid userId)
+        {
+            var member = await _departmentService.AddMemberTodepartment(clubId, userId, departmentId);
+            return Ok(member);
+        }
+        ///<summary>
+        ///Remove member from department
+        /// </summary>
+        [HttpDelete("{departmentId}/members/{memberId}/remove")]
+        public async Task<IActionResult> RemoveMemberFromDepartment(int clubId, int departmentId, Guid userId)
+        {
+            var member = await _departmentService.RemoveMemberFromDepartment(clubId, userId, departmentId);
+            return Ok(member);
         }
     }
 }

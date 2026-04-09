@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using UNIC.BusinessLogic.DTOs;
 
 namespace BusinessLogic.Services.Implementation
 {
@@ -140,6 +141,41 @@ namespace BusinessLogic.Services.Implementation
         public async Task<IEnumerable<Club>> GetAllClubsById(Guid UserId)
         {
             return await _userRepository.GetAllClubByUser(UserId);
+        }
+
+        public async Task<IEnumerable<UserDepartmentDto>?> GetUserDepartmentsInClubAsync(
+            Guid userId, int clubId)
+        {
+            // Check membership first
+            var clubs = await _userRepository.GetAllClubByUser(userId);
+            if (!clubs.Any(c => c.ClubId == clubId))
+                return null; // user is not a member of this club
+
+            var rows = await _userRepository.GetDepartmentsByUserAndClubAsync(userId, clubId);
+
+            return rows.Select(r => new UserDepartmentDto
+            {
+                DepartmentId   = r.Department.DepartmentId,
+                DepartmentName = r.Department.DepartmentName,
+                Description    = r.Department.Description,
+                DepartmentRole = r.DepartmentRole == null ? null : new DepartmentMemberRoleDto
+                {
+                    ClubRoleId  = r.DepartmentRole.ClubRoleId,
+                    RoleName    = r.DepartmentRole.RoleName,
+                    Description = r.DepartmentRole.Description,
+                    Level       = r.DepartmentRole.Level
+                },
+                Roles = (r.Department.ClubRoles ?? Enumerable.Empty<ClubRole>())
+                    .Select(cr => new DepartmentMemberRoleDto
+                    {
+                        ClubRoleId  = cr.ClubRoleId,
+                        RoleName    = cr.RoleName,
+                        Description = cr.Description,
+                        Level       = cr.Level
+                    })
+                    .ToList(),
+                MemberCount = r.MemberCount
+            });
         }
     }
 }

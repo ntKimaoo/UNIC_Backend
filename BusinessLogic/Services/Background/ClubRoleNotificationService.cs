@@ -69,17 +69,19 @@ namespace BusinessLogic.Services.Background
 
             var managerIds = await clubRoleRepo.GetManagerIdsForClubsAsync(clubIds);
 
-            foreach (var managerId in managerIds)
+            var tasks = managerIds.Select(async managerId =>
             {
                 var alreadyNotified = await notificationRepo.HasRecentNotificationAsync(
                     managerId, NotificationType, TimeSpan.FromHours(24));
-                if (alreadyNotified) continue;
+                if (alreadyNotified) return;
 
                 await notificationService.SendNotificationAsync(
                     managerId, NotificationTitle, NotificationMessage, NotificationType);
 
                 _logger.LogInformation("Notification sent to manager {UserId}", managerId);
-            }
+            });
+
+            await Task.WhenAll(tasks);
         }
     }
 }

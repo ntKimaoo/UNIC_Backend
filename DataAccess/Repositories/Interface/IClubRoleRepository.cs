@@ -21,6 +21,8 @@ namespace DataAccess.Repositories.Interface
         Task<List<Club>> GetManagedClubsAsync(Guid userId);
         Task<List<int>> GetClubIdsWithFewRolesAsync(int threshold);
         Task<List<Guid>> GetManagerIdsForClubsAsync(List<int> clubIds);
+        Task<bool> CheckDepartementRole(int roleId);
+        Task<UserClubRole> GetUserClubRoleByIdAsync(int clubId);
 
     }
 }

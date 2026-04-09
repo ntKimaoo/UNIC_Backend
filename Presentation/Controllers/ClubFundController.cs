@@ -12,7 +12,7 @@ namespace Presentation.Controllers
 {
     [Route("api/clubs/{clubId:int}/funds")]
     [ApiController]
-    [Authorize]
+    //[Authorize]
     public class ClubFundController : ControllerBase
     {
         private readonly IClubFundService _clubFundService;
@@ -34,7 +34,7 @@ namespace Presentation.Controllers
         }
 
         [HttpPost]
-        [RequireMemberPolicy("createfinance")]
+        [RequireClubPolicy("createfinance")]
         public async Task<IActionResult> CreateFund(int clubId, [FromBody] CreateFundDto dto)
         {
             try
@@ -84,7 +84,7 @@ namespace Presentation.Controllers
         }
 
         [HttpGet("{fundId}")]
-        [RequireMemberPolicy("viewfinance")]
+        [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFund(int fundId)
         {
             var fund = await _clubFundService.GetFundByIdAsync(fundId);
@@ -99,7 +99,7 @@ namespace Presentation.Controllers
         /// <param name="page">Trang, từ 1.</param>
         /// <param name="pageSize">1–100, mặc định 10.</param>
         [HttpGet]
-        [RequireMemberPolicy("viewfinance")]
+        [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFundsByClub(
             int clubId,
             [FromQuery] int page = 1,
@@ -211,7 +211,7 @@ namespace Presentation.Controllers
         }
 
         [HttpPost("approve")]
-        [RequireMemberPolicy("editfinance")]
+        [RequireClubPolicy("editfinance")]
         public async Task<IActionResult> ApproveFund([FromBody] ApproveFundDto dto)
         {
             try
@@ -294,7 +294,7 @@ namespace Presentation.Controllers
         /// <param name="status">Mặc định (bỏ trống): APPROVED — chỉ các lần nộp đã thanh toán thành công. PENDING / REJECTED / ALL (mọi trạng thái).</param>
         /// <param name="scope">mine = chỉ các lần nộp của tôi.</param>
         [HttpGet("history/{fundId}")]
-        [RequireMemberPolicy("viewfinance")]
+        //[RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetHistory(
             int fundId,
             [FromQuery] string? status,
@@ -329,7 +329,7 @@ namespace Presentation.Controllers
 
 
         [HttpGet("~/api/funds/{fundId}/location")]
-        [RequireMemberPolicy("viewfinance")]
+        [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFundLocation(int fundId)
         {
             var fund = await _clubFundService.GetFundByIdAsync(fundId);

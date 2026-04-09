@@ -1,6 +1,7 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Implementation;
 using BusinessLogic.Services.Interface;
+using DocumentFormat.OpenXml.Office2010.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Presentation.Authorization;
@@ -23,32 +24,56 @@ namespace Presentation.Controllers
         /// <summary>
         /// Get all club roles
         /// </summary>
-        [RequireMemberPolicy("ViewRole")]
+        [RequireClubPolicyOrRole("ViewRole", "Admin")]
         [HttpGet("api/club/{clubId}/role")]
         public async Task<IActionResult> GetAll(int clubId)
         {
-            var roles = await _service.GetAllAsync(clubId);
-            return Ok(new { success = true, data = roles });
+            try
+            {
+                var roles = await _service.GetAllAsync(clubId);
+                return Ok(new { success = true, data = roles });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "An error occurred while updating the club",
+                    error = ex.Message
+                });
+            }
         }
 
         /// <summary>
         /// Get club role by ID
         /// </summary>
-        [RequireMemberPolicy("ViewRole")]
+        [RequireClubPolicyOrRole("ViewRole", "Admin")]
         [HttpGet("api/club/{clubId}/role/{id}")]
         public async Task<IActionResult> GetById(int id, int clubId)
         {
-            var role = await _service.GetByIdAsync(id, clubId);
-            if (role == null)
-                return NotFound(new { success = false, message = "Club role not found." });
+            try
+            {
+                var role = await _service.GetByIdAsync(id, clubId);
+                if (role == null)
+                    return NotFound(new { success = false, message = "Club role not found." });
 
-            return Ok(new { success = true, data = role });
+                return Ok(new { success = true, data = role });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "An error occurred while updating the club",
+                    error = ex.Message
+                });
+            }
         }
 
         /// <summary>
         /// Create a new club role
         /// </summary>
-        [RequireMemberPolicy("CreateRole")]
+        [RequireClubPolicyOrRole("CreateRole", "Admin")]
         [HttpPost("api/club/{clubId}/role")]
         public async Task<IActionResult> Create([FromBody] CreateClubRoleDto dto, int clubId)
         {
@@ -66,10 +91,6 @@ namespace Presentation.Controllers
                     data = role
                 });
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { success = false, message = ex.Message });
-            }
             catch (Exception ex)
             {
                 return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
@@ -80,8 +101,8 @@ namespace Presentation.Controllers
         /// Update an existing club role
         /// </summary>
         [HttpPut("api/club/{clubId}/role/{id}")]
-        [RequireMemberPolicy("EditRole")]
-        public async Task<IActionResult> Update(int id, [FromBody] UpdateClubRoleDto dto,int clubId)
+        [RequireClubPolicyOrRole("EditRole", "Admin")]
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateClubRoleDto dto, int clubId)
         {
             if (!ModelState.IsValid)
                 return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
@@ -94,18 +115,14 @@ namespace Presentation.Controllers
 
                 return Ok(new { success = true, message = "Club role updated successfully", data = role });
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { success = false, message = ex.Message });
-            }
             catch (Exception ex)
             {
                 return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
             }
         }
         [HttpPut("api/club/{clubId}/role/{id}/policies")]
-        [RequireMemberPolicy("EditRole")]
-        public async Task<IActionResult> UpdatePolicies(int id, List<int> policyIds,int clubId)
+        [RequireClubPolicyOrRole("EditRole", "Admin")]
+        public async Task<IActionResult> UpdatePolicies(int id, List<int> policyIds, int clubId)
         {
             if (!ModelState.IsValid)
                 return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
@@ -114,10 +131,6 @@ namespace Presentation.Controllers
             {
                 await _service.UpdatePoliciesAsync(id, policyIds);
                 return Ok(new { success = true, message = "Club role updated successfully" });
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { success = false, message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -128,32 +141,55 @@ namespace Presentation.Controllers
         /// Delete a club role
         /// </summary>
         [HttpDelete("api/club/{clubId}/role/{id}")]
-        [RequireMemberPolicy("DeleteRole")]
+        [RequireClubPolicyOrRole("DeleteRole", "Admin")]
         public async Task<IActionResult> Delete(int clubId, int id)
         {
-            var result = await _service.DeleteAsync(id);
-            if (!result)
-                return NotFound(new { success = false, message = "Club role not found" });
+            try
+            {
+                var result = await _service.DeleteAsync(id);
+                if (!result)
+                    return NotFound(new { success = false, message = "Club role not found" });
 
-            return Ok(new { success = true, message = "Club role deleted successfully" });
+                return Ok(new { success = true, message = "Club role deleted successfully" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+            }
         }
         [HttpPost("api/assign")]
         public async Task<IActionResult> AssignRole([FromBody] AssignClubRoleDto dto)
         {
-            var result = await _service.AssignRoleAsync(dto);
 
-            if (!result)
-                return BadRequest("Cannot assign role");
+            try
+            {
+                var result = await _service.AssignRoleAsync(dto);
 
-            return Ok(new { message = "Role assigned successfully" });
+                if (!result)
+                    return BadRequest("Cannot assign role");
+
+                return Ok(new { message = "Role assigned successfully" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+            }
         }
         [HttpGet("api/club/{clubId}/user/{userId}/role")]
         public async Task<IActionResult> GetUserClubRole(Guid userId, int clubId)
         {
-            var role = await _service.GetUserClubRoleAsync(userId, clubId);
-            if (role == null)
-                return NotFound(new { success = false, message = "User club role not found" });
-            return Ok(new { success = true, data = role });
+
+            try
+            {
+                var role = await _service.GetUserClubRoleAsync(userId, clubId);
+                if (role == null)
+                    return NotFound(new { success = false, message = "User club role not found" });
+                return Ok(new { success = true, data = role });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+            }
         }
     }
 }

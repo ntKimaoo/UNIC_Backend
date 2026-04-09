@@ -109,11 +109,6 @@ namespace UNIC.DataAccess.Seed
                 var meetingRoom = new MeetingRoom
                 {
                     InterviewScheduleId = interviewSchedule.Id,
-                    RoomType = RoomType.Interview,
-                    Title = interviewSchedule.Title,
-                    CreatedByUserId = interviewSchedule.CreatedByUserId,
-                    ScheduledStartAt = interviewSchedule.ScheduledAt,
-                    ScheduledEndAt = interviewSchedule.ScheduledAt.AddMinutes(interviewSchedule.DurationMinutes),
                     RoomCode = "ROOM-IT-001",
                     Status = RoomStatus.Idle,
                     CreatedAt = DateTime.UtcNow

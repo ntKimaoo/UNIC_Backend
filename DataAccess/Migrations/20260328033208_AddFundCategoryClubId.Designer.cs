@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    [Migration("20260329113038_AddEventCollaborator")]
-    partial class AddEventCollaborator
+    [Migration("20260328033208_AddFundCategoryClubId")]
+    partial class AddFundCategoryClubId
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -603,41 +603,6 @@ namespace DataAccess.Migrations
                     b.ToTable("EventBudgets");
                 });
 
-            modelBuilder.Entity("DataAccess.Models.EventCollaborator", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("AssignedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid?>("AssignedBy")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("EventId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("EventId", "UserId")
-                        .IsUnique();
-
-                    b.ToTable("EventCollaborators");
-                });
-
             modelBuilder.Entity("DataAccess.Models.EventImage", b =>
                 {
                     b.Property<int>("ImageId")
@@ -721,11 +686,16 @@ namespace DataAccess.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int?>("ClubId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("CategoryId");
+
+                    b.HasIndex("ClubId");
 
                     b.ToTable("FundCategories");
                 });
@@ -1491,25 +1461,6 @@ namespace DataAccess.Migrations
                     b.Navigation("Event");
                 });
 
-            modelBuilder.Entity("DataAccess.Models.EventCollaborator", b =>
-                {
-                    b.HasOne("DataAccess.Models.Event", "Event")
-                        .WithMany("Collaborators")
-                        .HasForeignKey("EventId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("DataAccess.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.Navigation("Event");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("DataAccess.Models.EventImage", b =>
                 {
                     b.HasOne("DataAccess.Models.Event", "Event")
@@ -1530,6 +1481,16 @@ namespace DataAccess.Migrations
                         .IsRequired();
 
                     b.Navigation("Event");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.FundCategory", b =>
+                {
+                    b.HasOne("DataAccess.Models.Club", "Club")
+                        .WithMany()
+                        .HasForeignKey("ClubId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Club");
                 });
 
             modelBuilder.Entity("DataAccess.Models.FundTransaction", b =>
@@ -1816,8 +1777,6 @@ namespace DataAccess.Migrations
             modelBuilder.Entity("DataAccess.Models.Event", b =>
                 {
                     b.Navigation("Attendances");
-
-                    b.Navigation("Collaborators");
 
                     b.Navigation("EventBudgets");
 

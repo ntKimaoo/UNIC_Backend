@@ -59,7 +59,25 @@ namespace UNIC.ControllerTest.Controllers
 
             Assert.IsType<OkObjectResult>(result);
         }
+        [Fact]
+        public async Task GetAllRoles_WhenException_Returns500()
+        {
+            _mockService.Setup(s => s.GetAllAsync(1))
+                                .ThrowsAsync(new Exception("DB error"));
 
+            var result = await _controller.GetAll(1);
+
+            var objectResult = Assert.IsType<ObjectResult>(result);
+
+            Assert.Equal(500, objectResult.StatusCode);
+
+            var value = objectResult.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("An error occurred while updating the club",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
         #endregion
 
         #region GetById
@@ -88,7 +106,25 @@ namespace UNIC.ControllerTest.Controllers
 
             Assert.IsType<NotFoundObjectResult>(result);
         }
+        [Fact]
+        public async Task GetById_WhenException_Returns500()
+        {
+            _mockService.Setup(s => s.GetByIdAsync(1, 1))
+                                .ThrowsAsync(new Exception("DB error"));
 
+            var result = await _controller.GetById(1, 1);
+
+            var objectResult = Assert.IsType<ObjectResult>(result);
+
+            Assert.Equal(500, objectResult.StatusCode);
+
+            var value = objectResult.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("An error occurred while updating the club",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
         #endregion
 
         #region Create
@@ -109,16 +145,22 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         [Fact]
-        public async Task Create_ReturnsBadRequest_WhenInvalidOperation()
+        public async Task Create_WhenModelStateInvalid_ReturnsBadRequest()
         {
-            var dto = new CreateClubRoleDto { RoleName = "Duplicate Role" };
+            _controller.ModelState.AddModelError("Name", "Required");
 
-            _mockService.Setup(s => s.CreateAsync(dto, 1))
-                        .ThrowsAsync(new InvalidOperationException("Role already exists in this club"));
+            var dto = new CreateClubRoleDto();
 
             var result = await _controller.Create(dto, 1);
 
-            Assert.IsType<BadRequestObjectResult>(result);
+            var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+
+            var value = badRequest.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("Invalid data",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
         }
 
         [Fact]
@@ -139,6 +181,24 @@ namespace UNIC.ControllerTest.Controllers
 
         #region Update
 
+        [Fact]
+        public async Task Update_WhenModelStateInvalid_ReturnsBadRequest()
+        {
+            _controller.ModelState.AddModelError("Name", "Required");
+
+            var dto = new UpdateClubRoleDto();
+
+            var result = await _controller.Update(1, dto, 10);
+
+            var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+
+            var value = badRequest.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("Invalid data",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
         [Fact]
         public async Task Update_ReturnsOk_WhenSuccess()
         {
@@ -168,19 +228,6 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         [Fact]
-        public async Task Update_ReturnsBadRequest_WhenInvalidOperation()
-        {
-            var dto = new UpdateClubRoleDto { RoleName = "Bad Role" };
-
-            _mockService.Setup(s => s.UpdateAsync(1, dto, 1))
-                        .ThrowsAsync(new InvalidOperationException("Update failed"));
-
-            var result = await _controller.Update(1, dto, 1);
-
-            Assert.IsType<BadRequestObjectResult>(result);
-        }
-
-        [Fact]
         public async Task Update_Returns500_WhenUnexpectedException()
         {
             var dto = new UpdateClubRoleDto { RoleName = "Error Role" };
@@ -201,7 +248,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task UpdatePolicies_ReturnsOk_WhenSuccess()
         {
-            var policyIds = new List<int> { 1, 2, 3 };
+            var policyIds = new List<int> { 1, 2 };
 
             _mockService.Setup(s => s.UpdatePoliciesAsync(1, policyIds))
                         .Returns(Task.CompletedTask);
@@ -213,16 +260,20 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         [Fact]
-        public async Task UpdatePolicies_ReturnsBadRequest_WhenInvalidOperation()
+        public async Task UpdatePolicies_WhenModelStateInvalid_ReturnsBadRequest()
         {
-            var policyIds = new List<int> { 99 };
+            _controller.ModelState.AddModelError("policyIds", "Required");
 
-            _mockService.Setup(s => s.UpdatePoliciesAsync(1, policyIds))
-                        .ThrowsAsync(new InvalidOperationException("Policy not found"));
+            var result = await _controller.UpdatePolicies(1, new List<int>(), 10);
 
-            var result = await _controller.UpdatePolicies(1, policyIds, 1);
+            var badRequest = Assert.IsType<BadRequestObjectResult>(result);
 
-            Assert.IsType<BadRequestObjectResult>(result);
+            var value = badRequest.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("Invalid data",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
         }
 
         [Fact]
@@ -265,7 +316,25 @@ namespace UNIC.ControllerTest.Controllers
 
             Assert.IsType<NotFoundObjectResult>(result);
         }
+        [Fact]
+        public async Task Delete_WhenException_Returns500()
+        {
+            _mockService.Setup(s => s.DeleteAsync(1))
+                                .ThrowsAsync(new Exception("DB error"));
 
+            var result = await _controller.Delete(1, 1);
+
+            var objectResult = Assert.IsType<ObjectResult>(result);
+
+            Assert.Equal(500, objectResult.StatusCode);
+
+            var value = objectResult.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("An error occurred",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
         #endregion
 
         #region AssignRole
@@ -306,7 +375,31 @@ namespace UNIC.ControllerTest.Controllers
 
             Assert.IsType<BadRequestObjectResult>(result);
         }
+        [Fact]
+        public async Task AssignRole_WhenException_Returns500()
+        {
+            var dto = new AssignClubRoleDto
+            {
+                UserId = Guid.NewGuid(),
+                ClubRoleId = 1
+            };
 
+            _mockService.Setup(s => s.AssignRoleAsync(dto))
+                                .ThrowsAsync(new Exception("DB error"));
+
+            var result = await _controller.AssignRole(dto);
+
+            var objectResult = Assert.IsType<ObjectResult>(result);
+
+            Assert.Equal(500, objectResult.StatusCode);
+
+            var value = objectResult.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("An error occurred",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
         #endregion
 
         #region GetUserClubRole
@@ -337,7 +430,27 @@ namespace UNIC.ControllerTest.Controllers
 
             Assert.IsType<NotFoundObjectResult>(result);
         }
+        [Fact]
+        public async Task GetUserClubRole_WhenException_Returns500()
+        {
+            var userId = Guid.NewGuid();
 
+            _mockService.Setup(s => s.GetUserClubRoleAsync(userId, 1))
+                                .ThrowsAsync(new Exception("DB error"));
+
+            var result = await _controller.GetUserClubRole(userId, 1);
+
+            var objectResult = Assert.IsType<ObjectResult>(result);
+
+            Assert.Equal(500, objectResult.StatusCode);
+
+            var value = objectResult.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("An error occurred",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
         #endregion
     }
 }

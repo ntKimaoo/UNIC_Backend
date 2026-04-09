@@ -2,7 +2,6 @@ using AutoMapper;
 using BusinessLogic.DTOs;
 using BusinessLogic.Exceptions;
 using BusinessLogic.Services.Interface;
-using BusinessLogic.Services.Background;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using DataAccess.Enums;
@@ -45,7 +44,7 @@ namespace BusinessLogic.Services.Implementation
             _attendanceService = attendanceService;
         }
 
-        public async Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null, Guid? creatorUserId = null)
+        public async Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null)
         {
             // Validate input
             var validationResult = await _createValidator.ValidateAsync(request);
@@ -71,39 +70,6 @@ namespace BusinessLogic.Services.Implementation
             // Add to repository
             await _unitOfWork.Events.AddAsync(eventEntity);
             await _unitOfWork.SaveChangesAsync();
-
-            // Auto-assign CREATOR role to event creator
-            if (creatorUserId.HasValue)
-            {
-                var role = new EventRole
-                {
-                    EventId = eventEntity.EventId,
-                    RoleName = "Trưởng ban tổ chức",
-                    Description = "Người tạo sự kiện, toàn quyền quản trị",
-                    Level = 1
-                };
-                await _unitOfWork.EventRoles.CreateAsync(role);
-                // Get all Event policies from Policy table
-                var allEventPolicyNames = await _unitOfWork.EventRoles.GetEventPolicyNamesAsync();
-                
-                // Assign to user
-                var collaborator = new UserEventRole
-                {
-                    EventId = eventEntity.EventId,
-                    UserId = creatorUserId.Value,
-                    EventRole = role,
-                    JoinDate = DateTime.Now,
-                    AssignedBy = creatorUserId.Value
-                };
-                await _unitOfWork.EventMembers.AddAsync(collaborator);
-                await _unitOfWork.SaveChangesAsync();
-                
-                // Seed policies for Trưởng ban (all event policies)
-                if (allEventPolicyNames.Any())
-                {
-                    await _unitOfWork.EventRoles.SetPoliciesAsync(role.EventRoleId, allEventPolicyNames);
-                }
-            }
 
             return _mapper.Map<EventDetailDto>(eventEntity);
         }
@@ -133,26 +99,24 @@ namespace BusinessLogic.Services.Implementation
             // Map updates
             existingEvent.EventName = request.EventName;
             existingEvent.Description = request.Description;
-            existingEvent.IsOnline = request.IsOnline;
-            existingEvent.MeetLink = request.MeetLink;
-
+            
             // Handle Type switch (Offline <-> Online)
             if (request.IsOnline)
             {
-                // Online event: use provided MeetLink; generate internal room code if none provided
-                if (string.IsNullOrWhiteSpace(request.MeetLink))
+                // If switching to or staying Online, ensure we have a WebRTC link
+                if (string.IsNullOrEmpty(existingEvent.Location) || !existingEvent.Location.StartsWith("/webrtc/"))
                 {
-                    if (string.IsNullOrEmpty(existingEvent.MeetLink))
-                        existingEvent.MeetLink = $"/event-room/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+                    existingEvent.Location = $"/webrtc/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
                 }
-                // Location is optional for online events (clear it or keep as-is)
             }
             else
             {
-                // Offline event: clear MeetLink, require Location
-                existingEvent.MeetLink = null;
-                if (!string.IsNullOrWhiteSpace(request.Location))
-                    existingEvent.Location = request.Location;
+                // If staying or switching to Offline, ensure they provided a physical location
+                if (string.IsNullOrWhiteSpace(request.Location))
+                {
+                    throw new DomainException("Location is required for offline events.");
+                }
+                existingEvent.Location = request.Location;
             }
             
             existingEvent.StartDate = request.StartDate;
@@ -355,14 +319,7 @@ namespace BusinessLogic.Services.Implementation
                 var user = await _unitOfWork.Users.GetByIdAsync(att.UserId);
                 if (user != null)
                 {
-                    EmailQueueService.EnqueueEmail(new EmailQueueItem
-                    {
-                        ToEmail = user.Email,
-                        FullName = user.FullName,
-                        EmailType = EmailType.EventCheckIn,
-                        EventName = eventEntity.EventName,
-                        CheckInCode = generatedCode
-                    });
+                    _ = _emailService.SendEventCheckInCodeAsync(user.Email, user.FullName, eventEntity.EventName, generatedCode);
                 }
             }
 

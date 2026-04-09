@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using DataAccess.Models.Meeting.Enums;
 
 namespace DataAccess.Models.Meeting;
@@ -27,15 +26,6 @@ public class InterviewAssignment
     public InterviewerRole Role         { get; set; } = InterviewerRole.Interviewer;
     public bool            HasConfirmed { get; set; } = false;
 
-    // ── Tiêu chí được phân công ──────────────────────────────────
-
-    /// <summary>
-    /// Danh sách ID tiêu chí mà interviewer này được phân chấm,
-    /// lưu dạng comma-separated. VD: "1,3,5"
-    /// Nếu null/empty → chấm tất cả tiêu chí.
-    /// </summary>
-    public string? AssignedCriteriaIds { get; set; }
-
     // ── Feedback & kết quả ───────────────────────────────────────
     public string?          FeedbackNotes        { get; set; }
     public InterviewResult? Result               { get; set; }   // null = chưa đánh giá
@@ -43,7 +33,4 @@ public class InterviewAssignment
 
     public DateTime  AssignedAt          { get; set; } = DateTime.UtcNow;
     public DateTime? FeedbackSubmittedAt { get; set; }
-
-    // ── Navigation ───────────────────────────────────────────────
-    public ICollection<CriteriaScore> CriteriaScores { get; set; } = new List<CriteriaScore>();
 }
