@@ -32,18 +32,24 @@ namespace Presentation.Authorization
             AuthorizationHandlerContext context,
             ClubPolicyOrRoleRequirement requirement)
         {
-            // ── 1. Role check (fast, no DB) ───────────────────────────────────────
+            // ── 1. Role  ───────────────────────────────────────
             if (requirement.Roles.Length > 0)
             {
                 // JwtService adds UserRole names as ClaimTypes.Role.
                 // We also support a custom "UserRole" claim for flexibility.
-                var userRoleClaims = context.User
-                    .FindAll(ClaimTypes.Role)
-                    .Concat(context.User.FindAll("UserRole"))
-                    .Select(c => c.Value)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var userIdClaim = context.User.FindFirst(ClaimTypes.NameIdentifier)
+                   ?? context.User.FindFirst("UserId");
 
-                if (requirement.Roles.Any(r => userRoleClaims.Contains(r)))
+                if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+                {
+                    return;
+                }
+
+                var userRoles = await _policyService.GetUserRole(userId); 
+
+                var roleSet = userRoles.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                if (requirement.Roles.Any(r => roleSet.Contains(r)))
                 {
                     context.Succeed(requirement);
                     return;

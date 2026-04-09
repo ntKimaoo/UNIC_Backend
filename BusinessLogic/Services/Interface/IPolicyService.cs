@@ -27,5 +27,6 @@ namespace BusinessLogic.Services.Interface
 
         /// <summary>Kiểm tra user có policy trong một club cụ thể không</summary>
         Task<bool> HasMemberPolicyInClubAsync(Guid userId, int clubId, string policyTitle);
+        Task<List<string>> GetUserRole(Guid userId);
     }
 }

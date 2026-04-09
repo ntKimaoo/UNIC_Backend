@@ -28,5 +28,6 @@ namespace DataAccess.Repositories.Interface
 
         /// <summary>Kiểm tra user có policy trong một club cụ thể không (qua club role hoặc direct member policy)</summary>
         Task<bool> HasMemberPolicyInClubAsync(Guid userId, int clubId, string policyTitle);
+        Task<List<string>> GetUserRoleAsync(Guid userId);
     }
 }
