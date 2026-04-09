@@ -19,6 +19,7 @@ namespace UNIC.ControllerTest.Controllers
     {
         private readonly Mock<IEventService> _mockEventService;
         private readonly Mock<IFileStorageService> _mockFileStorageService;
+        private readonly Mock<IEventPermissionService> _mockEventPermService;
         private readonly ClubEventsController _controller;
         private const int ClubId = 1;
 
@@ -26,7 +27,11 @@ namespace UNIC.ControllerTest.Controllers
         {
             _mockEventService = new Mock<IEventService>();
             _mockFileStorageService = new Mock<IFileStorageService>();
-            _controller = new ClubEventsController(_mockEventService.Object, _mockFileStorageService.Object);
+            _mockEventPermService = new Mock<IEventPermissionService>();
+            _controller = new ClubEventsController(
+                _mockEventService.Object,
+                _mockFileStorageService.Object,
+                _mockEventPermService.Object);
         }
 
         /// <summary>

@@ -52,4 +52,21 @@ namespace Presentation.Authorization
             Policy = $"ClubPolicyOrRole_{policyTitle}|{string.Join(",", roles)}";
         }
     }
+
+    /// <summary>
+    /// Requires the authenticated user to have a specific policy
+    /// inside the event identified by the {eventId} or {id} route parameter.
+    /// Falls back to Club Manager check (auto-pass for managers).
+    ///
+    /// Usage: [RequireEventPolicy("editevent")]
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = false)]
+    public class RequireEventPolicyAttribute : AuthorizeAttribute
+    {
+        public RequireEventPolicyAttribute(string policyTitle)
+        {
+            // DynamicPolicyProvider resolves EventPolicy_<policyTitle>
+            Policy = $"EventPolicy_{policyTitle}";
+        }
+    }
 }

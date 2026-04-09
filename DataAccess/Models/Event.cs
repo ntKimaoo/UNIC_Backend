@@ -51,5 +51,7 @@ namespace DataAccess.Models
         public virtual ICollection<EventImage> EventImages { get; set; }
         public virtual ICollection<EventBudget> EventBudgets { get; set; }
         public virtual ICollection<Attendance> Attendances { get; set; }
+        public virtual ICollection<EventRole> EventRoles { get; set; } = new List<EventRole>();
+        public virtual ICollection<EventMember> EventMembers { get; set; } = new List<EventMember>();
     }
 }

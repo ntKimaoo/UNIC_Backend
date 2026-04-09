@@ -10,13 +10,15 @@ using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
 using System.Linq;
 using System;
+using Presentation.Authorization;
 
 namespace UNIC.Presentation.Controllers
 {
     /// <summary>
     /// Club-scoped event management endpoints.
     /// Route: /api/club/{clubId}/events
-    /// All actions require Manager permission for the given club.
+    /// Actions use [RequireEventPolicy] for granular event-level permission.
+    /// CreateEvent uses IsClubManager (no eventId exists yet).
     /// </summary>
     [ApiController]
     [Route("api/club/{clubId}/events")]
@@ -25,13 +27,26 @@ namespace UNIC.Presentation.Controllers
     {
         private readonly IEventService _eventService;
         private readonly IFileStorageService _fileStorageService;
+        private readonly IEventPermissionService _eventPermissionService;
 
-        public ClubEventsController(IEventService eventService, IFileStorageService fileStorageService)
+        public ClubEventsController(
+            IEventService eventService,
+            IFileStorageService fileStorageService,
+            IEventPermissionService eventPermissionService)
         {
             _eventService = eventService;
             _fileStorageService = fileStorageService;
+            _eventPermissionService = eventPermissionService;
         }
 
+        private Guid GetUserId()
+        {
+            var claim = User.FindFirst("UserId")
+                ?? User.FindFirst(ClaimTypes.NameIdentifier);
+            return claim != null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
+        }
+
+        // IsClubManager chỉ dùng cho CreateEvent (chưa có eventId)
         private class ClubRoleClaimDto
         {
             public int ClubId { get; set; }
@@ -54,7 +69,8 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>
-        /// Create a new event for a club
+        /// Create a new event for a club (Manager only — no eventId exists yet)
+        /// Auto-creates Creator role and assigns to the creator.
         /// </summary>
         [HttpPost]
         [Consumes("multipart/form-data")]
@@ -75,6 +91,14 @@ namespace UNIC.Presentation.Controllers
                 }
 
                 var eventDto = await _eventService.CreateEventAsync(request, imageUrl);
+
+                // Auto-create Creator role and assign to the user who created this event
+                var userId = GetUserId();
+                if (userId != Guid.Empty)
+                {
+                    await _eventPermissionService.CreateCreatorRoleAndAssignAsync(eventDto.EventId, userId);
+                }
+
                 return CreatedAtAction("GetEventById", "Events", new { id = eventDto.EventId }, eventDto);
             }
             catch (DomainException ex) { return BadRequest(new { error = ex.Message }); }
@@ -87,13 +111,11 @@ namespace UNIC.Presentation.Controllers
         /// </summary>
         [HttpPut("{id}")]
         [Consumes("multipart/form-data")]
+        [RequireEventPolicy("editevent")]
         public async Task<ActionResult<EventDetailDto>> UpdateEvent(int clubId, int id, [FromForm] UpdateEventRequest request, IFormFile? image)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
-
                 if (id != request.EventId) return BadRequest(new { error = "Event ID mismatch" });
 
                 // Verify the event belongs to this club
@@ -117,13 +139,11 @@ namespace UNIC.Presentation.Controllers
         /// </summary>
         [HttpPost("{id}/image")]
         [Consumes("multipart/form-data")]
+        [RequireEventPolicy("editevent")]
         public async Task<IActionResult> UploadEventImage(int clubId, int id, IFormFile image)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
-
                 if (image == null || image.Length == 0) return BadRequest(new { error = "No image file provided." });
 
                 var eventDto = await _eventService.GetEventByIdAsync(id);
@@ -150,13 +170,11 @@ namespace UNIC.Presentation.Controllers
         /// Create a session for an event within a club
         /// </summary>
         [HttpPost("{id}/sessions")]
+        [RequireEventPolicy("managesession")]
         public async Task<ActionResult<SessionDto>> CreateSession(int clubId, int id, [FromBody] CreateSessionRequest request)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
-
                 if (id != request.EventId) return BadRequest(new { error = "Event ID mismatch" });
 
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
@@ -178,13 +196,11 @@ namespace UNIC.Presentation.Controllers
         /// Update an existing session for an event within a club
         /// </summary>
         [HttpPut("{id}/sessions/{scheduleId}")]
+        [RequireEventPolicy("managesession")]
         public async Task<ActionResult<SessionDto>> UpdateSession(int clubId, int id, int scheduleId, [FromBody] UpdateSessionRequest request)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
-
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
                     return BadRequest(new { error = "Event does not belong to this club." });
@@ -207,13 +223,11 @@ namespace UNIC.Presentation.Controllers
         /// Delete a session for an event within a club
         /// </summary>
         [HttpDelete("{id}/sessions/{scheduleId}")]
+        [RequireEventPolicy("managesession")]
         public async Task<IActionResult> DeleteSession(int clubId, int id, int scheduleId)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
-
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
                     return BadRequest(new { error = "Event does not belong to this club." });
@@ -234,13 +248,11 @@ namespace UNIC.Presentation.Controllers
         /// Open registration for an event within a club
         /// </summary>
         [HttpPatch("{id}/open-registration")]
+        [RequireEventPolicy("openregistration")]
         public async Task<ActionResult<EventDetailDto>> OpenRegistration(int clubId, int id, [FromBody] OpenRegistrationRequest request)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
-
                 if (id != request.EventId) return BadRequest(new { error = "Event ID mismatch" });
 
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
@@ -257,13 +269,11 @@ namespace UNIC.Presentation.Controllers
         /// Start an event (generates check-in code)
         /// </summary>
         [HttpPut("{id}/start")]
+        [RequireEventPolicy("startevent")]
         public async Task<IActionResult> StartEvent(int clubId, int id)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
-
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
                     return BadRequest(new { error = "Event does not belong to this club." });
@@ -278,13 +288,11 @@ namespace UNIC.Presentation.Controllers
         /// Complete an event
         /// </summary>
         [HttpPut("{id}/complete")]
+        [RequireEventPolicy("completeevent")]
         public async Task<IActionResult> CompleteEvent(int clubId, int id)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
-
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
                     return BadRequest(new { error = "Event does not belong to this club." });
@@ -297,13 +305,11 @@ namespace UNIC.Presentation.Controllers
 
         /// <summary>Get sessions of an event within a club</summary>
         [HttpGet("{id}/sessions")]
+        [RequireEventPolicy("managesession")]
         public async Task<IActionResult> GetSessions(int clubId, int id)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions." });
-
                 var ev = await _eventService.GetEventByIdAsync(id);
                 if (ev.ClubId != clubId)
                     return BadRequest(new { error = "Event does not belong to this club." });

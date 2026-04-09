@@ -132,6 +132,7 @@ builder.Services.AddHostedService<BusinessLogic.Services.Background.EventStatusS
 // Unit of Work and Repositories
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IUnitOfWork, DataAccess.Repositories.Implementation.UnitOfWork>();
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventRepository, DataAccess.Repositories.Implementation.EventRepository>();
+builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventPermissionRepository, DataAccess.Repositories.Implementation.EventPermissionRepository>();
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IAttendanceRepository, DataAccess.Repositories.Implementation.AttendanceRepository>();
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventScheduleRepository, DataAccess.Repositories.Implementation.EventScheduleRepository>();
 
@@ -183,8 +184,12 @@ builder.Services.AddAuthentication(options =>
 });
 // Single handler: club-scoped policy check OR UserRole claim check (OR logic)
 builder.Services.AddScoped<IAuthorizationHandler, ClubPolicyOrRoleHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, EventPolicyHandler>();
 
-// Dynamic policy provider (ClubPolicy_ / Role_ / ClubPolicyOrRole_ prefixes)
+// Event Permission Service
+builder.Services.AddScoped<BusinessLogic.Services.Interface.IEventPermissionService, BusinessLogic.Services.Implementation.EventPermissionService>();
+
+// Dynamic policy provider (ClubPolicy_ / Role_ / ClubPolicyOrRole_ / EventPolicy_ prefixes)
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 
 // Configure file upload size limits

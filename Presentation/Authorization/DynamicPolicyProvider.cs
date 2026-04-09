@@ -29,6 +29,7 @@ namespace Presentation.Authorization
         private const string CLUB_POLICY_PREFIX     = "ClubPolicy_";
         private const string ROLE_PREFIX            = "Role_";
         private const string COMBINED_PREFIX        = "ClubPolicyOrRole_";
+        private const string EVENT_POLICY_PREFIX    = "EventPolicy_";
 
         public DynamicPolicyProvider(IOptions<AuthorizationOptions> options)
         {
@@ -84,6 +85,18 @@ namespace Presentation.Authorization
                 var policy = new AuthorizationPolicyBuilder()
                     .RequireAuthenticatedUser()
                     .AddRequirements(new ClubPolicyOrRoleRequirement(null, roles))
+                    .Build();
+
+                return Task.FromResult<AuthorizationPolicy?>(policy);
+            }
+            // ── EventPolicy_<policyTitle>  ─────────────────────────────────────────
+            if (policyName.StartsWith(EVENT_POLICY_PREFIX))
+            {
+                var policyTitle = policyName.Substring(EVENT_POLICY_PREFIX.Length);
+
+                var policy = new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .AddRequirements(new EventPolicyRequirement(policyTitle))
                     .Build();
 
                 return Task.FromResult<AuthorizationPolicy?>(policy);

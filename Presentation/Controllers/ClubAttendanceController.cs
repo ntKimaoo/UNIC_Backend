@@ -4,17 +4,17 @@ using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Presentation.Authorization;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace UNIC.Presentation.Controllers
 {
     /// <summary>
-    /// Club-scoped attendance management endpoints (Manager-only actions).
+    /// Club-scoped attendance management endpoints.
     /// Route: /api/club/{clubId}/events
+    /// Actions use [RequireEventPolicy] for granular event-level permission.
     /// </summary>
     [ApiController]
     [Route("api/club/{clubId}/events")]
@@ -30,38 +30,15 @@ namespace UNIC.Presentation.Controllers
             _eventService = eventService;
         }
 
-        private class ClubRoleClaimDto
-        {
-            public int ClubId { get; set; }
-            public string RoleName { get; set; } = string.Empty;
-            public int Level { get; set; }
-        }
-
-        private bool IsClubManager(int clubId)
-        {
-            if (User.IsInRole("Admin")) return true;
-            var clubRolesClaim = User.FindFirst("club_roles")?.Value;
-            if (string.IsNullOrEmpty(clubRolesClaim)) return false;
-            try
-            {
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                var roles = JsonSerializer.Deserialize<List<ClubRoleClaimDto>>(clubRolesClaim, options);
-                return roles != null && roles.Any(r => r.ClubId == clubId && (r.RoleName.Equals("Manager", StringComparison.OrdinalIgnoreCase) || r.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase)));
-            }
-            catch { return false; }
-        }
-
         /// <summary>
-        /// Approve a pending registration (Manager only)
+        /// Approve a pending registration
         /// </summary>
         [HttpPost("{id}/approve/{userId}")]
+        [RequireEventPolicy("approveattendance")]
         public async Task<IActionResult> ApproveRegistration(int clubId, int id, Guid userId)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "Bạn không có quyền quản lý sự kiện này." });
-
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
                     return BadRequest(new { error = "Event does not belong to this club." });
@@ -73,16 +50,14 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>
-        /// Reject a pending registration (Manager only)
+        /// Reject a pending registration
         /// </summary>
         [HttpPost("{id}/reject/{userId}")]
+        [RequireEventPolicy("approveattendance")]
         public async Task<IActionResult> RejectRegistration(int clubId, int id, Guid userId)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "Bạn không có quyền quản lý sự kiện này." });
-
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
                     return BadRequest(new { error = "Event does not belong to this club." });
@@ -94,16 +69,14 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>
-        /// Bulk approve multiple pending registrations (Manager only)
+        /// Bulk approve multiple pending registrations
         /// </summary>
         [HttpPost("{id}/approve-bulk")]
+        [RequireEventPolicy("approveattendance")]
         public async Task<IActionResult> BulkApproveRegistrations(int clubId, int id, [FromBody] List<Guid> userIds)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "Bạn không có quyền quản lý sự kiện này." });
-
                 if (userIds == null || userIds.Count == 0)
                     return BadRequest(new { error = "Danh sách userId không được rỗng." });
 
@@ -118,16 +91,14 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>
-        /// Generate check-in code for an event (Manager only)
+        /// Generate check-in code for an event
         /// </summary>
         [HttpPost("{id}/checkin-code")]
+        [RequireEventPolicy("checkin")]
         public async Task<ActionResult<CheckInCodeResponse>> GenerateCheckInCode(int clubId, int id)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "Bạn không có quyền tạo mã điểm danh." });
-
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
                     return BadRequest(new { error = "Event does not belong to this club." });
@@ -140,16 +111,14 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>
-        /// Check in a participant by scanning their QR code (Manager only)
+        /// Check in a participant by scanning their QR code
         /// </summary>
         [HttpPost("{id}/checkin-qr")]
+        [RequireEventPolicy("checkin")]
         public async Task<ActionResult<CheckInByQrResponse>> CheckInByQr(int clubId, int id, [FromBody] CheckInByQrRequest request)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "Bạn không có quyền điểm danh cho sự kiện của CLB này." });
-
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
                     return BadRequest(new { error = "Event does not belong to this club." });
@@ -167,16 +136,14 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>
-        /// Evaluate a member's performance at an event (Manager only)
+        /// Evaluate a member's performance at an event
         /// </summary>
         [HttpPost("{id}/evaluate")]
+        [RequireEventPolicy("approveattendance")]
         public async Task<IActionResult> EvaluateMember(int clubId, int id, [FromBody] EvaluateMemberRequest request)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "Bạn không có quyền đánh giá thành viên." });
-
                 if (id != request.EventId) return BadRequest(new { error = "Mã sự kiện không khớp." });
 
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
@@ -190,16 +157,14 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>
-        /// Get all attendees for an event (Manager only)
+        /// Get all attendees for an event
         /// </summary>
         [HttpGet("{id}/attendees")]
+        [RequireEventPolicy("viewattendance")]
         public async Task<ActionResult<IEnumerable<AttendanceDetailDto>>> GetEventAttendees(int clubId, int id)
         {
             try
             {
-                if (!IsClubManager(clubId))
-                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "Bạn không có quyền xem danh sách tham gia." });
-
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
                 if (existingEvent.ClubId != clubId)
                     return BadRequest(new { error = "Event does not belong to this club." });

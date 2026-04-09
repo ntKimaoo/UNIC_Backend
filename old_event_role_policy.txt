@@ -1,0 +1,10 @@
+﻿git : fatal: path 'DataAccess/Models/EventRolePolicy.cs' does not 
+exist in 'son_dev'
+At line:1 char:1
++ git show son_dev:DataAccess/Models/EventRolePolicy.cs 2>&1 | 
+Out-File ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (fatal: path 'Da...st in  
+   'son_dev':String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

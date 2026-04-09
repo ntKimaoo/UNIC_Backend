@@ -50,6 +50,10 @@ public partial class UnicContext : DbContext
     public DbSet<PolicyGroup> PolicyGroups { get; set; }
     public DbSet<ClubCreationRequest> ClubCreationRequests { get; set; }
     public DbSet<UserClubRoleDepartment> UserClubRoleDepartments { get; set; }
+    public DbSet<EventRole> EventRoles { get; set; }
+    public DbSet<EventMember> EventMembers { get; set; }
+    public DbSet<EventRolePolicy> EventRolePolicies { get; set; }
+    public DbSet<EventMemberPolicy> EventMemberPolicies { get; set; }
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
 
@@ -439,6 +443,74 @@ public partial class UnicContext : DbContext
             entity.Property(e => e.AdminComment)
                 .HasMaxLength(1000);
         });
+
+        // =============================================
+        // EVENT PERMISSION TABLES (copy pattern từ ClubPolicy)
+        // =============================================
+
+        // EventRole - Event
+        modelBuilder.Entity<EventRole>()
+            .HasOne(er => er.Event)
+            .WithMany(e => e.EventRoles)
+            .HasForeignKey(er => er.EventId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // EventMember - Event
+        modelBuilder.Entity<EventMember>()
+            .HasOne(em => em.Event)
+            .WithMany(e => e.EventMembers)
+            .HasForeignKey(em => em.EventId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // EventMember - User
+        modelBuilder.Entity<EventMember>()
+            .HasOne(em => em.User)
+            .WithMany()
+            .HasForeignKey(em => em.UserId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        // EventMember - EventRole
+        modelBuilder.Entity<EventMember>()
+            .HasOne(em => em.EventRole)
+            .WithMany(er => er.EventMembers)
+            .HasForeignKey(em => em.EventRoleId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        // EventMember - AssignedBy
+        modelBuilder.Entity<EventMember>()
+            .HasOne(em => em.AssignedByUser)
+            .WithMany()
+            .HasForeignKey(em => em.AssignedBy)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        // EventMember unique: one user per event
+        modelBuilder.Entity<EventMember>()
+            .HasIndex(em => new { em.EventId, em.UserId })
+            .IsUnique();
+
+        // EventRolePolicy (composite PK, copy từ ClubRolePolicy)
+        modelBuilder.Entity<EventRolePolicy>()
+            .HasKey(erp => new { erp.EventRoleId, erp.PolicyId });
+        modelBuilder.Entity<EventRolePolicy>()
+            .HasOne(erp => erp.EventRole)
+            .WithMany(er => er.EventRolePolicies)
+            .HasForeignKey(erp => erp.EventRoleId);
+        modelBuilder.Entity<EventRolePolicy>()
+            .HasOne(erp => erp.Policy)
+            .WithMany()
+            .HasForeignKey(erp => erp.PolicyId);
+
+        // EventMemberPolicy (composite PK, copy từ ClubMemberPolicy)
+        modelBuilder.Entity<EventMemberPolicy>()
+            .HasKey(emp => new { emp.EventMemberId, emp.PolicyId });
+        modelBuilder.Entity<EventMemberPolicy>()
+            .HasOne(emp => emp.EventMember)
+            .WithMany(em => em.EventMemberPolicies)
+            .HasForeignKey(emp => emp.EventMemberId);
+        modelBuilder.Entity<EventMemberPolicy>()
+            .HasOne(emp => emp.Policy)
+            .WithMany()
+            .HasForeignKey(emp => emp.PolicyId);
     }
 
     partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
