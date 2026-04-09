@@ -167,7 +167,7 @@ namespace DataAccess.Repositories.Implementation
         }
         public async Task<UserClubRole> GetUserClubRoleByIdAsync(int clubId)
         {
-            return await _context.UserClubRoles.FirstOrDefaultAsync(ucr => ucr.ClubRoleId == clubId);
+            return await _context.UserClubRoles.FirstOrDefaultAsync(ucr=>ucr.ClubRoleId==clubId);
         }
     }
 }

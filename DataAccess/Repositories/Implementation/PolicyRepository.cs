@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 
 namespace DataAccess.Repositories.Implementation
 {
@@ -180,6 +181,14 @@ namespace DataAccess.Repositories.Implementation
             }
 
             await _context.SaveChangesAsync();
+        }
+        public async Task<List<string>> GetUserRoleAsync(Guid userId)
+        {
+            var userRoles = await _context.UserRoles
+                .Where(ur => ur.UserId == userId)
+                .Select(ur => ur.RoleName)
+                .ToListAsync();
+            return userRoles;
         }
     }
 }
