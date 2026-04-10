@@ -427,6 +427,32 @@ namespace DataAccess.Repositories.Implementation
                 await _context.SaveChangesAsync();
             }
         }
+
+        // ════════════════════════════════════════════════════════════
+        //  AiAnalysisResult
+        // ════════════════════════════════════════════════════════════
+
+        public async Task<IEnumerable<AiCandidateAnalysisResult>> GetAiAnalysisResultsByCampaignIdAsync(int campaignId)
+        {
+            return await _context.AiCandidateAnalysisResults
+                .Where(a => a.CampaignId == campaignId)
+                .OrderByDescending(a => a.AnalyzedAt)
+                .ToListAsync();
+        }
+
+        public async Task<AiCandidateAnalysisResult> CreateAiAnalysisResultAsync(AiCandidateAnalysisResult result)
+        {
+            await _context.AiCandidateAnalysisResults.AddAsync(result);
+            await _context.SaveChangesAsync();
+            return result;
+        }
+
+        public async Task<IEnumerable<AiCandidateAnalysisResult>> CreateAiAnalysisResultsAsync(IEnumerable<AiCandidateAnalysisResult> results)
+        {
+            await _context.AiCandidateAnalysisResults.AddRangeAsync(results);
+            await _context.SaveChangesAsync();
+            return results;
+        }
     }
 }
 

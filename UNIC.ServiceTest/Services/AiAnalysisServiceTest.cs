@@ -1,6 +1,7 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Options;
 using BusinessLogic.Services.Implementation;
+using DataAccess.Models;
 using DataAccess.Models.Meeting;
 using DataAccess.Models.Meeting.Enums;
 using DataAccess.Repositories.Interface;
@@ -102,7 +103,7 @@ namespace UNIC.ServiceTest.Services
             _mockRepo.Setup(r => r.GetSchedulesAsync(1, null, null, null)).ReturnsAsync(schedules);
             _mockRepo.Setup(r => r.GetCriteriaByCampaignIdAsync(1)).ReturnsAsync(criteria);
             _mockRepo.Setup(r => r.GetCriteriaScoresByScheduleIdAsync(1)).ReturnsAsync(new List<CriteriaScore>());
-            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new DataAccess.Models.User { FullName = "Applicant A" });
+            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { FullName = "Applicant A" });
 
             // AI returns error → fallback
             var httpClient = CreateMockHttpClient(HttpStatusCode.InternalServerError, "error");
@@ -135,7 +136,7 @@ namespace UNIC.ServiceTest.Services
             _mockRepo.Setup(r => r.GetSchedulesAsync(1, null, null, null)).ReturnsAsync(schedules);
             _mockRepo.Setup(r => r.GetCriteriaByCampaignIdAsync(1)).ReturnsAsync(criteria);
             _mockRepo.Setup(r => r.GetCriteriaScoresByScheduleIdAsync(1)).ReturnsAsync(new List<CriteriaScore>());
-            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new DataAccess.Models.User { FullName = "Applicant A" });
+            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { FullName = "Applicant A" });
 
             var aiJson = JsonSerializer.Serialize(new[]
             {
@@ -299,7 +300,7 @@ namespace UNIC.ServiceTest.Services
                      {
                          new CriteriaScore { EvaluationCriterionId = 1, Note = "Very strong skills" }
                      });
-            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new DataAccess.Models.User { FullName = "Winner" });
+            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { FullName = "Winner" });
 
             var httpClient = CreateMockHttpClient(HttpStatusCode.InternalServerError, "error");
             var service = CreateService(httpClient);
@@ -335,7 +336,7 @@ namespace UNIC.ServiceTest.Services
             _mockRepo.Setup(r => r.GetCriteriaByCampaignIdAsync(1)).ReturnsAsync(criteria);
             _mockRepo.Setup(r => r.GetCriteriaScoresByScheduleIdAsync(1))
                      .ReturnsAsync(new List<CriteriaScore>());
-            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new DataAccess.Models.User { FullName = "Weak" });
+            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { FullName = "Weak" });
 
             var httpClient = CreateMockHttpClient(HttpStatusCode.InternalServerError, "error");
             var service = CreateService(httpClient);
@@ -366,7 +367,7 @@ namespace UNIC.ServiceTest.Services
             _mockRepo.Setup(r => r.GetSchedulesAsync(1, null, null, null)).ReturnsAsync(schedules);
             _mockRepo.Setup(r => r.GetCriteriaByCampaignIdAsync(1)).ReturnsAsync(criteria);
             _mockRepo.Setup(r => r.GetCriteriaScoresByScheduleIdAsync(1)).ReturnsAsync(new List<CriteriaScore>());
-            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new DataAccess.Models.User { FullName = "Middle" });
+            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { FullName = "Middle" });
 
             var httpClient = CreateMockHttpClient(HttpStatusCode.InternalServerError, "error");
             var service = CreateService(httpClient);
@@ -396,7 +397,7 @@ namespace UNIC.ServiceTest.Services
             _mockRepo.Setup(r => r.GetSchedulesAsync(1, null, null, null)).ReturnsAsync(schedules);
             _mockRepo.Setup(r => r.GetCriteriaByCampaignIdAsync(1)).ReturnsAsync(criteria);
             _mockRepo.Setup(r => r.GetCriteriaScoresByScheduleIdAsync(1)).ReturnsAsync(new List<CriteriaScore>());
-            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new DataAccess.Models.User { FullName = "Silent" });
+            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { FullName = "Silent" });
 
             var httpClient = CreateMockHttpClient(HttpStatusCode.InternalServerError, "error");
             var service = CreateService(httpClient);

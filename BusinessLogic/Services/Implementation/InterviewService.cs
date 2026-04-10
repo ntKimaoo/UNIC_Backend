@@ -15,11 +15,19 @@ namespace BusinessLogic.Services.Implementation
     {
         private readonly IInterviewRepository _repo;
         private readonly IUserRepository _userRepo;
+        private readonly IEmailService _emailService;
+        private readonly IRecruitmentCampaignRepository _campaignRepo;
 
-        public InterviewService(IInterviewRepository repo, IUserRepository userRepo)
+        public InterviewService(
+            IInterviewRepository repo, 
+            IUserRepository userRepo,
+            IEmailService emailService,
+            IRecruitmentCampaignRepository campaignRepo)
         {
             _repo = repo;
             _userRepo = userRepo;
+            _emailService = emailService;
+            _campaignRepo = campaignRepo;
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -1012,17 +1020,39 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<PublishStatusResponseDto> PublishResultsAsync(int campaignId, PublishResultDto dto)
         {
-            var decisions = (await _repo.GetDecisionsByCampaignIdAsync(campaignId)).ToList();
+            var allDecisions = (await _repo.GetDecisionsByCampaignIdAsync(campaignId)).ToList();
 
-            if (decisions.Count == 0)
+            if (allDecisions.Count == 0)
                 throw new InvalidOperationException("Chưa có quyết định nào cho campaign này.");
 
-            foreach (var d in decisions)
+            // Nếu có DecisionIds → chỉ publish decisions được chọn
+            var decisionsToPublish = dto.DecisionIds != null && dto.DecisionIds.Count > 0
+                ? allDecisions.Where(d => dto.DecisionIds.Contains(d.Id)).ToList()
+                : allDecisions;
+
+            if (decisionsToPublish.Count == 0)
+                throw new InvalidOperationException("Không tìm thấy quyết định nào phù hợp.");
+
+            foreach (var d in decisionsToPublish)
             {
                 if (dto.Mode.Equals("Now", StringComparison.OrdinalIgnoreCase))
                 {
                     d.PublishStatus = PublishStatus.Published;
                     d.PublishedAt = DateTime.UtcNow;
+
+                    if (d.Decision == DecisionResult.Accept)
+                    {
+                        var candidateUser = await _userRepo.GetByIdAsync(d.CandidateUserId);
+                        var campaign = await _campaignRepo.GetByIdAsync(campaignId);
+                        
+                        if (candidateUser != null && campaign != null)
+                        {
+                            await _emailService.SendClubAcceptanceEmailAsync(
+                                candidateUser.Email, 
+                                candidateUser.FullName, 
+                                campaign.CampaignName);
+                        }
+                    }
                 }
                 else // Schedule
                 {
@@ -1037,7 +1067,7 @@ namespace BusinessLogic.Services.Implementation
                 await _repo.UpdateDecisionAsync(d);
             }
 
-            return BuildPublishStatus(campaignId, decisions);
+            return BuildPublishStatus(campaignId, allDecisions);
         }
 
         public async Task<PublishStatusResponseDto?> GetPublishStatusAsync(int campaignId)

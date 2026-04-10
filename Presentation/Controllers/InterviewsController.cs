@@ -493,6 +493,23 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
+        /// POST /api/interviews/campaign/{campaignId}/ai-analysis/generate – Scan ứng viên chưa được phân tích, gọi AI & lưu DB
+        /// </summary>
+        [HttpPost("campaign/{campaignId}/ai-analysis/generate")]
+        public async Task<IActionResult> GenerateAiAnalysis(int campaignId)
+        {
+            try
+            {
+                var result = await _aiService.GenerateAiAnalysisAsync(campaignId);
+                return Ok(new { success = true, data = result });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// POST /api/interviews/campaign/{campaignId}/ai-search – Tìm kiếm ứng viên bằng AI
         /// </summary>
         [HttpPost("campaign/{campaignId}/ai-search")]

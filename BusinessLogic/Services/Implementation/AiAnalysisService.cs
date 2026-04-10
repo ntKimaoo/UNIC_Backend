@@ -1,6 +1,7 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Options;
 using BusinessLogic.Services.Interface;
+using DataAccess.Models.Meeting;
 using DataAccess.Models.Meeting.Enums;
 using DataAccess.Repositories.Interface;
 using Microsoft.Extensions.Logging;
@@ -50,22 +51,53 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<AiCampaignAnalysisResponseDto> AnalyzeCampaignCandidatesAsync(int campaignId)
         {
+            var dbResults = await _repo.GetAiAnalysisResultsByCampaignIdAsync(campaignId);
+
+            var candidates = dbResults.Select(r => new AiCandidateAnalysisDto
+            {
+                InterviewScheduleId = r.InterviewScheduleId,
+                CandidateUserId = r.CandidateUserId,
+                CandidateName = "Ứng viên (Lấy từ Frontend)", // Frontend will map names since DB doesn't store CandidateName or maybe we should fetch it? Actually, wait. User query returns Guid. Let's fetch the name.
+                Result = r.Result,
+                CriteriaEvaluations = JsonSerializer.Deserialize<List<AiCriteriaEvaluationDto>>(r.CriteriaEvaluationsJson, JsonOpts) ?? new(),
+                Strengths = JsonSerializer.Deserialize<List<string>>(r.StrengthsJson, JsonOpts) ?? new(),
+                Weaknesses = JsonSerializer.Deserialize<List<string>>(r.WeaknessesJson, JsonOpts) ?? new()
+            }).ToList();
+
+            // Populate names
+            foreach (var cand in candidates)
+            {
+                var user = await _userRepo.GetByIdAsync(cand.CandidateUserId);
+                if (user != null)
+                {
+                    cand.CandidateName = user.FullName;
+                }
+            }
+
+            return new AiCampaignAnalysisResponseDto
+            {
+                CampaignId = campaignId,
+                AnalyzedAt = DateTime.UtcNow.ToString("o"),
+                Candidates = candidates
+            };
+        }
+
+        public async Task<AiCampaignAnalysisResponseDto> GenerateAiAnalysisAsync(int campaignId)
+        {
             var allSchedules = (await _repo.GetSchedulesAsync(campaignId, null, null, null)).ToList();
             var criteria = (await _repo.GetCriteriaByCampaignIdAsync(campaignId)).ToList();
+            var existingResults = (await _repo.GetAiAnalysisResultsByCampaignIdAsync(campaignId)).ToList();
+            var existingScheduleIds = existingResults.Select(r => r.InterviewScheduleId).ToHashSet();
 
-            // Chỉ lấy các schedule đã Completed
+            // Chỉ lấy các schedule đã Completed VÀ CHƯA CÓ TRONG DB
             var completedSchedules = allSchedules
-                .Where(s => s.Status == InterviewStatus.Completed)
+                .Where(s => s.Status == InterviewStatus.Completed && !existingScheduleIds.Contains(s.Id))
                 .ToList();
 
             if (completedSchedules.Count == 0)
             {
-                return new AiCampaignAnalysisResponseDto
-                {
-                    CampaignId = campaignId,
-                    AnalyzedAt = DateTime.UtcNow.ToString("o"),
-                    Candidates = new()
-                };
+                // Nếu không có schedule mới, gọi lại hàm Analyze để lấy danh sách từ DB
+                return await AnalyzeCampaignCandidatesAsync(campaignId);
             }
 
             var candidateDataList = new List<CandidatePromptData>();
@@ -106,51 +138,69 @@ namespace BusinessLogic.Services.Implementation
                 {
                     InterviewScheduleId = schedule.Id,
                     CandidateUserId = schedule.CandidateUserId.ToString(),
-                    CandidateName = userFind.FullName,
+                    CandidateName = userFind!.FullName,
                     CriteriaDetails = criteriaDetails,
                     FeedbackNotes = feedbackNotes,
                     InterviewerResults = interviewerResults!
                 });
             }
 
-            if (candidateDataList.Count == 0)
+            if (candidateDataList.Count > 0)
             {
-                return new AiCampaignAnalysisResponseDto
+                var criteriaNames = criteria.Select(c => c.Name).ToList();
+
+                try
                 {
-                    CampaignId = campaignId,
-                    AnalyzedAt = DateTime.UtcNow.ToString("o"),
-                    Candidates = new()
-                };
-            }
+                    // Chia batch và gọi song song
+                    var batches = candidateDataList
+                        .Select((c, i) => new { c, i })
+                        .GroupBy(x => x.i / BatchSize)
+                        .Select(g => g.Select(x => x.c).ToList())
+                        .ToList();
 
-            var criteriaNames = criteria.Select(c => c.Name).ToList();
+                    var batchTasks = batches.Select(batch => ProcessAnalysisBatchAsync(batch, criteriaNames));
+                    var batchResults = await Task.WhenAll(batchTasks);
 
-            try
-            {
-                // Chia batch và gọi song song
-                var batches = candidateDataList
-                    .Select((c, i) => new { c, i })
-                    .GroupBy(x => x.i / BatchSize)
-                    .Select(g => g.Select(x => x.c).ToList())
-                    .ToList();
+                    var allCandidates = batchResults.SelectMany(r => r).ToList();
 
-                var batchTasks = batches.Select(batch => ProcessAnalysisBatchAsync(batch, criteriaNames));
-                var batchResults = await Task.WhenAll(batchTasks);
+                    // Save to DB
+                    var newDbResults = allCandidates.Select(c => new AiCandidateAnalysisResult
+                    {
+                        CampaignId = campaignId,
+                        InterviewScheduleId = c.InterviewScheduleId,
+                        CandidateUserId = c.CandidateUserId,
+                        Result = c.Result,
+                        CriteriaEvaluationsJson = JsonSerializer.Serialize(c.CriteriaEvaluations, JsonOpts),
+                        StrengthsJson = JsonSerializer.Serialize(c.Strengths, JsonOpts),
+                        WeaknessesJson = JsonSerializer.Serialize(c.Weaknesses, JsonOpts),
+                        AnalyzedAt = DateTime.UtcNow
+                    });
 
-                var allCandidates = batchResults.SelectMany(r => r).ToList();
-
-                return new AiCampaignAnalysisResponseDto
+                    await _repo.CreateAiAnalysisResultsAsync(newDbResults);
+                }
+                catch (Exception ex)
                 {
-                    CampaignId = campaignId,
-                    AnalyzedAt = DateTime.UtcNow.ToString("o"),
-                    Candidates = allCandidates
-                };
+                    _logger.LogWarning(ex, "AI Analysis failed for campaign {CampaignId}, using fallback", campaignId);
+                    var fallbackResponse = BuildFallbackAnalysis(campaignId, candidateDataList);
+                    
+                    var fallbackDbResults = fallbackResponse.Candidates.Select(c => new AiCandidateAnalysisResult
+                    {
+                        CampaignId = campaignId,
+                        InterviewScheduleId = c.InterviewScheduleId,
+                        CandidateUserId = c.CandidateUserId,
+                        Result = c.Result,
+                        CriteriaEvaluationsJson = JsonSerializer.Serialize(c.CriteriaEvaluations, JsonOpts),
+                        StrengthsJson = JsonSerializer.Serialize(c.Strengths, JsonOpts),
+                        WeaknessesJson = JsonSerializer.Serialize(c.Weaknesses, JsonOpts),
+                        AnalyzedAt = DateTime.UtcNow
+                    });
+
+                    await _repo.CreateAiAnalysisResultsAsync(fallbackDbResults);
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "AI Analysis failed for campaign {CampaignId}, using fallback", campaignId);
-                return BuildFallbackAnalysis(campaignId, candidateDataList);
-            }
+
+            // Cuối cùng return lại tất cả bao gồm cũ và mới từ DB
+            return await AnalyzeCampaignCandidatesAsync(campaignId);
         }
 
         public async Task<AiSearchResponseDto> SearchCandidatesAsync(int campaignId, AiSearchRequestDto dto)
@@ -361,7 +411,6 @@ namespace BusinessLogic.Services.Implementation
 
             return $@"Đánh giá ứng viên. Tiêu chí: {string.Join(", ", criteriaNames)}
 Trả JSON: [{{""interviewScheduleId"":n,""candidateUserId"":""s"",""candidateName"":""s"",""result"":""Pass|Fail|Consider"",""criteriaEvaluations"":[{{""criterionId"":n,""criterionName"":""s"",""result"":""Pass|Fail|Hold""}}],""strengths"":[""s""],""weaknesses"":[""s""]}}]
-criteriaEvaluations.result: Pass=đạt, Fail=không đạt, Hold=chưa rõ. Viết tiếng Việt.
 DATA:{dataJson}";
         }
 
@@ -371,7 +420,6 @@ DATA:{dataJson}";
 
             return $@"Tìm ứng viên khớp: ""{query}""
 Trả JSON: {{""results"":[{{""interviewScheduleId"":n,""candidateUserId"":""s"",""candidateName"":""s"",""matchReason"":""s"",""result"":""Pass|Fail|Consider""}}],""totalFound"":n,""aiExplanation"":""s""}}
-Viết tiếng Việt.
 DATA:{dataJson}";
         }
 

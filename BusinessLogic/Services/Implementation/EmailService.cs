@@ -396,6 +396,67 @@ namespace BusinessLogic.Services.Implementation
             return await SendEmailAsync(toEmail, subject, body);
         }
 
+        public async Task<bool> SendClubAcceptanceEmailAsync(string toEmail, string fullName, string campaignName)
+        {
+            var subject = $"[UniClub] Chúc mừng bạn đã trúng tuyển đợt: {campaignName}";
+
+            // Mẫu email tương tự các chuẩn khác của hệ thống
+            string body = $@"
+    <!DOCTYPE html>
+    <html lang='vi'>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+            body {{ margin: 0; padding: 0; background-color: #f8fafc; font-family: 'Inter', system-ui, -apple-system, sans-serif; }}
+        </style>
+    </head>
+    <body style='margin:0;padding:24px 16px;background-color:#f8fafc;font-family:""Inter"",system-ui,-apple-system,sans-serif;'>
+        <table align='center' border='0' cellpadding='0' cellspacing='0' width='100%' style='max-width:540px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 25px -5px rgba(0,0,0,0.05);margin:0 auto;'>
+            <tr><td style='padding:40px 40px 32px;'>
+                <div style='text-align:center;margin-bottom:28px;'>
+                    <table border='0' cellpadding='0' cellspacing='0' style='margin:0 auto;'><tr>
+                        <td style='height:48px;width:48px;background:linear-gradient(135deg,#e0e7ff 0%,#c7d2fe 100%);border-radius:12px;text-align:center;'>
+                            <svg width='28' height='28' viewBox='0 0 24 24' fill='none' stroke='#4f46e5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' style='vertical-align:middle;margin-top:10px;'><path d='M22 11.08V12a10 10 0 1 1-5.93-9.14'></path><polyline points='22 4 12 14.01 9 11.01'></polyline></svg>
+                        </td>
+                    </tr></table>
+                    <h2 style='margin:20px 0 0;font-size:22px;font-weight:700;color:#1e293b;letter-spacing:-0.5px;'>
+                        Chúc mừng bạn đã trúng tuyển!
+                    </h2>
+                </div>
+
+                <p style='font-size:15px;color:#475569;line-height:1.6;margin:0 0 20px;'>
+                    Xin chào <span style='font-weight:600;color:#1e293b;'>{fullName}</span>,
+                </p>
+                <p style='font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px;'>
+                    Chúng tôi rất vui mừng thông báo bạn đã xuất sắc vượt qua các vòng phỏng vấn và chính thức trở thành thành viên Câu lạc bộ thông qua chiến dịch tuyển dụng: <b style='color:#4f46e5;'>{campaignName}</b>.
+                </p>
+
+                <div style='background-color:#f8fafc;border-left:4px solid #4f46e5;padding:16px 20px;border-radius:0 8px 8px 0;margin-bottom:24px;'>
+                    <p style='font-size:14px;color:#334155;line-height:1.5;margin:0;'>
+                        Chào mừng bạn gia nhập gia đình UniClub. Các quản lý câu lạc bộ sẽ sớm liên hệ với bạn để phổ biến công việc và lịch sinh hoạt!
+                    </p>
+                </div>
+
+                <p style='font-size:15px;color:#475569;line-height:1.5;margin:0;'>
+                    Trân trọng,<br>
+                    <span style='font-weight:600;color:#1e293b;'>Đội ngũ UniClub</span>
+                </p>
+            </td></tr>
+            
+            <tr><td style='background:#f1f5f9;padding:24px 40px;text-align:center;'>
+                <p style='font-size:12px;color:#94a3b8;margin:0;'>
+                    © {DateTime.UtcNow.Year} UniClub System. Email này được gửi tự động.
+                </p>
+            </td></tr>
+        </table>
+    </body>
+    </html>";
+
+            return await SendEmailAsync(toEmail, subject, body);
+        }
+
         private async Task<bool> SendEmailAsync(string toEmail, string subject, string body, string? inlineContentId = null, byte[]? inlineImageBytes = null)
         {
             try

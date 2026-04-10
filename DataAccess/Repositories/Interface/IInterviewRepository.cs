@@ -64,7 +64,10 @@ namespace DataAccess.Repositories.Interface
         Task<ProposedTimeSlot?> GetTimeSlotByIdAsync(int id);
         Task<ProposedTimeSlot> CreateTimeSlotAsync(ProposedTimeSlot slot);
         Task<bool> UpdateTimeSlotAsync(ProposedTimeSlot slot);
-        Task DeleteTimeSlotsByScheduleIdAsync(int scheduleId);
+        // ── AiAnalysisResult ────────────────────────────────────
+        Task<IEnumerable<AiCandidateAnalysisResult>> GetAiAnalysisResultsByCampaignIdAsync(int campaignId);
+        Task<AiCandidateAnalysisResult> CreateAiAnalysisResultAsync(AiCandidateAnalysisResult result);
+        Task<IEnumerable<AiCandidateAnalysisResult>> CreateAiAnalysisResultsAsync(IEnumerable<AiCandidateAnalysisResult> results);
     }
 }
 

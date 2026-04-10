@@ -474,6 +474,11 @@ namespace BusinessLogic.DTOs
         /// Kênh gửi thông báo, VD: "Email,InApp"
         /// </summary>
         public string? NotificationChannels { get; set; }
+
+        /// <summary>
+        /// Danh sách ID quyết định cần công bố. Nếu null/rỗng → công bố tất cả.
+        /// </summary>
+        public List<int>? DecisionIds { get; set; }
     }
 
     public class CampaignDecisionResponseDto
