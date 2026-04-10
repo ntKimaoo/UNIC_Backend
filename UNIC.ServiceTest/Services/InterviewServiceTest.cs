@@ -709,7 +709,7 @@ namespace UNIC.ServiceTest.Services
 
             var result = await _interviewService.CreateCriterionAsync(1, new CreateEvaluationCriterionDto
             {
-                Name = "Test", Weight = 20
+                Name = "Test"
             });
 
             Assert.Equal("Test", result.Name);
@@ -725,13 +725,12 @@ namespace UNIC.ServiceTest.Services
         [Fact]
         public async Task UpdateCriterionAsync_UpdatesAndReturnsDto()
         {
-            var criterion = new EvaluationCriterion { Id = 1, Name = "Old", Weight = 10 };
+            var criterion = new EvaluationCriterion { Id = 1, Name = "Old" };
             _mockRepo.Setup(r => r.GetCriterionByIdAsync(1)).ReturnsAsync(criterion);
             _mockRepo.Setup(r => r.UpdateCriterionAsync(criterion)).ReturnsAsync(true);
 
-            var result = await _interviewService.UpdateCriterionAsync(1, new UpdateEvaluationCriterionDto { Name = "New", Weight = 30 });
+            var result = await _interviewService.UpdateCriterionAsync(1, new UpdateEvaluationCriterionDto { Name = "New" });
             Assert.Equal("New", result!.Name);
-            Assert.Equal(30, result.Weight);
         }
 
         [Fact]

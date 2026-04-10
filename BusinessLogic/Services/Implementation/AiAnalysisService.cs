@@ -1,6 +1,7 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Options;
 using BusinessLogic.Services.Interface;
+using DataAccess.Models.Meeting.Enums;
 using DataAccess.Repositories.Interface;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,6 +13,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using UNIC.BusinessLogic.DTOs;
 
 namespace BusinessLogic.Services.Implementation
 {
@@ -19,8 +21,11 @@ namespace BusinessLogic.Services.Implementation
     {
         private readonly HttpClient _httpClient;
         private readonly IInterviewRepository _repo;
-        private readonly OpenRouterOptions _options;
+        private readonly GeminiOptions _options;
         private readonly ILogger<AiAnalysisService> _logger;
+        private readonly IUserRepository _userRepo;
+
+        private const int BatchSize = 10;
 
         private static readonly JsonSerializerOptions JsonOpts = new()
         {
@@ -32,22 +37,28 @@ namespace BusinessLogic.Services.Implementation
         public AiAnalysisService(
             HttpClient httpClient,
             IInterviewRepository repo,
-            IOptions<OpenRouterOptions> options,
-            ILogger<AiAnalysisService> logger)
+            IOptions<GeminiOptions> options,
+            ILogger<AiAnalysisService> logger,
+            IUserRepository userRepo)
         {
             _httpClient = httpClient;
             _repo = repo;
             _options = options.Value;
             _logger = logger;
+            _userRepo = userRepo;
         }
 
         public async Task<AiCampaignAnalysisResponseDto> AnalyzeCampaignCandidatesAsync(int campaignId)
         {
-            // 1. Load all data
-            var schedules = (await _repo.GetSchedulesAsync(campaignId, null, null, null)).ToList();
+            var allSchedules = (await _repo.GetSchedulesAsync(campaignId, null, null, null)).ToList();
             var criteria = (await _repo.GetCriteriaByCampaignIdAsync(campaignId)).ToList();
 
-            if (schedules.Count == 0)
+            // Chỉ lấy các schedule đã Completed
+            var completedSchedules = allSchedules
+                .Where(s => s.Status == InterviewStatus.Completed)
+                .ToList();
+
+            if (completedSchedules.Count == 0)
             {
                 return new AiCampaignAnalysisResponseDto
                 {
@@ -57,18 +68,18 @@ namespace BusinessLogic.Services.Implementation
                 };
             }
 
-            // 2. Build candidate data for prompt
             var candidateDataList = new List<CandidatePromptData>();
 
-            foreach (var schedule in schedules)
+            foreach (var schedule in completedSchedules)
             {
                 var allNotes = (await _repo.GetCriteriaScoresByScheduleIdAsync(schedule.Id)).ToList();
 
+                if (!allNotes.Any()) continue;
+
                 var criteriaDetails = criteria.Select(c =>
                 {
-                    var notesForCriterion = allNotes.Where(s => s.EvaluationCriterionId == c.Id).ToList();
-                    var notes = notesForCriterion
-                        .Where(s => !string.IsNullOrEmpty(s.Note))
+                    var notes = allNotes
+                        .Where(s => s.EvaluationCriterionId == c.Id && !string.IsNullOrEmpty(s.Note))
                         .Select(s => s.Note!)
                         .ToList();
 
@@ -76,12 +87,10 @@ namespace BusinessLogic.Services.Implementation
                     {
                         CriterionId = c.Id,
                         CriterionName = c.Name,
-                        Weight = c.Weight,
                         Notes = notes
                     };
                 }).ToList();
 
-                // Collect interviewer feedback notes
                 var feedbackNotes = schedule.Assignments
                     .Where(a => !string.IsNullOrEmpty(a.FeedbackNotes))
                     .Select(a => a.FeedbackNotes!)
@@ -92,130 +101,203 @@ namespace BusinessLogic.Services.Implementation
                     .Select(a => a.Result!.ToString())
                     .ToList();
 
+                var userFind = await _userRepo.GetByIdAsync(schedule.CandidateUserId);
                 candidateDataList.Add(new CandidatePromptData
                 {
                     InterviewScheduleId = schedule.Id,
                     CandidateUserId = schedule.CandidateUserId.ToString(),
-                    CandidateName = schedule.Title,
+                    CandidateName = userFind.FullName,
                     CriteriaDetails = criteriaDetails,
                     FeedbackNotes = feedbackNotes,
                     InterviewerResults = interviewerResults!
                 });
             }
 
-            // 3. Build prompt
-            var prompt = BuildAnalysisPrompt(candidateDataList, criteria.Select(c => c.Name).ToList());
+            if (candidateDataList.Count == 0)
+            {
+                return new AiCampaignAnalysisResponseDto
+                {
+                    CampaignId = campaignId,
+                    AnalyzedAt = DateTime.UtcNow.ToString("o"),
+                    Candidates = new()
+                };
+            }
 
-            // 4. Call AI
+            var criteriaNames = criteria.Select(c => c.Name).ToList();
+
             try
             {
-                var aiResponseText = await CallOpenRouterAsync(prompt);
-                var candidates = ParseAnalysisResponse(aiResponseText, candidateDataList);
+                // Chia batch và gọi song song
+                var batches = candidateDataList
+                    .Select((c, i) => new { c, i })
+                    .GroupBy(x => x.i / BatchSize)
+                    .Select(g => g.Select(x => x.c).ToList())
+                    .ToList();
+
+                var batchTasks = batches.Select(batch => ProcessAnalysisBatchAsync(batch, criteriaNames));
+                var batchResults = await Task.WhenAll(batchTasks);
+
+                var allCandidates = batchResults.SelectMany(r => r).ToList();
 
                 return new AiCampaignAnalysisResponseDto
                 {
                     CampaignId = campaignId,
                     AnalyzedAt = DateTime.UtcNow.ToString("o"),
-                    Candidates = candidates
+                    Candidates = allCandidates
                 };
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "AI Analysis failed for campaign {CampaignId}, using fallback", campaignId);
-                return BuildFallbackAnalysis(campaignId, candidateDataList, criteria.Select(c => new { c.Id, c.Name, c.Weight }).ToList());
+                return BuildFallbackAnalysis(campaignId, candidateDataList);
             }
         }
 
         public async Task<AiSearchResponseDto> SearchCandidatesAsync(int campaignId, AiSearchRequestDto dto)
         {
-            // 1. Load data
-            var schedules = (await _repo.GetSchedulesAsync(campaignId, null, null, null)).ToList();
+            var allSchedules = (await _repo.GetSchedulesAsync(campaignId, null, null, null)).ToList();
             var criteria = (await _repo.GetCriteriaByCampaignIdAsync(campaignId)).ToList();
-            var totalWeight = criteria.Sum(c => c.Weight);
 
-            if (schedules.Count == 0)
+            var completedSchedules = allSchedules
+                .Where(s => s.Status == InterviewStatus.Completed)
+                .ToList();
+
+            if (completedSchedules.Count == 0)
             {
                 return new AiSearchResponseDto
                 {
                     Query = dto.Query,
                     Results = new(),
                     TotalFound = 0,
-                    AiExplanation = "Không có ứng viên nào trong campaign này."
+                    AiExplanation = "Không có ứng viên nào đã hoàn thành phỏng vấn trong campaign này."
                 };
             }
 
-            // 2. Build candidate summaries for search context
+            // Build compact candidate data cho search
             var candidateSummaries = new List<object>();
-            foreach (var schedule in schedules)
+            foreach (var schedule in completedSchedules)
             {
                 var allNotes = (await _repo.GetCriteriaScoresByScheduleIdAsync(schedule.Id)).ToList();
+                if (!allNotes.Any()) continue;
 
-                var criteriaNotes = new Dictionary<string, List<string>>();
+                var notes = new Dictionary<string, string>();
                 foreach (var c in criteria)
                 {
-                    var notesForCriterion = allNotes
+                    var criterionNotes = allNotes
                         .Where(s => s.EvaluationCriterionId == c.Id && !string.IsNullOrEmpty(s.Note))
                         .Select(s => s.Note!)
                         .ToList();
-                    if (notesForCriterion.Any())
-                        criteriaNotes[c.Name] = notesForCriterion;
+                    if (criterionNotes.Any())
+                        notes[c.Name] = string.Join("; ", criterionNotes);
                 }
 
-                var feedbackNotes = schedule.Assignments
+                var fb = schedule.Assignments
                     .Where(a => !string.IsNullOrEmpty(a.FeedbackNotes))
                     .Select(a => a.FeedbackNotes!)
                     .ToList();
 
                 candidateSummaries.Add(new
                 {
-                    interviewScheduleId = schedule.Id,
-                    candidateUserId = schedule.CandidateUserId.ToString(),
-                    candidateName = schedule.Title,
-                    criteriaNotes,
-                    feedbackNotes
+                    id = schedule.Id,
+                    uid = schedule.CandidateUserId.ToString(),
+                    name = schedule.Title,
+                    notes,
+                    fb = fb.Any() ? string.Join("; ", fb) : null
                 });
             }
 
-            // 3. Build search prompt
+            if (candidateSummaries.Count == 0)
+            {
+                return new AiSearchResponseDto
+                {
+                    Query = dto.Query,
+                    Results = new(),
+                    TotalFound = 0,
+                    AiExplanation = "Không có dữ liệu đánh giá nào."
+                };
+            }
+
             var prompt = BuildSearchPrompt(dto.Query, candidateSummaries);
 
-            // 4. Call AI
+            _logger.LogInformation("=== AI SEARCH PROMPT ===\n{Prompt}", prompt);
+
             try
             {
-                var aiResponseText = await CallOpenRouterAsync(prompt);
+                var aiResponseText = await CallGeminiAsync(prompt, candidateSummaries.Count);
+                _logger.LogInformation("=== AI SEARCH RESPONSE ===\n{Response}", aiResponseText);
                 return ParseSearchResponse(aiResponseText, dto.Query);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "AI Search failed for campaign {CampaignId}, using fallback", campaignId);
-                return BuildFallbackSearch(dto.Query, schedules);
+                return BuildFallbackSearch(dto.Query, completedSchedules);
             }
         }
 
         // ═══════════════════════════════════════════════════════════
-        //  OpenRouter API Call
+        //  Batch Processing
         // ═══════════════════════════════════════════════════════════
 
-        private async Task<string> CallOpenRouterAsync(string prompt)
+        private async Task<List<AiCandidateAnalysisDto>> ProcessAnalysisBatchAsync(
+            List<CandidatePromptData> batch, List<string> criteriaNames)
         {
+            var prompt = BuildAnalysisPrompt(batch, criteriaNames);
+
+            _logger.LogInformation("=== AI ANALYSIS PROMPT (batch {Count}) ===\n{Prompt}", batch.Count, prompt);
+
+            try
+            {
+                var aiResponseText = await CallGeminiAsync(prompt, batch.Count);
+                _logger.LogInformation("=== AI ANALYSIS RESPONSE (batch {Count}) ===\n{Response}", batch.Count, aiResponseText);
+                return ParseAnalysisResponse(aiResponseText, batch);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "AI batch failed, using fallback for {Count} candidates", batch.Count);
+                // Fallback cho batch bị lỗi
+                return batch.Select(c => BuildFallbackCandidate(c)).ToList();
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  Gemini API Call
+        // ═══════════════════════════════════════════════════════════
+
+        private async Task<string> CallGeminiAsync(string prompt, int candidateCount = 1)
+        {
+            // Tăng mạnh giới hạn token. 3 ứng viên có thể cần rất nhiều nếu feedbacks dài.
+            var maxTokens = Math.Min(Math.Max(candidateCount * 1500, 3000), 8192);
+            
+            // Đảm bảo dùng model hợp lệ (ưu tiên config, fallback về 1.5-flash nếu config lạ)
+            var modelName = _options.Model;
+            if (string.IsNullOrEmpty(modelName) || modelName.Contains("2.5")) modelName = "gemini-3-flash-preview";
+
             var requestBody = new
             {
-                model = _options.Model,
-                messages = new[]
+                contents = new[]
                 {
-                    new { role = "system", content = "You are an expert HR analyst AI. Always respond with valid JSON only, no markdown fences, no explanation text outside JSON." },
-                    new { role = "user", content = prompt }
+                    new
+                    {
+                        parts = new[]
+                        {
+                            new { text = "Chuyên gia HR. Trả JSON thuần, không markdown, không giải thích.\n\n" + prompt }
+                        }
+                    }
                 },
-                temperature = 0.3,
-                max_tokens = 4000
+                generationConfig = new
+                {
+                    temperature = 0.2,
+                    maxOutputTokens = maxTokens,
+                    responseMimeType = "application/json"
+                }
             };
-            Console.WriteLine(_options.ApiKey);
+
             var json = JsonSerializer.Serialize(requestBody, JsonOpts);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var request = new HttpRequestMessage(HttpMethod.Post, $"{_options.BaseUrl}/chat/completions");
-            request.Headers.Add("Authorization", $"Bearer {_options.ApiKey}");
-            request.Headers.Add("HTTP-Referer", "https://uniclub.app");
-            request.Headers.Add("X-Title", "UniClub Interview AI");
+
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent";
+            var request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Headers.Add("x-goog-api-key", _options.ApiKey);
             request.Content = content;
 
             var response = await _httpClient.SendAsync(request);
@@ -223,113 +305,84 @@ namespace BusinessLogic.Services.Implementation
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("OpenRouter API error {StatusCode}: {Body}", response.StatusCode, responseText);
-                throw new HttpRequestException($"OpenRouter API returned {response.StatusCode}");
+                _logger.LogError("Gemini API error {StatusCode}: {Body}", response.StatusCode, responseText);
+                throw new HttpRequestException($"Gemini API returned {response.StatusCode}");
             }
 
-            // Parse OpenRouter response (OpenAI-compatible format)
             using var doc = JsonDocument.Parse(responseText);
-            var choices = doc.RootElement.GetProperty("choices");
-            if (choices.GetArrayLength() == 0)
-                throw new InvalidOperationException("OpenRouter returned empty choices");
+            var candidates = doc.RootElement.GetProperty("candidates");
+            if (candidates.GetArrayLength() == 0)
+                throw new InvalidOperationException("Gemini returned empty candidates");
 
-            var messageContent = choices[0].GetProperty("message").GetProperty("content").GetString();
-            return messageContent ?? throw new InvalidOperationException("OpenRouter returned null content");
+            var firstCandidate = candidates[0];
+            
+            // Log lý do dừng và dung lượng token đã dùng để debug
+            if (firstCandidate.TryGetProperty("finishReason", out var reason))
+            {
+                _logger.LogInformation("Gemini FinishReason: {Reason}", reason.GetString());
+            }
+            if (doc.RootElement.TryGetProperty("usageMetadata", out var usage))
+            {
+                _logger.LogInformation("Gemini Usage: {Usage}", usage.GetRawText());
+            }
+
+            var text = firstCandidate
+                .GetProperty("content")
+                .GetProperty("parts")[0]
+                .GetProperty("text")
+                .GetString();
+
+            return text ?? throw new InvalidOperationException("Gemini returned null content");
         }
 
         // ═══════════════════════════════════════════════════════════
-        //  Prompt Builders
+        //  Prompt Builders (compact JSON format)
         // ═══════════════════════════════════════════════════════════
 
         private static string BuildAnalysisPrompt(List<CandidatePromptData> candidates, List<string> criteriaNames)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine("Analyze the following interview candidates based on interviewer notes and feedback. Return a JSON array.");
-            sb.AppendLine();
-            sb.AppendLine($"Evaluation criteria: {string.Join(", ", criteriaNames)}");
-            sb.AppendLine();
-            sb.AppendLine("For each candidate, provide:");
-            sb.AppendLine("- fitLevel: StrongFit, MediumFit, WeakFit, or NoData (based on note sentiment)");
-            sb.AppendLine("- suggestedResult: Accept, Reject, Waitlist, or Undecided");
-            sb.AppendLine("- summaryText: Brief AI summary in Vietnamese (2-3 sentences)");
-            sb.AppendLine("- criteriaSentiments: Array of { criterionId, criterionName, sentiment (positive/negative/neutral), confidence (0-1), explanation }");
-            sb.AppendLine("- strengths: Array of strong points in Vietnamese");
-            sb.AppendLine("- weaknesses: Array of weak points in Vietnamese");
-            sb.AppendLine();
-            sb.AppendLine("Return ONLY valid JSON in this exact format:");
-            sb.AppendLine("[");
-            sb.AppendLine("  {");
-            sb.AppendLine("    \"interviewScheduleId\": number,");
-            sb.AppendLine("    \"candidateUserId\": \"string\",");
-            sb.AppendLine("    \"candidateName\": \"string\",");
-            sb.AppendLine("    \"fitLevel\": \"string\",");
-            sb.AppendLine("    \"suggestedResult\": \"string\",");
-            sb.AppendLine("    \"summaryText\": \"string\",");
-            sb.AppendLine("    \"criteriaSentiments\": [{ \"criterionId\": number, \"criterionName\": \"string\", \"sentiment\": \"string\", \"confidence\": number, \"explanation\": \"string\" }],");
-            sb.AppendLine("    \"strengths\": [\"string\"],");
-            sb.AppendLine("    \"weaknesses\": [\"string\"]");
-            sb.AppendLine("  }");
-            sb.AppendLine("]");
-            sb.AppendLine();
-            sb.AppendLine("=== CANDIDATE DATA ===");
-
-            foreach (var c in candidates)
+            var compactData = candidates.Select(c => new
             {
-                sb.AppendLine();
-                sb.AppendLine($"--- Candidate: {c.CandidateName} (ID: {c.InterviewScheduleId}, UserID: {c.CandidateUserId}) ---");
+                id = c.InterviewScheduleId,
+                uid = c.CandidateUserId,
+                name = c.CandidateName,
+                criteria = c.CriteriaDetails
+                    .Where(cr => cr.Notes.Any())
+                    .Select(cr => new
+                    {
+                        cid = cr.CriterionId,
+                        n = cr.CriterionName,
+                        notes = string.Join("; ", cr.Notes)
+                    }),
+                fb = c.FeedbackNotes.Any() ? string.Join("; ", c.FeedbackNotes) : null
+            });
 
-                foreach (var cr in c.CriteriaDetails)
-                {
-                    sb.AppendLine($"  Criterion '{cr.CriterionName}' (ID:{cr.CriterionId}, Weight:{cr.Weight}%)");
-                    if (cr.Notes.Any())
-                        sb.AppendLine($"    Notes: {string.Join(" | ", cr.Notes)}");
-                    else
-                        sb.AppendLine($"    Notes: (no notes provided)");
-                }
+            var dataJson = JsonSerializer.Serialize(compactData, JsonOpts);
 
-                if (c.FeedbackNotes.Any())
-                    sb.AppendLine($"  Interviewer Notes: {string.Join(" | ", c.FeedbackNotes)}");
-
-                if (c.InterviewerResults.Any())
-                    sb.AppendLine($"  Interviewer Decisions: {string.Join(", ", c.InterviewerResults)}");
-            }
-
-            return sb.ToString();
+            return $@"Đánh giá ứng viên. Tiêu chí: {string.Join(", ", criteriaNames)}
+Trả JSON: [{{""interviewScheduleId"":n,""candidateUserId"":""s"",""candidateName"":""s"",""result"":""Pass|Fail|Consider"",""criteriaEvaluations"":[{{""criterionId"":n,""criterionName"":""s"",""result"":""Pass|Fail|Hold""}}],""strengths"":[""s""],""weaknesses"":[""s""]}}]
+criteriaEvaluations.result: Pass=đạt, Fail=không đạt, Hold=chưa rõ. Viết tiếng Việt.
+DATA:{dataJson}";
         }
 
         private static string BuildSearchPrompt(string query, List<object> candidateSummaries)
         {
-            var sb = new StringBuilder();
-            sb.AppendLine($"Given the following candidates data, find the candidates that best match this search query: \"{query}\"");
-            sb.AppendLine();
-            sb.AppendLine("Return ONLY valid JSON in this exact format:");
-            sb.AppendLine("{");
-            sb.AppendLine("  \"results\": [");
-            sb.AppendLine("    {");
-            sb.AppendLine("      \"interviewScheduleId\": number,");
-            sb.AppendLine("      \"candidateUserId\": \"string\",");
-            sb.AppendLine("      \"candidateName\": \"string\",");
-            sb.AppendLine("      \"relevanceScore\": number (0-1),");
-            sb.AppendLine("      \"matchReason\": \"string (in Vietnamese)\",");
-            sb.AppendLine("      \"suggestedResult\": \"string\"");
-            sb.AppendLine("    }");
-            sb.AppendLine("  ],");
-            sb.AppendLine("  \"totalFound\": number,");
-            sb.AppendLine("  \"aiExplanation\": \"string (in Vietnamese)\"");
-            sb.AppendLine("}");
-            sb.AppendLine();
-            sb.AppendLine("=== CANDIDATES DATA ===");
-            sb.AppendLine(JsonSerializer.Serialize(candidateSummaries, JsonOpts));
+            var dataJson = JsonSerializer.Serialize(candidateSummaries, JsonOpts);
 
-            return sb.ToString();
+            return $@"Tìm ứng viên khớp: ""{query}""
+Trả JSON: {{""results"":[{{""interviewScheduleId"":n,""candidateUserId"":""s"",""candidateName"":""s"",""matchReason"":""s"",""result"":""Pass|Fail|Consider""}}],""totalFound"":n,""aiExplanation"":""s""}}
+Viết tiếng Việt.
+DATA:{dataJson}";
         }
 
+        // ═══════════════════════════════════════════════════════════
+        //  Response Parsers
+        // ═══════════════════════════════════════════════════════════
 
         private List<AiCandidateAnalysisDto> ParseAnalysisResponse(string aiText, List<CandidatePromptData> originalData)
         {
             try
             {
-                // Clean up: remove markdown code fences if present
                 aiText = CleanJsonResponse(aiText);
 
                 var parsed = JsonSerializer.Deserialize<List<AiAnalysisRawItem>>(aiText, JsonOpts);
@@ -342,16 +395,12 @@ namespace BusinessLogic.Services.Implementation
                         InterviewScheduleId = item.InterviewScheduleId,
                         CandidateUserId = Guid.TryParse(item.CandidateUserId, out var uid) ? uid : Guid.Empty,
                         CandidateName = item.CandidateName ?? "Unknown",
-                        FitLevel = item.FitLevel ?? "NoData",
-                        SuggestedResult = item.SuggestedResult ?? "Undecided",
-                        SummaryText = item.SummaryText ?? "",
-                        CriteriaSentiments = item.CriteriaSentiments?.Select(cs => new AiCriteriaSentimentDto
+                        Result = item.Result ?? "Consider",
+                        CriteriaEvaluations = item.CriteriaEvaluations?.Select(ce => new AiCriteriaEvaluationDto
                         {
-                            CriterionId = cs.CriterionId,
-                            CriterionName = cs.CriterionName ?? "",
-                            Sentiment = cs.Sentiment ?? "neutral",
-                            Confidence = cs.Confidence,
-                            Explanation = cs.Explanation
+                            CriterionId = ce.CriterionId,
+                            CriterionName = ce.CriterionName ?? "",
+                            Result = NormalizeCriteriaResult(ce.Result)
                         }).ToList() ?? new(),
                         Strengths = item.Strengths ?? new(),
                         Weaknesses = item.Weaknesses ?? new()
@@ -384,9 +433,8 @@ namespace BusinessLogic.Services.Implementation
                         InterviewScheduleId = r.InterviewScheduleId,
                         CandidateUserId = Guid.TryParse(r.CandidateUserId, out var uid) ? uid : Guid.Empty,
                         CandidateName = r.CandidateName ?? "Unknown",
-                        RelevanceScore = r.RelevanceScore,
                         MatchReason = r.MatchReason ?? "",
-                        SuggestedResult = r.SuggestedResult ?? ""
+                        Result = r.Result ?? ""
                     }).ToList() ?? new()
                 };
             }
@@ -400,7 +448,6 @@ namespace BusinessLogic.Services.Implementation
         private static string CleanJsonResponse(string text)
         {
             text = text.Trim();
-            // Remove markdown code fences
             if (text.StartsWith("```json", StringComparison.OrdinalIgnoreCase))
                 text = text[7..];
             else if (text.StartsWith("```"))
@@ -412,83 +459,68 @@ namespace BusinessLogic.Services.Implementation
             return text.Trim();
         }
 
+        private static string NormalizeCriteriaResult(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return "Hold";
+            var val = raw.Trim();
+            if (val.Equals("Pass", StringComparison.OrdinalIgnoreCase)) return "Pass";
+            if (val.Equals("Fail", StringComparison.OrdinalIgnoreCase)) return "Fail";
+            return "Hold";
+        }
+
         // ═══════════════════════════════════════════════════════════
         //  Fallback (khi AI API không khả dụng)
         // ═══════════════════════════════════════════════════════════
 
+        private static AiCandidateAnalysisDto BuildFallbackCandidate(CandidatePromptData c)
+        {
+            var hasNotes = c.CriteriaDetails.Any(cr => cr.Notes.Any()) || c.FeedbackNotes.Any();
+            var interviewerPassed = c.InterviewerResults.Count(r => r == "Pass");
+            var interviewerFailed = c.InterviewerResults.Count(r => r == "Fail");
+
+            string fallbackResult;
+            if (!hasNotes)
+                fallbackResult = "Consider";
+            else if (interviewerPassed > interviewerFailed)
+                fallbackResult = "Pass";
+            else if (interviewerFailed > interviewerPassed)
+                fallbackResult = "Fail";
+            else
+                fallbackResult = "Consider";
+
+            var evaluations = c.CriteriaDetails.Select(cr => new AiCriteriaEvaluationDto
+            {
+                CriterionId = cr.CriterionId,
+                CriterionName = cr.CriterionName,
+                Result = cr.Notes.Any() ? "Hold" : "Hold"
+            }).ToList();
+
+            return new AiCandidateAnalysisDto
+            {
+                InterviewScheduleId = c.InterviewScheduleId,
+                CandidateUserId = Guid.TryParse(c.CandidateUserId, out var uid) ? uid : Guid.Empty,
+                CandidateName = c.CandidateName,
+                Result = fallbackResult,
+                CriteriaEvaluations = evaluations,
+                Strengths = c.FeedbackNotes.Take(2).ToList(),
+                Weaknesses = new()
+            };
+        }
+
         private AiCampaignAnalysisResponseDto BuildFallbackAnalysis(
             int campaignId,
-            List<CandidatePromptData> candidates,
-            dynamic criteriaList)
+            List<CandidatePromptData> candidates)
         {
-            var result = new AiCampaignAnalysisResponseDto
+            return new AiCampaignAnalysisResponseDto
             {
                 CampaignId = campaignId,
                 AnalyzedAt = DateTime.UtcNow.ToString("o"),
-                Candidates = new()
+                Candidates = candidates.Select(BuildFallbackCandidate).ToList()
             };
-
-            foreach (var c in candidates)
-            {
-                // Determine fit from note content (simple heuristic)
-                var hasNotes = c.CriteriaDetails.Any(cr => cr.Notes.Any()) || c.FeedbackNotes.Any();
-                var interviewerPassed = c.InterviewerResults.Count(r => r == "Pass");
-                var interviewerFailed = c.InterviewerResults.Count(r => r == "Fail");
-
-                string fitLevel;
-                string suggested;
-                if (!hasNotes)
-                {
-                    fitLevel = "NoData";
-                    suggested = "Undecided";
-                }
-                else if (interviewerPassed > interviewerFailed)
-                {
-                    fitLevel = "StrongFit";
-                    suggested = "Accept";
-                }
-                else if (interviewerFailed > interviewerPassed)
-                {
-                    fitLevel = "WeakFit";
-                    suggested = "Reject";
-                }
-                else
-                {
-                    fitLevel = "MediumFit";
-                    suggested = "Waitlist";
-                }
-
-                var sentiments = c.CriteriaDetails.Select(cr => new AiCriteriaSentimentDto
-                {
-                    CriterionId = cr.CriterionId,
-                    CriterionName = cr.CriterionName,
-                    Sentiment = cr.Notes.Any() ? "neutral" : "neutral",
-                    Confidence = cr.Notes.Any() ? 0.4 : 0,
-                    Explanation = cr.Notes.Any()
-                        ? $"Nhận xét: {string.Join(" | ", cr.Notes)}"
-                        : "(fallback — AI không khả dụng, không có nhận xét)"
-                }).ToList();
-
-                result.Candidates.Add(new AiCandidateAnalysisDto
-                {
-                    InterviewScheduleId = c.InterviewScheduleId,
-                    CandidateUserId = Guid.TryParse(c.CandidateUserId, out var uid) ? uid : Guid.Empty,
-                    CandidateName = c.CandidateName,
-                    FitLevel = fitLevel,
-                    SuggestedResult = suggested,
-                    SummaryText = "[Fallback] AI model không khả dụng. Dựa trên kết quả của interviewer.",
-                    CriteriaSentiments = sentiments,
-                    Strengths = c.FeedbackNotes.Take(2).ToList(),
-                    Weaknesses = new()
-                });
-            }
-
-            return result;
         }
 
         private static AiSearchResponseDto BuildFallbackSearch(string query, List<DataAccess.Models.Meeting.InterviewSchedule> schedules)
         {
-            // Simple name-based search fallback
             var queryLower = query.ToLowerInvariant();
             var results = schedules
                 .Where(s => s.Title.ToLowerInvariant().Contains(queryLower)
@@ -498,9 +530,8 @@ namespace BusinessLogic.Services.Implementation
                     InterviewScheduleId = s.Id,
                     CandidateUserId = s.CandidateUserId,
                     CandidateName = s.Title,
-                    RelevanceScore = 0.5,
-                    MatchReason = "[Fallback] Tìm theo tên — AI search không khả dụng.",
-                    SuggestedResult = "Undecided"
+                    MatchReason = "[Fallback] Tìm theo tên — AI không khả dụng.",
+                    Result = "Consider"
                 })
                 .ToList();
 
@@ -509,71 +540,8 @@ namespace BusinessLogic.Services.Implementation
                 Query = query,
                 Results = results,
                 TotalFound = results.Count,
-                AiExplanation = "[Fallback] AI search không khả dụng, tìm kiếm cơ bản theo tên ứng viên."
+                AiExplanation = "[Fallback] AI không khả dụng, tìm cơ bản theo tên."
             };
-        }
-
-        // ═══════════════════════════════════════════════════════════
-        //  Internal DTOs for parsing AI response
-        // ═══════════════════════════════════════════════════════════
-
-        private class AiAnalysisRawItem
-        {
-            public int InterviewScheduleId { get; set; }
-            public string? CandidateUserId { get; set; }
-            public string? CandidateName { get; set; }
-            public string? FitLevel { get; set; }
-            public string? SuggestedResult { get; set; }
-            public string? SummaryText { get; set; }
-            public List<AiCriteriaSentimentRaw>? CriteriaSentiments { get; set; }
-            public List<string>? Strengths { get; set; }
-            public List<string>? Weaknesses { get; set; }
-        }
-
-        private class AiCriteriaSentimentRaw
-        {
-            public int CriterionId { get; set; }
-            public string? CriterionName { get; set; }
-            public string? Sentiment { get; set; }
-            public double Confidence { get; set; }
-            public string? Explanation { get; set; }
-        }
-
-        private class AiSearchRawResponse
-        {
-            public List<AiSearchRawItem>? Results { get; set; }
-            public int TotalFound { get; set; }
-            public string? AiExplanation { get; set; }
-        }
-
-        private class AiSearchRawItem
-        {
-            public int InterviewScheduleId { get; set; }
-            public string? CandidateUserId { get; set; }
-            public string? CandidateName { get; set; }
-            public double RelevanceScore { get; set; }
-            public string? MatchReason { get; set; }
-            public string? SuggestedResult { get; set; }
-        }
-
-        // ── Data classes for prompt building ───────────────────────
-
-        private class CandidatePromptData
-        {
-            public int InterviewScheduleId { get; set; }
-            public string CandidateUserId { get; set; } = null!;
-            public string CandidateName { get; set; } = null!;
-            public List<CriterionPromptData> CriteriaDetails { get; set; } = new();
-            public List<string> FeedbackNotes { get; set; } = new();
-            public List<string> InterviewerResults { get; set; } = new();
-        }
-
-        private class CriterionPromptData
-        {
-            public int CriterionId { get; set; }
-            public string CriterionName { get; set; } = null!;
-            public int Weight { get; set; }
-            public List<string> Notes { get; set; } = new();
         }
     }
 }

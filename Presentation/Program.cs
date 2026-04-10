@@ -144,7 +144,7 @@ builder.Services.AddScoped<BusinessLogic.Services.Interface.IQRCodeGeneratorServ
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<BusinessLogic.Validators.CreateEventRequestValidator>();
-builder.Services.Configure<OpenRouterOptions>(builder.Configuration.GetSection("OpenRouter"));
+builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection("Gemini"));
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(BusinessLogic.Mappings.EventMappingProfile).Assembly);
 

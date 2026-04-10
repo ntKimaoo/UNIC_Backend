@@ -310,7 +310,6 @@ namespace BusinessLogic.DTOs
         public int CampaignId { get; set; }
         public string Name { get; set; } = null!;
         public string? Description { get; set; }
-        public int Weight { get; set; }
         public bool IsDefault { get; set; }
     }
 
@@ -321,10 +320,6 @@ namespace BusinessLogic.DTOs
         public string Name { get; set; } = null!;
 
         public string? Description { get; set; }
-
-        [Required]
-        [Range(1, 100)]
-        public int Weight { get; set; }
     }
 
     public class UpdateEvaluationCriterionDto
@@ -332,9 +327,6 @@ namespace BusinessLogic.DTOs
         [MaxLength(200)]
         public string? Name { get; set; }
         public string? Description { get; set; }
-
-        [Range(1, 100)]
-        public int? Weight { get; set; }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -382,7 +374,6 @@ namespace BusinessLogic.DTOs
     {
         public int CriterionId { get; set; }
         public string CriterionName { get; set; } = null!;
-        public int Weight { get; set; }
         public string? Note { get; set; }
         public Guid InterviewerUserId { get; set; }
         public string InterviewerRole { get; set; } = null!;
@@ -410,7 +401,6 @@ namespace BusinessLogic.DTOs
     {
         public int CriterionId { get; set; }
         public string CriterionName { get; set; } = null!;
-        public int Weight { get; set; }
 
         /// <summary>
         /// Nhận xét từng interviewer cho tiêu chí này.
@@ -526,35 +516,24 @@ namespace BusinessLogic.DTOs
         public Guid CandidateUserId { get; set; }
         public string CandidateName { get; set; } = null!;
 
-        /// <summary> StrongFit, MediumFit, WeakFit, NoData </summary>
-        public string FitLevel { get; set; } = "NoData";
+        /// <summary> Pass, Fail, Consider </summary>
+        public string Result { get; set; } = "Consider";
 
-        /// <summary> Accept, Reject, Waitlist, Undecided </summary>
-        public string SuggestedResult { get; set; } = "Undecided";
-
-        /// <summary> AI-generated summary text. </summary>
-        public string SummaryText { get; set; } = string.Empty;
-
-        public List<AiCriteriaSentimentDto> CriteriaSentiments { get; set; } = new();
+        public List<AiCriteriaEvaluationDto> CriteriaEvaluations { get; set; } = new();
         public List<string> Strengths { get; set; } = new();
         public List<string> Weaknesses { get; set; } = new();
     }
 
     /// <summary>
-    /// Sentiment AI cho 1 tiêu chí của ứng viên.
+    /// Đánh giá AI cho 1 tiêu chí của ứng viên.
     /// </summary>
-    public class AiCriteriaSentimentDto
+    public class AiCriteriaEvaluationDto
     {
         public int CriterionId { get; set; }
         public string CriterionName { get; set; } = null!;
 
-        /// <summary> positive, negative, neutral </summary>
-        public string Sentiment { get; set; } = "neutral";
-
-        /// <summary> Confidence 0–1. </summary>
-        public double Confidence { get; set; }
-
-        public string? Explanation { get; set; }
+        /// <summary> Pass, Fail, Hold </summary>
+        public string Result { get; set; } = "Hold";
     }
 
     /// <summary>
@@ -589,13 +568,11 @@ namespace BusinessLogic.DTOs
         public Guid CandidateUserId { get; set; }
         public string CandidateName { get; set; } = null!;
 
-        /// <summary> Relevance score 0–1. </summary>
-        public double RelevanceScore { get; set; }
-
         /// <summary> AI explanation tại sao match. </summary>
         public string MatchReason { get; set; } = string.Empty;
 
-        public string SuggestedResult { get; set; } = string.Empty;
+        /// <summary> Pass, Fail, Consider </summary>
+        public string Result { get; set; } = string.Empty;
     }
 
     /// <summary>

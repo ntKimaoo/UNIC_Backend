@@ -719,13 +719,13 @@ namespace BusinessLogic.Services.Implementation
         /// <summary>
         /// 5 tiêu chí mặc định – tự tạo khi campaign chưa có tiêu chí nào.
         /// </summary>
-        private static readonly List<(string Name, string Desc, int Weight)> DefaultCriteria = new()
+        private static readonly List<(string Name, string Desc)> DefaultCriteria = new()
         {
-            ("Kiến thức chuyên môn",       "Đánh giá kiến thức nền tảng, chuyên ngành liên quan", 25),
-            ("Kỹ năng giao tiếp",          "Khả năng trình bày, tương tác, diễn đạt ý tưởng",    20),
-            ("Tư duy & giải quyết vấn đề", "Khả năng phân tích, tư duy logic, đề xuất giải pháp", 20),
-            ("Phù hợp văn hóa CLB",        "Mức độ phù hợp với giá trị, phong cách hoạt động CLB", 20),
-            ("Kinh nghiệm & thành tích",   "Kinh nghiệm hoạt động, thành tích cá nhân, kỹ năng mềm", 15),
+            ("Kiến thức chuyên môn",       "Đánh giá kiến thức nền tảng, chuyên ngành liên quan"),
+            ("Kỹ năng giao tiếp",          "Khả năng trình bày, tương tác, diễn đạt ý tưởng"),
+            ("Tư duy & giải quyết vấn đề", "Khả năng phân tích, tư duy logic, đề xuất giải pháp"),
+            ("Phù hợp văn hóa CLB",        "Mức độ phù hợp với giá trị, phong cách hoạt động CLB"),
+            ("Kinh nghiệm & thành tích",   "Kinh nghiệm hoạt động, thành tích cá nhân, kỹ năng mềm"),
         };
 
         public async Task<List<EvaluationCriterionDto>> GetCampaignCriteriaAsync(int campaignId)
@@ -736,14 +736,13 @@ namespace BusinessLogic.Services.Implementation
             // Nếu chưa có tiêu chí → seed 5 default
             if (list.Count == 0)
             {
-                foreach (var (name, desc, weight) in DefaultCriteria)
+                foreach (var (name, desc) in DefaultCriteria)
                 {
                     var c = new EvaluationCriterion
                     {
                         CampaignId   = campaignId,
                         Name         = name,
                         Description  = desc,
-                        Weight       = weight,
                         IsDefault    = true,
                         CreatedAt    = DateTime.UtcNow
                     };
@@ -762,7 +761,6 @@ namespace BusinessLogic.Services.Implementation
                 CampaignId   = campaignId,
                 Name         = dto.Name,
                 Description  = dto.Description,
-                Weight       = dto.Weight,
                 IsDefault    = false,
                 CreatedAt    = DateTime.UtcNow
             };
@@ -780,8 +778,6 @@ namespace BusinessLogic.Services.Implementation
                 criterion.Name = dto.Name;
             if (dto.Description != null)
                 criterion.Description = dto.Description;
-            if (dto.Weight.HasValue)
-                criterion.Weight = dto.Weight.Value;
 
             await _repo.UpdateCriterionAsync(criterion);
             return MapCriterionToDto(criterion);
@@ -896,12 +892,10 @@ namespace BusinessLogic.Services.Implementation
                 {
                     CriterionId   = c.Id,
                     CriterionName = c.Name,
-                    Weight        = c.Weight,
                     IndividualNotes = notesForCriterion.Select(s => new CriteriaNoteResultDto
                     {
                         CriterionId       = c.Id,
                         CriterionName     = c.Name,
-                        Weight            = c.Weight,
                         Note              = s.Note,
                         InterviewerUserId = s.InterviewAssignment.InterviewerUserId,
                         InterviewerRole   = s.InterviewAssignment.Role.ToString()
@@ -925,11 +919,17 @@ namespace BusinessLogic.Services.Implementation
             var schedules = (await _repo.GetSchedulesAsync(campaignId, null, null, null)).ToList();
             var criteria  = (await _repo.GetCriteriaByCampaignIdAsync(campaignId)).ToList();
 
+            var completedSchedules = schedules
+                .Where(s => s.Status == InterviewStatus.Completed)
+                .ToList();
+
             var items = new List<CandidateComparisonItemDto>();
 
-            foreach (var schedule in schedules)
+            foreach (var schedule in completedSchedules)
             {
                 var allNotes = (await _repo.GetCriteriaScoresByScheduleIdAsync(schedule.Id)).ToList();
+
+                if (!allNotes.Any()) continue;
 
                 var criteriaSummaries = criteria.Select(c =>
                 {
@@ -938,12 +938,10 @@ namespace BusinessLogic.Services.Implementation
                     {
                         CriterionId   = c.Id,
                         CriterionName = c.Name,
-                        Weight        = c.Weight,
                         IndividualNotes = notesForCriterion.Select(n => new CriteriaNoteResultDto
                         {
                             CriterionId       = c.Id,
                             CriterionName     = c.Name,
-                            Weight            = c.Weight,
                             Note              = n.Note,
                             InterviewerUserId = n.InterviewAssignment.InterviewerUserId,
                             InterviewerRole   = n.InterviewAssignment.Role.ToString()
@@ -1062,7 +1060,6 @@ namespace BusinessLogic.Services.Implementation
                 CampaignId   = c.CampaignId,
                 Name         = c.Name,
                 Description  = c.Description,
-                Weight       = c.Weight,
                 IsDefault    = c.IsDefault
             };
         }

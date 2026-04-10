@@ -29,11 +29,7 @@ public class EvaluationCriterion
     /// </summary>
     public string? Description { get; set; }
 
-    /// <summary>
-    /// Trọng số (phần trăm). VD: 25 = 25%.
-    /// Tổng trọng số các tiêu chí trong campaign phải = 100.
-    /// </summary>
-    public int Weight { get; set; }
+
 
     /// <summary>
     /// Tiêu chí mặc định hay do admin tạo thêm.
