@@ -120,7 +120,7 @@ namespace Presentation.Controllers
         /// </summary>
         [HttpPut("api/clubs/{clubId}/members/{memberId}/role")]
         
-        public async Task<IActionResult> UpdateMemberRole(int clubId, int memberId, [FromBody] UpdateMemberRoleDto dto)
+        public async Task<IActionResult> UpdateMemberRole(int clubId, int memberId, [FromBody] UpdateMemberRoleDto? dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
@@ -135,7 +135,7 @@ namespace Presentation.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+                return StatusCode(500, new { success = false, message = ex.Message, error = ex.Message });
             }
         }
 
