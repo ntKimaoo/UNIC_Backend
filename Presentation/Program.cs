@@ -231,19 +231,35 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<UnicContext>();
     var meetingDb = scope.ServiceProvider.GetRequiredService<MeetingDbContext>();
 
-    var retry = 0;
-    while (!db.Database.CanConnect())
+    // Connect to 'master' to check SQL Server readiness (target DB may not exist yet)
+    var connString = builder.Configuration.GetConnectionString("DefaultConnection")!;
+    var masterConn = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(connString)
     {
-        retry++;
-        if (retry > 10)
-        {
-            throw new Exception("SQL Server is not ready after waiting.");
-        }
+        InitialCatalog = "master"
+    }.ConnectionString;
 
-        Console.WriteLine("Waiting for SQL Server...");
-        Thread.Sleep(3000);
+    var retry = 0;
+    while (true)
+    {
+        try
+        {
+            using var conn = new Microsoft.Data.SqlClient.SqlConnection(masterConn);
+            conn.Open();
+            break;
+        }
+        catch
+        {
+            retry++;
+            if (retry > 30)
+            {
+                throw new Exception("SQL Server is not ready after waiting 150s.");
+            }
+            Console.WriteLine($"Waiting for SQL Server... ({retry}/30)");
+            Thread.Sleep(5000);
+        }
     }
 
+    Console.WriteLine("SQL Server is ready. Running migrations...");
     db.Database.Migrate();
     meetingDb.Database.Migrate();
 
