@@ -20,9 +20,7 @@ jobs:
           script: |
             cd /var/www/UNIC_Backend
 
-            git pull origin kien_dev
+            git fetch origin kien_dev
+            git reset --hard origin/kien_dev
 
-            docker-compose down
             docker-compose up -d --build
-
-            docker image prune -f
