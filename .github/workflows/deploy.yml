@@ -39,18 +39,6 @@ jobs:
           script: |
             cd ${{ secrets.DEPLOY_PATH || '~/unic-backend' }}
 
-            # ── Create .env file from secrets ──
-            cat > .env << 'EOF'
-            JWT_KEY=${{ secrets.JWT_KEY }}
-            EMAIL_USERNAME=${{ secrets.EMAIL_USERNAME }}
-            EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}
-            EMAIL_FROM=${{ secrets.EMAIL_FROM }}
-            CLOUDINARY_CLOUD=${{ secrets.CLOUDINARY_CLOUD }}
-            CLOUDINARY_KEY=${{ secrets.CLOUDINARY_KEY }}
-            CLOUDINARY_SECRET=${{ secrets.CLOUDINARY_SECRET }}
-            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
-            EOF
-
             # ── Build & restart services ──
             docker compose up -d --build --force-recreate
 
