@@ -20,11 +20,49 @@ namespace UNIC.Presentation.Controllers
     {
         private readonly IEventService _eventService;
         private readonly IQRCodeGeneratorService _qrCodeGeneratorService;
+        private readonly IEventPermissionService _eventPermService;
 
-        public EventsController(IEventService eventService, IQRCodeGeneratorService qrCodeGeneratorService)
+        public EventsController(
+            IEventService eventService,
+            IQRCodeGeneratorService qrCodeGeneratorService,
+            IEventPermissionService eventPermService)
         {
             _eventService = eventService;
             _qrCodeGeneratorService = qrCodeGeneratorService;
+            _eventPermService = eventPermService;
+        }
+
+        private Guid GetUserId()
+        {
+            var claim = User.FindFirst("UserId")
+                ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            return claim != null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
+        }
+
+        /// <summary>
+        /// Get all events the current user participates in (as attendee or collaborator).
+        /// Returns policies per event for frontend action gating.
+        /// </summary>
+        [HttpGet("my-events")]
+        [Authorize]
+        public async Task<ActionResult<MyEventsPagedResult>> GetMyEvents(
+            [FromQuery] string? search = null,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
+        {
+            try
+            {
+                var userId = GetUserId();
+                if (userId == Guid.Empty)
+                    return Unauthorized(new { error = "User not authenticated." });
+
+                if (page < 1) page = 1;
+                if (pageSize < 1 || pageSize > 50) pageSize = 10;
+
+                var result = await _eventPermService.GetMyEventsAsync(userId, search, page, pageSize);
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
         }
 
         /// <summary>

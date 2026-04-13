@@ -29,8 +29,19 @@ namespace DataAccess.Repositories.Interface
         Task<EventRole?> GetEventRoleByIdAsync(int eventRoleId);
         Task AddEventRoleAsync(EventRole role);
         Task RemoveEventRoleAsync(int eventRoleId);
+        Task UpdateEventRoleAsync(EventRole role);
+        Task SetEventRolePoliciesAsync(int eventRoleId, List<int> policyIds);
 
         // User permissions list
         Task<IEnumerable<string>> GetUserEventPoliciesAsync(Guid userId, int eventId);
+
+        // Resolve policy names to IDs
+        Task<List<int>> GetPolicyIdsByNamesAsync(List<string> policyNames);
+
+        // My Events
+        Task<List<int>> GetUserParticipatingEventIdsAsync(Guid userId, string? search);
+        Task<List<Event>> GetEventsByIdsPagedAsync(List<int> eventIds, int page, int pageSize);
+        Task<Dictionary<int, (string Status, DateTime? CheckInTime)>> GetUserAttendancesAsync(Guid userId, List<int> eventIds);
+        Task<Dictionary<int, EventMember>> GetUserEventMembershipsAsync(Guid userId, List<int> eventIds);
     }
 }

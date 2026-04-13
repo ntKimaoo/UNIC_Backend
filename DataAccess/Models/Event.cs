@@ -19,10 +19,10 @@ namespace DataAccess.Models
         [MaxLength(200)]
         public string EventName { get; set; }
 
-        public string Description { get; set; }
-        public string ImageUrl { get; set; }
+        public string? Description { get; set; }
+        public string? ImageUrl { get; set; }
         [MaxLength(200)]
-        public string Location { get; set; }
+        public string? Location { get; set; }
 
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
@@ -42,7 +42,16 @@ namespace DataAccess.Models
         public string? CheckInCode { get; set; }
         public DateTime? CodeExpiresAt { get; set; }
 
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        // Online meeting
+        public bool IsOnline { get; set; } = false;
+        [MaxLength(500)]
+        public string? MeetLink { get; set; }
+
+        // Optimistic Concurrency Control
+        [Timestamp]
+        public byte[]? RowVersion { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         [ForeignKey("ClubId")]
         public virtual Club Club { get; set; }

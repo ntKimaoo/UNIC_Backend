@@ -43,7 +43,7 @@ namespace UNIC.Presentation.Controllers
         // ── Team Members ──
 
         /// <summary>Lấy danh sách ban tổ chức event</summary>
-        [HttpGet("team")]
+        [HttpGet("members")]
         [RequireEventPolicy("managecollaborator")]
         public async Task<ActionResult<IEnumerable<EventMemberDto>>> GetTeamMembers(int clubId, int eventId)
         {
@@ -60,7 +60,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>Thêm thành viên vào ban tổ chức</summary>
-        [HttpPost("team")]
+        [HttpPost("members")]
         [RequireEventPolicy("managecollaborator")]
         public async Task<ActionResult<EventMemberDto>> AddTeamMember(
             int clubId, int eventId, [FromBody] AddEventMemberRequest request)
@@ -79,7 +79,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>Xóa thành viên khỏi ban tổ chức</summary>
-        [HttpDelete("team/{memberId}")]
+        [HttpDelete("members/{memberId}")]
         [RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> RemoveTeamMember(int clubId, int eventId, int memberId)
         {
@@ -92,7 +92,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>Đổi role cho thành viên ban tổ chức</summary>
-        [HttpPut("team/{memberId}/role")]
+        [HttpPut("members/{memberId}/role")]
         [RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> UpdateMemberRole(
             int clubId, int eventId, int memberId, [FromBody] UpdateEventMemberRoleRequest request)
@@ -147,6 +147,34 @@ namespace UNIC.Presentation.Controllers
             catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
         }
 
+        /// <summary>Cập nhật role event (tên, mô tả)</summary>
+        [HttpPut("roles/{roleId}")]
+        [RequireEventPolicy("managecollaborator")]
+        public async Task<ActionResult<EventRoleDto>> UpdateEventRole(
+            int clubId, int eventId, int roleId, [FromBody] UpdateEventRoleRequest request)
+        {
+            try
+            {
+                var role = await _eventPermService.UpdateEventRoleAsync(roleId, request.RoleName, request.Description);
+                return Ok(role);
+            }
+            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+        }
+
+        /// <summary>Set policies cho role event</summary>
+        [HttpPut("roles/{roleId}/policies")]
+        [RequireEventPolicy("managecollaborator")]
+        public async Task<IActionResult> SetEventRolePolicies(
+            int clubId, int eventId, int roleId, [FromBody] List<string> policies)
+        {
+            try
+            {
+                await _eventPermService.SetEventRolePoliciesAsync(roleId, policies);
+                return Ok(new { message = "Cập nhật quyền thành công." });
+            }
+            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+        }
+
         // ── Permissions Check ──
 
         /// <summary>Xem quyền của mình trên event</summary>
@@ -161,6 +189,26 @@ namespace UNIC.Presentation.Controllers
 
                 var permissions = await _eventPermService.GetUserEventPermissionsAsync(userId, eventId);
                 return Ok(permissions);
+            }
+            catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        }
+
+        /// <summary>Xem role + policies của mình trên event (dùng bởi frontend useEventPermission hook)</summary>
+        [HttpGet("my-role")]
+        public async Task<IActionResult> GetMyRole(int clubId, int eventId)
+        {
+            try
+            {
+                var userId = GetUserId();
+                if (userId == Guid.Empty)
+                    return Unauthorized(new { error = "User not authenticated." });
+
+                var permissions = await _eventPermService.GetUserEventPermissionsAsync(userId, eventId);
+                // Return shape expected by frontend: { role, policies }
+                string? role = permissions.IsClubManager ? "ADMIN"
+                             : permissions.IsEventMember ? (permissions.RoleName ?? "MEMBER")
+                             : null;
+                return Ok(new { role, policies = permissions.Policies });
             }
             catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
         }

@@ -14,6 +14,7 @@ namespace BusinessLogic.Mappings
             // Attendance -> AttendanceDetailDto
             CreateMap<Attendance, AttendanceDetailDto>()
                 .ForMember(dest => dest.MemberName, opt => opt.MapFrom(src => src.User.FullName))
+                .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.User.Email))
                 .ForMember(dest => dest.StudentId, opt => opt.MapFrom(src => src.User.StudentId));
 
             // Event -> CheckInCodeResponse

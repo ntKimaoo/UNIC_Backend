@@ -81,11 +81,15 @@ namespace Presentation.Authorization
             // ── 2. Club Manager → pass ──
             if (clubId.HasValue)
             {
-                var isManager = await _policyService.HasMemberPolicyInClubAsync(userId, clubId.Value, requirement.PolicyTitle);
-                if (isManager)
+                // Check if club member has ANY of the required policies
+                foreach (var pt in requirement.PolicyTitles)
                 {
-                    context.Succeed(requirement);
-                    return;
+                    var hasClubPolicy = await _policyService.HasMemberPolicyInClubAsync(userId, clubId.Value, pt);
+                    if (hasClubPolicy)
+                    {
+                        context.Succeed(requirement);
+                        return;
+                    }
                 }
 
                 // Also check IsClubManager from JWT claims (Level 0)
@@ -128,13 +132,16 @@ namespace Presentation.Authorization
                 return;
             }
 
-            var hasEventPolicy = await _eventPermService.HasEventPolicyAsync(
-                userId, eventId.Value, requirement.PolicyTitle);
-
-            if (hasEventPolicy)
+            // Check if user has ANY of the required event policies
+            foreach (var pt in requirement.PolicyTitles)
             {
-                context.Succeed(requirement);
-                return;
+                var hasEventPolicy = await _eventPermService.HasEventPolicyAsync(
+                    userId, eventId.Value, pt);
+                if (hasEventPolicy)
+                {
+                    context.Succeed(requirement);
+                    return;
+                }
             }
 
             context.Fail();

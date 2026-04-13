@@ -84,8 +84,8 @@ namespace UNIC.Presentation.Controllers
                 if (existingEvent.ClubId != clubId)
                     return BadRequest(new { error = "Event does not belong to this club." });
 
-                var approvedCount = await _attendanceService.BulkApproveAsync(id, userIds);
-                return Ok(new { message = $"Đã duyệt {approvedCount}/{userIds.Count} đăng ký.", approvedCount });
+                var result = await _attendanceService.BulkApproveAsync(id, userIds);
+                return Ok(result);
             }
             catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
         }
@@ -157,11 +157,16 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>
-        /// Get all attendees for an event
+        /// Get attendees for an event with optional status filter + pagination.
+        /// Query: ?status=PENDING&page=1&pageSize=50
         /// </summary>
         [HttpGet("{id}/attendees")]
-        [RequireEventPolicy("viewattendance")]
-        public async Task<ActionResult<IEnumerable<AttendanceDetailDto>>> GetEventAttendees(int clubId, int id)
+        [RequireEventPolicy("viewattendance,approveattendance")]
+        public async Task<IActionResult> GetEventAttendees(
+            int clubId, int id,
+            [FromQuery] string? status = null,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 50)
         {
             try
             {
@@ -169,11 +174,65 @@ namespace UNIC.Presentation.Controllers
                 if (existingEvent.ClubId != clubId)
                     return BadRequest(new { error = "Event does not belong to this club." });
 
-                var attendees = await _attendanceService.GetEventAttendeesAsync(id);
-                return Ok(attendees);
+                if (status != null)
+                {
+                    // Server-side filtered + paged
+                    var pagedResult = await _attendanceService.GetEventAttendeesAsync(id, status, page, pageSize);
+                    return Ok(pagedResult);
+                }
+                else
+                {
+                    // Backward compatible: return flat array
+                    var attendees = await _attendanceService.GetEventAttendeesAsync(id);
+                    return Ok(attendees);
+                }
             }
             catch (NotFoundException ex) { return NotFound(new { error = ex.Message }); }
             catch (Exception ex) { return StatusCode(500, new { error = "Lỗi khi lấy danh sách tham gia", details = ex.Message }); }
+        }
+
+        /// <summary>
+        /// Update attendee status manually (PENDING ↔ WAITLIST only).
+        /// For approve/reject, use dedicated endpoints.
+        /// </summary>
+        [HttpPatch("{id}/attendees/{userId}/status")]
+        [RequireEventPolicy("approveattendance")]
+        public async Task<IActionResult> UpdateAttendeeStatus(
+            int clubId, int id, Guid userId,
+            [FromBody] UpdateAttendeeStatusRequest request)
+        {
+            try
+            {
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                if (existingEvent.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                await _attendanceService.UpdateAttendeeStatusAsync(id, userId, request.Status);
+                return Ok(new { message = $"Đã chuyển trạng thái thành '{request.Status}'." });
+            }
+            catch (NotFoundException ex) { return NotFound(new { error = ex.Message }); }
+            catch (DomainException ex) { return BadRequest(new { error = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        }
+
+        /// <summary>
+        /// Manager add club members directly to event as REGISTERED
+        /// </summary>
+        [HttpPost("{id}/add-attendees")]
+        [RequireEventPolicy("approveattendance")]
+        public async Task<IActionResult> AddAttendees(int clubId, int id, [FromBody] List<Guid> userIds)
+        {
+            try
+            {
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                if (existingEvent.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                var addedCount = await _attendanceService.AddAttendeesAsync(id, userIds);
+                return Ok(new { message = $"Đã thêm {addedCount} thành viên vào sự kiện.", addedCount });
+            }
+            catch (NotFoundException ex) { return NotFound(new { error = ex.Message }); }
+            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
         }
     }
 }

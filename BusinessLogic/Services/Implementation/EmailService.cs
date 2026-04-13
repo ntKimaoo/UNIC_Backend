@@ -182,6 +182,25 @@ namespace BusinessLogic.Services.Implementation
             return await SendEmailAsync(toEmail, subject, body);
         }
 
+        public async Task<bool> SendRegistrationRejectedAsync(string toEmail, string fullName, string eventName)
+        {
+            var subject = $"Đăng ký sự kiện bị từ chối: {eventName}";
+            var body = $@"
+            <html>
+            <body style='font-family: Arial, sans-serif;'>
+                <h2>Chào {fullName},</h2>
+                <p>Rất tiếc, đăng ký của bạn cho sự kiện <strong>{eventName}</strong> đã bị từ chối bởi ban tổ chức.</p>
+                <p>Nếu bạn cho rằng đây là nhầm lẫn, vui lòng liên hệ ban tổ chức để biết thêm chi tiết.</p>
+                <p>Bạn có thể đăng ký lại nếu sự kiện vẫn còn mở đăng ký.</p>
+                <br>
+                <p>Trân trọng,</p>
+                <p>Ban Tổ Chức</p>
+            </body>
+            </html>
+        ";
+            return await SendEmailAsync(toEmail, subject, body);
+        }
+
         private async Task<bool> SendEmailAsync(string toEmail, string subject, string body, string? inlineContentId = null, byte[]? inlineImageBytes = null)
         {
             try

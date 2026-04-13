@@ -1,4 +1,5 @@
 using DataAccess.Models;
+using UNIC.DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -150,6 +151,30 @@ namespace DataAccess.Repositories.Implementation
             }
         }
 
+        public async Task UpdateEventRoleAsync(EventRole role)
+        {
+            _context.EventRoles.Update(role);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task SetEventRolePoliciesAsync(int eventRoleId, List<int> policyIds)
+        {
+            // Remove existing policies
+            var existing = await _context.EventRolePolicies
+                .Where(erp => erp.EventRoleId == eventRoleId)
+                .ToListAsync();
+            _context.EventRolePolicies.RemoveRange(existing);
+
+            // Add new policies
+            var newPolicies = policyIds.Select(pid => new EventRolePolicy
+            {
+                EventRoleId = eventRoleId,
+                PolicyId = pid
+            });
+            await _context.EventRolePolicies.AddRangeAsync(newPolicies);
+            await _context.SaveChangesAsync();
+        }
+
         // ── User permissions ──
 
         public async Task<IEnumerable<string>> GetUserEventPoliciesAsync(Guid userId, int eventId)
@@ -169,6 +194,80 @@ namespace DataAccess.Repositories.Implementation
                 .ToListAsync();
 
             return rolePolicies.Concat(memberPolicies).Distinct().ToList();
+        }
+
+        public async Task<List<int>> GetPolicyIdsByNamesAsync(List<string> policyNames)
+        {
+            var normalized = policyNames.Select(n => n.ToLower().Trim()).ToList();
+            return await _context.Policies
+                .Where(p => normalized.Contains(p.Name.ToLower()))
+                .Select(p => p.Id)
+                .ToListAsync();
+        }
+
+        // ── My Events ──
+
+        public async Task<List<int>> GetUserParticipatingEventIdsAsync(Guid userId, string? search)
+        {
+            // Events where user is an attendee
+            var attendeeIds = _context.Attendances
+                .Where(a => a.UserId == userId)
+                .Select(a => a.EventId);
+
+            // Events where user is an event member (collaborator)
+            var memberIds = _context.EventMembers
+                .Where(em => em.UserId == userId)
+                .Select(em => em.EventId);
+
+            var query = attendeeIds.Union(memberIds).Distinct();
+
+            // If search provided, join with Events to filter by name
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var searchLower = search.ToLower().Trim();
+                query = query.Where(eid =>
+                    _context.Events.Any(e => e.EventId == eid &&
+                        e.EventName.ToLower().Contains(searchLower)));
+            }
+
+            return await query.ToListAsync();
+        }
+
+        public async Task<List<Event>> GetEventsByIdsPagedAsync(List<int> eventIds, int page, int pageSize)
+        {
+            return await _context.Events
+                .Include(e => e.Club)
+                .Where(e => eventIds.Contains(e.EventId))
+                .OrderByDescending(e => e.StartDate ?? e.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+        }
+
+        public async Task<Dictionary<int, (string Status, DateTime? CheckInTime)>> GetUserAttendancesAsync(Guid userId, List<int> eventIds)
+        {
+            var attendances = await _context.Attendances
+                .Where(a => a.UserId == userId && eventIds.Contains(a.EventId))
+                .Select(a => new { a.EventId, a.AttendanceStatus, a.CheckInTime })
+                .ToListAsync();
+
+            return attendances.ToDictionary(
+                a => a.EventId,
+                a => (a.AttendanceStatus, a.CheckInTime));
+        }
+
+        public async Task<Dictionary<int, EventMember>> GetUserEventMembershipsAsync(Guid userId, List<int> eventIds)
+        {
+            var members = await _context.EventMembers
+                .Include(em => em.EventRole)
+                    .ThenInclude(er => er!.EventRolePolicies)
+                    .ThenInclude(erp => erp.Policy)
+                .Include(em => em.EventMemberPolicies)!
+                    .ThenInclude(emp => emp.Policy)
+                .Where(em => em.UserId == userId && eventIds.Contains(em.EventId))
+                .ToListAsync();
+
+            return members.ToDictionary(m => m.EventId);
         }
     }
 }

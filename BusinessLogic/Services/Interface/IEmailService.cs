@@ -13,5 +13,6 @@ namespace BusinessLogic.Services.Interface
         Task<bool> SendWelcomeEmailAsync(string toEmail, string fullName);
         Task<bool> SendEventRegistrationSuccessAsync(string toEmail, string fullName, string eventName, DateTime? startDate, string? checkInQrToken = null, string? apiBaseUrl = null);
         Task<bool> SendEventCheckInCodeAsync(string toEmail, string fullName, string eventName, string checkInCode);
+        Task<bool> SendRegistrationRejectedAsync(string toEmail, string fullName, string eventName);
     }
 }

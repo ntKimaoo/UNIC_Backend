@@ -59,4 +59,40 @@ namespace BusinessLogic.DTOs
         public int Level { get; set; } = 1;
         public List<int>? PolicyIds { get; set; }
     }
+
+    public class UpdateEventRoleRequest
+    {
+        public string RoleName { get; set; } = string.Empty;
+        public string? Description { get; set; }
+    }
+
+    // ── My Events ──
+
+    public class MyEventItemDto
+    {
+        public int EventId { get; set; }
+        public string EventName { get; set; } = string.Empty;
+        public string? ImageUrl { get; set; }
+        public string? Location { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string? ClubName { get; set; }
+        public int? ClubId { get; set; }
+
+        // Participation info
+        public bool IsAttendee { get; set; }
+        public string? AttendanceStatus { get; set; }  // REGISTERED, APPROVED, CHECKED_IN
+        public bool IsCollaborator { get; set; }
+        public string? RoleName { get; set; }
+        public List<string> Policies { get; set; } = new();
+    }
+
+    public class MyEventsPagedResult
+    {
+        public List<MyEventItemDto> Items { get; set; } = new();
+        public int Total { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+    }
 }

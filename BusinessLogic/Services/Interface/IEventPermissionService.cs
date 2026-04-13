@@ -23,8 +23,13 @@ namespace BusinessLogic.Services.Interface
         Task<IEnumerable<EventRoleDto>> GetEventRolesAsync(int eventId);
         Task<EventRoleDto> CreateEventRoleAsync(int eventId, CreateEventRoleRequest request);
         Task RemoveEventRoleAsync(int eventRoleId);
+        Task<EventRoleDto> UpdateEventRoleAsync(int eventRoleId, string roleName, string? description);
+        Task SetEventRolePoliciesAsync(int eventRoleId, List<string> policyNames);
 
         // Auto-create creator on event creation
         Task CreateCreatorRoleAndAssignAsync(int eventId, Guid creatorUserId);
+
+        // My Events
+        Task<MyEventsPagedResult> GetMyEventsAsync(Guid userId, string? search, int page, int pageSize);
     }
 }

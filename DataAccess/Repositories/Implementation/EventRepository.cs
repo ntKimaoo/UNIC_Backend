@@ -119,6 +119,15 @@ namespace DataAccess.Repositories.Implementation
                     s.SetProperty(e => e.AvailableSlots, e => e.AvailableSlots + 1));
         }
 
+        // Set AvailableSlots trực tiếp — dùng cho recalc
+        public async Task SetAvailableSlotsAsync(int eventId, int value)
+        {
+            await _context.Events
+                .Where(e => e.EventId == eventId)
+                .ExecuteUpdateAsync(s =>
+                    s.SetProperty(e => e.AvailableSlots, value));
+        }
+
         public async Task AddAsync(Event @event)
         {
             await _context.Events.AddAsync(@event);

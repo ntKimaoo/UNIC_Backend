@@ -142,6 +142,33 @@ namespace BusinessLogic.Services.Implementation
             await _eventPermRepo.RemoveEventRoleAsync(eventRoleId);
         }
 
+        public async Task<EventRoleDto> UpdateEventRoleAsync(int eventRoleId, string roleName, string? description)
+        {
+            var role = await _eventPermRepo.GetEventRoleByIdAsync(eventRoleId)
+                ?? throw new Exception("Event role not found.");
+            role.RoleName = roleName;
+            role.Description = description;
+            await _eventPermRepo.UpdateEventRoleAsync(role);
+
+            var saved = await _eventPermRepo.GetEventRoleByIdAsync(eventRoleId);
+            return new EventRoleDto
+            {
+                EventRoleId = saved!.EventRoleId,
+                EventId = saved.EventId,
+                RoleName = saved.RoleName,
+                Description = saved.Description,
+                Level = saved.Level,
+                Policies = saved.EventRolePolicies?.Select(p => p.Policy.Name).ToList() ?? new()
+            };
+        }
+
+        public async Task SetEventRolePoliciesAsync(int eventRoleId, List<string> policyNames)
+        {
+            // Resolve policy names to IDs
+            var policyIds = await _eventPermRepo.GetPolicyIdsByNamesAsync(policyNames);
+            await _eventPermRepo.SetEventRolePoliciesAsync(eventRoleId, policyIds);
+        }
+
         // ── Auto-create Creator ──
 
         public async Task CreateCreatorRoleAndAssignAsync(int eventId, Guid creatorUserId)
@@ -163,6 +190,81 @@ namespace BusinessLogic.Services.Implementation
                 AssignedAt = DateTime.Now
             };
             await _eventPermRepo.AddEventMemberAsync(member);
+        }
+
+        // ── My Events ──
+
+        public async Task<MyEventsPagedResult> GetMyEventsAsync(Guid userId, string? search, int page, int pageSize)
+        {
+            // 1. Get all event IDs where user participates (attendee or collaborator)
+            var allEventIds = await _eventPermRepo.GetUserParticipatingEventIdsAsync(userId, search);
+            var total = allEventIds.Count;
+
+            // 2. Get paged events
+            var events = await _eventPermRepo.GetEventsByIdsPagedAsync(allEventIds, page, pageSize);
+            var pagedEventIds = events.Select(e => e.EventId).ToList();
+
+            // 3. Batch load participation data
+            var attendances = await _eventPermRepo.GetUserAttendancesAsync(userId, pagedEventIds);
+            var memberships = await _eventPermRepo.GetUserEventMembershipsAsync(userId, pagedEventIds);
+
+            // 4. Map to DTOs
+            var items = events.Select(e =>
+            {
+                var isAttendee = attendances.ContainsKey(e.EventId);
+                var isCollaborator = memberships.ContainsKey(e.EventId);
+
+                // Compute effective policies for collaborator
+                var policies = new List<string>();
+                string? roleName = null;
+                if (isCollaborator)
+                {
+                    var member = memberships[e.EventId];
+                    roleName = member.EventRole?.RoleName;
+
+                    // Creator (Level 0) = full access
+                    if (member.EventRole?.Level == 0)
+                    {
+                        policies.Add("*");
+                    }
+                    else
+                    {
+                        // Role policies
+                        if (member.EventRole?.EventRolePolicies != null)
+                            policies.AddRange(member.EventRole.EventRolePolicies.Select(p => p.Policy.Name));
+                        // Direct member policies
+                        if (member.EventMemberPolicies != null)
+                            policies.AddRange(member.EventMemberPolicies.Select(p => p.Policy.Name));
+                        policies = policies.Distinct().ToList();
+                    }
+                }
+
+                return new MyEventItemDto
+                {
+                    EventId = e.EventId,
+                    EventName = e.EventName,
+                    ImageUrl = e.ImageUrl,
+                    Location = e.Location,
+                    StartDate = e.StartDate,
+                    EndDate = e.EndDate,
+                    Status = e.Status,
+                    ClubName = e.Club?.ClubName,
+                    ClubId = e.ClubId,
+                    IsAttendee = isAttendee,
+                    AttendanceStatus = isAttendee ? attendances[e.EventId].Status : null,
+                    IsCollaborator = isCollaborator,
+                    RoleName = roleName,
+                    Policies = policies
+                };
+            }).ToList();
+
+            return new MyEventsPagedResult
+            {
+                Items = items,
+                Total = total,
+                Page = page,
+                PageSize = pageSize
+            };
         }
 
         // ── Helpers ──
