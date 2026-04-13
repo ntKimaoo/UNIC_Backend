@@ -48,5 +48,19 @@ namespace BusinessLogic.Services.Interface
         Task<FundCapabilitiesDto> GetFundCapabilitiesAsync(Guid userId, int clubId);
         Task<ClubFundReportSummaryDto> GetClubFundReportSummaryAsync(int clubId, DateTime? fromUtc, DateTime? toUtc);
         Task<IReadOnlyList<FundCategoryResponseDto>> GetFundCategoriesForClubAsync(int clubId);
+
+        Task<FundRefundRequestResponseDto> CreateFundRefundRequestAsync(Guid userId, int clubId, CreateFundRefundRequestDto dto);
+        Task<PagedResultDto<FundRefundRequestResponseDto>> GetMyFundRefundRequestsPagedAsync(
+            Guid userId, int clubId, int pageNumber, int pageSize);
+        Task<PagedResultDto<FundRefundRequestResponseDto>> GetClubFundRefundRequestsPagedAsync(
+            Guid managerUserId, int clubId, bool isSystemAdmin, string? status, int pageNumber, int pageSize);
+        Task<bool> CancelFundRefundRequestAsync(Guid userId, int clubId, int refundRequestId);
+        Task<bool> CompleteFundRefundRequestAsync(
+            Guid managerUserId, int clubId, bool isSystemAdmin, int refundRequestId, CompleteFundRefundRequestDto dto);
+        Task<bool> RejectFundRefundRequestAsync(
+            Guid managerUserId, int clubId, bool isSystemAdmin, int refundRequestId, RejectFundRefundRequestDto dto);
+
+        Task<RecordCashContributionResponseDto> RecordCashContributionAsync(
+            Guid managerUserId, int clubId, bool isSystemAdmin, RecordCashContributionRequestDto dto);
     }
 }

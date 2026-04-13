@@ -1230,5 +1230,91 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         #endregion
+
+        #region Refund requests
+
+        [Fact]
+        public async Task CreateFundRefundRequest_Returns403_WhenNotMember()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(false);
+
+            var result = await _controller.CreateFundRefundRequest(1, new CreateFundRefundRequestDto
+            {
+                OriginalTransactionId = 5,
+                Amount = 10_000m,
+                BankName = "VCB",
+                BankAccountNumber = "1",
+                AccountHolderName = "A"
+            });
+
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(403, obj.StatusCode);
+        }
+
+        [Fact]
+        public async Task CreateFundRefundRequest_ReturnsOk_WhenSuccess()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.CreateFundRefundRequestAsync(_userId, 1, It.IsAny<CreateFundRefundRequestDto>()))
+                .ReturnsAsync(new FundRefundRequestResponseDto { RefundRequestId = 3, ClubId = 1, Amount = 10_000m });
+
+            var result = await _controller.CreateFundRefundRequest(1, new CreateFundRefundRequestDto
+            {
+                OriginalTransactionId = 5,
+                Amount = 10_000m,
+                BankName = "VCB",
+                BankAccountNumber = "1",
+                AccountHolderName = "A"
+            });
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task RecordCashContribution_Returns403_WhenNotMember()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(false);
+
+            var result = await _controller.RecordCashContribution(1, new RecordCashContributionRequestDto
+            {
+                FundId = 1,
+                ContributorUserId = Guid.NewGuid(),
+                Amount = 10_000m,
+                Note = "Nộp mặt"
+            });
+
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(403, obj.StatusCode);
+        }
+
+        [Fact]
+        public async Task RecordCashContribution_ReturnsOk_WhenSuccess()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.RecordCashContributionAsync(_userId, 1, false, It.IsAny<RecordCashContributionRequestDto>()))
+                .ReturnsAsync(new RecordCashContributionResponseDto
+                {
+                    TransactionId = 50,
+                    FundId = 2,
+                    Amount = 15_000m,
+                    Status = "APPROVED",
+                    ContributionSource = "CASH",
+                    NewCurrentBalance = 99_000m,
+                    ContributorUserId = Guid.NewGuid(),
+                    RecordedByUserId = _userId
+                });
+
+            var result = await _controller.RecordCashContribution(1, new RecordCashContributionRequestDto
+            {
+                FundId = 2,
+                ContributorUserId = Guid.NewGuid(),
+                Amount = 15_000m,
+                Note = "Nộp mặt buổi họp"
+            });
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+
+        #endregion
     }
 }

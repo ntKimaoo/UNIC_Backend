@@ -39,6 +39,7 @@ public partial class UnicContext : DbContext
     public DbSet<FundCategory> FundCategories { get; set; }
     public DbSet<ClubFund> ClubFunds { get; set; }
     public DbSet<FundTransaction> FundTransactions { get; set; }
+    public DbSet<FundRefundRequest> FundRefundRequests { get; set; }
     public DbSet<ClubPayOSSettings> ClubPayOSSettings { get; set; }
     public DbSet<RecruitmentCampaign> RecruitmentCampaigns { get; set; }
     public DbSet<ApplicationForm> ApplicationForms { get; set; }
@@ -381,6 +382,32 @@ public partial class UnicContext : DbContext
             .WithMany()
             .HasForeignKey(ft => ft.CreatedBy)
             .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<FundTransaction>()
+            .HasOne(ft => ft.RefundForOriginalTransaction)
+            .WithMany()
+            .HasForeignKey(ft => ft.RefundForTransactionId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<FundRefundRequest>()
+            .HasOne(r => r.OriginalTransaction)
+            .WithMany()
+            .HasForeignKey(r => r.OriginalTransactionId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<FundRefundRequest>()
+            .HasOne(r => r.ClubFund)
+            .WithMany()
+            .HasForeignKey(r => r.FundId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<FundRefundRequest>()
+            .HasIndex(r => new { r.ClubId, r.Status });
+
+        modelBuilder.Entity<FundRefundRequest>()
+            .HasIndex(r => r.OriginalTransactionId)
+            .IsUnique()
+            .HasFilter("[Status] = N'PENDING'");
 
         // RecruitmentCampaign - Club
         modelBuilder.Entity<RecruitmentCampaign>()
