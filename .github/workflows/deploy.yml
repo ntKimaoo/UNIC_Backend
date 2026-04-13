@@ -18,7 +18,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT }}
           script: |
-            cd /var/www/uniclub-api
+            cd /var/www/UNIC_Backend
 
             git pull origin kien_dev
 
