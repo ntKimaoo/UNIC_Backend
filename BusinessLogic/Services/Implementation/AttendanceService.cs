@@ -81,7 +81,7 @@ namespace BusinessLogic.Services.Implementation
             var isAlreadyRegistered = await _unitOfWork.Attendances.IsUserRegisteredAsync(request.EventId, request.UserId);
             if (isAlreadyRegistered)
             {
-                throw new ConflictException("User is already registered for this event");
+                throw new ConflictException("Người dùng đã đăng ký sự kiện này rồi");
             }
 
             // Check if user exists
@@ -97,28 +97,38 @@ namespace BusinessLogic.Services.Implementation
             await using var txn = await _unitOfWork.BeginTransactionAsync();
             try
             {
-                if (eventEntity.RequiresApproval)
+                if (eventEntity.MaxAttendees.HasValue)
                 {
-                    // Option B: PENDING không trừ slot — chỉ trừ khi Approve
-                    status = nameof(AttendanceStatus.PENDING);
-                }
-                else if (eventEntity.MaxAttendees.HasValue)
-                {
-                    // Atomic: trừ 1 slot nếu còn AvailableSlots > 0 (DB row-level lock)
-                    bool gotSlot = await _unitOfWork.Events.TryDecrementSlotAsync(request.EventId);
-                    if (!gotSlot)
+                    // Có giới hạn slot → kiểm tra còn chỗ không
+                    bool hasSlot = (eventEntity.AvailableSlots ?? 0) > 0;
+
+                    if (!hasSlot)
                     {
-                        // Slot hết → vào WAITLIST (không cần trừ slot)
+                        // Hết slot → WAITLIST (bất kể RequiresApproval)
                         status = nameof(AttendanceStatus.WAITLIST);
+                    }
+                    else if (eventEntity.RequiresApproval)
+                    {
+                        // Còn slot + cần duyệt → PENDING (không trừ slot, chờ Approve)
+                        status = nameof(AttendanceStatus.PENDING);
                     }
                     else
                     {
-                        status = nameof(AttendanceStatus.REGISTERED);
+                        // Còn slot + không cần duyệt → trừ slot ngay
+                        bool gotSlot = await _unitOfWork.Events.TryDecrementSlotAsync(request.EventId);
+                        status = gotSlot
+                            ? nameof(AttendanceStatus.REGISTERED)
+                            : nameof(AttendanceStatus.WAITLIST); // race condition fallback
                     }
+                }
+                else if (eventEntity.RequiresApproval)
+                {
+                    // Không giới hạn chỗ + cần duyệt → PENDING
+                    status = nameof(AttendanceStatus.PENDING);
                 }
                 else
                 {
-                    // Không giới hạn chỗ → không cần trừ slot
+                    // Không giới hạn chỗ + không cần duyệt → REGISTERED ngay
                     status = nameof(AttendanceStatus.REGISTERED);
                 }
                 // Check nếu đã có record cũ (REJECTED/CANCELLED) → update thay vì tạo mới
@@ -209,20 +219,20 @@ namespace BusinessLogic.Services.Implementation
             // Validate check-in code
             if (string.IsNullOrEmpty(eventEntity.CheckInCode) || eventEntity.CheckInCode != request.Code)
             {
-                throw new DomainException("Invalid check-in code");
+                throw new DomainException("Mã điểm danh không hợp lệ hoặc đã hết hạn");
             }
 
             // Validate code expiration
             if (!eventEntity.CodeExpiresAt.HasValue || eventEntity.CodeExpiresAt.Value < DateTime.UtcNow)
             {
-                throw new DomainException("Check-in code has expired");
+                throw new DomainException("Mã điểm danh đã hết hạn");
             }
 
             // Find attendance record
             var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(request.EventId, request.UserId);
             if (attendance == null)
             {
-                throw new NotFoundException("Attendance record not found. User must register for the event first.");
+                throw new NotFoundException("Không tìm thấy bản ghi điểm danh. Người dùng phải đăng ký sự kiện trước.");
             }
 
             // Update attendance status
@@ -373,21 +383,21 @@ namespace BusinessLogic.Services.Implementation
             // Validate event has ended
             if (!eventEntity.EndDate.HasValue || eventEntity.EndDate.Value > DateTime.UtcNow)
             {
-                throw new DomainException("Cannot evaluate members before event has ended");
+                throw new DomainException("Chỉ có thể đánh giá sau khi sự kiện kết thúc");
             }
 
             // Find attendance record
             var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(request.EventId, request.UserId);
             if (attendance == null)
             {
-                throw new NotFoundException("Attendance record not found");
+                throw new NotFoundException("Không tìm thấy bản ghi điểm danh");
             }
 
             // Validate member status is PRESENT (or legacy CHECKED_IN)
             if (attendance.AttendanceStatus != nameof(AttendanceStatus.PRESENT)
                 && attendance.AttendanceStatus != nameof(AttendanceStatus.CHECKED_IN))
             {
-                throw new DomainException($"Cannot evaluate member with status '{attendance.AttendanceStatus}'. Member must have attended the event.");
+                throw new DomainException($"Không thể đánh giá thành viên có trạng thái '{attendance.AttendanceStatus}'. Thành viên phải đã tham gia sự kiện.");
             }
 
             // Update score and comment

@@ -63,7 +63,7 @@ namespace BusinessLogic.Services.Implementation
 
             if (!eventEntity.IsPublic)
             {
-                // Generate a WebRTC room code for private events
+                // Online/private events → generate a WebRTC room code
                 eventEntity.Location = $"/webrtc/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
             }
 
@@ -93,12 +93,15 @@ namespace BusinessLogic.Services.Implementation
             // Check status - cannot update if canceled or closed
             if (existingEvent.Status == "CANCELED" || existingEvent.Status == "CLOSED")
             {
-                throw new DomainException($"Cannot update event with status '{existingEvent.Status}'");
+                throw new DomainException($"Không thể cập nhật sự kiện có trạng thái '{existingEvent.Status}'");
             }
 
             // Map updates
             existingEvent.EventName = request.EventName;
             existingEvent.Description = request.Description;
+            existingEvent.RequiresApproval = request.RequiresApproval;
+            existingEvent.IsOnline = request.IsOnline;
+            existingEvent.MeetLink = request.MeetLink;
             
             // Handle Type switch (Offline <-> Online)
             if (request.IsOnline)
@@ -114,7 +117,7 @@ namespace BusinessLogic.Services.Implementation
                 // If staying or switching to Offline, ensure they provided a physical location
                 if (string.IsNullOrWhiteSpace(request.Location))
                 {
-                    throw new DomainException("Location is required for offline events.");
+                    throw new DomainException("Địa điểm là bắt buộc cho sự kiện trực tiếp.");
                 }
                 existingEvent.Location = request.Location;
             }
@@ -155,12 +158,12 @@ namespace BusinessLogic.Services.Implementation
             {
                 if (eventEntity.StartDate.HasValue && request.StartTime < eventEntity.StartDate.Value)
                 {
-                    throw new DomainException("Session start time cannot be before event start date");
+                    throw new DomainException("Thời gian bắt đầu phiên không được trước ngày bắt đầu sự kiện");
                 }
 
                 if (eventEntity.EndDate.HasValue && request.EndTime > eventEntity.EndDate.Value)
                 {
-                    throw new DomainException("Session end time cannot be after event end date");
+                    throw new DomainException("Thời gian kết thúc phiên không được sau ngày kết thúc sự kiện");
                 }
             }
 
@@ -182,7 +185,7 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("Session", request.ScheduleId);
 
             if (schedule.EventId != request.EventId)
-                throw new DomainException("Session does not belong to this event.");
+                throw new DomainException("Phiên không thuộc sự kiện này.");
 
             schedule.ScheduleName = request.SessionName;
             schedule.StartTime    = request.StartTime;
@@ -205,7 +208,7 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("Session", scheduleId);
 
             if (schedule.EventId != eventId)
-                throw new DomainException("Session does not belong to this event.");
+                throw new DomainException("Phiên không thuộc sự kiện này.");
 
             _unitOfWork.EventSchedules.Delete(schedule);
             await _unitOfWork.SaveChangesAsync();
@@ -230,13 +233,13 @@ namespace BusinessLogic.Services.Implementation
             // Check event status is PLANNED or REGISTRATION_OPEN (allow editing dates)
             if (eventEntity.Status != "PLANNED" && eventEntity.Status != "REGISTRATION_OPEN")
             {
-                throw new DomainException($"Cannot open/update registration for event with status '{eventEntity.Status}'. Event must be in PLANNED or REGISTRATION_OPEN status.");
+                throw new DomainException($"Không thể mở/cập nhật đăng ký cho sự kiện có trạng thái '{eventEntity.Status}'. Sự kiện phải ở trạng thái PLANNED hoặc REGISTRATION_OPEN.");
             }
 
             // Validate registration end date is before event start date
             if (eventEntity.StartDate.HasValue && request.RegistrationEndDate >= eventEntity.StartDate.Value)
             {
-                throw new DomainException("Registration end date must be before event start date");
+                throw new DomainException("Ngày kết thúc đăng ký phải trước ngày bắt đầu sự kiện");
             }
 
             // Update event
@@ -309,7 +312,7 @@ namespace BusinessLogic.Services.Implementation
         public async Task RegisterForEventAsync(int eventId, string userId, string? apiBaseUrl = null)
         {
             if (!Guid.TryParse(userId, out var userGuid))
-                throw new DomainException("Invalid user ID format");
+                throw new DomainException("Định dạng ID người dùng không hợp lệ");
 
             await _attendanceService.RegisterMemberAsync(new EventRegistrationRequest 
             { 
@@ -355,28 +358,28 @@ namespace BusinessLogic.Services.Implementation
         public async Task CheckInEventAsync(int eventId, string userId, string checkInCode)
         {
             if (!Guid.TryParse(userId, out var userGuid))
-                throw new DomainException("Invalid user ID format");
+                throw new DomainException("Định dạng ID người dùng không hợp lệ");
 
             var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
             if (eventEntity == null)
                 throw new NotFoundException("Event", eventId);
 
             if (eventEntity.Status != "ONGOING")
-                throw new DomainException("Event is not currently ongoing.");
+                throw new DomainException("Sự kiện hiện không đang diễn ra.");
 
             if (string.IsNullOrEmpty(eventEntity.CheckInCode) || !eventEntity.CheckInCode.Equals(checkInCode, StringComparison.OrdinalIgnoreCase))
-                throw new DomainException("Invalid check-in code.");
+                throw new DomainException("Mã điểm danh không hợp lệ hoặc đã hết hạn");
 
             if (eventEntity.CodeExpiresAt.HasValue && DateTime.UtcNow > eventEntity.CodeExpiresAt.Value)
-                throw new DomainException("Check-in code has expired.");
+                throw new DomainException("Mã điểm danh đã hết hạn.");
 
             var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, userGuid);
             if (attendance == null)
-                throw new DomainException("User is not registered for this event.");
+                throw new DomainException("Người dùng chưa đăng ký sự kiện này.");
 
             if (attendance.AttendanceStatus == nameof(AttendanceStatus.PRESENT)
                 || attendance.AttendanceStatus == nameof(AttendanceStatus.CHECKED_IN))
-                throw new DomainException("User has already checked in.");
+                throw new DomainException("Người dùng đã điểm danh rồi.");
 
             attendance.AttendanceStatus = nameof(AttendanceStatus.PRESENT);
             attendance.CheckInTime = DateTime.UtcNow;
@@ -392,7 +395,7 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("Event", eventId);
 
             if (eventEntity.Status != "ONGOING")
-                throw new DomainException($"Cannot complete event from status '{eventEntity.Status}'.");
+                throw new DomainException($"Không thể kết thúc sự kiện từ trạng thái '{eventEntity.Status}'.");
 
             eventEntity.Status = "COMPLETED";
 

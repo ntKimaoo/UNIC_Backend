@@ -64,6 +64,11 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<EventMemberDto> AddEventMemberAsync(int eventId, AddEventMemberRequest request, Guid assignedBy)
         {
+            // Kiểm tra thành viên đã là cộng tác viên chưa
+            var existing = await _eventPermRepo.GetEventMemberByUserAsync(eventId, request.UserId);
+            if (existing != null)
+                throw new InvalidOperationException("Thành viên đã là cộng tác viên của sự kiện.");
+
             var member = new EventMember
             {
                 EventId = eventId,
