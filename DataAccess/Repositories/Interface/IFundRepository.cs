@@ -79,6 +79,16 @@ namespace UNIC.DataAccess.Repositories.Interface
         Task<bool> TryRejectRefundRequestAsync(int refundRequestId, Guid managerId, string rejectionReason);
         Task<bool> TryCancelRefundRequestAsync(int refundRequestId, Guid memberUserId);
 
+        Task<(int TransactionId, decimal NewCurrentBalance)?> TryRecordApprovedManagerRefundExpenseAsync(
+            int clubId,
+            int fundId,
+            int originalTransactionId,
+            Guid managerId,
+            decimal amount,
+            string? reason,
+            string? transferReference,
+            string? managerNote);
+
         Task<(int TransactionId, decimal NewCurrentBalance)?> TryRecordApprovedCashIncomeAsync(
             int clubId,
             int fundId,

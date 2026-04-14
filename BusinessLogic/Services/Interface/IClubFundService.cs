@@ -62,5 +62,11 @@ namespace BusinessLogic.Services.Interface
 
         Task<RecordCashContributionResponseDto> RecordCashContributionAsync(
             Guid managerUserId, int clubId, bool isSystemAdmin, RecordCashContributionRequestDto dto);
+
+        Task<FundMemberContributionOverviewDto> GetFundMemberContributionOverviewAsync(
+            Guid currentUserId, int clubId, int fundId);
+
+        Task<FundTransactionResponseDto> ManagerRefundContributionAsync(
+            Guid managerUserId, int clubId, int fundId, bool isSystemAdmin, ManagerRefundContributionDto dto);
     }
 }

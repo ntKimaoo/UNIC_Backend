@@ -1,5 +1,9 @@
+using System.Globalization;
+using System.Linq;
+using System.Text;
 using System.Text.Json;
 using BusinessLogic.DTOs;
+using BusinessLogic.PaymentGateways;
 using BusinessLogic.Services.Interface;
 using DataAccess.Repositories.Interface;
 using UNIC.DataAccess.Repositories.Interface;
@@ -21,7 +25,7 @@ namespace Presentation.Controllers
         private readonly IClubMemberService _clubMemberService;
         private readonly IClubPayOSSettingsService _clubPayOSSettingsService;
 
-        private readonly IPayOSService _payOSService;
+        private readonly IFundPaymentGatewayRegistry _paymentGatewayRegistry;
         private readonly IFundRepository _fundRepository;
         private readonly IClubPayOSSettingsRepository _clubPayOSSettingsRepository;
         private readonly IWebHostEnvironment _environment;
@@ -30,7 +34,7 @@ namespace Presentation.Controllers
             IClubFundService clubFundService,
             IClubMemberService clubMemberService,
             IClubPayOSSettingsService clubPayOSSettingsService,
-            IPayOSService payOSService,
+            IFundPaymentGatewayRegistry paymentGatewayRegistry,
             IFundRepository fundRepository,
             IClubPayOSSettingsRepository clubPayOSSettingsRepository,
             IWebHostEnvironment environment)
@@ -38,7 +42,7 @@ namespace Presentation.Controllers
             _clubFundService = clubFundService;
             _clubMemberService = clubMemberService;
             _clubPayOSSettingsService = clubPayOSSettingsService;
-            _payOSService = payOSService;
+            _paymentGatewayRegistry = paymentGatewayRegistry;
             _fundRepository = fundRepository;
             _clubPayOSSettingsRepository = clubPayOSSettingsRepository;
             _environment = environment;
@@ -52,11 +56,36 @@ namespace Presentation.Controllers
                 return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
 
             var settings = await _clubPayOSSettingsRepository.GetByClubIdAsync(clubId);
-            var isConfigured = settings != null
-                               && !string.IsNullOrWhiteSpace(settings.ClientId)
-                               && !string.IsNullOrWhiteSpace(settings.ApiKey)
-                               && !string.IsNullOrWhiteSpace(settings.ChecksumKey);
+            var providerGuide = PaymentGatewayProviderCodes.Normalize(settings?.PaymentProvider);
+            var isConfigured = settings != null && providerGuide switch
+            {
+                PaymentGatewayProviderCodes.PayOS => !string.IsNullOrWhiteSpace(settings.ClientId)
+                                                     && !string.IsNullOrWhiteSpace(settings.ApiKey)
+                                                     && !string.IsNullOrWhiteSpace(settings.ChecksumKey),
+                PaymentGatewayProviderCodes.VNPay => !string.IsNullOrWhiteSpace(settings.ClientId)
+                                                   && !string.IsNullOrWhiteSpace(settings.ApiKey),
+                _ => false
+            };
             var isEnabled = settings?.IsEnabled ?? false;
+            var onlineProviders = _paymentGatewayRegistry.ListOnlineProviders()
+                .Select(p => new
+                {
+                    code = p.Code,
+                    labelVi = p.DisplayNameVi,
+                    credentialFields = p.CredentialFields
+                        .OrderBy(f => f.SortOrder)
+                        .Select(f => new
+                        {
+                            name = f.Name,
+                            labelVi = f.LabelVi,
+                            requiredWhenEnabled = f.RequiredWhenEnabled,
+                            maxLength = f.MaxLength,
+                            inputType = f.InputType,
+                            helpTextVi = f.HelpTextVi
+                        })
+                        .ToList()
+                })
+                .ToList();
 
             return Ok(new
             {
@@ -64,17 +93,20 @@ namespace Presentation.Controllers
                 data = new
                 {
                     clubId,
+                    paymentCredentialSchemaVersion = 1,
+                    onlinePaymentProviders = onlineProviders,
                     payos = new
                     {
                         isConfigured,
                         isEnabled,
-                        noteVi = "Chỉ Club Manager mới có quyền cài đặt PayOS. Nếu CLB chưa cài đặt, có thể dùng chuyển khoản thủ công."
+                        noteVi = "Chỉ Club Manager mới có quyền cài đặt cổng thanh toán. Nếu CLB chưa cài đặt, có thể dùng chuyển khoản thủ công (ghi nhận tiền mặt)."
                     },
                     stepsVi = new[]
                     {
-                        "Tạo/đăng ký tài khoản merchant trên PayOS cho chính CLB.",
-                        "Lấy 3 thông tin: ClientId, ApiKey, ChecksumKey trên PayOS dashboard.",
-                        "Club Manager vào mục Cài đặt Thanh toán và nhập 3 key để bật thanh toán qua QR."
+                        "Chọn cổng trong onlinePaymentProviders; mỗi cổng có credentialFields — FE dựng form động (name gửi lại PUT payos-settings: clientId, apiKey, checksumKey).",
+                        "Đăng ký merchant trên trang của cổng thanh toán, rồi dán key vào form.",
+                        "VNPay: cấu hình IPN/Return URL trên cổng trỏ về API backend (xem tài liệu triển khai).",
+                        "Club Manager vào Cài đặt Thanh toán, chọn cổng và nhập thông tin để bật thanh toán trực tuyến."
                     }
                 }
             });
@@ -560,6 +592,45 @@ namespace Presentation.Controllers
             }
         }
 
+        /// <summary>
+        /// Club Manager hoàn tiền chủ động (không cần member tạo refund-request).
+        /// Tạo 1 giao dịch EXPENSE (APPROVED) có RefundForTransactionId trỏ tới giao dịch INCOME gốc.
+        /// </summary>
+        [HttpPost("{fundId:int}/manager-refunds")]
+        [RequireClubPolicy("editfinance")]
+        public async Task<IActionResult> ManagerRefundContribution(
+            int clubId,
+            int fundId,
+            [FromBody] ManagerRefundContributionDto dto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+
+                var isAdmin = User.IsInRole("Admin");
+                var data = await _clubFundService.ManagerRefundContributionAsync(userId, clubId, fundId, isAdmin, dto);
+                return Ok(new { success = true, data, message = "Đã hoàn tiền." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
         [HttpGet("~/api/fund-contributions/payos-return/{orderCode:int}")]
         public async Task<IActionResult> GetPayOsContributionReturn(int orderCode)
         {
@@ -690,11 +761,18 @@ namespace Presentation.Controllers
                 if (tx?.ClubFund == null)
                     return Ok(new { success = true });
 
+                var providerCode = PaymentGatewayProviderCodes.Normalize(tx.PaymentProvider);
+                if (!string.Equals(providerCode, PaymentGatewayProviderCodes.PayOS, StringComparison.Ordinal))
+                    return Ok(new { success = true });
+
                 var settings = await _clubPayOSSettingsRepository.GetByClubIdAsync(tx.ClubFund.ClubId);
                 if (settings == null || !settings.IsEnabled || string.IsNullOrWhiteSpace(settings.ChecksumKey))
-                    return BadRequest(new { success = false, message = "PayOS not configured for club" });
+                    return BadRequest(new { success = false, message = "Payment gateway not configured for club" });
+                if (!string.Equals(PaymentGatewayProviderCodes.Normalize(settings.PaymentProvider), providerCode, StringComparison.Ordinal))
+                    return BadRequest(new { success = false, message = "Payment provider mismatch" });
 
-                if (string.IsNullOrEmpty(receivedSignature) || !_payOSService.VerifyWebhookSignature(settings.ChecksumKey, receivedSignature, dataEl))
+                var gateway = _paymentGatewayRegistry.Get(providerCode);
+                if (string.IsNullOrEmpty(receivedSignature) || !gateway.VerifyWebhookSignature(settings, receivedSignature, dataEl))
                     return BadRequest(new { success = false, message = "Invalid signature" });
 
                 await _clubFundService.ProcessPayOSPaymentSuccessAsync(orderCode);
@@ -704,6 +782,90 @@ namespace Presentation.Controllers
             {
                 return StatusCode(500, new { success = false, message = "Webhook processing error" });
             }
+        }
+
+        /// <summary>IPN VNPay (server-to-server). Đăng ký URL này trên cổng VNPay: GET/POST ~/api/vnpay/ipn</summary>
+        [HttpGet("~/api/vnpay/ipn")]
+        [HttpPost("~/api/vnpay/ipn")]
+        [AllowAnonymous]
+        public async Task<IActionResult> VnpayIpn()
+        {
+            try
+            {
+                var flat = FlattenVnpRequest(Request);
+                if (!flat.TryGetValue("vnp_TxnRef", out var txnRef) || !int.TryParse(txnRef, out var txnId) || txnId <= 0)
+                    return VnpIpnPlain("01", "Order not found");
+
+                var tx = await _fundRepository.GetTransactionByIdAsync(txnId);
+                if (tx?.ClubFund == null)
+                    return VnpIpnPlain("01", "Order not found");
+
+                var clubSettings = await _clubPayOSSettingsRepository.GetByClubIdAsync(tx.ClubFund.ClubId);
+                if (clubSettings == null || !clubSettings.IsEnabled || string.IsNullOrWhiteSpace(clubSettings.ApiKey))
+                    return VnpIpnPlain("02", "Gateway not configured");
+
+                var txProvider = PaymentGatewayProviderCodes.Normalize(tx.PaymentProvider);
+                var clubProvider = PaymentGatewayProviderCodes.Normalize(clubSettings.PaymentProvider);
+                if (!string.Equals(txProvider, PaymentGatewayProviderCodes.VNPay, StringComparison.Ordinal)
+                    || !string.Equals(clubProvider, PaymentGatewayProviderCodes.VNPay, StringComparison.Ordinal))
+                    return VnpIpnPlain("03", "Provider mismatch");
+
+                if (!VnPaySignature.VerifyIpn(flat, clubSettings.ApiKey.Trim(), out _))
+                    return VnpIpnPlain("97", "Checksum failed");
+
+                if (!flat.TryGetValue("vnp_ResponseCode", out var rc) || rc != "00")
+                    return VnpIpnPlain("00", "Confirm Success");
+
+                if (flat.TryGetValue("vnp_TransactionStatus", out var tst) && tst != "00")
+                    return VnpIpnPlain("00", "Confirm Success");
+
+                if (!flat.TryGetValue("vnp_Amount", out var amtStr)
+                    || !long.TryParse(amtStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var vnpAmountMinor))
+                    return VnpIpnPlain("04", "Invalid amount");
+
+                var expectedMinor = (long)(tx.Amount * 100m);
+                if (vnpAmountMinor != expectedMinor)
+                    return VnpIpnPlain("04", "Invalid amount");
+
+                await _clubFundService.ProcessPayOSPaymentSuccessAsync(txnId);
+                return VnpIpnPlain("00", "Confirm Success");
+            }
+            catch (Exception)
+            {
+                return VnpIpnPlain("99", "Unknown error");
+            }
+        }
+
+        [HttpGet("~/api/vnpay/return")]
+        [AllowAnonymous]
+        public IActionResult VnpayReturn()
+        {
+            return Content(
+                "<html><body><p>Giao dịch kết thúc. Bạn có thể đóng trang và quay lại ứng dụng.</p></body></html>",
+                "text/html",
+                Encoding.UTF8);
+        }
+
+        private static ContentResult VnpIpnPlain(string rspCode, string message) =>
+            new ContentResult
+            {
+                Content = $"RspCode={rspCode}&Message={message}",
+                ContentType = "text/plain; charset=utf-8",
+                StatusCode = 200
+            };
+
+        private static Dictionary<string, string> FlattenVnpRequest(HttpRequest request)
+        {
+            var d = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var kv in request.Query)
+                d[kv.Key] = kv.Value.ToString();
+            if (request.HasFormContentType)
+            {
+                foreach (var kv in request.Form)
+                    d[kv.Key] = kv.Value.ToString();
+            }
+
+            return d;
         }
 
         [HttpGet("history/{fundId}")]
@@ -738,6 +900,32 @@ namespace Presentation.Controllers
                 return Unauthorized(new { success = false, message = ex.Message });
             }
             catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpGet("{fundId:int}/member-contributions")]
+        public async Task<IActionResult> GetFundMemberContributionOverview(int clubId, int fundId)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+
+                var data = await _clubFundService.GetFundMemberContributionOverviewAsync(userId, clubId, fundId);
+                return Ok(new { success = true, data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

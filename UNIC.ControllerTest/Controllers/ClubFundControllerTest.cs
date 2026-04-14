@@ -1,4 +1,5 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.PaymentGateways;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -25,7 +26,8 @@ namespace UNIC.ControllerTest.Controllers
         private readonly Mock<IClubFundService> _fundService;
         private readonly Mock<IClubMemberService> _memberService;
         private readonly Mock<IClubPayOSSettingsService> _clubPayOSSettingsService;
-        private readonly Mock<IPayOSService> _payOSService;
+        private readonly Mock<IFundPaymentGatewayRegistry> _paymentGatewayRegistry;
+        private readonly Mock<IFundPaymentGateway> _fundPaymentGateway;
         private readonly Mock<IFundRepository> _fundRepository;
         private readonly Mock<IClubPayOSSettingsRepository> _clubPayOSSettingsRepository;
         private readonly Mock<IWebHostEnvironment> _environment;
@@ -37,7 +39,27 @@ namespace UNIC.ControllerTest.Controllers
             _fundService = new Mock<IClubFundService>();
             _memberService = new Mock<IClubMemberService>();
             _clubPayOSSettingsService = new Mock<IClubPayOSSettingsService>();
-            _payOSService = new Mock<IPayOSService>();
+            _fundPaymentGateway = new Mock<IFundPaymentGateway>();
+            _fundPaymentGateway.Setup(g => g.CredentialFields).Returns(Array.Empty<PaymentCredentialFieldDescriptor>());
+            _paymentGatewayRegistry = new Mock<IFundPaymentGatewayRegistry>();
+            _paymentGatewayRegistry.Setup(r => r.Get(It.IsAny<string>())).Returns(_fundPaymentGateway.Object);
+            _paymentGatewayRegistry.Setup(r => r.ListOnlineProviders()).Returns(new List<PaymentGatewayDescriptor>
+            {
+                new(
+                    PaymentGatewayProviderCodes.PayOS,
+                    "PayOS",
+                    new List<PaymentCredentialFieldDescriptor>
+                    {
+                        new(PaymentCredentialFieldDescriptor.FieldNames.ClientId, "Client ID", true, 100, "text", null, 0)
+                    }),
+                new(
+                    PaymentGatewayProviderCodes.VNPay,
+                    "VNPay",
+                    new List<PaymentCredentialFieldDescriptor>
+                    {
+                        new(PaymentCredentialFieldDescriptor.FieldNames.ClientId, "TMN Code", true, 100, "text", null, 0)
+                    })
+            });
             _fundRepository = new Mock<IFundRepository>();
             _clubPayOSSettingsRepository = new Mock<IClubPayOSSettingsRepository>();
             _environment = new Mock<IWebHostEnvironment>();
@@ -46,7 +68,7 @@ namespace UNIC.ControllerTest.Controllers
                 _fundService.Object,
                 _memberService.Object,
                 _clubPayOSSettingsService.Object,
-                _payOSService.Object,
+                _paymentGatewayRegistry.Object,
                 _fundRepository.Object,
                 _clubPayOSSettingsRepository.Object,
                 _environment.Object);
@@ -54,6 +76,23 @@ namespace UNIC.ControllerTest.Controllers
             var http = new DefaultHttpContext();
             _controller.ControllerContext = new ControllerContext { HttpContext = http };
             SetAuthenticatedUser(_userId);
+        }
+
+        [Fact]
+        public async Task ManagerRefundContribution_ReturnsOk_WhenSuccess()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 8)).ReturnsAsync(true);
+            _fundService.Setup(s => s.ManagerRefundContributionAsync(
+                    _userId,
+                    8,
+                    3,
+                    It.IsAny<bool>(),
+                    It.IsAny<ManagerRefundContributionDto>()))
+                .ReturnsAsync(new FundTransactionResponseDto { TransactionId = 9, FundId = 3, TransactionType = "EXPENSE", Status = "APPROVED", Amount = 10_000m });
+
+            var result = await _controller.ManagerRefundContribution(8, 3, new ManagerRefundContributionDto { OriginalTransactionId = 5, Amount = 10_000m });
+
+            Assert.IsType<OkObjectResult>(result);
         }
 
         private void SetAuthenticatedUser(Guid userId, bool isAdmin = false)
@@ -971,15 +1010,17 @@ namespace UNIC.ControllerTest.Controllers
             _fundRepository.Setup(r => r.GetTransactionByIdAsync(5)).ReturnsAsync(new FundTransaction
             {
                 TransactionId = 5,
+                PaymentProvider = PaymentGatewayProviderCodes.PayOS,
                 ClubFund = new ClubFund { ClubId = 1 }
             });
             _clubPayOSSettingsRepository.Setup(r => r.GetByClubIdAsync(1)).ReturnsAsync(new ClubPayOSSettings
             {
                 ClubId = 1,
+                PaymentProvider = PaymentGatewayProviderCodes.PayOS,
                 ChecksumKey = "club-key",
                 IsEnabled = true
             });
-            _payOSService.Setup(p => p.VerifyWebhookSignature("club-key", "sig", It.IsAny<System.Text.Json.JsonElement>())).Returns(false);
+            _fundPaymentGateway.Setup(g => g.VerifyWebhookSignature(It.IsAny<ClubPayOSSettings>(), "sig", It.IsAny<System.Text.Json.JsonElement>())).Returns(false);
 
             var result = await _controller.PayOSWebhookClubScoped(CancellationToken.None);
 
@@ -993,15 +1034,17 @@ namespace UNIC.ControllerTest.Controllers
             _fundRepository.Setup(r => r.GetTransactionByIdAsync(5)).ReturnsAsync(new FundTransaction
             {
                 TransactionId = 5,
+                PaymentProvider = PaymentGatewayProviderCodes.PayOS,
                 ClubFund = new ClubFund { ClubId = 1 }
             });
             _clubPayOSSettingsRepository.Setup(r => r.GetByClubIdAsync(1)).ReturnsAsync(new ClubPayOSSettings
             {
                 ClubId = 1,
+                PaymentProvider = PaymentGatewayProviderCodes.PayOS,
                 ChecksumKey = "club-key",
                 IsEnabled = true
             });
-            _payOSService.Setup(p => p.VerifyWebhookSignature("club-key", "good", It.IsAny<System.Text.Json.JsonElement>())).Returns(true);
+            _fundPaymentGateway.Setup(g => g.VerifyWebhookSignature(It.IsAny<ClubPayOSSettings>(), "good", It.IsAny<System.Text.Json.JsonElement>())).Returns(true);
             _fundService.Setup(s => s.ProcessPayOSPaymentSuccessAsync(5)).ReturnsAsync(true);
 
             var result = await _controller.PayOSWebhookClubScoped(CancellationToken.None);
@@ -1050,17 +1093,19 @@ namespace UNIC.ControllerTest.Controllers
             _fundRepository.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(new FundTransaction
             {
                 TransactionId = 1,
+                PaymentProvider = PaymentGatewayProviderCodes.PayOS,
                 ClubFund = new ClubFund { ClubId = 1 }
             });
             _clubPayOSSettingsRepository.Setup(r => r.GetByClubIdAsync(1)).ReturnsAsync(new ClubPayOSSettings
             {
                 ClubId = 1,
+                PaymentProvider = PaymentGatewayProviderCodes.PayOS,
                 ChecksumKey = "club-key",
                 IsEnabled = true
             });
             var result = await _controller.PayOSWebhookClubScoped(CancellationToken.None);
             Assert.IsType<BadRequestObjectResult>(result);
-            _payOSService.Verify(p => p.VerifyWebhookSignature(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<System.Text.Json.JsonElement>()), Times.Never);
+            _fundPaymentGateway.Verify(g => g.VerifyWebhookSignature(It.IsAny<ClubPayOSSettings>(), It.IsAny<string>(), It.IsAny<System.Text.Json.JsonElement>()), Times.Never);
         }
 
         private void SetJsonBody(string json)

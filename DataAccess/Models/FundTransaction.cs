@@ -38,6 +38,9 @@ namespace DataAccess.Models
         [MaxLength(100)]
         public string? PaymentLinkId { get; set; }
 
+        [MaxLength(32)]
+        public string? PaymentProvider { get; set; }
+
         [MaxLength(20)]
         public string? ContributionSource { get; set; }
 

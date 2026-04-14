@@ -4,16 +4,19 @@ using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    partial class UnicContextModelSnapshot : ModelSnapshot
+    [Migration("20260413151634_AddPaymentGatewayProviderFields")]
+    partial class AddPaymentGatewayProviderFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -316,12 +319,6 @@ namespace UNIC.DataAccess.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<int>("FundTypeId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal?>("GoalAmount")
-                        .HasColumnType("decimal(15,2)");
-
                     b.Property<string>("RejectReason")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
@@ -340,8 +337,6 @@ namespace UNIC.DataAccess.Migrations
                     b.HasKey("FundId");
 
                     b.HasIndex("ClubId");
-
-                    b.HasIndex("FundTypeId");
 
                     b.ToTable("ClubFunds");
                 });
@@ -995,33 +990,6 @@ namespace UNIC.DataAccess.Migrations
                     b.ToTable("FundTransactions");
                 });
 
-            modelBuilder.Entity("DataAccess.Models.FundType", b =>
-                {
-                    b.Property<int>("FundTypeId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FundTypeId"));
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("int");
-
-                    b.HasKey("FundTypeId");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("FundTypes");
-                });
-
             modelBuilder.Entity("DataAccess.Models.Notification", b =>
                 {
                     b.Property<int>("NotificationId")
@@ -1658,15 +1626,7 @@ namespace UNIC.DataAccess.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
-                    b.HasOne("DataAccess.Models.FundType", "FundType")
-                        .WithMany()
-                        .HasForeignKey("FundTypeId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
                     b.Navigation("Club");
-
-                    b.Navigation("FundType");
                 });
 
             modelBuilder.Entity("DataAccess.Models.ClubPayOSSettings", b =>

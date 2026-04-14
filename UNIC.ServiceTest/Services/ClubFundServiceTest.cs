@@ -1,6 +1,7 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Options;
 using BusinessLogic.Services.Implementation;
+using BusinessLogic.Services.Implementation.PaymentGateways;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
@@ -24,6 +25,7 @@ namespace UNIC.ServiceTest.Services
         private readonly Mock<IPayOSService> _payOS;
         private readonly Mock<IPolicyService> _policy;
         private readonly Mock<IClubPayOSSettingsRepository> _paySettingsRepo;
+        private readonly Mock<IFundTypeRepository> _fundTypeRepo;
         private readonly ClubFundService _service;
 
         public ClubFundServiceTest()
@@ -33,16 +35,22 @@ namespace UNIC.ServiceTest.Services
             _payOS = new Mock<IPayOSService>();
             _policy = new Mock<IPolicyService>();
             _paySettingsRepo = new Mock<IClubPayOSSettingsRepository>();
+            _fundTypeRepo = new Mock<IFundTypeRepository>();
             _fundRepo.Setup(r => r.ExistsNonRejectedFundNameInClubAsync(It.IsAny<int>(), It.IsAny<string>()))
                 .ReturnsAsync(false);
+            _fundTypeRepo.Setup(r => r.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new FundType { FundTypeId = 1, Name = "Hàng Tháng", IsActive = true, SortOrder = 0 });
 
             var payOpts = Options.Create(new PayOSOptions { LinkExpirationMinutes = 60 });
+            var payOsGateway = new PayOSFundPaymentGateway(_payOS.Object, payOpts);
+            var registry = new FundPaymentGatewayRegistry(new IFundPaymentGateway[] { payOsGateway });
             _service = new ClubFundService(
                 _fundRepo.Object,
                 _memberRepo.Object,
-                _payOS.Object,
+                registry,
                 _policy.Object,
                 _paySettingsRepo.Object,
+                _fundTypeRepo.Object,
                 payOpts);
         }
 
@@ -60,7 +68,7 @@ namespace UNIC.ServiceTest.Services
         public async Task CreateFundAsync_ShouldThrow_WhenFundNameEmpty()
         {
             var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-                _service.CreateFundAsync(Guid.NewGuid(), new CreateFundDto { ClubId = 1, FundName = "  " }));
+                _service.CreateFundAsync(Guid.NewGuid(), new CreateFundDto { ClubId = 1, FundName = "  ", FundTypeId = 1 }));
             Assert.Contains("Tên quỹ", ex.Message);
         }
 
@@ -75,7 +83,8 @@ namespace UNIC.ServiceTest.Services
                 _service.CreateFundAsync(uid, new CreateFundDto
                 {
                     ClubId = 1,
-                    FundName = "Q2"
+                    FundName = "Q2",
+                    FundTypeId = 1
                 }));
 
             Assert.Contains("Tên quỹ đã tồn tại", ex.Message);
@@ -89,6 +98,7 @@ namespace UNIC.ServiceTest.Services
                 {
                     ClubId = 1,
                     FundName = "Q",
+                    FundTypeId = 1,
                     ExpiresAt = DateTime.UtcNow.Date.AddDays(-1)
                 }));
         }
@@ -100,7 +110,7 @@ namespace UNIC.ServiceTest.Services
             _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync((UserClubRole?)null);
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-                _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q" }));
+                _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q", FundTypeId = 1 }));
         }
 
         [Fact]
@@ -114,7 +124,7 @@ namespace UNIC.ServiceTest.Services
             });
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-                _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q" }));
+                _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q", FundTypeId = 1 }));
         }
 
         [Fact]
@@ -128,7 +138,7 @@ namespace UNIC.ServiceTest.Services
             });
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-                _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q" }));
+                _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q", FundTypeId = 1 }));
         }
 
         [Fact]
@@ -146,7 +156,8 @@ namespace UNIC.ServiceTest.Services
             {
                 ClubId = 1,
                 FundName = " Quỹ A ",
-                Description = "  Mo ta quy  "
+                Description = "  Mo ta quy  ",
+                FundTypeId = 1
             });
 
             Assert.NotNull(captured);
@@ -169,7 +180,7 @@ namespace UNIC.ServiceTest.Services
                 .Callback<ClubFund>(f => captured = f)
                 .ReturnsAsync((ClubFund f) => f);
 
-            await _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q" });
+            await _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q", FundTypeId = 1 });
 
             Assert.Equal("PENDING", captured!.Status);
         }
@@ -190,6 +201,7 @@ namespace UNIC.ServiceTest.Services
             {
                 ClubId = 1,
                 FundName = "Q Alias",
+                FundTypeId = 1,
                 ExtraData = new Dictionary<string, JsonElement>
                 {
                     ["fundDescription"] = aliasJson
@@ -296,6 +308,7 @@ namespace UNIC.ServiceTest.Services
             _paySettingsRepo.Setup(r => r.GetByClubIdAsync(2)).ReturnsAsync(new ClubPayOSSettings
             {
                 ClubId = 2,
+                PaymentProvider = "PAYOS",
                 ClientId = "c",
                 ApiKey = "a",
                 ChecksumKey = "k",
@@ -396,6 +409,7 @@ namespace UNIC.ServiceTest.Services
             _paySettingsRepo.Setup(r => r.GetByClubIdAsync(2)).ReturnsAsync(new ClubPayOSSettings
             {
                 ClubId = 2,
+                PaymentProvider = "PAYOS",
                 ClientId = "c",
                 ApiKey = "a",
                 ChecksumKey = "k",
@@ -440,6 +454,7 @@ namespace UNIC.ServiceTest.Services
             _paySettingsRepo.Setup(r => r.GetByClubIdAsync(2)).ReturnsAsync(new ClubPayOSSettings
             {
                 ClubId = 2,
+                PaymentProvider = "PAYOS",
                 ClientId = "c",
                 ApiKey = "a",
                 ChecksumKey = "k",
@@ -1143,6 +1158,7 @@ namespace UNIC.ServiceTest.Services
             {
                 ClubId = 1,
                 FundName = "QExp",
+                FundTypeId = 1,
                 ExpiresAt = future
             });
 
@@ -1694,6 +1710,46 @@ namespace UNIC.ServiceTest.Services
 
             await Assert.ThrowsAsync<ArgumentException>(() =>
                 _service.RejectFundRefundRequestAsync(uid, 1, false, 1, new RejectFundRefundRequestDto { RejectionReason = "no" }));
+        }
+
+        [Fact]
+        public async Task ManagerRefundContributionAsync_ShouldReturnTransaction_WhenValid()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
+            _fundRepo.Setup(r => r.GetFundByIdAsync(2)).ReturnsAsync(new ClubFund { FundId = 2, ClubId = 1, FundName = "Q", Status = "APPROVED" });
+            _fundRepo.Setup(r => r.TryRecordApprovedManagerRefundExpenseAsync(
+                    1, 2, 5, uid, 10_000m,
+                    It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>()))
+                .ReturnsAsync((99, 123m));
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(99)).ReturnsAsync(new FundTransaction
+            {
+                TransactionId = 99,
+                FundId = 2,
+                TransactionType = "EXPENSE",
+                Status = "APPROVED",
+                Amount = 10_000m,
+                Description = "refund",
+                TransactionDate = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                RefundForTransactionId = 5
+            });
+
+            var dto = await _service.ManagerRefundContributionAsync(uid, 1, 2, false, new ManagerRefundContributionDto
+            {
+                OriginalTransactionId = 5,
+                Amount = 10_000m,
+                Reason = "Hoàn",
+                TransferReference = "TR",
+                ManagerNote = "NOTE"
+            });
+
+            Assert.Equal(99, dto.TransactionId);
+            Assert.Equal("EXPENSE", dto.TransactionType);
+            Assert.Equal("APPROVED", dto.Status);
+            Assert.Equal(10_000m, dto.Amount);
+            Assert.Equal(5, dto.RefundForTransactionId);
         }
 
         #endregion

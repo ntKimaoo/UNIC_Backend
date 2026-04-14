@@ -40,6 +40,7 @@ public partial class UnicContext : DbContext
     public DbSet<ClubFund> ClubFunds { get; set; }
     public DbSet<FundTransaction> FundTransactions { get; set; }
     public DbSet<FundRefundRequest> FundRefundRequests { get; set; }
+    public DbSet<FundType> FundTypes { get; set; }
     public DbSet<ClubPayOSSettings> ClubPayOSSettings { get; set; }
     public DbSet<RecruitmentCampaign> RecruitmentCampaigns { get; set; }
     public DbSet<ApplicationForm> ApplicationForms { get; set; }
@@ -350,6 +351,16 @@ public partial class UnicContext : DbContext
             .HasOne(cf => cf.Club)
             .WithMany(c => c.ClubFunds)
             .HasForeignKey(cf => cf.ClubId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<FundType>()
+            .HasIndex(x => x.Name)
+            .IsUnique();
+
+        modelBuilder.Entity<ClubFund>()
+            .HasOne(cf => cf.FundType)
+            .WithMany()
+            .HasForeignKey(cf => cf.FundTypeId)
             .OnDelete(DeleteBehavior.NoAction);
 
         modelBuilder.Entity<ClubPayOSSettings>()

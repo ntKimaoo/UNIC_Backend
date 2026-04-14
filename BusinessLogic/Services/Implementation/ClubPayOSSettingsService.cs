@@ -1,4 +1,5 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.PaymentGateways;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
@@ -12,13 +13,16 @@ namespace BusinessLogic.Services.Implementation
 
         private readonly IClubMemberRepository _clubMemberRepository;
         private readonly IClubPayOSSettingsRepository _settingsRepository;
+        private readonly IFundPaymentGatewayRegistry _paymentGatewayRegistry;
 
         public ClubPayOSSettingsService(
             IClubMemberRepository clubMemberRepository,
-            IClubPayOSSettingsRepository settingsRepository)
+            IClubPayOSSettingsRepository settingsRepository,
+            IFundPaymentGatewayRegistry paymentGatewayRegistry)
         {
             _clubMemberRepository = clubMemberRepository;
             _settingsRepository = settingsRepository;
+            _paymentGatewayRegistry = paymentGatewayRegistry;
         }
 
         public async Task<ClubPayOSSettingsResponseDto> GetAsync(Guid currentUserId, int clubId, bool isSystemAdmin)
@@ -32,19 +36,17 @@ namespace BusinessLogic.Services.Implementation
         {
             await EnsureCanManagePayOSAsync(currentUserId, clubId, isSystemAdmin);
 
+            var providerNorm = PaymentGatewayProviderCodes.Normalize(dto.PaymentProvider);
+            var gateway = _paymentGatewayRegistry.Get(providerNorm);
+
             var clientId = (dto.ClientId ?? string.Empty).Trim();
             var apiKey = (dto.ApiKey ?? string.Empty).Trim();
             var checksumKey = (dto.ChecksumKey ?? string.Empty).Trim();
 
-            if (dto.IsEnabled)
-            {
-                if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(checksumKey))
-                    throw new ArgumentException("Bật PayOS thì cần đủ ClientId, ApiKey, ChecksumKey.");
-            }
-
             var settings = new ClubPayOSSettings
             {
                 ClubId = clubId,
+                PaymentProvider = providerNorm,
                 ClientId = clientId,
                 ApiKey = apiKey,
                 ChecksumKey = checksumKey,
@@ -52,6 +54,8 @@ namespace BusinessLogic.Services.Implementation
                 UpdatedAtUtc = DateTime.UtcNow,
                 UpdatedBy = currentUserId
             };
+
+            gateway.ValidateCredentialsForSave(settings);
 
             await _settingsRepository.UpsertAsync(settings);
             return ToResponse(clubId, settings);
@@ -73,14 +77,21 @@ namespace BusinessLogic.Services.Implementation
 
         private static ClubPayOSSettingsResponseDto ToResponse(int clubId, ClubPayOSSettings? s)
         {
-            var configured = s != null
-                             && !string.IsNullOrWhiteSpace(s.ClientId)
-                             && !string.IsNullOrWhiteSpace(s.ApiKey)
-                             && !string.IsNullOrWhiteSpace(s.ChecksumKey);
+            var provider = PaymentGatewayProviderCodes.Normalize(s?.PaymentProvider);
+            var configured = s != null && provider switch
+            {
+                PaymentGatewayProviderCodes.PayOS => !string.IsNullOrWhiteSpace(s.ClientId)
+                                                     && !string.IsNullOrWhiteSpace(s.ApiKey)
+                                                     && !string.IsNullOrWhiteSpace(s.ChecksumKey),
+                PaymentGatewayProviderCodes.VNPay => !string.IsNullOrWhiteSpace(s.ClientId)
+                                                     && !string.IsNullOrWhiteSpace(s.ApiKey),
+                _ => false
+            };
 
             return new ClubPayOSSettingsResponseDto
             {
                 ClubId = clubId,
+                PaymentProvider = provider,
                 IsConfigured = configured,
                 IsEnabled = s?.IsEnabled ?? false,
                 ClientId = string.IsNullOrWhiteSpace(s?.ClientId) ? null : s!.ClientId,
