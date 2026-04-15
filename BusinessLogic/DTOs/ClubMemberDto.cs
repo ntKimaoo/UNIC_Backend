@@ -23,7 +23,6 @@ namespace BusinessLogic.DTOs
     /// </summary>
     public class UpdateMemberRoleDto
     {
-        [Required]
         public int ClubRoleId { get; set; }
     }
 

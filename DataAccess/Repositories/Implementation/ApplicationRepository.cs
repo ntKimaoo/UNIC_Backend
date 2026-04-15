@@ -209,9 +209,38 @@ namespace UNIC.DataAccess.Repositories.Implementation
 
             if (existing == null) return false;
 
-            _context.ApplicationForms.Remove(existing);
-            await _context.SaveChangesAsync();
-            return true;
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                var applications = await _context.Applications
+                    .Where(a => a.FormId == formId)
+                    .Select(a => a.ApplicationId)
+                    .ToListAsync();
+
+                await _context.ApplicationAnswers
+                    .Where(a => applications.Contains(a.ApplicationId))
+                    .ExecuteDeleteAsync();
+
+                await _context.Applications
+                    .Where(a => a.FormId == formId)
+                    .ExecuteDeleteAsync();
+
+                await _context.ApplicationQuestions
+                    .Where(q => q.FormId == formId)
+                    .ExecuteDeleteAsync();
+
+                _context.ApplicationForms.Remove(existing);
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+                return true;
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         // ================= QUESTION =================

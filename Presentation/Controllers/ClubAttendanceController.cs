@@ -47,7 +47,7 @@ namespace UNIC.Presentation.Controllers
         /// Approve registration — CREATOR, MANAGER, COORDINATOR
         /// </summary>
         [HttpPost("{id}/approve/{userId}")]
-        [RequireEventPolicy("approveattendance")]
+        //[RequireEventPolicy("approveattendance")]
         public async Task<IActionResult> ApproveRegistration(int clubId, int id, Guid userId)
         {
             try
@@ -67,7 +67,7 @@ namespace UNIC.Presentation.Controllers
         /// Reject registration — CREATOR, MANAGER, COORDINATOR
         /// </summary>
         [HttpPost("{id}/reject/{userId}")]
-        [RequireEventPolicy("approveattendance")]
+        //[RequireEventPolicy("approveattendance")]
         public async Task<IActionResult> RejectRegistration(int clubId, int id, Guid userId)
         {
             try
@@ -87,7 +87,7 @@ namespace UNIC.Presentation.Controllers
         /// Bulk approve — CREATOR, MANAGER, COORDINATOR
         /// </summary>
         [HttpPost("{id}/approve-bulk")]
-        [RequireEventPolicy("approveattendance")]
+        //[RequireEventPolicy("approveattendance")]
         public async Task<IActionResult> BulkApproveRegistrations(int clubId, int id, [FromBody] List<Guid> userIds)
         {
             try
@@ -110,7 +110,7 @@ namespace UNIC.Presentation.Controllers
         /// Generate check-in code — CREATOR, MANAGER, COORDINATOR, CHECKER
         /// </summary>
         [HttpPost("{id}/checkin-code")]
-        [RequireEventPolicy("checkin")]
+        //[RequireEventPolicy("checkin")]
         public async Task<ActionResult<CheckInCodeResponse>> GenerateCheckInCode(int clubId, int id)
         {
             try
@@ -131,7 +131,7 @@ namespace UNIC.Presentation.Controllers
         /// Check in by QR — CREATOR, MANAGER, COORDINATOR, CHECKER
         /// </summary>
         [HttpPost("{id}/checkin-qr")]
-        [RequireEventPolicy("checkin")]
+        //[RequireEventPolicy("checkin")]
         public async Task<ActionResult<CheckInByQrResponse>> CheckInByQr(int clubId, int id, [FromBody] CheckInByQrRequest request)
         {
             try
@@ -157,7 +157,7 @@ namespace UNIC.Presentation.Controllers
         /// Evaluate member — CREATOR, MANAGER, COORDINATOR
         /// </summary>
         [HttpPost("{id}/evaluate")]
-        [RequireEventPolicy("evaluatemember")]
+        //[RequireEventPolicy("evaluatemember")]
         public async Task<IActionResult> EvaluateMember(int clubId, int id, [FromBody] EvaluateMemberRequest request)
         {
             try
@@ -179,7 +179,7 @@ namespace UNIC.Presentation.Controllers
         /// Get attendees — CREATOR, MANAGER, COORDINATOR, CHECKER
         /// </summary>
         [HttpGet("{id}/attendees")]
-        [RequireEventPolicy("viewattendance")]
+        //[RequireEventPolicy("viewattendance")]
         public async Task<ActionResult<IEnumerable<AttendanceDetailDto>>> GetEventAttendees(int clubId, int id)
         {
             try

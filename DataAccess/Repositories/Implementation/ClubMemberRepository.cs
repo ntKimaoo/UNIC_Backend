@@ -153,5 +153,22 @@ namespace DataAccess.Repositories.Implementation
                 .OrderBy(m => m.JoinDate)
                 .ToListAsync();
         }
+
+        public async Task<bool> HasClubManager(int clubId)
+        {
+            var clubManager = _context.UserClubRoles.Include(u => u.ClubRole).FirstOrDefaultAsync(uc => uc.ClubId == clubId && uc.ClubRole.Level == 0);
+            return clubManager != null;
+
+        }
+
+        public async Task<bool> RemoveMemberRole(int clubMemberId)
+        {
+            var member = await _context.UserClubRoles.FindAsync(clubMemberId);
+            if (member == null) return false;
+
+            member.ClubRoleId = null;
+            await _context.SaveChangesAsync();
+            return true;
+        }
     }
 }

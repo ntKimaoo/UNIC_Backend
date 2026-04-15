@@ -177,5 +177,15 @@ namespace BusinessLogic.Services.Implementation
                 MemberCount = r.MemberCount
             });
         }
+
+        public Task<bool> AssignUserRole(Guid userId, string roleName)
+        {
+            return _userRepository.AssignUserRole(userId, roleName);
+        }
+
+        public Task<string> GetUserRole(Guid userId)
+        {
+            return _userRepository.GetUserRole(userId);
+        }
     }
 }

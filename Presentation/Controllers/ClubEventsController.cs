@@ -127,7 +127,7 @@ namespace UNIC.Presentation.Controllers
         /// </summary>
         [HttpPut("{id}")]
         [Consumes("multipart/form-data")]
-        [RequireEventPolicy("editevent")]
+        //[RequireEventPolicy("editevent")]
         public async Task<ActionResult<EventDetailDto>> UpdateEvent(int clubId, int id, [FromForm] UpdateEventRequest request, IFormFile? image)
         {
             try
@@ -155,7 +155,7 @@ namespace UNIC.Presentation.Controllers
         /// </summary>
         [HttpPost("{id}/image")]
         [Consumes("multipart/form-data")]
-        [RequireEventPolicy("editevent")]
+        //[RequireEventPolicy("editevent")]
         public async Task<IActionResult> UploadEventImage(int clubId, int id, IFormFile image)
         {
             try
@@ -187,7 +187,7 @@ namespace UNIC.Presentation.Controllers
         /// Create session — CREATOR, MANAGER, COORDINATOR
         /// </summary>
         [HttpPost("{id}/sessions")]
-        [RequireEventPolicy("managesession")]
+        //[RequireEventPolicy("managesession")]
         public async Task<ActionResult<SessionDto>> CreateSession(int clubId, int id, [FromBody] CreateSessionRequest request)
         {
             try
@@ -214,7 +214,7 @@ namespace UNIC.Presentation.Controllers
         /// Update session — CREATOR, MANAGER, COORDINATOR
         /// </summary>
         [HttpPut("{id}/sessions/{scheduleId}")]
-        [RequireEventPolicy("managesession")]
+        //[RequireEventPolicy("managesession")]
         public async Task<ActionResult<SessionDto>> UpdateSession(int clubId, int id, int scheduleId, [FromBody] UpdateSessionRequest request)
         {
             try
@@ -242,7 +242,7 @@ namespace UNIC.Presentation.Controllers
         /// Delete session — CREATOR, MANAGER
         /// </summary>
         [HttpDelete("{id}/sessions/{scheduleId}")]
-        [RequireEventPolicy("managesession")]
+        //[RequireEventPolicy("managesession")]
         public async Task<IActionResult> DeleteSession(int clubId, int id, int scheduleId)
         {
             try
@@ -267,7 +267,7 @@ namespace UNIC.Presentation.Controllers
         /// Open registration — CREATOR, MANAGER
         /// </summary>
         [HttpPatch("{id}/open-registration")]
-        [RequireEventPolicy("openregistration")]
+        //[RequireEventPolicy("openregistration")]
         public async Task<ActionResult<EventDetailDto>> OpenRegistration(int clubId, int id, [FromBody] OpenRegistrationRequest request)
         {
             try
@@ -289,7 +289,7 @@ namespace UNIC.Presentation.Controllers
         /// Start event — CREATOR, MANAGER
         /// </summary>
         [HttpPut("{id}/start")]
-        [RequireEventPolicy("startevent")]
+        //[RequireEventPolicy("startevent")]
         public async Task<IActionResult> StartEvent(int clubId, int id)
         {
             try
@@ -309,7 +309,7 @@ namespace UNIC.Presentation.Controllers
         /// Complete event — CREATOR, MANAGER
         /// </summary>
         [HttpPut("{id}/complete")]
-        [RequireEventPolicy("completeevent")]
+        //[RequireEventPolicy("completeevent")]
         public async Task<IActionResult> CompleteEvent(int clubId, int id)
         {
             try
@@ -403,7 +403,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPost("{id}/roles")]
-        [RequireEventPolicy("managecollaborator")]
+        //[RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> CreateEventRole(int clubId, int id, [FromBody] EventRoleDto request)
         {
             try
@@ -426,7 +426,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPut("{id}/roles/{roleId}")]
-        [RequireEventPolicy("managecollaborator")]
+        //[RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> UpdateEventRole(int clubId, int id, int roleId, [FromBody] EventRoleDto request)
         {
             try
@@ -453,7 +453,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpDelete("{id}/roles/{roleId}")]
-        [RequireEventPolicy("managecollaborator")]
+        //[RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> DeleteEventRole(int clubId, int id, int roleId)
         {
             try
@@ -471,7 +471,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPut("{id}/roles/{roleId}/policies")]
-        [RequireEventPolicy("managecollaborator")]
+        //[RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> SetEventRolePolicies(int clubId, int id, int roleId, [FromBody] List<string> policies)
         {
             try
@@ -525,7 +525,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPost("{id}/members")]
-        [RequireEventPolicy("managecollaborator")]
+        //[RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> AddEventMember(int clubId, int id, [FromBody] AddEventMemberRequest request)
         {
             try
@@ -550,7 +550,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPut("{id}/members/{memberId}/role")]
-        [RequireEventPolicy("managecollaborator")]
+        //[RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> UpdateEventMemberRole(int clubId, int id, int memberId, [FromBody] int? roleId)
         {
             try
@@ -570,7 +570,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpDelete("{id}/members/{memberId}")]
-        [RequireEventPolicy("managecollaborator")]
+        //[RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> RemoveEventMember(int clubId, int id, int memberId)
         {
             try
@@ -588,7 +588,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPut("{id}/members/{memberId}/policies")]
-        [RequireEventPolicy("managecollaborator")]
+        //[RequireEventPolicy("managecollaborator")]
         public async Task<IActionResult> SetEventMemberPolicies(int clubId, int id, int memberId, [FromBody] List<string> policies)
         {
             try

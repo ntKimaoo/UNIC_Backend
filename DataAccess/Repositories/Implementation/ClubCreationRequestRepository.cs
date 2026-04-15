@@ -18,6 +18,7 @@ namespace DataAccess.Repositories
         {
             return await _context.ClubCreationRequests
                 .Include(r => r.User)
+                .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
         }
 

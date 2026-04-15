@@ -25,9 +25,11 @@ namespace DataAccess.Migrations
                 nullable: true);
 
             migrationBuilder.Sql("""
-                IF COL_LENGTH('dbo.FundTransactions', 'PaymentLinkId') IS NOT NULL
-                    EXEC(N'UPDATE dbo.FundTransactions SET IsMemberContribution = 1 WHERE PaymentLinkId IS NOT NULL AND TransactionType = N''INCOME''');
+                UPDATE FundTransactions
+                SET IsMemberContribution = 1
+                WHERE TransactionType = 'INCOME'
                 """);
+            // sua lai neu ko chay duoc doan sql tren WHERE PaymentLinkId IS NOT NULL AND TransactionType = 'INCOME'
         }
 
         /// <inheritdoc />

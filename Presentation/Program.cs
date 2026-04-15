@@ -191,6 +191,10 @@ builder.Services.AddAuthentication(options =>
 // Register authorization handler
 builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
 
+builder.Services.AddScoped<IAuthorizationHandler, ClubPolicyOrRoleHandler>();
+
+=========
+>>>>>>>>> Temporary merge branch 2
 // Register club-scoped authorization handler
 builder.Services.AddScoped<IAuthorizationHandler, ClubMemberAuthorizationHandler>();
 

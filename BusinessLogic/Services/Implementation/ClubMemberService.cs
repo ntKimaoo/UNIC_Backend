@@ -14,15 +14,18 @@ namespace BusinessLogic.Services.Implementation
         private readonly IClubMemberRepository _memberRepository;
         private readonly IClubRepository _clubRepository;
         private readonly IUserRepository _userRepository;
+        private readonly IClubRoleRepository _clubRoleRepo;
 
         public ClubMemberService(
             IClubMemberRepository memberRepository,
             IClubRepository clubRepository,
-            IUserRepository userRepository)
+            IUserRepository userRepository,
+            IClubRoleRepository clubRoleRepo)
         {
             _memberRepository = memberRepository;
             _clubRepository = clubRepository;
             _userRepository = userRepository;
+            _clubRoleRepo = clubRoleRepo;
         }
 
         public async Task<IEnumerable<ClubMemberResponseDto>> GetMembersByClubAsync(int clubId)
@@ -96,6 +99,22 @@ namespace BusinessLogic.Services.Implementation
         {
             var member = await _memberRepository.GetMemberByIdAsync(clubMemberId);
             if (member == null) return null;
+            if (dto.ClubRoleId == 0)
+            {
+                await _memberRepository.RemoveMemberRole(clubMemberId);
+                var result1 = await _memberRepository.GetMemberByIdAsync(clubMemberId);
+                return MapToResponseDto(result1!);
+            }
+
+            var clubRole = await _clubRoleRepo.GetByIdAsync(dto.ClubRoleId, member.ClubId);
+
+            if (clubRole.Level == 0)
+            {
+                if (await _memberRepository.HasClubManager(member.ClubId))
+                {
+                    throw new Exception("Each club has only one Club Manager");
+                }
+            }
 
             member.ClubRoleId = dto.ClubRoleId;
             await _memberRepository.UpdateMemberAsync(member);
