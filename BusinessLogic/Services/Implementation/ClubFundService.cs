@@ -943,6 +943,16 @@ namespace BusinessLogic.Services.Implementation
             if (dto.Amount <= 0m)
                 throw new ArgumentException("Số tiền hoàn phải > 0.", nameof(dto.Amount));
 
+            var transferRef = (dto.TransferReference ?? string.Empty).Trim();
+            if (transferRef.Length > 100)
+                throw new ArgumentException("TransferReference không được vượt quá 100 ký tự.", nameof(dto.TransferReference));
+            var note = (dto.ManagerNote ?? string.Empty).Trim();
+            if (note.Length > 500)
+                throw new ArgumentException("ManagerNote không được vượt quá 500 ký tự.", nameof(dto.ManagerNote));
+            var reason = (dto.Reason ?? string.Empty).Trim();
+            if (reason.Length > 2000)
+                throw new ArgumentException("Reason không được vượt quá 2000 ký tự.", nameof(dto.Reason));
+
             var fund = await _fundRepository.GetFundByIdAsync(fundId);
             if (fund == null)
                 throw new KeyNotFoundException("Quỹ không tồn tại.");
@@ -955,9 +965,9 @@ namespace BusinessLogic.Services.Implementation
                 dto.OriginalTransactionId,
                 managerUserId,
                 dto.Amount,
-                dto.Reason,
-                dto.TransferReference,
-                dto.ManagerNote);
+                reason,
+                transferRef,
+                note);
 
             if (result == null)
                 throw new InvalidOperationException("Không thể hoàn tiền (giao dịch gốc không hợp lệ, số tiền vượt quá, hoặc quỹ không đủ số dư).");
@@ -1126,7 +1136,7 @@ namespace BusinessLogic.Services.Implementation
                 managerUserId,
                 dto?.TransferReference,
                 dto?.ManagerNote);
-        }
+        }   
 
         public async Task<bool> RejectFundRefundRequestAsync(
             Guid managerUserId, int clubId, bool isSystemAdmin, int refundRequestId, RejectFundRefundRequestDto dto)

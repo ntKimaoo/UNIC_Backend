@@ -1774,6 +1774,22 @@ namespace UNIC.ServiceTest.Services
             Assert.Equal(5, dto.RefundForTransactionId);
         }
 
+        [Fact]
+        public async Task ManagerRefundContributionAsync_ShouldThrow_WhenManagerNoteTooLong()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
+            _fundRepo.Setup(r => r.GetFundByIdAsync(2)).ReturnsAsync(new ClubFund { FundId = 2, ClubId = 1, FundName = "Q", Status = "APPROVED" });
+
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.ManagerRefundContributionAsync(uid, 1, 2, false, new ManagerRefundContributionDto
+                {
+                    OriginalTransactionId = 5,
+                    Amount = 10_000m,
+                    ManagerNote = new string('a', 501)
+                }));
+        }
+
         #endregion
 
         #region Record cash contribution
