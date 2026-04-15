@@ -4,16 +4,19 @@ using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    partial class UnicContextModelSnapshot : ModelSnapshot
+    [Migration("20260407114736_AddClubPayOSSettings")]
+    partial class AddClubPayOSSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -815,96 +818,6 @@ namespace UNIC.DataAccess.Migrations
                     b.ToTable("FundCategories");
                 });
 
-            modelBuilder.Entity("DataAccess.Models.FundRefundRequest", b =>
-                {
-                    b.Property<int>("RefundRequestId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RefundRequestId"));
-
-                    b.Property<string>("AccountHolderName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(15,2)");
-
-                    b.Property<string>("BankAccountNumber")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<string>("BankName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("ClubId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("CompletedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid?>("CompletedBy")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("FundId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ManagerNote")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int>("OriginalTransactionId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<DateTime?>("RejectedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid?>("RejectedBy")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("RejectionReason")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<Guid>("RequestedBy")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("TransferReference")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("RefundRequestId");
-
-                    b.HasIndex("FundId");
-
-                    b.HasIndex("OriginalTransactionId")
-                        .IsUnique()
-                        .HasFilter("[Status] = N'PENDING'");
-
-                    b.HasIndex("ClubId", "Status");
-
-                    b.ToTable("FundRefundRequests");
-                });
-
             modelBuilder.Entity("DataAccess.Models.FundTransaction", b =>
                 {
                     b.Property<int>("TransactionId")
@@ -921,10 +834,6 @@ namespace UNIC.DataAccess.Migrations
 
                     b.Property<int?>("CategoryId")
                         .HasColumnType("int");
-
-                    b.Property<string>("ContributionSource")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -945,9 +854,6 @@ namespace UNIC.DataAccess.Migrations
                     b.Property<string>("PaymentLinkId")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
-
-                    b.Property<int?>("RefundForTransactionId")
-                        .HasColumnType("int");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -972,8 +878,6 @@ namespace UNIC.DataAccess.Migrations
                     b.HasIndex("CreatedBy");
 
                     b.HasIndex("FundId");
-
-                    b.HasIndex("RefundForTransactionId");
 
                     b.ToTable("FundTransactions");
                 });
@@ -1794,25 +1698,6 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("Club");
                 });
 
-            modelBuilder.Entity("DataAccess.Models.FundRefundRequest", b =>
-                {
-                    b.HasOne("DataAccess.Models.ClubFund", "ClubFund")
-                        .WithMany()
-                        .HasForeignKey("FundId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("DataAccess.Models.FundTransaction", "OriginalTransaction")
-                        .WithMany()
-                        .HasForeignKey("OriginalTransactionId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.Navigation("ClubFund");
-
-                    b.Navigation("OriginalTransaction");
-                });
-
             modelBuilder.Entity("DataAccess.Models.FundTransaction", b =>
                 {
                     b.HasOne("DataAccess.Models.FundCategory", "FundCategory")
@@ -1831,18 +1716,11 @@ namespace UNIC.DataAccess.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
-                    b.HasOne("DataAccess.Models.FundTransaction", "RefundForOriginalTransaction")
-                        .WithMany()
-                        .HasForeignKey("RefundForTransactionId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
                     b.Navigation("ClubFund");
 
                     b.Navigation("Creator");
 
                     b.Navigation("FundCategory");
-
-                    b.Navigation("RefundForOriginalTransaction");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Notification", b =>

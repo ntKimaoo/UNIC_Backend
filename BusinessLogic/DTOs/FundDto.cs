@@ -55,13 +55,46 @@ namespace BusinessLogic.DTOs
         }
     }
 
+    public class RecordCashContributionRequestDto
+    {
+        [Required]
+        public int FundId { get; set; }
+
+        [Required]
+        public Guid ContributorUserId { get; set; }
+
+        [Required]
+        [Range(10000, double.MaxValue, ErrorMessage = "Số tiền tối thiểu 10.000 ₫")]
+        public decimal Amount { get; set; }
+
+        [Required]
+        [MinLength(3)]
+        [MaxLength(2000)]
+        public string Note { get; set; } = string.Empty;
+
+        public int? CategoryId { get; set; }
+        public DateTime? ContributedAtUtc { get; set; }
+    }
+
+    public class RecordCashContributionResponseDto
+    {
+        public int TransactionId { get; set; }
+        public int FundId { get; set; }
+        public decimal Amount { get; set; }
+        public string Status { get; set; } = "APPROVED";
+        public string ContributionSource { get; set; } = "CASH";
+        public decimal NewCurrentBalance { get; set; }
+        public Guid ContributorUserId { get; set; }
+        public Guid RecordedByUserId { get; set; }
+    }
+
     public class ContributeRequestDto
     {
         [Required]
         public int FundId { get; set; }
         public int? CategoryId { get; set; }
         [Required]
-        [Range(1000, double.MaxValue, ErrorMessage = "Số tiền tối thiểu 1.000 ₫")]
+        [Range(10000, double.MaxValue, ErrorMessage = "Số tiền tối thiểu 10.000 ₫")]
         public decimal Amount { get; set; }
         [MaxLength(255)]
         public string? Description { get; set; }
@@ -168,6 +201,8 @@ namespace BusinessLogic.DTOs
         public Guid? CreatedBy { get; set; }
         public Guid? ApprovedBy { get; set; }
         public string? PaymentLinkId { get; set; }
+        public string? ContributionSource { get; set; }
+        public int? RefundForTransactionId { get; set; }
         public bool IsMemberContribution { get; set; }
         public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
@@ -224,5 +259,71 @@ namespace BusinessLogic.DTOs
         public decimal TotalBalanceApprovedFunds { get; set; }
         public decimal TotalApprovedIncome { get; set; }
         public decimal TotalApprovedExpense { get; set; }
+    }
+
+    public class CreateFundRefundRequestDto
+    {
+        [Required]
+        public int OriginalTransactionId { get; set; }
+
+        [Required]
+        [Range(typeof(decimal), "0.01", "79228162514264337593543950335", ErrorMessage = "Số tiền hoàn phải lớn hơn 0.")]
+        public decimal Amount { get; set; }
+
+        [MaxLength(2000)]
+        public string? Reason { get; set; }
+
+        [Required]
+        [MaxLength(100)]
+        public string BankName { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(32)]
+        public string BankAccountNumber { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(200)]
+        public string AccountHolderName { get; set; } = string.Empty;
+    }
+
+    public class CompleteFundRefundRequestDto
+    {
+        [MaxLength(100)]
+        public string? TransferReference { get; set; }
+
+        [MaxLength(500)]
+        public string? ManagerNote { get; set; }
+    }
+
+    public class RejectFundRefundRequestDto
+    {
+        [Required]
+        [MaxLength(2000)]
+        public string RejectionReason { get; set; } = string.Empty;
+    }
+
+    public class FundRefundRequestResponseDto
+    {
+        public int RefundRequestId { get; set; }
+        public int ClubId { get; set; }
+        public int FundId { get; set; }
+        public int OriginalTransactionId { get; set; }
+        public Guid RequestedBy { get; set; }
+        public decimal Amount { get; set; }
+        public string? Reason { get; set; }
+        public string BankName { get; set; } = string.Empty;
+        public string BankAccountNumber { get; set; } = string.Empty;
+        public string AccountHolderName { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public DateTime CreatedAtUtc { get; set; }
+        public DateTime UpdatedAtUtc { get; set; }
+        public DateTime? CompletedAtUtc { get; set; }
+        public Guid? CompletedBy { get; set; }
+        public DateTime? RejectedAtUtc { get; set; }
+        public Guid? RejectedBy { get; set; }
+        public string? RejectionReason { get; set; }
+        public string? TransferReference { get; set; }
+        public string? ManagerNote { get; set; }
+        public string? FundName { get; set; }
     }
 }

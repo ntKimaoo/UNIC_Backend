@@ -112,6 +112,7 @@ builder.Services.AddHttpClient<IPayOSService, PayOSService>((sp, client) =>
     client.BaseAddress = new Uri(opt.BaseUrl.TrimEnd('/') + "/");
 });
 builder.Services.AddScoped<IFundRepository, FundRepository>();
+builder.Services.AddScoped<IClubPayOSSettingsRepository, ClubPayOSSettingsRepository>();
 builder.Services.AddScoped<IClubFundService, ClubFundService>();
 builder.Services.AddScoped<IClubRepository, ClubRepository>();
 builder.Services.AddScoped<IClubService, ClubService>();
@@ -119,6 +120,7 @@ builder.Services.AddScoped<IClubRoleRepository, ClubRoleRepository>();
 builder.Services.AddScoped<IClubRoleService, ClubRoleService>();
 builder.Services.AddScoped<IClubMemberRepository, ClubMemberRepository>();
 builder.Services.AddScoped<IClubMemberService, ClubMemberService>();
+builder.Services.AddScoped<IClubPayOSSettingsService, ClubPayOSSettingsService>();
 builder.Services.AddScoped<IPolicyRepository, PolicyRepository>();
 builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddHostedService<TokenCleanupService>();

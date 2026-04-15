@@ -15,13 +15,13 @@ namespace DataAccess.Models
 
         [Required]
         [MaxLength(20)]
-        public string TransactionType { get; set; } // 'INCOME' or 'EXPENSE'
+        public string TransactionType { get; set; } 
 
         [MaxLength(20)]
-        public string Status { get; set; } = "PENDING"; // 'PENDING', 'APPROVED', 'REJECTED'
+        public string Status { get; set; } = "PENDING"; 
 
-        public Guid? CreatedBy { get; set; }  // Nguoi tao yeu cau
-        public Guid? ApprovedBy { get; set; } // Nguoi duyet
+        public Guid? CreatedBy { get; set; }  
+        public Guid? ApprovedBy { get; set; } 
 
         [Required]
         [Column(TypeName = "decimal(15,2)")]
@@ -31,20 +31,25 @@ namespace DataAccess.Models
 
         public DateTime TransactionDate { get; set; } = DateTime.Now;
 
-        /// <summary>Thời điểm tạo bản ghi (UTC). Dùng cho lịch sử nộp tiền.</summary>
         public DateTime CreatedAt { get; set; }
 
-        /// <summary>Thời điểm cập nhật cuối (UTC), ví dụ sau PayOS webhook — FE ưu tiên cho «thời gian nộp».</summary>
         public DateTime UpdatedAt { get; set; }
 
         [MaxLength(100)]
         public string? PaymentLinkId { get; set; }
 
-        /// <summary>True nếu giao dịch tạo từ luồng nộp tiền (PayOS) của thành viên — dùng cho lịch sử nộp tiền.</summary>
+        [MaxLength(20)]
+        public string? ContributionSource { get; set; }
+
+        public int? RefundForTransactionId { get; set; }
+
         public bool IsMemberContribution { get; set; }
 
         [ForeignKey("FundId")]
         public virtual ClubFund ClubFund { get; set; }
+
+        [ForeignKey(nameof(RefundForTransactionId))]
+        public virtual FundTransaction? RefundForOriginalTransaction { get; set; }
 
         [ForeignKey("CategoryId")]
         public virtual FundCategory FundCategory { get; set; }
