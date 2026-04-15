@@ -1114,6 +1114,13 @@ namespace BusinessLogic.Services.Implementation
             if (r == null || r.ClubId != clubId)
                 return false;
 
+            var transferRef = (dto?.TransferReference ?? string.Empty).Trim();
+            if (transferRef.Length > 100)
+                throw new ArgumentException("TransferReference không được vượt quá 100 ký tự.", nameof(dto.TransferReference));
+            var note = (dto?.ManagerNote ?? string.Empty).Trim();
+            if (note.Length > 500)
+                throw new ArgumentException("ManagerNote không được vượt quá 500 ký tự.", nameof(dto.ManagerNote));
+
             return await _fundRepository.TryCompleteRefundRequestAsync(
                 refundRequestId,
                 managerUserId,

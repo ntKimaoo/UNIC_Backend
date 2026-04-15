@@ -1713,6 +1713,28 @@ namespace UNIC.ServiceTest.Services
         }
 
         [Fact]
+        public async Task CompleteFundRefundRequestAsync_ShouldThrow_WhenManagerNoteTooLong()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
+            _fundRepo.Setup(r => r.GetRefundRequestByIdAsync(1)).ReturnsAsync(new FundRefundRequest
+            {
+                RefundRequestId = 1,
+                ClubId = 1,
+                FundId = 1,
+                Status = "PENDING"
+            });
+
+            var dto = new CompleteFundRefundRequestDto
+            {
+                ManagerNote = new string('a', 501)
+            };
+
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.CompleteFundRefundRequestAsync(uid, 1, false, 1, dto));
+        }
+
+        [Fact]
         public async Task ManagerRefundContributionAsync_ShouldReturnTransaction_WhenValid()
         {
             var uid = Guid.NewGuid();
