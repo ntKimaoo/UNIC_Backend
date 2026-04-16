@@ -434,6 +434,7 @@ namespace BusinessLogic.Services.Implementation
             return new JoinRoomResponseDto
             {
                 RoomCode                = room.RoomCode,
+                RoomType                = room.RoomType.ToString(),
                 PeerId                  = peerId,
                 StunServerUri           = room.StunServerUri,
                 TurnServerUri           = room.TurnServerUri,

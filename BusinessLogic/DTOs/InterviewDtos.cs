@@ -240,6 +240,12 @@ namespace BusinessLogic.DTOs
     public class JoinRoomResponseDto
     {
         public string RoomCode { get; set; } = null!;
+
+        /// <summary>
+        /// "Interview" | "General" | "Internal" | "Training"
+        /// </summary>
+        public string RoomType { get; set; } = "General";
+
         public string? PeerId { get; set; }
         public string? StunServerUri { get; set; }
         public string? TurnServerUri { get; set; }
