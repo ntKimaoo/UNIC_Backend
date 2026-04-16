@@ -1,6 +1,12 @@
+using System.Globalization;
+using System.Linq;
+using System.Text;
 using System.Text.Json;
 using BusinessLogic.DTOs;
+using BusinessLogic.PaymentGateways;
 using BusinessLogic.Services.Interface;
+using DataAccess.Repositories.Interface;
+using UNIC.DataAccess.Repositories.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -17,20 +23,135 @@ namespace Presentation.Controllers
     {
         private readonly IClubFundService _clubFundService;
         private readonly IClubMemberService _clubMemberService;
+        private readonly IClubPayOSSettingsService _clubPayOSSettingsService;
 
-        private readonly IPayOSService _payOSService;
+        private readonly IFundPaymentGatewayRegistry _paymentGatewayRegistry;
+        private readonly IFundRepository _fundRepository;
+        private readonly IClubPayOSSettingsRepository _clubPayOSSettingsRepository;
         private readonly IWebHostEnvironment _environment;
 
         public ClubFundController(
             IClubFundService clubFundService,
             IClubMemberService clubMemberService,
-            IPayOSService payOSService,
+            IClubPayOSSettingsService clubPayOSSettingsService,
+            IFundPaymentGatewayRegistry paymentGatewayRegistry,
+            IFundRepository fundRepository,
+            IClubPayOSSettingsRepository clubPayOSSettingsRepository,
             IWebHostEnvironment environment)
         {
             _clubFundService = clubFundService;
             _clubMemberService = clubMemberService;
-            _payOSService = payOSService;
+            _clubPayOSSettingsService = clubPayOSSettingsService;
+            _paymentGatewayRegistry = paymentGatewayRegistry;
+            _fundRepository = fundRepository;
+            _clubPayOSSettingsRepository = clubPayOSSettingsRepository;
             _environment = environment;
+        }
+
+        [HttpGet("payos-guide")]
+        public async Task<IActionResult> GetPayOSGuide(int clubId)
+        {
+            var userId = GetCurrentUserId();
+            if (!await CanAccessClubAsync(userId, clubId))
+                return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+
+            var settings = await _clubPayOSSettingsRepository.GetByClubIdAsync(clubId);
+            var providerGuide = PaymentGatewayProviderCodes.Normalize(settings?.PaymentProvider);
+            var isConfigured = settings != null && providerGuide switch
+            {
+                PaymentGatewayProviderCodes.PayOS => !string.IsNullOrWhiteSpace(settings.ClientId)
+                                                     && !string.IsNullOrWhiteSpace(settings.ApiKey)
+                                                     && !string.IsNullOrWhiteSpace(settings.ChecksumKey),
+                PaymentGatewayProviderCodes.VNPay => !string.IsNullOrWhiteSpace(settings.ClientId)
+                                                   && !string.IsNullOrWhiteSpace(settings.ApiKey),
+                _ => false
+            };
+            var isEnabled = settings?.IsEnabled ?? false;
+            var onlineProviders = _paymentGatewayRegistry.ListOnlineProviders()
+                .Select(p => new
+                {
+                    code = p.Code,
+                    labelVi = p.DisplayNameVi,
+                    credentialFields = p.CredentialFields
+                        .OrderBy(f => f.SortOrder)
+                        .Select(f => new
+                        {
+                            name = f.Name,
+                            labelVi = f.LabelVi,
+                            requiredWhenEnabled = f.RequiredWhenEnabled,
+                            maxLength = f.MaxLength,
+                            inputType = f.InputType,
+                            helpTextVi = f.HelpTextVi
+                        })
+                        .ToList()
+                })
+                .ToList();
+
+            return Ok(new
+            {
+                success = true,
+                data = new
+                {
+                    clubId,
+                    paymentCredentialSchemaVersion = 1,
+                    onlinePaymentProviders = onlineProviders,
+                    payos = new
+                    {
+                        isConfigured,
+                        isEnabled,
+                        noteVi = "Chỉ Club Manager mới có quyền cài đặt cổng thanh toán. Nếu CLB chưa cài đặt, có thể dùng chuyển khoản thủ công (ghi nhận tiền mặt)."
+                    },
+                    stepsVi = new[]
+                    {
+                        "Chọn cổng trong onlinePaymentProviders; mỗi cổng có credentialFields — FE dựng form động (name gửi lại PUT payos-settings: clientId, apiKey, checksumKey).",
+                        "Đăng ký merchant trên trang của cổng thanh toán, rồi dán key vào form.",
+                        "VNPay: cấu hình IPN/Return URL trên cổng trỏ về API backend (xem tài liệu triển khai).",
+                        "Club Manager vào Cài đặt Thanh toán, chọn cổng và nhập thông tin để bật thanh toán trực tuyến."
+                    }
+                }
+            });
+        }
+
+        [HttpGet("payos-settings")]
+        [RequireClubPolicy("editfinance")]
+        public async Task<IActionResult> GetClubPayOSSettings(int clubId)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var isSystemAdmin = User.IsInRole("Admin");
+                var data = await _clubPayOSSettingsService.GetAsync(userId, clubId, isSystemAdmin);
+                return Ok(new { success = true, data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPut("payos-settings")]
+        [RequireClubPolicy("editfinance")]
+        public async Task<IActionResult> UpsertClubPayOSSettings(int clubId, [FromBody] UpsertClubPayOSSettingsDto dto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var isSystemAdmin = User.IsInRole("Admin");
+                var data = await _clubPayOSSettingsService.UpsertAsync(userId, clubId, isSystemAdmin, dto);
+                return Ok(new { success = true, data, message = "Cập nhật liên kết PayOS thành công." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
         }
 
         [HttpPost]
@@ -278,7 +399,238 @@ namespace Presentation.Controllers
             }
         }
 
-        
+        [HttpPost("contributions/cash")]
+        [RequireClubPolicy("editfinance")]
+        public async Task<IActionResult> RecordCashContribution(int clubId, [FromBody] RecordCashContributionRequestDto dto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+                var isAdmin = User.IsInRole("Admin");
+                var data = await _clubFundService.RecordCashContributionAsync(userId, clubId, isAdmin, dto);
+                return Ok(new { success = true, data, message = "Đã ghi nhận đóng góp tiền mặt." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost("refund-requests")]
+        public async Task<IActionResult> CreateFundRefundRequest(int clubId, [FromBody] CreateFundRefundRequestDto dto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+                var data = await _clubFundService.CreateFundRefundRequestAsync(userId, clubId, dto);
+                return Ok(new { success = true, data, message = "Đã gửi yêu cầu hoàn tiền." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpGet("refund-requests/mine")]
+        public async Task<IActionResult> GetMyFundRefundRequests(int clubId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        {
+            try
+            {
+                if (page < 1)
+                    return BadRequest(new { success = false, message = "Page phải >= 1." });
+                if (pageSize < 1 || pageSize > 100)
+                    return BadRequest(new { success = false, message = "PageSize từ 1 đến 100." });
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+                var data = await _clubFundService.GetMyFundRefundRequestsPagedAsync(userId, clubId, page, pageSize);
+                return Ok(new { success = true, data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpGet("refund-requests")]
+        [RequireClubPolicy("editfinance")]
+        public async Task<IActionResult> GetClubFundRefundRequests(
+            int clubId,
+            [FromQuery] string? status,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
+        {
+            try
+            {
+                if (page < 1)
+                    return BadRequest(new { success = false, message = "Page phải >= 1." });
+                if (pageSize < 1 || pageSize > 100)
+                    return BadRequest(new { success = false, message = "PageSize từ 1 đến 100." });
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
+                var isAdmin = User.IsInRole("Admin");
+                var data = await _clubFundService.GetClubFundRefundRequestsPagedAsync(userId, clubId, isAdmin, status, page, pageSize);
+                return Ok(new { success = true, data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost("refund-requests/{refundRequestId:int}/cancel")]
+        public async Task<IActionResult> CancelFundRefundRequest(int clubId, int refundRequestId)
+        {
+            var userId = GetCurrentUserId();
+            if (!await CanAccessClubAsync(userId, clubId))
+                return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+            var ok = await _clubFundService.CancelFundRefundRequestAsync(userId, clubId, refundRequestId);
+            if (!ok)
+                return BadRequest(new { success = false, message = "Không thể hủy yêu cầu (không tồn tại, không phải của bạn, hoặc không còn ở trạng thái chờ xử lý)." });
+            return Ok(new { success = true, message = "Đã hủy yêu cầu hoàn tiền." });
+        }
+
+        [HttpPost("refund-requests/{refundRequestId:int}/complete")]
+        [RequireClubPolicy("editfinance")]
+        public async Task<IActionResult> CompleteFundRefundRequest(
+            int clubId,
+            int refundRequestId,
+            [FromBody] CompleteFundRefundRequestDto? dto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+                var isAdmin = User.IsInRole("Admin");
+                var ok = await _clubFundService.CompleteFundRefundRequestAsync(userId, clubId, isAdmin, refundRequestId, dto ?? new CompleteFundRefundRequestDto());
+                if (!ok)
+                    return BadRequest(new { success = false, message = "Không thể xác nhận hoàn tất (không tồn tại, trạng thái không hợp lệ, hoặc số dư quỹ không đủ)." });
+                return Ok(new { success = true, message = "Đã xác nhận hoàn tiền và ghi chi vào quỹ." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost("refund-requests/{refundRequestId:int}/reject")]
+        [RequireClubPolicy("editfinance")]
+        public async Task<IActionResult> RejectFundRefundRequest(int clubId, int refundRequestId, [FromBody] RejectFundRefundRequestDto dto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+                var isAdmin = User.IsInRole("Admin");
+                var ok = await _clubFundService.RejectFundRefundRequestAsync(userId, clubId, isAdmin, refundRequestId, dto);
+                if (!ok)
+                    return BadRequest(new { success = false, message = "Không thể từ chối yêu cầu (không tồn tại hoặc trạng thái không hợp lệ)." });
+                return Ok(new { success = true, message = "Đã từ chối yêu cầu hoàn tiền." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Club Manager hoàn tiền chủ động (không cần member tạo refund-request).
+        /// Tạo 1 giao dịch EXPENSE (APPROVED) có RefundForTransactionId trỏ tới giao dịch INCOME gốc.
+        /// </summary>
+        [HttpPost("{fundId:int}/manager-refunds")]
+        [RequireClubPolicy("editfinance")]
+        public async Task<IActionResult> ManagerRefundContribution(
+            int clubId,
+            int fundId,
+            [FromBody] ManagerRefundContributionDto dto)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+
+                var isAdmin = User.IsInRole("Admin");
+                var data = await _clubFundService.ManagerRefundContributionAsync(userId, clubId, fundId, isAdmin, dto);
+                return Ok(new { success = true, data, message = "Đã hoàn tiền." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
         [HttpGet("~/api/fund-contributions/payos-return/{orderCode:int}")]
         public async Task<IActionResult> GetPayOsContributionReturn(int orderCode)
         {
@@ -401,12 +753,27 @@ namespace Presentation.Controllers
                     return BadRequest(new { success = false, message = "Missing data or signature" });
 
                 var receivedSignature = sigEl.GetString();
-                if (string.IsNullOrEmpty(receivedSignature) || !_payOSService.VerifyWebhookSignature(receivedSignature, dataEl))
-                    return BadRequest(new { success = false, message = "Invalid signature" });
-
                 var orderCode = dataEl.TryGetProperty("orderCode", out var oc) ? oc.GetInt32() : 0;
                 if (orderCode <= 0)
                     return BadRequest(new { success = false, message = "Invalid orderCode" });
+
+                var tx = await _fundRepository.GetTransactionByIdAsync(orderCode);
+                if (tx?.ClubFund == null)
+                    return Ok(new { success = true });
+
+                var providerCode = PaymentGatewayProviderCodes.Normalize(tx.PaymentProvider);
+                if (!string.Equals(providerCode, PaymentGatewayProviderCodes.PayOS, StringComparison.Ordinal))
+                    return Ok(new { success = true });
+
+                var settings = await _clubPayOSSettingsRepository.GetByClubIdAsync(tx.ClubFund.ClubId);
+                if (settings == null || !settings.IsEnabled || string.IsNullOrWhiteSpace(settings.ChecksumKey))
+                    return BadRequest(new { success = false, message = "Payment gateway not configured for club" });
+                if (!string.Equals(PaymentGatewayProviderCodes.Normalize(settings.PaymentProvider), providerCode, StringComparison.Ordinal))
+                    return BadRequest(new { success = false, message = "Payment provider mismatch" });
+
+                var gateway = _paymentGatewayRegistry.Get(providerCode);
+                if (string.IsNullOrEmpty(receivedSignature) || !gateway.VerifyWebhookSignature(settings, receivedSignature, dataEl))
+                    return BadRequest(new { success = false, message = "Invalid signature" });
 
                 await _clubFundService.ProcessPayOSPaymentSuccessAsync(orderCode);
                 return Ok(new { success = true });
@@ -417,10 +784,90 @@ namespace Presentation.Controllers
             }
         }
 
-        /// <param name="page">Trang, bắt đầu từ 1.</param>
-        /// <param name="pageSize">Số bản ghi mỗi trang (1–100).</param>
-        /// <param name="status">Mặc định (bỏ trống): APPROVED — chỉ các lần nộp đã thanh toán thành công. PENDING / REJECTED / ALL (mọi trạng thái).</param>
-        /// <param name="scope">mine = chỉ các lần nộp của tôi.</param>
+        /// <summary>IPN VNPay (server-to-server). Đăng ký URL này trên cổng VNPay: GET/POST ~/api/vnpay/ipn</summary>
+        [HttpGet("~/api/vnpay/ipn")]
+        [HttpPost("~/api/vnpay/ipn")]
+        [AllowAnonymous]
+        public async Task<IActionResult> VnpayIpn()
+        {
+            try
+            {
+                var flat = FlattenVnpRequest(Request);
+                if (!flat.TryGetValue("vnp_TxnRef", out var txnRef) || !int.TryParse(txnRef, out var txnId) || txnId <= 0)
+                    return VnpIpnPlain("01", "Order not found");
+
+                var tx = await _fundRepository.GetTransactionByIdAsync(txnId);
+                if (tx?.ClubFund == null)
+                    return VnpIpnPlain("01", "Order not found");
+
+                var clubSettings = await _clubPayOSSettingsRepository.GetByClubIdAsync(tx.ClubFund.ClubId);
+                if (clubSettings == null || !clubSettings.IsEnabled || string.IsNullOrWhiteSpace(clubSettings.ApiKey))
+                    return VnpIpnPlain("02", "Gateway not configured");
+
+                var txProvider = PaymentGatewayProviderCodes.Normalize(tx.PaymentProvider);
+                var clubProvider = PaymentGatewayProviderCodes.Normalize(clubSettings.PaymentProvider);
+                if (!string.Equals(txProvider, PaymentGatewayProviderCodes.VNPay, StringComparison.Ordinal)
+                    || !string.Equals(clubProvider, PaymentGatewayProviderCodes.VNPay, StringComparison.Ordinal))
+                    return VnpIpnPlain("03", "Provider mismatch");
+
+                if (!VnPaySignature.VerifyIpn(flat, clubSettings.ApiKey.Trim(), out _))
+                    return VnpIpnPlain("97", "Checksum failed");
+
+                if (!flat.TryGetValue("vnp_ResponseCode", out var rc) || rc != "00")
+                    return VnpIpnPlain("00", "Confirm Success");
+
+                if (flat.TryGetValue("vnp_TransactionStatus", out var tst) && tst != "00")
+                    return VnpIpnPlain("00", "Confirm Success");
+
+                if (!flat.TryGetValue("vnp_Amount", out var amtStr)
+                    || !long.TryParse(amtStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var vnpAmountMinor))
+                    return VnpIpnPlain("04", "Invalid amount");
+
+                var expectedMinor = (long)(tx.Amount * 100m);
+                if (vnpAmountMinor != expectedMinor)
+                    return VnpIpnPlain("04", "Invalid amount");
+
+                await _clubFundService.ProcessPayOSPaymentSuccessAsync(txnId);
+                return VnpIpnPlain("00", "Confirm Success");
+            }
+            catch (Exception)
+            {
+                return VnpIpnPlain("99", "Unknown error");
+            }
+        }
+
+        [HttpGet("~/api/vnpay/return")]
+        [AllowAnonymous]
+        public IActionResult VnpayReturn()
+        {
+            return Content(
+                "<html><body><p>Giao dịch kết thúc. Bạn có thể đóng trang và quay lại ứng dụng.</p></body></html>",
+                "text/html",
+                Encoding.UTF8);
+        }
+
+        private static ContentResult VnpIpnPlain(string rspCode, string message) =>
+            new ContentResult
+            {
+                Content = $"RspCode={rspCode}&Message={message}",
+                ContentType = "text/plain; charset=utf-8",
+                StatusCode = 200
+            };
+
+        private static Dictionary<string, string> FlattenVnpRequest(HttpRequest request)
+        {
+            var d = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var kv in request.Query)
+                d[kv.Key] = kv.Value.ToString();
+            if (request.HasFormContentType)
+            {
+                foreach (var kv in request.Form)
+                    d[kv.Key] = kv.Value.ToString();
+            }
+
+            return d;
+        }
+
         [HttpGet("history/{fundId}")]
         //[RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetHistory(
@@ -453,6 +900,32 @@ namespace Presentation.Controllers
                 return Unauthorized(new { success = false, message = ex.Message });
             }
             catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpGet("{fundId:int}/member-contributions")]
+        public async Task<IActionResult> GetFundMemberContributionOverview(int clubId, int fundId)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+
+                var data = await _clubFundService.GetFundMemberContributionOverviewAsync(userId, clubId, fundId);
+                return Ok(new { success = true, data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

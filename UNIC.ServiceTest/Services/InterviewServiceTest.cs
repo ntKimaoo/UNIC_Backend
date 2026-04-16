@@ -15,12 +15,14 @@ namespace UNIC.ServiceTest.Services
     public class InterviewServiceTest
     {
         private readonly Mock<IInterviewRepository> _mockRepo;
+        private readonly Mock<IUserRepository> _mockUserRepo;
         private readonly InterviewService _interviewService;
 
         public InterviewServiceTest()
         {
             _mockRepo = new Mock<IInterviewRepository>();
-            _interviewService = new InterviewService(_mockRepo.Object);
+            _mockUserRepo = new Mock<IUserRepository>();
+            _interviewService = new InterviewService(_mockRepo.Object, _mockUserRepo.Object);
         }
 
         #region CreateScheduleAsync

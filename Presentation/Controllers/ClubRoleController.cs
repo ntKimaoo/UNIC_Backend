@@ -23,8 +23,8 @@ namespace Presentation.Controllers
 
         /// <summary>
         /// Get all club roles
-        /// </summary>
-        [RequireClubPolicyOrRole("ViewRole", "Admin")]
+        /// </summary>      
+        //[RequireClubPolicyOrRole("ViewRole", "Admin")]
         [HttpGet("api/club/{clubId}/role")]
         public async Task<IActionResult> GetAll(int clubId)
         {

@@ -14,6 +14,11 @@ namespace DataAccess.Models
         public string FundName { get; set; }
         [MaxLength(1000)]
         public string? Description { get; set; }
+        public int FundTypeId { get; set; }
+        [ForeignKey("FundTypeId")]
+        public virtual FundType? FundType { get; set; }
+        [Column(TypeName = "decimal(15,2)")]
+        public decimal? GoalAmount { get; set; }
         [Column(TypeName = "decimal(15,2)")]
         public decimal TotalAmount { get; set; } = 0;
         [Column(TypeName = "decimal(15,2)")]

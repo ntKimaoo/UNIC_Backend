@@ -320,6 +320,9 @@ __pycache__/
 # tools/**
 # !tools/packages.config
 
+# Local helper scripts (do not commit)
+tools/
+
 # Tabs Studio
 *.tss
 
@@ -362,7 +365,9 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
-<<<<<<<<< Temporary merge branch 1
+# Backup files
+*.bak
+
 # VS Code files for those working on multiple tools
 .vscode/*
 !.vscode/settings.json
@@ -398,6 +403,7 @@ appsettings.Development.json
 appsettings.Production.json
 appsettings.Staging.json
 appsettings.*.json
+!Presentation/appsettings.example.json
 
 # Environment variables
 .env
