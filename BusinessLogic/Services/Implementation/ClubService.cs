@@ -83,41 +83,41 @@ namespace BusinessLogic.Services.Implementation
             if (club == null)
                 return null;
 
-            
-                var nameExists = await _repository.ClubNameExistsAsync(dto.ClubName);
-                if (nameExists && club.ClubName != dto.ClubName)
-                {
-                    throw new InvalidOperationException("Club name already exists");
-                }
-                club.ClubName = dto.ClubName;
 
-                club.ShortName = dto.ShortName;
+            var nameExists = await _repository.ClubNameExistsAsync(dto.ClubName);
+            if (nameExists && club.ClubName != dto.ClubName)
+            {
+                throw new InvalidOperationException("Club name already exists");
+            }
+            club.ClubName = dto.ClubName;
 
-                club.Description = dto.Description;
+            club.ShortName = dto.ShortName;
 
-                club.FoundedDate = dto.FoundedDate;
+            club.Description = dto.Description;
 
-                club.Status = dto.Status;
+            club.FoundedDate = dto.FoundedDate;
+
+            club.Status = dto.Status;
             if (dto.IsPublic.HasValue)
                 club.IsPublic = dto.IsPublic.Value;
 
-                club.LogoUrl = dto.LogoUrl;
+            club.LogoUrl = dto.LogoUrl;
 
-                club.CoverImageUrl = dto.CoverImageUrl;
+            club.CoverImageUrl = dto.CoverImageUrl;
 
-                club.Email = dto.Email;
+            club.Email = dto.Email;
 
-                club.PhoneNumber = dto.PhoneNumber;
+            club.PhoneNumber = dto.PhoneNumber;
 
-                club.FacebookUrl = dto.FacebookUrl;
+            club.FacebookUrl = dto.FacebookUrl;
 
-                club.WebsiteUrl = dto.WebsiteUrl;
+            club.WebsiteUrl = dto.WebsiteUrl;
 
-                club.Address = dto.Address;
-            if(dto.IsActive.HasValue)
+            club.Address = dto.Address;
+            if (dto.IsActive.HasValue)
                 club.IsActive = dto.IsActive.Value;
-            
-                club.UpdatedAt = DateTime.UtcNow;
+
+            club.UpdatedAt = DateTime.UtcNow;
 
             var updated = await _repository.UpdateAsync(club);
             if (!updated)
@@ -162,6 +162,10 @@ namespace BusinessLogic.Services.Implementation
                 IsActive = club.IsActive,
                 IsDeleted = club.IsDeleted
             };
+        }
+        public async Task<bool> isDeleted(int clubId)
+        {
+            return await _repository.isDeleted(clubId);
         }
     }
 }

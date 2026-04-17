@@ -18,5 +18,6 @@ namespace DataAccess.Repositories.Interface
         Task<bool> ClubNameExistsAsync(string clubName);
         Task<int> CountMemberAsync(int clubId);
         Task ChangeStatusClub(int clubId);
+        Task<bool> isDeleted(int clubId);
     }
 }

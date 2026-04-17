@@ -52,5 +52,6 @@ namespace DataAccess.Repositories.Interface
         /// Lấy tất cả clubs mà user đã gia nhập kèm role
         /// </summary>
         Task<IEnumerable<UserClubRole>> GetClubsByUserIdAsync(Guid userId);
+        Task<bool> isMemberActive(Guid userId, int clubId);
     }
 }

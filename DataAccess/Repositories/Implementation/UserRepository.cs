@@ -148,7 +148,7 @@ namespace DataAccess.Repositories.Implementation
                     .Include(d => d.ClubRoles)
                     .Select(d => new
                     {
-                        Department  = d,
+                        Department = d,
                         MemberCount = _context.UserClubRoleDepartments
                             .Count(ud => ud.DepartmentId == d.DepartmentId)
                     })
@@ -187,5 +187,14 @@ namespace DataAccess.Repositories.Implementation
 
             return rows.Select(r => (r.Department, (ClubRole?)r.DepartmentRole, r.MemberCount));
         }
+        public async Task<bool> isActiveAccount(Guid userId)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(m => m.UserId == userId);
+            if (user == null)
+                return false;
+            return user.Status.ToLower() == "active";
+        }
+       
     }
 }

@@ -23,5 +23,6 @@ namespace BusinessLogic.Services.Interface
         /// Returns null when the user is not a member of the club.
         /// </summary>
         Task<IEnumerable<UserDepartmentDto>?> GetUserDepartmentsInClubAsync(Guid userId, int clubId);
+        Task<bool> isActiveAccount(Guid userId);
     }
 }

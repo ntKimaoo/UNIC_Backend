@@ -3,6 +3,9 @@ using DataAccess.Repositories.Interface;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data.SqlTypes;
+using System.Diagnostics;
 using System.Formats.Asn1;
 using System.Linq;
 using System.Threading.Tasks;
@@ -136,6 +139,15 @@ namespace DataAccess.Repositories.Implementation
                 await _context.SaveChangesAsync();
             }
         }
-        
+        public async Task<bool> isDeleted(int clubId)
+        {
+            var club = await GetByIdAsync(clubId);
+            if (club != null)
+            {
+                return !club.IsActive;
+            }
+            return false;
+
+        }
     }
 }

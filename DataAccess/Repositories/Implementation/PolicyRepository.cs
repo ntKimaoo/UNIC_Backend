@@ -182,13 +182,13 @@ namespace DataAccess.Repositories.Implementation
 
             await _context.SaveChangesAsync();
         }
-        public async Task<List<string>> GetUserRoleAsync(Guid userId)
+        public async Task<string> GetUserRoleAsync(Guid userId)
         {
             var userRoles = await _context.UserRoles
                 .Where(ur => ur.UserId == userId)
                 .Select(ur => ur.RoleName)
                 .ToListAsync();
-            return userRoles;
+            return userRoles.FirstOrDefault() ?? "User";
         }
     }
 }

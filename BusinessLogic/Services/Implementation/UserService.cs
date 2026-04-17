@@ -155,27 +155,32 @@ namespace BusinessLogic.Services.Implementation
 
             return rows.Select(r => new UserDepartmentDto
             {
-                DepartmentId   = r.Department.DepartmentId,
+                DepartmentId = r.Department.DepartmentId,
                 DepartmentName = r.Department.DepartmentName,
-                Description    = r.Department.Description,
+                Description = r.Department.Description,
                 DepartmentRole = r.DepartmentRole == null ? null : new DepartmentMemberRoleDto
                 {
-                    ClubRoleId  = r.DepartmentRole.ClubRoleId,
-                    RoleName    = r.DepartmentRole.RoleName,
+                    ClubRoleId = r.DepartmentRole.ClubRoleId,
+                    RoleName = r.DepartmentRole.RoleName,
                     Description = r.DepartmentRole.Description,
-                    Level       = r.DepartmentRole.Level
+                    Level = r.DepartmentRole.Level
                 },
                 Roles = (r.Department.ClubRoles ?? Enumerable.Empty<ClubRole>())
                     .Select(cr => new DepartmentMemberRoleDto
                     {
-                        ClubRoleId  = cr.ClubRoleId,
-                        RoleName    = cr.RoleName,
+                        ClubRoleId = cr.ClubRoleId,
+                        RoleName = cr.RoleName,
                         Description = cr.Description,
-                        Level       = cr.Level
+                        Level = cr.Level
                     })
                     .ToList(),
                 MemberCount = r.MemberCount
             });
         }
+        public async Task<bool> isActiveAccount(Guid userId)
+        {
+            return await _userRepository.isActiveAccount(userId);
+        }
+      
     }
 }

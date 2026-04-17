@@ -26,5 +26,6 @@ namespace DataAccess.Repositories.Interface
         /// along with the role they hold in each department (if any).
         /// </summary>
         Task<IEnumerable<(Department Department, ClubRole? DepartmentRole, int MemberCount)>> GetDepartmentsByUserAndClubAsync(Guid userId, int clubId);
+        Task<bool> isActiveAccount(Guid userId);
     }
 }

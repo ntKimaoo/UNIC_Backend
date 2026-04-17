@@ -15,5 +15,6 @@ namespace BusinessLogic.Services.Interface
         Task<bool> DeleteAsync(int clubId);
         Task<bool> SoftDeleteAsync(int clubId);
         Task ChangeStatusClub(int clubId);
+        Task<bool> isDeleted(int clubId);
     }
 }

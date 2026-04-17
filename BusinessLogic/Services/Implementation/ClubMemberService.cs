@@ -140,5 +140,10 @@ namespace BusinessLogic.Services.Implementation
                 AssignedBy = m.AssignedBy,
             };
         }
+
+        public async Task<bool> IsMemberActiveAsync(Guid userId, int clubId)
+        {
+            return await _memberRepository.isMemberActive(userId, clubId);
+        }
     }
 }

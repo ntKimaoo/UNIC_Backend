@@ -126,7 +126,7 @@ namespace DataAccess.Repositories.Implementation
             {
                 var member = await _context.UserClubRoles.FindAsync(clubMemberId);
                 if (member == null) return false;
-                
+
                 _context.UserClubRoles.Remove(member);
                 await _context.SaveChangesAsync();
                 return true;
@@ -152,6 +152,12 @@ namespace DataAccess.Repositories.Implementation
                 .Where(m => m.UserId == userId && m.Status != null && m.Status.ToUpper() == "ACTIVE")
                 .OrderBy(m => m.JoinDate)
                 .ToListAsync();
+        }
+        public async Task<bool> isMemberActive(Guid userId, int clubId)
+        {
+            var member = await _context.UserClubRoles
+                .FirstOrDefaultAsync(m => m.UserId == userId && m.ClubId == clubId);
+            return member != null && member.Status != null && member.Status.ToUpper() == "ACTIVE";
         }
     }
 }
