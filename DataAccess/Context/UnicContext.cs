@@ -57,7 +57,8 @@ public partial class UnicContext : DbContext
     public DbSet<UserEventRole> UserEventRoles { get; set; }
     public DbSet<EventRolePolicy> EventRolePolicies { get; set; }
     public DbSet<EventMemberPolicy> EventMemberPolicies { get; set; }
-    public DbSet<UserClubRoleDepartment> UserClubRoleDepartments { get; set; }
+    public virtual DbSet<UserClubRoleDepartment> UserClubRoleDepartments { get; set; }
+    public virtual DbSet<RecordOfChange> RecordsOfChange { get; set; }
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
 
@@ -239,6 +240,12 @@ public partial class UnicContext : DbContext
             .WithMany(u => u.Notifications)
             .HasForeignKey(n => n.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Notification>()
+            .HasOne(n => n.FromUser)
+            .WithMany(u => u.SentNotifications)
+            .HasForeignKey(n => n.FromUserId)
+            .OnDelete(DeleteBehavior.NoAction);
 
         // Event - Club
         modelBuilder.Entity<Event>()
@@ -488,6 +495,17 @@ public partial class UnicContext : DbContext
 
         modelBuilder.Entity<Club>()
             .HasIndex(c => c.ClubName);
+
+        modelBuilder.Entity<Club>()
+            .HasOne(c => c.RecordOfChange)
+            .WithOne(r => r.Club)
+            .HasForeignKey<RecordOfChange>(r => r.ClubId);
+
+        modelBuilder.Entity<RecordOfChange>()
+            .HasOne(r => r.ChangedByUser)
+            .WithMany(u => u.RecordsOfChange)
+            .HasForeignKey(r => r.ChangedBy)
+            .OnDelete(DeleteBehavior.NoAction);
 
         modelBuilder.Entity<Event>()
             .HasIndex(e => e.StartDate);

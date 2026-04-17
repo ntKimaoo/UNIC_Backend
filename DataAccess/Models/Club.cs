@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -48,6 +48,7 @@ namespace DataAccess.Models
         public virtual ICollection<ClubFund> ClubFunds { get; set; }
         public virtual ICollection<RecruitmentCampaign> RecruitmentCampaigns { get; set; }
         public virtual ICollection<ClubRole> ClubRoles { get; set; }
+        public virtual RecordOfChange RecordOfChange { get; set; }
     }
 
 

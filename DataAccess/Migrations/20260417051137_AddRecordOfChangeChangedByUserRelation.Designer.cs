@@ -4,16 +4,19 @@ using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    partial class UnicContextModelSnapshot : ModelSnapshot
+    [Migration("20260417051137_AddRecordOfChangeChangedByUserRelation")]
+    partial class AddRecordOfChangeChangedByUserRelation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1033,9 +1036,6 @@ namespace UNIC.DataAccess.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid?>("FromUserId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<bool>("IsRead")
                         .HasColumnType("bit");
 
@@ -1057,8 +1057,6 @@ namespace UNIC.DataAccess.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("NotificationId");
-
-                    b.HasIndex("FromUserId");
 
                     b.HasIndex("UserId", "IsRead");
 
@@ -1966,18 +1964,11 @@ namespace UNIC.DataAccess.Migrations
 
             modelBuilder.Entity("DataAccess.Models.Notification", b =>
                 {
-                    b.HasOne("DataAccess.Models.User", "FromUser")
-                        .WithMany("SentNotifications")
-                        .HasForeignKey("FromUserId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
                     b.HasOne("DataAccess.Models.User", "User")
                         .WithMany("Notifications")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("FromUser");
 
                     b.Navigation("User");
                 });
@@ -2332,8 +2323,6 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("RecordsOfChange");
 
                     b.Navigation("RefreshTokens");
-
-                    b.Navigation("SentNotifications");
 
                     b.Navigation("UserRoles");
                 });
