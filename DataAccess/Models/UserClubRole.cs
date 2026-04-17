@@ -15,8 +15,6 @@ namespace DataAccess.Models
         [Required]
         public int ClubId { get; set; }
 
-        public int? ClubRoleId { get; set; }
-
         public DateTime JoinDate { get; set; } = DateTime.Now;
 
         [MaxLength(20)]
@@ -30,14 +28,13 @@ namespace DataAccess.Models
         [ForeignKey("ClubId")]
         public virtual Club Club { get; set; }
 
-        [ForeignKey("ClubRoleId")]
-        public virtual ClubRole? ClubRole { get; set; }
-
         [ForeignKey("AssignedBy")]
         public virtual User AssignedByUser { get; set; }
         public virtual IList<ClubMemberPolicy>? ClubMemberPolicies { get; set; }
 
         /// <summary>Departments the member belongs to (many-to-many via UserClubRoleDepartment).</summary>
         public virtual ICollection<UserClubRoleDepartment> MemberDepartments { get; set; } = new List<UserClubRoleDepartment>();
+
+        public virtual ICollection<UserClubRoleAssignment> RoleAssignments { get; set; } = new List<UserClubRoleAssignment>();
     }
 }

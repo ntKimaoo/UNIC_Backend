@@ -45,7 +45,7 @@ namespace BusinessLogic.Services.Implementation
             return clubs.Select(MapToResponseDto);
         }
 
-        public async Task<ClubResponseDto> CreateAsync(CreateClubDto dto)
+        public async Task<ClubResponseDto> CreateAsync(Guid uid, CreateClubDto dto)
         {
             // Check if club name already exists
             if (await _repository.ClubNameExistsAsync(dto.ClubName))
@@ -73,7 +73,7 @@ namespace BusinessLogic.Services.Implementation
                 CreatedAt = DateTime.UtcNow
             };
 
-            var createdClub = await _repository.CreateAsync(club);
+            var createdClub = await _repository.CreateAsync(uid, club);
             return MapToResponseDto(createdClub);
         }
 

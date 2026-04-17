@@ -51,8 +51,15 @@ namespace DataAccess.Repositories.Implementation
                 .ToListAsync();
         }
 
-        public async Task<Club> CreateAsync(Club club)
+        public async Task<Club> CreateAsync(Guid uid, Club club)
         {
+            if (!await _context.UserRoles.AnyAsync(u => u.UserId == uid && u.RoleName.ToLower().Equals("admin")))
+            {
+                if (await _context.UserClubRoleAssignments.AnyAsync(ura => ura.ClubMember.UserId == uid && ura.ClubRole.Level == 0))
+                {
+                    throw new InvalidOperationException("A club manager already exists. Cannot create a new club without this manager.");
+                }
+            }
             club.CreatedAt = DateTime.UtcNow;
             club.IsDeleted = false;
             await _context.Clubs.AddAsync(club);

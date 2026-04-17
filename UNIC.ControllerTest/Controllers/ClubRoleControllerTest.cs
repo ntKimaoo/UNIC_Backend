@@ -346,7 +346,7 @@ namespace UNIC.ControllerTest.Controllers
             {
                 UserId = Guid.NewGuid(),
                 ClubId = 1,
-                ClubRoleId = 2
+                ClubRoleIds = new List<int> { 2 }
             };
 
             _mockService.Setup(s => s.AssignRoleAsync(dto))
@@ -365,7 +365,7 @@ namespace UNIC.ControllerTest.Controllers
             {
                 UserId = Guid.NewGuid(),
                 ClubId = 1,
-                ClubRoleId = 99
+                ClubRoleIds = new List<int> { 99 }
             };
 
             _mockService.Setup(s => s.AssignRoleAsync(dto))
@@ -381,7 +381,7 @@ namespace UNIC.ControllerTest.Controllers
             var dto = new AssignClubRoleDto
             {
                 UserId = Guid.NewGuid(),
-                ClubRoleId = 1
+                ClubRoleIds = new List<int> { 1 }
             };
 
             _mockService.Setup(s => s.AssignRoleAsync(dto))

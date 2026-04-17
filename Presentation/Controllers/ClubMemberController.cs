@@ -7,20 +7,23 @@ using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using UNIC.BusinessLogic.Services.Interface;
 
 namespace Presentation.Controllers
 {
     [ApiController]
-    
+
     public class ClubMemberController : ControllerBase
     {
         private readonly IClubMemberService _service;
         private readonly IPolicyService _policyService;
+        private readonly IDepartmentService _departmentService;
 
-        public ClubMemberController(IClubMemberService service, IPolicyService policyService)
+        public ClubMemberController(IClubMemberService service, IPolicyService policyService, IDepartmentService departmentService)
         {
             _service = service;
             _policyService = policyService;
+            _departmentService = departmentService;
         }
         private Guid? GetCurrentUserId()
         {
@@ -117,7 +120,7 @@ namespace Presentation.Controllers
         /// </summary>
         [HttpPut("api/clubs/{clubId}/members/{memberId}/role")]
         
-        public async Task<IActionResult> UpdateMemberRole(int clubId, int memberId, [FromBody] UpdateMemberRoleDto dto)
+        public async Task<IActionResult> UpdateMemberRole(int clubId, int memberId, [FromBody] UpdateMemberRoleDto? dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
@@ -132,7 +135,7 @@ namespace Presentation.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+                return StatusCode(500, new { success = false, message = ex.Message, error = ex.Message });
             }
         }
 
@@ -153,6 +156,46 @@ namespace Presentation.Controllers
                 return StatusCode(500, new { success = false, message = "Failed to remove member" });
 
             return Ok(new { success = true, message = "Member removed from club successfully" });
+        }
+
+        // ─── Role Extension Endpoints ─────────────────────────────────────
+
+        /// <summary>
+        /// Gán thêm 1 role cho member
+        /// </summary>
+        [HttpPost("api/clubs/{clubId}/members/{memberId}/roles/{roleId}")]
+        public async Task<IActionResult> AddMemberRole(int clubId, int memberId, int roleId)
+        {
+            var member = await _service.GetMemberByIdAsync(memberId);
+            if (member == null || member.ClubId != clubId)
+                return NotFound(new { success = false, message = "Member not found" });
+
+            var roles = member.Roles.Select(r => r.ClubRoleId).ToList();
+            if (!roles.Contains(roleId))
+            {
+                roles.Add(roleId);
+                await _service.UpdateMemberRoleAsync(memberId, new UpdateMemberRoleDto { ClubRoleIds = roles });
+            }
+            return Ok(new { success = true, message = "Role added successfully" });
+        }
+
+        /// <summary>
+        /// Xóa 1 role khỏi member
+        /// </summary>
+        [HttpDelete("api/clubs/{clubId}/members/{memberId}/roles/{roleId}")]
+        public async Task<IActionResult> RemoveMemberRole(int clubId, int memberId, int roleId)
+        {
+            var member = await _service.GetMemberByIdAsync(memberId);
+            if (member == null || member.ClubId != clubId)
+                return NotFound(new { success = false, message = "Member not found" });
+
+            var roles = member.Roles.Select(r => r.ClubRoleId).ToList();
+            if (roles.Contains(roleId))
+            {
+                roles.Remove(roleId);
+                await _service.UpdateMemberRoleAsync(memberId, new UpdateMemberRoleDto { ClubRoleIds = roles });
+            }
+            return Ok(new { success = true, message = "Role removed successfully" });
         }
 
         /// <summary>
@@ -244,6 +287,32 @@ namespace Presentation.Controllers
                 return NotFound(new { success = false, message = "Policy not assigned to this member" });
 
             return Ok(new { success = true, message = "Policy revoked successfully" });
+        }
+
+        /// <summary>
+        /// Lấy danh sách phòng ban mà thành viên ĐÃ tham gia (dùng cho modal xóa khỏi phòng ban)
+        /// GET /api/clubs/{clubId}/members/{memberId}/departments/joined
+        /// </summary>
+        [HttpGet("api/clubs/{clubId}/members/{memberId}/departments/joined")]
+        public async Task<IActionResult> GetJoinedDepartments(int clubId, int memberId)
+        {
+            var departments = await _departmentService.GetDepartmentsJoinedByMemberAsync(clubId, memberId);
+            if (departments == null)
+                return NotFound(new { success = false, message = "Member not found in this club" });
+            return Ok(new { success = true, data = departments });
+        }
+
+        /// <summary>
+        /// Lấy danh sách phòng ban mà thành viên CHƯA tham gia (dùng cho modal thêm vào phòng ban)
+        /// GET /api/clubs/{clubId}/members/{memberId}/departments/not-joined
+        /// </summary>
+        [HttpGet("api/clubs/{clubId}/members/{memberId}/departments/not-joined")]
+        public async Task<IActionResult> GetNotJoinedDepartments(int clubId, int memberId)
+        {
+            var departments = await _departmentService.GetDepartmentsNotJoinedByMemberAsync(clubId, memberId);
+            if (departments == null)
+                return NotFound(new { success = false, message = "Member not found in this club" });
+            return Ok(new { success = true, data = departments });
         }
     }
 }

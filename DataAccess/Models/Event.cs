@@ -24,6 +24,10 @@ namespace DataAccess.Models
         [MaxLength(200)]
         public string Location { get; set; }
 
+        [MaxLength(500)]
+        public string? MeetLink { get; set; }
+        public bool IsOnline { get; set; } = false;
+
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         public bool IsPublic { get; set; }
@@ -51,5 +55,7 @@ namespace DataAccess.Models
         public virtual ICollection<EventImage> EventImages { get; set; }
         public virtual ICollection<EventBudget> EventBudgets { get; set; }
         public virtual ICollection<Attendance> Attendances { get; set; }
+        public virtual ICollection<UserEventRole> EventMembers { get; set; }
+        public virtual ICollection<EventRole> EventRoles { get; set; }
     }
 }

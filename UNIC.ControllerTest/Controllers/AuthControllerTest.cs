@@ -75,6 +75,16 @@ namespace UNIC.ControllerTest.Controllers
             Assert.IsType<UnauthorizedObjectResult>(result);
         }
 
+        [Fact]
+        public async Task Login_ReturnsBadRequest_WhenModelStateInvalid()
+        {
+            _controller.ModelState.AddModelError("Email", "Required");
+
+            var result = await _controller.Login(new LoginRequestDto());
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
         #endregion
 
         #region Register
@@ -119,6 +129,16 @@ namespace UNIC.ControllerTest.Controllers
             Assert.IsType<BadRequestObjectResult>(result);
         }
 
+        [Fact]
+        public async Task Register_ReturnsBadRequest_WhenModelStateInvalid()
+        {
+            _controller.ModelState.AddModelError("Email", "Required");
+
+            var result = await _controller.Register(new RegisterRequestDto());
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
         #endregion
 
         #region VerifyEmail
@@ -145,6 +165,16 @@ namespace UNIC.ControllerTest.Controllers
                             .ReturnsAsync(false);
 
             var result = await _controller.VerifyEmail(request);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task VerifyEmail_ReturnsBadRequest_WhenModelStateInvalid()
+        {
+            _controller.ModelState.AddModelError("Email", "Required");
+
+            var result = await _controller.VerifyEmail(new VerifyEmailRequestDto());
 
             Assert.IsType<BadRequestObjectResult>(result);
         }
@@ -180,6 +210,16 @@ namespace UNIC.ControllerTest.Controllers
             Assert.IsType<UnauthorizedObjectResult>(result);
         }
 
+        [Fact]
+        public async Task RefreshToken_ReturnsBadRequest_WhenModelStateInvalid()
+        {
+            _controller.ModelState.AddModelError("RefreshToken", "Required");
+
+            var result = await _controller.RefreshToken(new RefreshTokenRequestDto());
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
         #endregion
 
         #region ForgotPassword
@@ -195,6 +235,16 @@ namespace UNIC.ControllerTest.Controllers
             var result = await _controller.ForgotPassword(request);
 
             Assert.IsType<OkObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task ForgotPassword_ReturnsBadRequest_WhenModelStateInvalid()
+        {
+            _controller.ModelState.AddModelError("Email", "Required");
+
+            var result = await _controller.ForgotPassword(new ForgotPasswordRequestDto());
+
+            Assert.IsType<BadRequestObjectResult>(result);
         }
 
         #endregion
@@ -223,6 +273,16 @@ namespace UNIC.ControllerTest.Controllers
                             .ReturnsAsync(false);
 
             var result = await _controller.ResetPassword(request);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task ResetPassword_ReturnsBadRequest_WhenModelStateInvalid()
+        {
+            _controller.ModelState.AddModelError("NewPassword", "Required");
+
+            var result = await _controller.ResetPassword(new ResetPasswordRequestDto());
 
             Assert.IsType<BadRequestObjectResult>(result);
         }
@@ -257,6 +317,16 @@ namespace UNIC.ControllerTest.Controllers
             Assert.IsType<BadRequestObjectResult>(result);
         }
 
+        [Fact]
+        public async Task Logout_ReturnsBadRequest_WhenModelStateInvalid()
+        {
+            _controller.ModelState.AddModelError("RefreshToken", "Required");
+
+            var result = await _controller.RevokeToken(new RefreshTokenRequestDto());
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
         #endregion
 
         #region LogoutAllDevices
@@ -284,6 +354,20 @@ namespace UNIC.ControllerTest.Controllers
             var result = await _controller.LogoutAllDevices();
 
             Assert.IsType<UnauthorizedObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task LogoutAll_ReturnsBadRequest_WhenServiceFails()
+        {
+            var userId = Guid.NewGuid();
+            SetupAuthenticatedUser(userId);
+
+            _mockAuthService.Setup(s => s.LogoutAllDevicesAsync(userId))
+                            .ReturnsAsync(false);
+
+            var result = await _controller.LogoutAllDevices();
+
+            Assert.IsType<BadRequestObjectResult>(result);
         }
 
         #endregion
@@ -320,6 +404,46 @@ namespace UNIC.ControllerTest.Controllers
             Assert.IsType<BadRequestObjectResult>(result);
         }
 
+        [Fact]
+        public async Task ChangePassword_ReturnsBadRequest_WhenModelStateInvalid()
+        {
+            _controller.ModelState.AddModelError("NewPassword", "Required");
+            SetupAuthenticatedUser(Guid.NewGuid());
+
+            var result = await _controller.ChangePassword(new ChangePasswordRequestDto());
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task ChangePassword_ReturnsUnauthorized_WhenNotAuthenticated()
+        {
+            _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity());
+
+            var result = await _controller.ChangePassword(new ChangePasswordRequestDto
+            {
+                CurrentPassword = "old",
+                NewPassword = "new"
+            });
+
+            Assert.IsType<UnauthorizedObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task ChangePassword_ReturnsBadRequest_WhenServiceReturnsFalse()
+        {
+            var userId = Guid.NewGuid();
+            SetupAuthenticatedUser(userId);
+            var request = new ChangePasswordRequestDto { CurrentPassword = "old", NewPassword = "new" };
+
+            _mockAuthService.Setup(s => s.ChangePasswordAsync(userId, request))
+                            .ReturnsAsync(false);
+
+            var result = await _controller.ChangePassword(request);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
         #endregion
 
         #region ResendVerification
@@ -350,12 +474,22 @@ namespace UNIC.ControllerTest.Controllers
             Assert.IsType<BadRequestObjectResult>(result);
         }
 
+        [Fact]
+        public async Task ResendVerification_ReturnsBadRequest_WhenModelStateInvalid()
+        {
+            _controller.ModelState.AddModelError("Email", "Required");
+
+            var result = await _controller.ResendVerification(new ForgotPasswordRequestDto());
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
         #endregion
 
         #region GetCurrentUser (GetProfile)
 
         [Fact]
-        public async Task GetProfile_ReturnsOk_WhenAuthenticated()
+        public void GetProfile_ReturnsOk_WhenAuthenticated()
         {
             var userId = Guid.NewGuid();
             SetupAuthenticatedUser(userId, "test@test.com", "Test User");
@@ -366,13 +500,53 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         [Fact]
-        public async Task GetProfile_ReturnsUnauthorized_WhenNotAuthenticated()
+        public void GetProfile_ReturnsUnauthorized_WhenNotAuthenticated()
         {
             _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity());
 
             var result = _controller.GetCurrentUser();
 
             Assert.IsType<UnauthorizedObjectResult>(result);
+        }
+
+        [Fact]
+        public void GetProfile_ReturnsOk_WithClubRoles()
+        {
+            var userId = Guid.NewGuid();
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+                new Claim(ClaimTypes.Email, "test@test.com"),
+                new Claim(ClaimTypes.Name, "Test User"),
+                new Claim(ClaimTypes.Role, "Admin"),
+                new Claim("club_roles", "[{\"ClubId\":1,\"RoleName\":\"President\",\"Level\":1}]")
+            };
+            var identity = new ClaimsIdentity(claims, "TestAuth");
+            _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(identity);
+
+            var result = _controller.GetCurrentUser();
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+
+        [Fact]
+        public void GetProfile_ReturnsOk_WithInvalidClubRolesJson()
+        {
+            var userId = Guid.NewGuid();
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+                new Claim(ClaimTypes.Email, "test@test.com"),
+                new Claim(ClaimTypes.Name, "Test User"),
+                new Claim("club_roles", "INVALID_JSON")
+            };
+            var identity = new ClaimsIdentity(claims, "TestAuth");
+            _controller.ControllerContext.HttpContext.User = new ClaimsPrincipal(identity);
+
+            // Should not throw — invalid JSON is ignored
+            var result = _controller.GetCurrentUser();
+
+            Assert.IsType<OkObjectResult>(result);
         }
 
         #endregion

@@ -26,9 +26,9 @@ namespace Presentation.Authorization
     {
         private readonly DefaultAuthorizationPolicyProvider _fallback;
 
-        private const string CLUB_POLICY_PREFIX     = "ClubPolicy_";
-        private const string ROLE_PREFIX            = "Role_";
-        private const string COMBINED_PREFIX        = "ClubPolicyOrRole_";
+        private const string CLUB_POLICY_PREFIX = "ClubPolicy_";
+        private const string ROLE_PREFIX = "Role_";
+        private const string COMBINED_PREFIX = "ClubPolicyOrRole_";
 
         public DynamicPolicyProvider(IOptions<AuthorizationOptions> options)
         {
@@ -46,11 +46,11 @@ namespace Presentation.Authorization
             // ── ClubPolicyOrRole_<policyTitle>|<role1>,<role2>  ──────────────────
             if (policyName.StartsWith(COMBINED_PREFIX))
             {
-                var rest  = policyName.Substring(COMBINED_PREFIX.Length);
+                var rest = policyName.Substring(COMBINED_PREFIX.Length);
                 // Format: <policyTitle>|<role1>,<role2>,...
-                var pipe  = rest.IndexOf('|');
+                var pipe = rest.IndexOf('|');
                 var policyTitle = pipe >= 0 ? rest.Substring(0, pipe) : rest;
-                var roles       = pipe >= 0
+                var roles = pipe >= 0
                     ? rest.Substring(pipe + 1).Split(',', System.StringSplitOptions.RemoveEmptyEntries)
                     : System.Array.Empty<string>();
 

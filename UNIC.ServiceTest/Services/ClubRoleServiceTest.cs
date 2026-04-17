@@ -1,4 +1,4 @@
-﻿using BusinessLogic.DTOs;
+using BusinessLogic.DTOs;
 using BusinessLogic.Services.Implementation;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
@@ -338,26 +338,6 @@ namespace UNIC.ServiceTest.Services
         #endregion
         #region AssignRole
         [Fact]
-        public async Task AssignRoleAsync_ShouldUpdate_WhenUserRoleExists()
-        {
-            // Arrange
-            var dto = new AssignClubRoleDto { UserId = Guid.NewGuid(), ClubId = 1, ClubRoleId = 2 };
-            var existingUserRole = new UserClubRole { UserId = dto.UserId, ClubId = dto.ClubId, ClubRoleId = 1 };
-
-            _mockClubRoleRepository.Setup(repo => repo.GetUserClubRoleAsync(dto.UserId, dto.ClubId))
-                                   .ReturnsAsync(existingUserRole);
-            _mockClubRoleRepository.Setup(repo => repo.UpdateUserClubRoleAsync(existingUserRole))
-                                   .ReturnsAsync(true);
-
-            // Act
-            var result = await _clubRoleService.AssignRoleAsync(dto);
-
-            // Assert
-            Assert.True(result);
-            Assert.Equal(2, existingUserRole.ClubRoleId);
-            _mockClubRoleRepository.Verify(repo => repo.UpdateUserClubRoleAsync(existingUserRole), Times.Once);
-        }
-        [Fact]
         public async Task AssignRoleAsync_WhenUserRoleNotExists_ShouldCreateNew()
         {
             // Arrange
@@ -365,7 +345,7 @@ namespace UNIC.ServiceTest.Services
             {
                 UserId = Guid.NewGuid(),
                 ClubId = 100,
-                ClubRoleId = 5
+                ClubRoleIds = new List<int> { 5 }
             };
 
             _mockClubRoleRepository
@@ -386,7 +366,7 @@ namespace UNIC.ServiceTest.Services
                 x.AddUserClubRoleAsync(It.Is<UserClubRole>(u =>
                     u.UserId == dto.UserId &&
                     u.ClubId == dto.ClubId &&
-                    u.ClubRoleId == dto.ClubRoleId &&
+                    
                     u.Status == "ACTIVE"
                 )),
                 Times.Once);
@@ -408,7 +388,7 @@ namespace UNIC.ServiceTest.Services
             {
                 UserId = userId,
                 ClubId = clubId,
-                ClubRoleId = 5
+                
             };
 
             _mockClubRoleRepository

@@ -14,15 +14,18 @@ namespace BusinessLogic.Services.Implementation
         private readonly IClubMemberRepository _memberRepository;
         private readonly IClubRepository _clubRepository;
         private readonly IUserRepository _userRepository;
+        private readonly IClubRoleRepository _clubRoleRepo;
 
         public ClubMemberService(
             IClubMemberRepository memberRepository,
             IClubRepository clubRepository,
-            IUserRepository userRepository)
+            IUserRepository userRepository,
+            IClubRoleRepository clubRoleRepo)
         {
             _memberRepository = memberRepository;
             _clubRepository = clubRepository;
             _userRepository = userRepository;
+            _clubRoleRepo = clubRoleRepo;
         }
 
         public async Task<IEnumerable<ClubMemberResponseDto>> GetMembersByClubAsync(int clubId)
@@ -56,7 +59,16 @@ namespace BusinessLogic.Services.Implementation
         public async Task<ClubMemberResponseDto?> GetMemberByIdAsync(int clubMemberId)
         {
             var member = await _memberRepository.GetMemberByIdAsync(clubMemberId);
-            return member == null ? null : MapToResponseDto(member);
+            if (member == null) return null;
+            var member_response = MapToResponseDto(member);
+            var member_role= await _clubRoleRepo.GetRolesOfMemberAsync(clubMemberId);
+            member_response.Roles = member_role.Select(ra => new ClubRoleInfoDto
+            {
+                ClubRoleId = ra.ClubRoleId,
+                RoleName = ra?.RoleName ?? "",
+                Level = ra?.Level ?? 0,
+            }).ToList() ?? new List<ClubRoleInfoDto>();
+            return member_response;
         }
 
         public async Task<ClubMemberResponseDto> AddUserToClubAsync(int clubId, AddUserToClubDto dto, Guid? assignedBy)
@@ -79,13 +91,16 @@ namespace BusinessLogic.Services.Implementation
             {
                 UserId = dto.UserId,
                 ClubId = clubId,
-                ClubRoleId = dto.ClubRoleId,
                 JoinDate = DateTime.UtcNow,
                 Status = "ACTIVE",
                 AssignedBy = assignedBy
             };
 
             var created = await _memberRepository.AddMemberAsync(member);
+            if (dto.ClubRoleIds != null && dto.ClubRoleIds.Any())
+            {
+                await _clubRoleRepo.SetMemberRolesAsync(created.ClubMemberId, dto.ClubRoleIds);
+            }
 
             // Load lại để có navigation properties
             var result = await _memberRepository.GetMemberByIdAsync(created.ClubMemberId);
@@ -96,9 +111,31 @@ namespace BusinessLogic.Services.Implementation
         {
             var member = await _memberRepository.GetMemberByIdAsync(clubMemberId);
             if (member == null) return null;
+            
+            if (dto.ClubRoleIds == null || !dto.ClubRoleIds.Any())
+            {
+                await _clubRoleRepo.SetMemberRolesAsync(clubMemberId, new List<int>());
+                var result1 = await _memberRepository.GetMemberByIdAsync(clubMemberId);
+                return MapToResponseDto(result1!);
+            }
 
-            member.ClubRoleId = dto.ClubRoleId;
-            await _memberRepository.UpdateMemberAsync(member);
+            foreach (var roleId in dto.ClubRoleIds)
+            {
+                var clubRole = await _clubRoleRepo.GetByIdAsync(roleId, member.ClubId);
+                if (clubRole != null && clubRole.Level == 0)
+                {
+                    if (await _memberRepository.HasClubManager(member.ClubId))
+                    {
+                        var isCurrentManager = member.RoleAssignments.Any(ra => ra.ClubRole.Level == 0);
+                        if (!isCurrentManager)
+                        {
+                            throw new Exception("Each club has only one Club Manager");
+                        }
+                    }
+                }
+            }
+
+            await _clubRoleRepo.SetMemberRolesAsync(clubMemberId, dto.ClubRoleIds);
 
             var result = await _memberRepository.GetMemberByIdAsync(clubMemberId);
             return MapToResponseDto(result!);
@@ -133,8 +170,13 @@ namespace BusinessLogic.Services.Implementation
                 Avatar = m.User?.Avatar,
                 StudentId = m.User?.StudentId,
                 ClubId = m.ClubId,
-                ClubRoleId = m.ClubRoleId,
-                RoleName = m.ClubRole?.RoleName,
+                Roles = m.RoleAssignments?.Select(ra => new ClubRoleInfoDto
+                {
+                    ClubRoleId = ra.ClubRoleId,
+                    RoleName = ra.ClubRole?.RoleName ?? "",
+                    Level = ra.ClubRole?.Level ?? 0,
+                    AssignedAt = ra.AssignedAt
+                }).ToList() ?? new List<ClubRoleInfoDto>(),
                 JoinDate = m.JoinDate,
                 Status = m.Status,
                 AssignedBy = m.AssignedBy,

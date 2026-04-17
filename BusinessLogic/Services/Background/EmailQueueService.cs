@@ -1,4 +1,4 @@
-﻿using BusinessLogic.DTOs;
+using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -79,6 +79,14 @@ namespace BusinessLogic.Services.Background
                         item.ToEmail, item.Token!, item.FullName),
                     EmailType.Welcome => await emailService.SendWelcomeEmailAsync(
                         item.ToEmail, item.FullName),
+                    EmailType.EventRegistration => await emailService.SendEventRegistrationSuccessAsync(
+                        item.ToEmail, item.FullName, item.EventName!, item.StartDate, item.Token),
+                    EmailType.EventCheckIn => await emailService.SendEventCheckInCodeAsync(
+                        item.ToEmail, item.FullName, item.EventName!, item.CheckInCode!),
+                    EmailType.InterviewStatusChange => await emailService.SendInterviewStatusChangeEmailAsync(
+                        item.ToEmail, item.FullName, item.InterviewTitle!, item.InterviewStatus!,
+                        item.InterviewScheduledAt ?? DateTime.UtcNow, item.InterviewDurationMinutes,
+                        item.CancelReason, item.ConfirmDeadline),
                     _ => false
                 };
 

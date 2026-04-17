@@ -18,5 +18,6 @@ namespace DataAccess.Repositories.Interface
         Task IncrementSlotAsync(int eventId);
         Task AddAsync(Event @event);
         void Update(Event @event);
+        Task<int> BulkSyncStatusAsync();
     }
 }

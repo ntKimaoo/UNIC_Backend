@@ -22,9 +22,9 @@ namespace DataAccess.Repositories.Implementation
         public async Task<IEnumerable<Policy>> GetUserPoliciesAsync(Guid userId)
         {
             // Get policies from user's club roles
-            var clubRolePolicies = await _context.UserClubRoles
-                .Where(ucr => ucr.UserId == userId)
-                .SelectMany(ucr => ucr.ClubRole.ClubRolePolicies)
+            var clubRolePolicies = await _context.UserClubRoleAssignments
+                .Where(ura => ura.ClubMember.UserId == userId)
+                .SelectMany(ura => ura.ClubRole.ClubRolePolicies)
                 .Select(crp => crp.Policy)
                 .ToListAsync();
             // Get policies from club member's policies
@@ -69,12 +69,12 @@ namespace DataAccess.Repositories.Implementation
         public async Task<bool> HasMemberPolicyInClubAsync(Guid userId, int clubId, string policyTitle)
         {
             var normalizedTitle = policyTitle.ToLower().Trim();
-            var isClubManager = await _context.UserClubRoles.AnyAsync(ucr => ucr.UserId == userId && ucr.ClubRole.Level == 0);
+            var isClubManager = await _context.UserClubRoleAssignments.AnyAsync(ura => ura.ClubMember.UserId == userId && ura.ClubRole.Level == 0);
             if (isClubManager) return true;
             // Check policy from club role (within this specific club)
-            var hasRolePolicy = await _context.UserClubRoles
-                .Where(ucr => ucr.UserId == userId && ucr.ClubId == clubId)
-                .SelectMany(ucr => ucr.ClubRole!.ClubRolePolicies)
+            var hasRolePolicy = await _context.UserClubRoleAssignments
+                .Where(ura => ura.ClubMember.UserId == userId && ura.ClubMember.ClubId == clubId)
+                .SelectMany(ura => ura.ClubRole!.ClubRolePolicies)
                 .AnyAsync(crp => crp.Policy.Name == normalizedTitle);
 
             if (hasRolePolicy) return true;

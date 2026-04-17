@@ -23,7 +23,7 @@ namespace DataAccess.Repositories.Implementation
             return await _context.Users
                 .Include(u => u.UserRoles)
                 .Include(u => u.ClubMembers)
-                    .ThenInclude(cm => cm.ClubRole)
+                    .ThenInclude(cm => cm.RoleAssignments).ThenInclude(ra => ra.ClubRole)
                 .FirstOrDefaultAsync(m => m.Email == email);
         }
 
@@ -140,7 +140,7 @@ namespace DataAccess.Repositories.Implementation
             GetDepartmentsByUserAndClubAsync(Guid userId, int clubId)
         {
             bool isAdmin = await _context.UserRoles
-               .AnyAsync(m => m.UserId == userId && m.RoleName == "Admin");
+               .AnyAsync(m => m.UserId == userId && (m.RoleName == "Admin"||m.RoleName == "Club Manager"));
             if (isAdmin)
             {
                 var departments = await _context.Departments
@@ -171,15 +171,14 @@ namespace DataAccess.Repositories.Implementation
                 .Include(ud => ud.Department)
                     .ThenInclude(d => d.ClubRoles)      // ← all roles in the department
                 .Include(ud => ud.ClubMember)
-                    .ThenInclude(ucr => ucr.ClubRole)
+                    .ThenInclude(ucr => ucr.RoleAssignments).ThenInclude(ra => ra.ClubRole)
                 .Select(ud => new
                 {
                     ud.Department,
-                    // Only surface the user's own role when it belongs to this department
-                    DepartmentRole = ud.ClubMember.ClubRole != null
-                        && ud.ClubMember.ClubRole.DepartmentId == ud.DepartmentId
-                        ? ud.ClubMember.ClubRole
-                        : null,
+                    DepartmentRole = ud.ClubMember.RoleAssignments
+                        .Where(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == ud.DepartmentId)
+                        .Select(ra => ra.ClubRole)
+                        .FirstOrDefault(),
                     MemberCount = _context.UserClubRoleDepartments
                         .Count(x => x.DepartmentId == ud.DepartmentId)
                 })
@@ -196,5 +195,25 @@ namespace DataAccess.Repositories.Implementation
             return user.Status.ToLower() == "active";
         }
        
+
+        public async Task<bool> AssignUserRole(Guid userId, string roleName)
+        {
+            var userRole = new UserRole
+            {
+                UserId = userId,
+                RoleName = roleName,
+                AssignedAt = DateTime.UtcNow
+            };
+            await _context.UserRoles.AddAsync(userRole);
+            return await _context.SaveChangesAsync() > 0;
+        }
+
+        public async Task<string> GetUserRole(Guid userId)
+        {
+            return await _context.UserRoles
+                .Where(ur => ur.UserId == userId)
+                .Select(ur => ur.RoleName)
+                .FirstOrDefaultAsync() ?? "User";
+        }
     }
 }

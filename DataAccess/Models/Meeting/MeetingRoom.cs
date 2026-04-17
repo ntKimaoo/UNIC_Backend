@@ -5,16 +5,52 @@ using DataAccess.Models.Meeting.Enums;
 namespace DataAccess.Models.Meeting;
 
 /// <summary>
-/// Phòng WebRTC – tạo tự động khi InterviewSchedule được Confirm.
-/// Quan hệ 1-1 với InterviewSchedule.
+/// Phòng WebRTC – dùng chung cho nhiều mục đích:
+/// phỏng vấn, họp nội bộ, đào tạo, v.v.
+/// Khi RoomType = Interview thì gắn với InterviewSchedule (optional 1-0..1).
 /// </summary>
 public class MeetingRoom
 {
     public int Id { get; set; }
 
-    // ── 1-1 với InterviewSchedule ────────────────────────────────
-    public int               InterviewScheduleId { get; set; }
-    public InterviewSchedule InterviewSchedule   { get; set; } = null!;
+    // ── Phân loại phòng ──────────────────────────────────────────
+
+    /// <summary>
+    /// Loại phòng: Interview, Internal, Training, General
+    /// </summary>
+    public RoomType RoomType { get; set; } = RoomType.General;
+
+    /// <summary>
+    /// Tiêu đề phòng. Ví dụ: "Họp ban chủ nhiệm", "PV Vòng 1 – Năng lực"
+    /// </summary>
+    public string Title { get; set; } = null!;
+
+    /// <summary>
+    /// Mô tả mục đích / nội dung cuộc họp.
+    /// </summary>
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// Users.UserId – người tạo phòng.
+    /// </summary>
+    public Guid CreatedByUserId { get; set; }
+
+    // ── Lịch trình ───────────────────────────────────────────────
+
+    /// <summary>Thời gian dự kiến bắt đầu.</summary>
+    public DateTime? ScheduledStartAt { get; set; }
+
+    /// <summary>Thời gian dự kiến kết thúc.</summary>
+    public DateTime? ScheduledEndAt { get; set; }
+
+    // ── Liên kết Interview (optional) ────────────────────────────
+
+    /// <summary>
+    /// FK tới InterviewSchedule – chỉ có giá trị khi RoomType = Interview.
+    /// Nullable để room có thể tồn tại độc lập.
+    /// </summary>
+    public int?               InterviewScheduleId { get; set; }
+    public InterviewSchedule? InterviewSchedule   { get; set; }
 
     // ── Định danh phòng ──────────────────────────────────────────
 

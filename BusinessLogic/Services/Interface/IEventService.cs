@@ -6,7 +6,7 @@ namespace BusinessLogic.Services.Interface
 {
     public interface IEventService
     {
-        Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null);
+        Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null, Guid? creatorUserId = null);
         Task<EventDetailDto> UpdateEventAsync(UpdateEventRequest request);
         Task<SessionDto>      CreateSessionAsync(CreateSessionRequest request);
         Task<SessionDto>      UpdateSessionAsync(UpdateSessionRequest request);

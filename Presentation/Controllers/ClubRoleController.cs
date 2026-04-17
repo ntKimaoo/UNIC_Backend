@@ -23,8 +23,8 @@ namespace Presentation.Controllers
 
         /// <summary>
         /// Get all club roles
-        /// </summary>
-        [RequireClubPolicyOrRole("ViewRole", "Admin")]
+        /// </summary>      
+        //[RequireClubPolicyOrRole("ViewRole", "Admin")]
         [HttpGet("api/club/{clubId}/role")]
         public async Task<IActionResult> GetAll(int clubId)
         {
@@ -73,13 +73,12 @@ namespace Presentation.Controllers
         /// <summary>
         /// Create a new club role
         /// </summary>
-        [RequireClubPolicyOrRole("CreateRole", "Admin")]
+        [RequireClubPolicyOrRole("CreateRole", "Admin", "Club Manager")]
         [HttpPost("api/club/{clubId}/role")]
         public async Task<IActionResult> Create([FromBody] CreateClubRoleDto dto, int clubId)
         {
             if (!ModelState.IsValid)
                 return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
-
             try
             {
                 var role = await _service.CreateAsync(dto, clubId);
@@ -157,6 +156,8 @@ namespace Presentation.Controllers
                 return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
             }
         }
+
+        [RequireClubPolicyOrRole("EditRole", "Admin", "Club Manager")]
         [HttpPost("api/assign")]
         public async Task<IActionResult> AssignRole([FromBody] AssignClubRoleDto dto)
         {

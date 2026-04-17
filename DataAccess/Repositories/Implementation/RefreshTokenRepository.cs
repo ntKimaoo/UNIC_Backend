@@ -31,7 +31,7 @@ namespace DataAccess.Repositories.Implementation
                     .ThenInclude(u => u.UserRoles)
                 .Include(rt => rt.User)
                     .ThenInclude(u => u.ClubMembers)
-                    .ThenInclude(cm => cm.ClubRole)
+                    .ThenInclude(cm => cm.RoleAssignments).ThenInclude(ra => ra.ClubRole)
                 .FirstOrDefaultAsync(rt => rt.TokenHash == tokenHash);
         }
 

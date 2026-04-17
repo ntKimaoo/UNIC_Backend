@@ -26,5 +26,20 @@ namespace UNIC.DataAccess.Repositories.Interface
         Task<IEnumerable<UserClubRole>> GetMembersWithRolesByDepartmentAsync(int clubId, int departmentId);
         Task<UserClubRoleDepartment> AddMemberTodepartment(UserClubRoleDepartment departMember);
         Task<UserClubRoleDepartment> RemoveMemberFromDepartment(UserClubRoleDepartment departMember);
+
+        /// <summary>
+        /// Returns all UserClubRole entries for members of the club who are NOT in the given department.
+        /// </summary>
+        Task<IEnumerable<UserClubRole>> GetClubMembersNotInDepartmentAsync(int clubId, int departmentId);
+
+        /// <summary>
+        /// Returns all departments (within the club) that the given club member HAS joined.
+        /// </summary>
+        Task<IEnumerable<Department>> GetDepartmentsJoinedByMemberAsync(int clubId, int clubMemberId);
+
+        /// <summary>
+        /// Returns all departments (within the club) that the given club member has NOT joined.
+        /// </summary>
+        Task<IEnumerable<Department>> GetDepartmentsNotJoinedByMemberAsync(int clubId, int clubMemberId);
     }
 }
