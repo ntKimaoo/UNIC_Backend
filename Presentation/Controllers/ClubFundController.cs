@@ -16,9 +16,9 @@ using Presentation.Authorization;
 
 namespace Presentation.Controllers
 {
+    [Authorize]
     [Route("api/clubs/{clubId:int}/funds")]
     [ApiController]
-    //[Authorize]
     public class ClubFundController : ControllerBase
     {
         private readonly IClubFundService _clubFundService;
@@ -103,7 +103,7 @@ namespace Presentation.Controllers
                     },
                     stepsVi = new[]
                     {
-                        "Chọn cổng trong onlinePaymentProviders; mỗi cổng có credentialFields — FE dựng form động (name gửi lại PUT payos-settings: clientId, apiKey, checksumKey).",
+                        "Chọn cổng trong onlinePaymentProviders; mỗi cổng có credentialFields — FE dựng form động.",
                         "Đăng ký merchant trên trang của cổng thanh toán, rồi dán key vào form.",
                         "VNPay: cấu hình IPN/Return URL trên cổng trỏ về API backend (xem tài liệu triển khai).",
                         "Club Manager vào Cài đặt Thanh toán, chọn cổng và nhập thông tin để bật thanh toán trực tuyến."
@@ -270,7 +270,7 @@ namespace Presentation.Controllers
                 var userId = GetCurrentUserId();
                 if (!await CanAccessClubAsync(userId, clubId))
                     return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
-                var data = await _clubFundService.GetFundCapabilitiesAsync(userId, clubId);
+                var data = await _clubFundService.GetFundCapabilitiesAsync(userId, clubId, User.IsInRole("Admin"));
                 return Ok(new { success = true, data });
             }
             catch (UnauthorizedAccessException ex)
@@ -869,7 +869,7 @@ namespace Presentation.Controllers
         }
 
         [HttpGet("history/{fundId}")]
-        //[RequireClubPolicy("viewfinance")]
+        [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetHistory(
             int clubId,
             int fundId,
@@ -906,6 +906,7 @@ namespace Presentation.Controllers
         }
 
         [HttpGet("{fundId:int}/member-contributions")]
+        [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFundMemberContributionOverview(int clubId, int fundId)
         {
             try

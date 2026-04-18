@@ -1065,9 +1065,30 @@ namespace UNIC.ServiceTest.Services
             Assert.True(dto.CanViewFunds);
             Assert.True(dto.CanCreateFund);
             Assert.True(dto.CanApproveOrRejectFundEntity);
+            Assert.True(dto.CanManageOnlinePaymentSettings);
+            Assert.True(dto.CanRecordCashContributions);
+            Assert.True(dto.CanProcessClubRefunds);
             Assert.Equal(5, dto.MenuItems.Count);
             Assert.Equal(new[] { "overview", "my-funds", "transactions", "reports", "settings" }, dto.MenuItems.Select(m => m.Id).ToArray());
             Assert.All(dto.MenuItems, m => Assert.True(m.Visible));
+        }
+
+        [Fact]
+        public async Task GetFundCapabilitiesAsync_ViceWithEditFinance_DoesNotGetManagerOnlyOps()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 2));
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "viewfinance")).ReturnsAsync(true);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "createfinance")).ReturnsAsync(true);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "editfinance")).ReturnsAsync(true);
+
+            var dto = await _service.GetFundCapabilitiesAsync(uid, 1);
+            Assert.True(dto.CanViewFunds);
+            Assert.True(dto.CanCreateFund);
+            Assert.False(dto.CanApproveOrRejectFundEntity);
+            Assert.False(dto.CanManageOnlinePaymentSettings);
+            Assert.False(dto.CanRecordCashContributions);
+            Assert.False(dto.CanProcessClubRefunds);
         }
 
         [Fact]

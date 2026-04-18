@@ -277,6 +277,9 @@ namespace BusinessLogic.DTOs
         public bool CanContribute { get; set; }
         public bool CanCreateFund { get; set; }
         public bool CanApproveOrRejectFundEntity { get; set; }
+        public bool CanManageOnlinePaymentSettings { get; set; }
+        public bool CanRecordCashContributions { get; set; }
+        public bool CanProcessClubRefunds { get; set; }
         public string? FinanceAccessHintVi { get; set; }
         public IReadOnlyList<FundMenuItemDto> MenuItems { get; set; } = Array.Empty<FundMenuItemDto>();
     }

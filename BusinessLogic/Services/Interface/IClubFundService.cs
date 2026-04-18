@@ -45,7 +45,7 @@ namespace BusinessLogic.Services.Interface
         Task<bool> ApproveFundAsync(Guid managerId, ApproveFundDto dto);
         Task<bool> ProcessPayOSPaymentSuccessAsync(int orderCode);
         Task<bool> TryCompleteOwnPendingContributionForDevelopmentAsync(Guid userId, int clubId, int transactionId);
-        Task<FundCapabilitiesDto> GetFundCapabilitiesAsync(Guid userId, int clubId);
+        Task<FundCapabilitiesDto> GetFundCapabilitiesAsync(Guid userId, int clubId, bool isSystemAdmin = false);
         Task<ClubFundReportSummaryDto> GetClubFundReportSummaryAsync(int clubId, DateTime? fromUtc, DateTime? toUtc);
         Task<IReadOnlyList<FundCategoryResponseDto>> GetFundCategoriesForClubAsync(int clubId);
 

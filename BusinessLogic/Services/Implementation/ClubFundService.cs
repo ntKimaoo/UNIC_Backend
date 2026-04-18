@@ -725,7 +725,7 @@ namespace BusinessLogic.Services.Implementation
             return true;
         }
 
-        public async Task<FundCapabilitiesDto> GetFundCapabilitiesAsync(Guid userId, int clubId)
+        public async Task<FundCapabilitiesDto> GetFundCapabilitiesAsync(Guid userId, int clubId, bool isSystemAdmin = false)
         {
             var dto = new FundCapabilitiesDto { ClubId = clubId };
             var member = await _clubMemberRepository.GetMemberAsync(userId, clubId);
@@ -758,6 +758,11 @@ namespace BusinessLogic.Services.Implementation
             dto.CanContribute = true;
             dto.CanCreateFund = hasCreate && isMgrOrVice;
             dto.CanApproveOrRejectFundEntity = hasEdit && isMgr;
+
+            var canMgrSensitiveOps = isSystemAdmin || (hasEdit && isMgr);
+            dto.CanManageOnlinePaymentSettings = canMgrSensitiveOps;
+            dto.CanRecordCashContributions = canMgrSensitiveOps;
+            dto.CanProcessClubRefunds = canMgrSensitiveOps;
 
             if (!hasView)
                 dto.FinanceAccessHintVi =

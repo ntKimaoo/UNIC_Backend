@@ -229,7 +229,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task GetFundCapabilities_ReturnsOk_WhenMember()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 5)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundCapabilitiesAsync(_userId, 5))
+            _fundService.Setup(s => s.GetFundCapabilitiesAsync(_userId, 5, It.IsAny<bool>()))
                 .ReturnsAsync(new FundCapabilitiesDto { ClubId = 5, CanViewFunds = true });
 
             var result = await _controller.GetFundCapabilities(5);
@@ -241,7 +241,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task GetFundCapabilities_ReturnsUnauthorized_WhenServiceThrows()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 5)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundCapabilitiesAsync(_userId, 5))
+            _fundService.Setup(s => s.GetFundCapabilitiesAsync(_userId, 5, It.IsAny<bool>()))
                 .ThrowsAsync(new UnauthorizedAccessException());
 
             var result = await _controller.GetFundCapabilities(5);
