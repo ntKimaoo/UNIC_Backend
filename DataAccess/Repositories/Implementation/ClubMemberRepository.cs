@@ -88,6 +88,7 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.UserClubRoles
                 .Include(m => m.User)
+                .Include(m => m.MemberDepartments)
                 .Include(m => m.RoleAssignments).ThenInclude(ra => ra.ClubRole)
                 .FirstOrDefaultAsync(m => m.ClubMemberId == clubMemberId);
         }
@@ -96,6 +97,7 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.UserClubRoles
                 .Include(m => m.User)
+                .Include(m => m.MemberDepartments)
                 .Include(m => m.RoleAssignments).ThenInclude(ra => ra.ClubRole)
                 .FirstOrDefaultAsync(m => m.UserId == userId && m.ClubId == clubId);
         }

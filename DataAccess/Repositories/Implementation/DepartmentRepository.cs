@@ -111,18 +111,20 @@ namespace UNIC.DataAccess.Repositories.Implementation
         }
 
         public async Task<IEnumerable<UserClubRole>> GetMembersWithRolesByDepartmentAsync(
-            int clubId, int departmentId)
-        {
-            return await _context.UserClubRoleDepartments
-                .Where(ud => ud.DepartmentId == departmentId
-                          && ud.ClubMember.ClubId == clubId)
-                .Include(ud => ud.ClubMember)
-                    .ThenInclude(ucr => ucr.User)
-                .Include(ud => ud.ClubMember)
-                    .ThenInclude(ucr => ucr.RoleAssignments).ThenInclude(ra => ra.ClubRole)
-                .Select(ud => ud.ClubMember)
-                .ToListAsync();
-        }
+    int clubId, int departmentId)
+{
+    return await _context.UserClubRoleDepartments
+        .Where(ud => ud.DepartmentId == departmentId
+                  && ud.ClubMember.ClubId == clubId)
+        .Include(ud => ud.ClubMember)
+            .ThenInclude(cm => cm.User)
+        .Include(ud => ud.ClubMember)
+            .ThenInclude(cm => cm.RoleAssignments)
+                .ThenInclude(ra => ra.ClubRole)
+        .Select(ud => ud.ClubMember)
+        .Distinct()
+        .ToListAsync();
+}
         public async Task<UserClubRoleDepartment> AddMemberTodepartment(UserClubRoleDepartment departMember)
         {
             await _context.UserClubRoleDepartments.AddAsync(departMember);
@@ -131,7 +133,15 @@ namespace UNIC.DataAccess.Repositories.Implementation
         }
         public async Task<UserClubRoleDepartment> RemoveMemberFromDepartment(UserClubRoleDepartment departMember)
         {
-            _context.UserClubRoleDepartments.Remove(departMember);
+            var tracked = _context.UserClubRoleDepartments.Local.FirstOrDefault(e => e.ClubMemberId == departMember.ClubMemberId && e.DepartmentId == departMember.DepartmentId);
+            if (tracked != null)
+            {
+                _context.UserClubRoleDepartments.Remove(tracked);
+            }
+            else
+            {
+                _context.UserClubRoleDepartments.Remove(departMember);
+            }
             await _context.SaveChangesAsync();
             return departMember;
         }

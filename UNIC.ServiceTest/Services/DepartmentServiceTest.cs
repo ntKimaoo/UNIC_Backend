@@ -355,17 +355,17 @@ namespace UNIC.ServiceTest.Services
 
             // Assert Member 1
             list[0].FullName.Should().Be("U1");
-            list[0].DepartmentRole.Should().NotBeNull();
-            list[0].DepartmentRole!.RoleName.Should().Be("R1");
+            list[0].DepartmentRoles.Should().NotBeEmpty();
+            list[0].DepartmentRoles.First().RoleName.Should().Be("R1");
 
             // Assert Member 2
             list[1].FullName.Should().Be(string.Empty);
             list[1].Email.Should().Be(string.Empty);
-            list[1].DepartmentRole.Should().BeNull();
+            list[1].DepartmentRoles.Should().BeEmpty();
 
             // Assert Member 3
             list[2].FullName.Should().Be("U3");
-            list[2].DepartmentRole.Should().BeNull();
+            list[2].DepartmentRoles.Should().BeEmpty();
         }
 
         #endregion
