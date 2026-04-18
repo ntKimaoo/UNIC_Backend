@@ -65,7 +65,10 @@ namespace BusinessLogic.Services.Implementation
         public async Task<UserResponseDto?> GetUserByIdAsync(Guid id)
         {
             var user = await _userRepository.GetByIdAsync(id);
-            return user == null ? null : MapToDto(user);
+            if (user == null) return null;
+            var dto = MapToDto(user);
+            dto.Role = await _userRepository.GetUserRole(id);
+            return dto;
         }
 
         public async Task<UserResponseDto> CreateUserAsync(CreateUserDto request)

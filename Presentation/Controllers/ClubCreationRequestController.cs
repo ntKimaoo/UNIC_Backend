@@ -1,6 +1,7 @@
 ﻿using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Mvc;
+using Presentation.Authorization;
 using UNIC.BusinessLogic.DTOs;
 
 namespace UNIC.Presentation.Controllers

@@ -131,7 +131,7 @@ namespace DataAccess.Repositories.Implementation
                 return await _context.Clubs.ToListAsync();
             }
             return await _context.UserClubRoles
-                .Where(cm => cm.UserId == userId)
+                .Where(cm => cm.UserId == userId && cm.Club.IsActive == true && cm.Club.IsDeleted == false)
                 .Select(cm => cm.Club)
                 .ToListAsync();
         }

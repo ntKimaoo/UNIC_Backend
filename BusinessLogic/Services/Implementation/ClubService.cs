@@ -12,10 +12,14 @@ namespace BusinessLogic.Services.Implementation
     public class ClubService : IClubService
     {
         private readonly IClubRepository _repository;
+        private readonly IClubRoleService _clubRoleService;
+        private readonly IClubMemberService _memberService;
 
-        public ClubService(IClubRepository repository)
+        public ClubService(IClubRepository repository, IClubRoleService clubRoleService, IClubMemberService memberService)
         {
             _repository = repository;
+            _clubRoleService = clubRoleService;
+            _memberService = memberService;
         }
 
         public async Task<ClubResponseDto?> GetByIdAsync(int clubId)
@@ -74,6 +78,21 @@ namespace BusinessLogic.Services.Implementation
             };
 
             var createdClub = await _repository.CreateAsync(uid, club);
+
+            var managerRole = await _clubRoleService.CreateAsync(new CreateClubRoleDto
+            {
+                RoleName = "Club Manager",
+                Description = "Vai trò chủ nhiệm câu lạc bộ, có toàn quyền quản lý và điều hành các hoạt động của câu lạc bộ.",
+                Level = 0,
+                policies = new List<int>()
+            }, createdClub.ClubId);
+
+            await _memberService.AddUserToClubAsync(createdClub.ClubId, new AddUserToClubDto
+            {
+                UserId = uid,
+                ClubRoleIds = new List<int> { managerRole.ClubRoleId }
+            }, uid);
+
             return MapToResponseDto(createdClub);
         }
 
