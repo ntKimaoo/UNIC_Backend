@@ -111,8 +111,8 @@ namespace UNIC.Presentation.Controllers
                 });
             }
 
-            try
-            {
+            //try
+            //{
                 var updatedDepartment = await _departmentService.UpdateDepartmentAsync(clubId, id, request);
                 if (updatedDepartment == null)
                 {
@@ -129,17 +129,17 @@ namespace UNIC.Presentation.Controllers
                     message = "Department updated successfully",
                     data = updatedDepartment 
                 });
-            }
+            //}
             
-            catch (Exception ex)
-            {
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = "An error occurred while updating the department",
-                    error = ex.Message
-                });
-            }
+            //catch (Exception ex)
+            //{
+            //    return StatusCode(500, new
+            //    {
+            //        success = false,
+            //        message = "An error occurred while updating the department",
+            //        error = ex.Message
+            //    });
+            //}
         }
 
         /// <summary>

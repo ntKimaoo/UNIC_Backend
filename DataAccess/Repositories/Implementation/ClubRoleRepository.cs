@@ -224,5 +224,16 @@ namespace DataAccess.Repositories.Implementation
                 .Select(ura => ura.ClubRole)
                 .ToListAsync();
         }
+
+        public async Task<IEnumerable<UserClubRole>> GetMembersByRoleAsync(int clubId, int roleId)
+        {
+            return await _context.UserClubRoles
+                .Include(m => m.User)
+                .Include(m => m.RoleAssignments)
+                    .ThenInclude(ra => ra.ClubRole)
+                .Where(m => m.ClubId == clubId && m.RoleAssignments.Any(ra => ra.ClubRoleId == roleId))
+                .OrderBy(m => m.JoinDate)
+                .ToListAsync();
+        }
     }
 }
