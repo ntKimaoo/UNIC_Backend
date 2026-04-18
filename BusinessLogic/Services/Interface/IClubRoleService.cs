@@ -16,6 +16,7 @@ namespace BusinessLogic.Services.Interface
         Task UpdatePoliciesAsync(int clubRoleId, List<int> policyIds);
         Task<bool> AssignRoleAsync(AssignClubRoleDto dto);
         Task<UserClubRole?> GetUserClubRoleAsync(Guid userId, int clubId);
+        Task<IEnumerable<ClubMemberResponseDto>> GetUsersByRoleAsync(int clubId, int roleId);
         Task<List<ClubResponseDto>> GetManagedClubsAsync(Guid userId);
         Task<ClubStructureResponseDto> GetClubStructureAsync(int clubId);
     }

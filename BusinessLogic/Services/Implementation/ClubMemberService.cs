@@ -181,6 +181,19 @@ namespace BusinessLogic.Services.Implementation
             return MapToResponseDto(result!);
         }
 
+        public async Task<ClubMemberResponseDto?> UpdateMemberStatusAsync(int clubMemberId, bool isActive)
+        {
+            var member = await _memberRepository.GetMemberByIdAsync(clubMemberId);
+            if (member == null) return null;
+
+            member.Status = isActive ? "ACTIVE" : "INACTIVE";
+            var updated = await _memberRepository.UpdateMemberAsync(member);
+            if (!updated) return null;
+
+            var result = await _memberRepository.GetMemberByIdAsync(clubMemberId);
+            return result == null ? null : MapToResponseDto(result);
+        }
+
         public async Task<bool> RemoveMemberAsync(int clubMemberId)
         {
             // Remove all role assignments of the member before removing the member

@@ -27,6 +27,15 @@ namespace BusinessLogic.DTOs
     }
 
     /// <summary>
+    /// Request để active/deactive member trong club
+    /// </summary>
+    public class UpdateMemberStatusDto
+    {
+        [Required]
+        public bool IsActive { get; set; }
+    }
+
+    /// <summary>
     /// Request để gán/cập nhật danh sách policies của member
     /// </summary>
     public class MemberPolicyDto
