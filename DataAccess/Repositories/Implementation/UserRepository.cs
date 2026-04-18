@@ -215,5 +215,12 @@ namespace DataAccess.Repositories.Implementation
                 .Select(ur => ur.RoleName)
                 .FirstOrDefaultAsync() ?? "User";
         }
+
+        public async Task<IEnumerable<User>> Search(string query)
+        {
+            return await _context.Users
+                .Where(u => u.FullName.Contains(query) || u.Email.Contains(query) || u.StudentId.Contains(query))
+                .ToListAsync();
+        }
     }
 }

@@ -191,5 +191,16 @@ namespace BusinessLogic.Services.Implementation
         {
             return await _userRepository.isActiveAccount(userId);
         }
+
+        public async Task<UserResponseDto> GetByEmail(string email)
+        {
+            var user = await _userRepository.GetByEmailAsync(email);
+            return user == null ? null : MapToDto(user);
+        }
+
+        public async Task<IEnumerable<UserResponseDto>> Search(string query)
+        {
+            return await _userRepository.Search(query).ContinueWith(t => t.Result.Select(MapToDto));
+        }
     }
 }
