@@ -158,6 +158,46 @@ namespace Presentation.Controllers
             return Ok(new { success = true, message = "Member removed from club successfully" });
         }
 
+        // ─── Role Extension Endpoints ─────────────────────────────────────
+
+        /// <summary>
+        /// Gán thêm 1 role cho member
+        /// </summary>
+        [HttpPost("api/clubs/{clubId}/members/{memberId}/roles/{roleId}")]
+        public async Task<IActionResult> AddMemberRole(int clubId, int memberId, int roleId)
+        {
+            var member = await _service.GetMemberByIdAsync(memberId);
+            if (member == null || member.ClubId != clubId)
+                return NotFound(new { success = false, message = "Member not found" });
+
+            var roles = member.Roles.Select(r => r.ClubRoleId).ToList();
+            if (!roles.Contains(roleId))
+            {
+                roles.Add(roleId);
+                await _service.UpdateMemberRoleAsync(memberId, new UpdateMemberRoleDto { ClubRoleIds = roles });
+            }
+            return Ok(new { success = true, message = "Role added successfully" });
+        }
+
+        /// <summary>
+        /// Xóa 1 role khỏi member
+        /// </summary>
+        [HttpDelete("api/clubs/{clubId}/members/{memberId}/roles/{roleId}")]
+        public async Task<IActionResult> RemoveMemberRole(int clubId, int memberId, int roleId)
+        {
+            var member = await _service.GetMemberByIdAsync(memberId);
+            if (member == null || member.ClubId != clubId)
+                return NotFound(new { success = false, message = "Member not found" });
+
+            var roles = member.Roles.Select(r => r.ClubRoleId).ToList();
+            if (roles.Contains(roleId))
+            {
+                roles.Remove(roleId);
+                await _service.UpdateMemberRoleAsync(memberId, new UpdateMemberRoleDto { ClubRoleIds = roles });
+            }
+            return Ok(new { success = true, message = "Role removed successfully" });
+        }
+
         /// <summary>
         /// Lấy danh sách club mà user đã gia nhập kèm role đảm nhiệm
         /// GET /api/members/by-user?userId=...

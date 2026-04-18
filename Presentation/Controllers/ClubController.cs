@@ -138,10 +138,15 @@ namespace Presentation.Controllers
         /// Get all public clubs
         /// </summary>
         [HttpGet("public")]
-        public async Task<IActionResult> GetPublicClubs(int pageSize, string? searchQuery, string pageIndex)
+        public async Task<IActionResult> GetPublicClubs(int? pageSize, string? searchQuery, string? pageIndex)
         {
             try
             {
+                if (pageSize == null || pageSize <= 0)
+                {
+                    pageSize = 8; // Default page size
+                }
+
                 var clubs = await _service.GetPublicClubsAsync();
 
                 if (!string.IsNullOrEmpty(searchQuery))
@@ -161,8 +166,8 @@ namespace Presentation.Controllers
                     if (int.TryParse(pageIndex, out int pageInt))
                     {
                         clubs = clubs
-                            .Skip((pageInt - 1) * pageSize)
-                            .Take(pageSize);
+                            .Skip((pageInt - 1) * pageSize.Value)
+                            .Take(pageSize.Value);
 
                         return Ok(new
                         {

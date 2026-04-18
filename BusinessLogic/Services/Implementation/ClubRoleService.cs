@@ -169,7 +169,7 @@ namespace BusinessLogic.Services.Implementation
                 RoleName     = clubRole.RoleName,
                 Description  = clubRole.Description,
                 Level        = clubRole.Level,
-                MemberCount  = clubRole.ClubMembers?.Count ?? 0,
+                MemberCount  = clubRole.MemberAssignments?.Count ?? 0,
                 Policies     = clubRole.ClubRolePolicies?
                     .Select(crp => new PolicyResponseDto
                     {
@@ -189,7 +189,7 @@ namespace BusinessLogic.Services.Implementation
                 RoleName = clubRole.RoleName,
                 Description = clubRole.Description,
                 Level = clubRole.Level,
-                MemberCount = clubRole.ClubMembers?.Count ?? 0,
+                MemberCount = clubRole.MemberAssignments?.Count ?? 0,
                 Policies = clubRole.ClubRolePolicies?
                     .Select(crp => new PolicyResponseDto
                     {
@@ -210,31 +210,38 @@ namespace BusinessLogic.Services.Implementation
 
             if (exist != null)
             {
-                exist.ClubRoleId = dto.ClubRoleId;
-                if (await _repository.CheckDepartementRole(dto.ClubRoleId))
+                await _repository.SetMemberRolesAsync(exist.ClubMemberId, dto.ClubRoleIds);
+                foreach(var roleId in dto.ClubRoleIds)
                 {
-                    var clubRole = await _repository.GetByIdAsync(dto.ClubRoleId, dto.ClubId);
-                    var departMember = new UserClubRoleDepartment
+                    if (await _repository.CheckDepartementRole(roleId))
                     {
-                        ClubMemberId = exist.ClubMemberId,
-                        DepartmentId = clubRole?.DepartmentId ?? 0,
-                    };
-                    await _departmentRepository.AddMemberTodepartment(departMember);
+                        var clubRole = await _repository.GetByIdAsync(roleId, dto.ClubId);
+                        var departMember = new UserClubRoleDepartment
+                        {
+                            ClubMemberId = exist.ClubMemberId,
+                            DepartmentId = clubRole?.DepartmentId ?? 0,
+                        };
+                        await _departmentRepository.AddMemberTodepartment(departMember);
+                    }
                 }
 
-                return await _repository.UpdateUserClubRoleAsync(exist);
+                return true;
             }
 
             var member = new UserClubRole
             {
                 UserId = dto.UserId,
                 ClubId = dto.ClubId,
-                ClubRoleId = dto.ClubRoleId,
                 JoinDate = DateTime.UtcNow,
                 Status = "ACTIVE"
             };
 
-            return await _repository.AddUserClubRoleAsync(member);
+            var assigned = await _repository.AddUserClubRoleAsync(member);
+            if(assigned)
+            {
+                await _repository.SetMemberRolesAsync(member.ClubMemberId, dto.ClubRoleIds);
+            }
+            return assigned;
         }
 
         public Task<UserClubRole?> GetUserClubRoleAsync(Guid userId, int clubId)

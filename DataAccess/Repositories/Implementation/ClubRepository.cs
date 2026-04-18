@@ -3,6 +3,9 @@ using DataAccess.Repositories.Interface;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data.SqlTypes;
+using System.Diagnostics;
 using System.Formats.Asn1;
 using System.Linq;
 using System.Threading.Tasks;
@@ -52,7 +55,7 @@ namespace DataAccess.Repositories.Implementation
         {
             if (!await _context.UserRoles.AnyAsync(u => u.UserId == uid && u.RoleName.ToLower().Equals("admin")))
             {
-                if (await _context.UserClubRoles.AnyAsync(uc => uc.UserId == uid && uc.ClubRole.Level == 0))
+                if (await _context.UserClubRoleAssignments.AnyAsync(ura => ura.ClubMember.UserId == uid && ura.ClubRole.Level == 0))
                 {
                     throw new InvalidOperationException("A club manager already exists. Cannot create a new club without this manager.");
                 }
@@ -143,6 +146,15 @@ namespace DataAccess.Repositories.Implementation
                 await _context.SaveChangesAsync();
             }
         }
-        
+        public async Task<bool> isDeleted(int clubId)
+        {
+            var club = await GetByIdAsync(clubId);
+            if (club != null)
+            {
+                return !club.IsActive;
+            }
+            return false;
+
+        }
     }
 }

@@ -59,7 +59,7 @@ namespace UNIC.ServiceTest.Services
             {
                 ClubId = clubId,
                 Status = "ACTIVE",
-                ClubRole = new ClubRole { Level = level, RoleName = "Role" }
+                RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { Level = level, RoleName = "Role" } } }
             };
 
         #region CreateFundAsync
@@ -120,7 +120,7 @@ namespace UNIC.ServiceTest.Services
             _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(new UserClubRole
             {
                 Status = "LEFT",
-                ClubRole = new ClubRole { Level = 1 }
+                RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { Level = 1 } } }
             });
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
@@ -134,7 +134,7 @@ namespace UNIC.ServiceTest.Services
             _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(new UserClubRole
             {
                 Status = "ACTIVE",
-                ClubRole = new ClubRole { Level = 3 }
+                RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { Level = 3 } } }
             });
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
@@ -1378,7 +1378,7 @@ namespace UNIC.ServiceTest.Services
             _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(new UserClubRole
             {
                 Status = "LEFT",
-                ClubRole = new ClubRole { Level = 1 }
+                RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { Level = 1 } } }
             });
 
             var dto = await _service.GetFundCapabilitiesAsync(uid, 1);
@@ -1461,7 +1461,7 @@ namespace UNIC.ServiceTest.Services
             _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(new UserClubRole
             {
                 Status = "LEFT",
-                ClubRole = new ClubRole { Level = 1 }
+                RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { Level = 1 } } }
             });
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
@@ -1651,7 +1651,7 @@ namespace UNIC.ServiceTest.Services
             {
                 ClubId = 2,
                 Status = "ACTIVE",
-                ClubRole = new ClubRole { Level = 3 }
+                RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { Level = 3 } } }
             });
             _fundRepo.Setup(r => r.GetTotalRefundedAmountForOriginalTransactionAsync(5)).ReturnsAsync(0m);
             _fundRepo.Setup(r => r.ExistsPendingRefundForOriginalTransactionAsync(5)).ReturnsAsync(false);
@@ -1821,7 +1821,7 @@ namespace UNIC.ServiceTest.Services
             {
                 ClubId = 1,
                 Status = "ACTIVE",
-                ClubRole = new ClubRole { Level = 5 }
+                RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { Level = 5 } } }
             });
             _fundRepo.Setup(r => r.GetFundByIdAsync(9)).ReturnsAsync(new ClubFund
             {

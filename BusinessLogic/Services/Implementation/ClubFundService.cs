@@ -69,10 +69,10 @@ namespace BusinessLogic.Services.Implementation
                 throw new UnauthorizedAccessException("Bạn không phải thành viên của câu lạc bộ này.");
             if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
                 throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được tạo quỹ.");
-            if (!HasManagerOrViceLevel(member.ClubRole))
+            if (!HasManagerOrViceLevel(member))
                 throw new UnauthorizedAccessException("Chỉ Club Manager hoặc Vice Manager mới được tạo quỹ.");
 
-            var fundStatus = HasHighestClubLevel(member.ClubRole) ? STATUS_APPROVED : STATUS_PENDING;
+            var fundStatus = HasHighestClubLevel(member) ? STATUS_APPROVED : STATUS_PENDING;
 
             if (dto.FundTypeId <= 0)
                 throw new ArgumentException("Bắt buộc chọn loại quỹ.", nameof(dto.FundTypeId));
@@ -292,7 +292,7 @@ namespace BusinessLogic.Services.Implementation
             {
                 var member = await _clubMemberRepository.GetMemberAsync(currentUserId, clubId);
                 var hasEditFinance = await _policyService.HasMemberPolicyInClubAsync(currentUserId, clubId, "editfinance");
-                canFilterByWorkflowStatus = hasEditFinance && member != null && HasHighestClubLevel(member.ClubRole);
+                canFilterByWorkflowStatus = hasEditFinance && member != null && HasHighestClubLevel(member);
             }
 
             var statusForNormalization = (!canFilterByWorkflowStatus) ? STATUS_APPROVED : status;
@@ -638,16 +638,14 @@ namespace BusinessLogic.Services.Implementation
             return Math.Ceiling(value);
         }
 
-        private static bool HasManagerOrViceLevel(ClubRole? clubRole)
+        private static bool HasManagerOrViceLevel(UserClubRole? member)
         {
-            if (clubRole == null) return false;
-            return clubRole.Level == 1 || clubRole.Level == 2;
+            return member?.RoleAssignments?.Any(ra => ra.ClubRole?.Level == 1 || ra.ClubRole?.Level == 2) ?? false;
         }
 
-        private static bool HasHighestClubLevel(ClubRole? clubRole)
+        private static bool HasHighestClubLevel(UserClubRole? member)
         {
-            if (clubRole == null) return false;
-            return clubRole.Level == 1;
+            return member?.RoleAssignments?.Any(ra => ra.ClubRole?.Level == 1) ?? false;
         }
 
         public async Task<bool> ProcessPayOSPaymentSuccessAsync(int orderCode)
@@ -692,7 +690,7 @@ namespace BusinessLogic.Services.Implementation
                 throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
             if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
                 throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được duyệt quỹ.");
-            if (!HasHighestClubLevel(member.ClubRole))
+            if (!HasHighestClubLevel(member))
                 throw new UnauthorizedAccessException("Chỉ Club Manager (role có Level cao nhất trong club) mới được duyệt hoặc từ chối quỹ.");
 
             var action = dto.Action?.Trim().ToUpperInvariant();
@@ -735,8 +733,8 @@ namespace BusinessLogic.Services.Implementation
                 return dto;
 
             dto.IsActiveClubMember = string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase);
-            dto.ClubRoleLevel = member.ClubRole?.Level;
-            dto.ClubRoleName = member.ClubRole?.RoleName;
+            dto.ClubRoleLevel = member.RoleAssignments?.Where(ra => ra.ClubRole != null).Min(ra => (int?)ra.ClubRole!.Level);
+            dto.ClubRoleName = string.Join(", ", member.RoleAssignments?.Select(ra => ra.ClubRole?.RoleName).Where(x => x != null) ?? Array.Empty<string>());
 
             if (!dto.IsActiveClubMember)
             {
@@ -753,8 +751,8 @@ namespace BusinessLogic.Services.Implementation
             dto.HasCreateFinancePolicy = hasCreate;
             dto.HasEditFinancePolicy = hasEdit;
 
-            var isMgrOrVice = HasManagerOrViceLevel(member.ClubRole);
-            var isMgr = HasHighestClubLevel(member.ClubRole);
+            var isMgrOrVice = HasManagerOrViceLevel(member);
+            var isMgr = HasHighestClubLevel(member);
 
             dto.CanViewFunds = hasView;
             dto.CanContribute = true;
@@ -991,7 +989,7 @@ namespace BusinessLogic.Services.Implementation
                 throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
             if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
                 throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được thực hiện thao tác này.");
-            if (member.ClubRole?.Level != 1)
+            if (!HasHighestClubLevel(member))
                 throw new UnauthorizedAccessException("Chỉ Club Manager (Level 1) mới được thực hiện thao tác này.");
         }
 

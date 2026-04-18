@@ -377,11 +377,11 @@ namespace UNIC.ControllerTest.Controllers
             Guid userId = Guid.NewGuid();
             var returnedModel = new UserClubRoleDepartment();
 
-            _mockDepartmentService.Setup(s => s.AddMemberTodepartment(clubId, userId, departmentId))
+            _mockDepartmentService.Setup(s => s.AddMemberToDepartment(clubId, 1, departmentId))
                 .ReturnsAsync(returnedModel);
 
             // Act
-            var result = await _controller.AddMemberToDepartment(clubId, departmentId, userId);
+            var result = await _controller.AddMemberToDepartment(clubId, departmentId, 1);
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result);
@@ -401,11 +401,11 @@ namespace UNIC.ControllerTest.Controllers
             Guid userId = Guid.NewGuid();
             var returnedModel = new UserClubRoleDepartment();
 
-            _mockDepartmentService.Setup(s => s.RemoveMemberFromDepartment(clubId, userId, departmentId))
+            _mockDepartmentService.Setup(s => s.RemoveMemberFromDepartment(clubId, 1, departmentId))
                 .ReturnsAsync(returnedModel);
 
             // Act
-            var result = await _controller.RemoveMemberFromDepartment(clubId, departmentId, userId);
+            var result = await _controller.RemoveMemberFromDepartment(clubId, departmentId, 1);
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result);

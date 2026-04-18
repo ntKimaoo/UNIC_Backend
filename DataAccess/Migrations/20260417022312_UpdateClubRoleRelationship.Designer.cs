@@ -4,16 +4,19 @@ using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    partial class UnicContextModelSnapshot : ModelSnapshot
+    [Migration("20260417022312_UpdateClubRoleRelationship")]
+    partial class UpdateClubRoleRelationship
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1033,9 +1036,6 @@ namespace UNIC.DataAccess.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid?>("FromUserId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<bool>("IsRead")
                         .HasColumnType("bit");
 
@@ -1057,8 +1057,6 @@ namespace UNIC.DataAccess.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("NotificationId");
-
-                    b.HasIndex("FromUserId");
 
                     b.HasIndex("UserId", "IsRead");
 
@@ -1105,55 +1103,6 @@ namespace UNIC.DataAccess.Migrations
                     b.HasIndex(new[] { "UserId" }, "IX_PasswordResetTokens_UserId");
 
                     b.ToTable("PasswordResetTokens");
-                });
-
-            modelBuilder.Entity("DataAccess.Models.RecordOfChange", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ChangeType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("ChangedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("ChangedBy")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int?>("ClubId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("EntityId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("EntityName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("NewValue")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Notification")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("OldValue")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ChangedBy");
-
-                    b.HasIndex("ClubId")
-                        .IsUnique()
-                        .HasFilter("[ClubId] IS NOT NULL");
-
-                    b.ToTable("RecordsOfChange");
                 });
 
             modelBuilder.Entity("DataAccess.Models.RecruitmentCampaign", b =>
@@ -1966,18 +1915,11 @@ namespace UNIC.DataAccess.Migrations
 
             modelBuilder.Entity("DataAccess.Models.Notification", b =>
                 {
-                    b.HasOne("DataAccess.Models.User", "FromUser")
-                        .WithMany("SentNotifications")
-                        .HasForeignKey("FromUserId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
                     b.HasOne("DataAccess.Models.User", "User")
                         .WithMany("Notifications")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("FromUser");
 
                     b.Navigation("User");
                 });
@@ -1992,23 +1934,6 @@ namespace UNIC.DataAccess.Migrations
                         .HasConstraintName("FK__PasswordR__User__412EB0B6");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("DataAccess.Models.RecordOfChange", b =>
-                {
-                    b.HasOne("DataAccess.Models.User", "ChangedByUser")
-                        .WithMany("RecordsOfChange")
-                        .HasForeignKey("ChangedBy")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("DataAccess.Models.Club", "Club")
-                        .WithOne("RecordOfChange")
-                        .HasForeignKey("DataAccess.Models.RecordOfChange", "ClubId");
-
-                    b.Navigation("ChangedByUser");
-
-                    b.Navigation("Club");
                 });
 
             modelBuilder.Entity("DataAccess.Models.RecruitmentCampaign", b =>
@@ -2247,9 +2172,6 @@ namespace UNIC.DataAccess.Migrations
 
                     b.Navigation("Events");
 
-                    b.Navigation("RecordOfChange")
-                        .IsRequired();
-
                     b.Navigation("RecruitmentCampaigns");
                 });
 
@@ -2329,11 +2251,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.Navigation("PasswordResetTokens");
 
-                    b.Navigation("RecordsOfChange");
-
                     b.Navigation("RefreshTokens");
-
-                    b.Navigation("SentNotifications");
 
                     b.Navigation("UserRoles");
                 });

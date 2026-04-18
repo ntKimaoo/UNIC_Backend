@@ -27,6 +27,7 @@ public partial class UnicContext : DbContext
     public DbSet<Club> Clubs { get; set; }
     public DbSet<ClubRole> ClubRoles { get; set; }
     public DbSet<UserClubRole> UserClubRoles { get; set; }
+    public DbSet<UserClubRoleAssignment> UserClubRoleAssignments { get; set; }
     public DbSet<Department> Departments { get; set; }
     public DbSet<ClubPost> ClubPosts { get; set; }
     public DbSet<Notification> Notifications { get; set; }
@@ -56,7 +57,8 @@ public partial class UnicContext : DbContext
     public DbSet<UserEventRole> UserEventRoles { get; set; }
     public DbSet<EventRolePolicy> EventRolePolicies { get; set; }
     public DbSet<EventMemberPolicy> EventMemberPolicies { get; set; }
-    public DbSet<UserClubRoleDepartment> UserClubRoleDepartments { get; set; }
+    public virtual DbSet<UserClubRoleDepartment> UserClubRoleDepartments { get; set; }
+    public virtual DbSet<RecordOfChange> RecordsOfChange { get; set; }
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
 
@@ -182,11 +184,21 @@ public partial class UnicContext : DbContext
             .HasForeignKey(ucr => ucr.ClubId)
             .OnDelete(DeleteBehavior.NoAction);
 
-        modelBuilder.Entity<UserClubRole>()
-            .HasOne(ucr => ucr.ClubRole)
-            .WithMany(cr => cr.ClubMembers)
-            .HasForeignKey(ucr => ucr.ClubRoleId)
-            .OnDelete(DeleteBehavior.NoAction);
+        // UserClubRoleAssignment (Composite PK)
+        modelBuilder.Entity<UserClubRoleAssignment>()
+            .HasKey(ura => new { ura.ClubMemberId, ura.ClubRoleId });
+
+        modelBuilder.Entity<UserClubRoleAssignment>()
+            .HasOne(ura => ura.ClubMember)
+            .WithMany(ucr => ucr.RoleAssignments)
+            .HasForeignKey(ura => ura.ClubMemberId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserClubRoleAssignment>()
+            .HasOne(ura => ura.ClubRole)
+            .WithMany(cr => cr.MemberAssignments)
+            .HasForeignKey(ura => ura.ClubRoleId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         // ClubRole - Department relationship
         modelBuilder.Entity<ClubRole>()
@@ -228,6 +240,12 @@ public partial class UnicContext : DbContext
             .WithMany(u => u.Notifications)
             .HasForeignKey(n => n.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Notification>()
+            .HasOne(n => n.FromUser)
+            .WithMany(u => u.SentNotifications)
+            .HasForeignKey(n => n.FromUserId)
+            .OnDelete(DeleteBehavior.NoAction);
 
         // Event - Club
         modelBuilder.Entity<Event>()
@@ -477,6 +495,17 @@ public partial class UnicContext : DbContext
 
         modelBuilder.Entity<Club>()
             .HasIndex(c => c.ClubName);
+
+        modelBuilder.Entity<Club>()
+            .HasOne(c => c.RecordOfChange)
+            .WithOne(r => r.Club)
+            .HasForeignKey<RecordOfChange>(r => r.ClubId);
+
+        modelBuilder.Entity<RecordOfChange>()
+            .HasOne(r => r.ChangedByUser)
+            .WithMany(u => u.RecordsOfChange)
+            .HasForeignKey(r => r.ChangedBy)
+            .OnDelete(DeleteBehavior.NoAction);
 
         modelBuilder.Entity<Event>()
             .HasIndex(e => e.StartDate);

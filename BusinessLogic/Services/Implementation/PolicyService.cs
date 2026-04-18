@@ -52,7 +52,7 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<bool> HasMemberPolicyInClubAsync(Guid userId, int clubId, string policyTitle)
             => await _policyRepository.HasMemberPolicyInClubAsync(userId, clubId, policyTitle);
-        public async Task<List<string>> GetUserRole(Guid userId)
+        public async Task<string> GetUserRole(Guid userId)
             => await _policyRepository.GetUserRoleAsync(userId);
     }
 }

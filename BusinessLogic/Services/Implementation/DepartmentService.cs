@@ -197,13 +197,13 @@ namespace UNIC.BusinessLogic.Services.Implementation
                 StudentId    = ucr.User?.StudentId,
                 Status       = ucr.Status,
                 JoinDate     = ucr.JoinDate,
-                DepartmentRole    = (ucr.ClubRole != null && ucr.ClubRole.DepartmentId == departmentId)
+                DepartmentRole    = ucr.RoleAssignments.FirstOrDefault(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == departmentId)?.ClubRole != null
                     ? new DepartmentMemberRoleDto
                     {
-                        ClubRoleId  = ucr.ClubRole.ClubRoleId,
-                        RoleName    = ucr.ClubRole.RoleName,
-                        Description = ucr.ClubRole.Description,
-                        Level       = ucr.ClubRole.Level
+                        ClubRoleId  = ucr.RoleAssignments.First(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == departmentId).ClubRole.ClubRoleId,
+                        RoleName    = ucr.RoleAssignments.First(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == departmentId).ClubRole.RoleName,
+                        Description = ucr.RoleAssignments.First(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == departmentId).ClubRole.Description,
+                        Level       = ucr.RoleAssignments.First(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == departmentId).ClubRole.Level
                     }
                     : null
             });

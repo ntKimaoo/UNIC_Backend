@@ -71,7 +71,7 @@ namespace BusinessLogic.Services.Implementation
                 throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
             if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
                 throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được cấu hình PayOS.");
-            if (member.ClubRole?.Level != 1)
+            if (!(member.RoleAssignments?.Any(ra => ra.ClubRole?.Level == 1) ?? false))
                 throw new UnauthorizedAccessException("Chỉ Club Manager (Level 1) mới được cấu hình PayOS cho CLB.");
         }
 
