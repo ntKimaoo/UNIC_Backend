@@ -190,6 +190,10 @@ namespace BusinessLogic.DTOs
         public DateTime? RejectedAt { get; set; }
         [JsonPropertyName("rejectionReasonVi")]
         public string? RejectionReasonVi { get; set; }
+        public bool IsDeleted { get; set; }
+        public bool IsClosed { get; set; }
+        public string? ClosedReasonCode { get; set; }
+        public string? LifecycleStatusVi { get; set; }
         public bool CanAcceptContributions { get; set; }
         public string? CannotContributeReasonVi { get; set; }
         public string? BalanceContextVi { get; set; }
@@ -273,6 +277,7 @@ namespace BusinessLogic.DTOs
         public bool HasViewFinancePolicy { get; set; }
         public bool HasCreateFinancePolicy { get; set; }
         public bool HasEditFinancePolicy { get; set; }
+        public bool HasDeleteFinancePolicy { get; set; }
         public bool CanViewFunds { get; set; }
         public bool CanContribute { get; set; }
         public bool CanCreateFund { get; set; }
@@ -280,6 +285,8 @@ namespace BusinessLogic.DTOs
         public bool CanManageOnlinePaymentSettings { get; set; }
         public bool CanRecordCashContributions { get; set; }
         public bool CanProcessClubRefunds { get; set; }
+        public bool CanSoftDeleteFund { get; set; }
+        public bool CanViewSoftDeletedFunds { get; set; }
         public string? FinanceAccessHintVi { get; set; }
         public IReadOnlyList<FundMenuItemDto> MenuItems { get; set; } = Array.Empty<FundMenuItemDto>();
     }

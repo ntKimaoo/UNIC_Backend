@@ -10,7 +10,8 @@ namespace UNIC.DataAccess.Repositories.Interface
     public interface IFundRepository
     {
         Task<FundTransaction?> GetTransactionByIdAsync(int id);
-        Task<ClubFund?> GetFundByIdAsync(int id);
+        Task<ClubFund?> GetFundByIdAsync(int id, bool includeDeleted = false);
+        Task<bool> SoftDeleteFundAsync(int fundId, int clubId, Guid deletedByUserId);
         Task<bool> ExistsNonRejectedFundNameInClubAsync(int clubId, string fundNameNormalized);
         Task<ClubFund> AddFundAsync(ClubFund fund);
         Task AddTransactionAsync(FundTransaction transaction);
@@ -51,7 +52,8 @@ namespace UNIC.DataAccess.Repositories.Interface
             string? search,
             string sort,
             int pageNumber,
-            int pageSize);
+            int pageSize,
+            bool includeSoftDeletedFunds = false);
         Task<(IEnumerable<ClubFund> Items, int TotalCount)> GetMyFundsByClubIdPagedAsync(
             int clubId,
             Guid currentUserId,
@@ -60,7 +62,8 @@ namespace UNIC.DataAccess.Repositories.Interface
             string? search,
             string sort,
             int pageNumber,
-            int pageSize);
+            int pageSize,
+            bool includeSoftDeletedFunds = false);
         Task<(int PendingFundCount, int ApprovedFundCount, int RejectedFundCount, decimal TotalBalanceApprovedFunds, decimal TotalApprovedIncome, decimal TotalApprovedExpense)> GetClubFundReportAggregatesAsync(
             int clubId,
             DateTime? fromUtc,

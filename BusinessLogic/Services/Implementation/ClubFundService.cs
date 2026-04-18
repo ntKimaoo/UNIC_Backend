@@ -24,6 +24,8 @@ namespace BusinessLogic.Services.Implementation
         private const string STATUS_PENDING = "PENDING";
         private const string STATUS_APPROVED = "APPROVED";
         private const string STATUS_REJECTED = "REJECTED";
+        private const string CLOSED_REASON_EXPIRED = "EXPIRED";
+        private const string CLOSED_REASON_MANAGER_CLOSED = "MANAGER_CLOSED";
         private const string TYPE_INCOME = "INCOME";
         private const string MEMBER_STATUS_ACTIVE = "ACTIVE";
         private const decimal MinTransactionAmountVnd = 10000m;
@@ -267,10 +269,24 @@ namespace BusinessLogic.Services.Implementation
             };
         }
 
-        public async Task<FundResponseDto?> GetFundByIdAsync(int fundId)
+        public async Task<FundResponseDto?> GetFundByIdAsync(
+            int fundId,
+            Guid currentUserId,
+            bool isSystemAdmin,
+            bool includeSoftDeletedIfPrivileged = true)
         {
-            var fund = await _fundRepository.GetFundByIdAsync(fundId);
-            return fund == null ? null : MapToFundDto(fund);
+            if (!includeSoftDeletedIfPrivileged)
+            {
+                var active = await _fundRepository.GetFundByIdAsync(fundId, includeDeleted: false);
+                return active == null ? null : MapToFundDto(active);
+            }
+
+            var fund = await _fundRepository.GetFundByIdAsync(fundId, includeDeleted: true);
+            if (fund == null)
+                return null;
+            if (fund.IsDeleted && !await CanViewSoftDeletedFundsInClubAsync(currentUserId, fund.ClubId, isSystemAdmin))
+                return null;
+            return MapToFundDto(fund);
         }
 
         public async Task<PagedResultDto<FundResponseDto>> GetFundsByClubIdPagedAsync(
@@ -283,17 +299,7 @@ namespace BusinessLogic.Services.Implementation
             int pageNumber,
             int pageSize)
         {
-            bool canFilterByWorkflowStatus;
-            if (isSystemAdmin)
-            {
-                canFilterByWorkflowStatus = true;
-            }
-            else
-            {
-                var member = await _clubMemberRepository.GetMemberAsync(currentUserId, clubId);
-                var hasEditFinance = await _policyService.HasMemberPolicyInClubAsync(currentUserId, clubId, "editfinance");
-                canFilterByWorkflowStatus = hasEditFinance && member != null && HasHighestClubLevel(member);
-            }
+            var canFilterByWorkflowStatus = await CanViewSoftDeletedFundsInClubAsync(currentUserId, clubId, isSystemAdmin);
 
             var statusForNormalization = (!canFilterByWorkflowStatus) ? STATUS_APPROVED : status;
 
@@ -321,13 +327,15 @@ namespace BusinessLogic.Services.Implementation
                 normalizedSearch,
                 normalizedSort,
                 pageNumber,
-                pageSize);
+                pageSize,
+                canFilterByWorkflowStatus);
             return ToPagedResult(items.Select(MapToFundDto), pageNumber, pageSize, totalCount);
         }
 
         public async Task<PagedResultDto<FundResponseDto>> GetMyFundsByClubIdPagedAsync(
             int clubId,
             Guid currentUserId,
+            bool isSystemAdmin,
             string? mineType,
             string? status,
             string? search,
@@ -362,6 +370,7 @@ namespace BusinessLogic.Services.Implementation
             if (normalizedSort is not ("NEWEST" or "OLDEST" or "NAME_ASC" or "NAME_DESC"))
                 throw new ArgumentException("Sắp xếp hợp lệ: NEWEST, OLDEST, NAME_ASC, NAME_DESC.", nameof(sort));
 
+            var includeSoftDeleted = await CanViewSoftDeletedFundsInClubAsync(currentUserId, clubId, isSystemAdmin);
             var (items, totalCount) = await _fundRepository.GetMyFundsByClubIdPagedAsync(
                 clubId,
                 currentUserId,
@@ -370,7 +379,8 @@ namespace BusinessLogic.Services.Implementation
                 normalizedSearch,
                 normalizedSort,
                 pageNumber,
-                pageSize);
+                pageSize,
+                includeSoftDeleted);
 
             return ToPagedResult(items.Select(MapToFundDto), pageNumber, pageSize, totalCount);
         }
@@ -453,6 +463,17 @@ namespace BusinessLogic.Services.Implementation
             };
         }
 
+        private async Task<bool> CanViewSoftDeletedFundsInClubAsync(Guid userId, int clubId, bool isSystemAdmin)
+        {
+            if (isSystemAdmin)
+                return true;
+            var member = await _clubMemberRepository.GetMemberAsync(userId, clubId);
+            if (member == null)
+                return false;
+            var hasEditFinance = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "editfinance");
+            return hasEditFinance && HasHighestClubLevel(member);
+        }
+
         private static FundResponseDto MapToFundDto(ClubFund fund)
         {
             var status = string.IsNullOrWhiteSpace(fund.Status) ? STATUS_PENDING : fund.Status.Trim();
@@ -460,28 +481,42 @@ namespace BusinessLogic.Services.Implementation
             var rejected = string.Equals(status, STATUS_REJECTED, StringComparison.OrdinalIgnoreCase);
             var pending = string.Equals(status, STATUS_PENDING, StringComparison.OrdinalIgnoreCase);
             var notExpired = !fund.ExpiresAt.HasValue || DateTime.UtcNow.Date <= fund.ExpiresAt.Value.Date;
-            var canContribute = approved && notExpired;
+            var expiredClosed = approved && !notExpired;
+            var isClosed = fund.IsDeleted || expiredClosed;
+            string? closedReason = null;
+            if (fund.IsDeleted)
+                closedReason = CLOSED_REASON_MANAGER_CLOSED;
+            else if (expiredClosed)
+                closedReason = CLOSED_REASON_EXPIRED;
+
+            var canContribute = approved && notExpired && !fund.IsDeleted;
 
             string? cannotContributeReason = null;
             if (!canContribute)
             {
-                if (rejected)
+                if (fund.IsDeleted)
+                    cannotContributeReason = "Quỹ đã đóng (quản lý đã đóng quỹ).";
+                else if (rejected)
                     cannotContributeReason = "Quỹ đã bị từ chối.";
                 else if (pending)
                     cannotContributeReason = "Quỹ đang chờ duyệt.";
                 else if (approved && !notExpired)
-                    cannotContributeReason = "Đã quá hạn nhận nộp tiền.";
+                    cannotContributeReason = "Quỹ đã đóng — hết hạn nhận nộp tiền.";
                 else
                     cannotContributeReason = "Quỹ chưa được duyệt hoặc không thể nhận nộp ở trạng thái hiện tại.";
             }
 
             string? balanceContext = null;
-            if (rejected)
+            if (fund.IsDeleted)
+                balanceContext = "Quỹ đã đóng (quản lý đã đóng quỹ).";
+            else if (rejected)
                 balanceContext = "Quỹ không hoạt động.";
             else if (pending)
                 balanceContext = "Quỹ đang chờ duyệt — số dư sẽ cập nhật sau khi được duyệt.";
+            else if (approved && !notExpired)
+                balanceContext = "Quỹ đã đóng — hết hạn nhận nộp tiền.";
             else if (approved && fund.CurrentBalance == 0m && fund.TotalAmount == 0m)
-                balanceContext = "Chưa có giao dịch thu/chi được duyệt (số 0 là bình thường nếu chưa phát sinh).";
+                balanceContext = "Chưa có giao dịch thu/chi được duyệt.";
 
             return new FundResponseDto
             {
@@ -500,11 +535,15 @@ namespace BusinessLogic.Services.Implementation
                 RejectReason = fund.RejectReason,
                 RejectedAt = fund.RejectedAt,
                 RejectionReasonVi = rejected ? fund.RejectReason : null,
+                IsDeleted = fund.IsDeleted,
+                IsClosed = isClosed,
+                ClosedReasonCode = closedReason,
+                LifecycleStatusVi = isClosed ? "Đã đóng" : null,
                 CanAcceptContributions = canContribute,
                 CannotContributeReasonVi = cannotContributeReason,
                 BalanceContextVi = balanceContext,
                 ExpiresAtUtcNoteVi = fund.ExpiresAt.HasValue
-                    ? "Hạn nhận nộp theo ngày lưu trong DB (UTC, so với ngày hiện tại của máy chủ)."
+                    ? "Hạn nhận nộp theo ngày lưu trong DB."
                     : null
             };
         }
@@ -640,12 +679,12 @@ namespace BusinessLogic.Services.Implementation
 
         private static bool HasManagerOrViceLevel(UserClubRole? member)
         {
-            return member?.RoleAssignments?.Any(ra => ra.ClubRole?.Level == 1 || ra.ClubRole?.Level == 2) ?? false;
+            return member?.RoleAssignments?.Any(ra => ra.ClubRole?.Level == 0 || ra.ClubRole?.Level == 1) ?? false;
         }
 
         private static bool HasHighestClubLevel(UserClubRole? member)
         {
-            return member?.RoleAssignments?.Any(ra => ra.ClubRole?.Level == 1) ?? false;
+            return member?.RoleAssignments?.Any(ra => ra.ClubRole?.Level == 0) ?? false;
         }
 
         public async Task<bool> ProcessPayOSPaymentSuccessAsync(int orderCode)
@@ -725,6 +764,29 @@ namespace BusinessLogic.Services.Implementation
             return true;
         }
 
+        public async Task SoftDeleteFundAsync(Guid userId, int clubId, int fundId, bool isSystemAdmin)
+        {
+            await EnsureClubHeadManagerOrAdminAsync(userId, clubId, isSystemAdmin);
+
+            if (!isSystemAdmin)
+            {
+                if (!await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "deletefinance"))
+                    throw new UnauthorizedAccessException("Bạn chưa có quyền xóa/ẩn quỹ (policy deletefinance).");
+            }
+
+            var fund = await _fundRepository.GetFundByIdAsync(fundId, includeDeleted: false);
+            if (fund == null)
+                throw new KeyNotFoundException("Quỹ không tồn tại hoặc đã được đóng (ẩn).");
+            if (fund.ClubId != clubId)
+                throw new UnauthorizedAccessException("Quỹ không thuộc câu lạc bộ này.");
+            if (fund.CurrentBalance != 0m)
+                throw new InvalidOperationException("Chỉ có thể ẩn quỹ khi số dư hiện tại bằng 0.");
+
+            var ok = await _fundRepository.SoftDeleteFundAsync(fundId, clubId, userId);
+            if (!ok)
+                throw new InvalidOperationException("Không thể ẩn quỹ (đã ẩn trước đó hoặc dữ liệu không hợp lệ).");
+        }
+
         public async Task<FundCapabilitiesDto> GetFundCapabilitiesAsync(Guid userId, int clubId, bool isSystemAdmin = false)
         {
             var dto = new FundCapabilitiesDto { ClubId = clubId };
@@ -746,10 +808,12 @@ namespace BusinessLogic.Services.Implementation
             var hasView = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "viewfinance");
             var hasCreate = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "createfinance");
             var hasEdit = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "editfinance");
+            var hasDelete = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "deletefinance");
 
             dto.HasViewFinancePolicy = hasView;
             dto.HasCreateFinancePolicy = hasCreate;
             dto.HasEditFinancePolicy = hasEdit;
+            dto.HasDeleteFinancePolicy = hasDelete;
 
             var isMgrOrVice = HasManagerOrViceLevel(member);
             var isMgr = HasHighestClubLevel(member);
@@ -763,6 +827,8 @@ namespace BusinessLogic.Services.Implementation
             dto.CanManageOnlinePaymentSettings = canMgrSensitiveOps;
             dto.CanRecordCashContributions = canMgrSensitiveOps;
             dto.CanProcessClubRefunds = canMgrSensitiveOps;
+            dto.CanSoftDeleteFund = hasDelete && isMgr;
+            dto.CanViewSoftDeletedFunds = canMgrSensitiveOps;
 
             if (!hasView)
                 dto.FinanceAccessHintVi =
@@ -773,6 +839,9 @@ namespace BusinessLogic.Services.Implementation
             else if (!hasCreate && isMgrOrVice)
                 dto.FinanceAccessHintVi =
                     "Bạn chưa có quyền tạo quỹ (policy createfinance). Liên hệ quản lý CLB nếu cần cấp quyền.";
+            else if (!hasDelete && isMgr)
+                dto.FinanceAccessHintVi =
+                    "Bạn chưa có quyền xóa/ẩn quỹ (policy deletefinance). Liên hệ quản lý CLB nếu cần cấp quyền.";
 
             dto.MenuItems = BuildFundMenuItems(dto);
             return dto;
@@ -859,7 +928,7 @@ namespace BusinessLogic.Services.Implementation
             bool isSystemAdmin,
             RecordCashContributionRequestDto dto)
         {
-            await EnsureClubManagerLevel1OrAdminAsync(managerUserId, clubId, isSystemAdmin);
+            await EnsureClubHeadManagerOrAdminAsync(managerUserId, clubId, isSystemAdmin);
 
             if (dto.Amount < MinTransactionAmountVnd)
                 throw new ArgumentException($"Số tiền tối thiểu là {MinTransactionAmountVnd:N0} ₫.", nameof(dto.Amount));
@@ -939,7 +1008,7 @@ namespace BusinessLogic.Services.Implementation
         public async Task<FundTransactionResponseDto> ManagerRefundContributionAsync(
             Guid managerUserId, int clubId, int fundId, bool isSystemAdmin, ManagerRefundContributionDto dto)
         {
-            await EnsureClubManagerLevel1OrAdminAsync(managerUserId, clubId, isSystemAdmin);
+            await EnsureClubHeadManagerOrAdminAsync(managerUserId, clubId, isSystemAdmin);
 
             if (dto.OriginalTransactionId <= 0)
                 throw new ArgumentException("OriginalTransactionId không hợp lệ.", nameof(dto.OriginalTransactionId));
@@ -984,7 +1053,7 @@ namespace BusinessLogic.Services.Implementation
 
         private const string REFUND_PENDING = "PENDING";
 
-        private async Task EnsureClubManagerLevel1OrAdminAsync(Guid userId, int clubId, bool isSystemAdmin)
+        private async Task EnsureClubHeadManagerOrAdminAsync(Guid userId, int clubId, bool isSystemAdmin)
         {
             if (isSystemAdmin)
                 return;
@@ -995,7 +1064,7 @@ namespace BusinessLogic.Services.Implementation
             if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
                 throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được thực hiện thao tác này.");
             if (!HasHighestClubLevel(member))
-                throw new UnauthorizedAccessException("Chỉ Club Manager (Level 1) mới được thực hiện thao tác này.");
+                throw new UnauthorizedAccessException("Chỉ Club Manager (Level 0) mới được thực hiện thao tác này.");
         }
 
         public async Task<FundRefundRequestResponseDto> CreateFundRefundRequestAsync(
@@ -1087,7 +1156,7 @@ namespace BusinessLogic.Services.Implementation
         public async Task<PagedResultDto<FundRefundRequestResponseDto>> GetClubFundRefundRequestsPagedAsync(
             Guid managerUserId, int clubId, bool isSystemAdmin, string? status, int pageNumber, int pageSize)
         {
-            await EnsureClubManagerLevel1OrAdminAsync(managerUserId, clubId, isSystemAdmin);
+            await EnsureClubHeadManagerOrAdminAsync(managerUserId, clubId, isSystemAdmin);
 
             string? normalizedStatus = null;
             if (!string.IsNullOrWhiteSpace(status))
@@ -1121,7 +1190,7 @@ namespace BusinessLogic.Services.Implementation
         public async Task<bool> CompleteFundRefundRequestAsync(
             Guid managerUserId, int clubId, bool isSystemAdmin, int refundRequestId, CompleteFundRefundRequestDto dto)
         {
-            await EnsureClubManagerLevel1OrAdminAsync(managerUserId, clubId, isSystemAdmin);
+            await EnsureClubHeadManagerOrAdminAsync(managerUserId, clubId, isSystemAdmin);
 
             var r = await _fundRepository.GetRefundRequestByIdAsync(refundRequestId);
             if (r == null || r.ClubId != clubId)
@@ -1144,7 +1213,7 @@ namespace BusinessLogic.Services.Implementation
         public async Task<bool> RejectFundRefundRequestAsync(
             Guid managerUserId, int clubId, bool isSystemAdmin, int refundRequestId, RejectFundRefundRequestDto dto)
         {
-            await EnsureClubManagerLevel1OrAdminAsync(managerUserId, clubId, isSystemAdmin);
+            await EnsureClubHeadManagerOrAdminAsync(managerUserId, clubId, isSystemAdmin);
 
             var r = await _fundRepository.GetRefundRequestByIdAsync(refundRequestId);
             if (r == null || r.ClubId != clubId)

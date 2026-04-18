@@ -237,7 +237,8 @@ namespace Presentation.Controllers
 
                 if (fundId.HasValue)
                 {
-                    var fund = await _clubFundService.GetFundByIdAsync(fundId.Value);
+                    var fund = await _clubFundService.GetFundByIdAsync(
+                        fundId.Value, userId, User.IsInRole("Admin"));
                     if (fund == null)
                         return NotFound(new { success = false, message = "Quỹ không tồn tại." });
                     if (fund.ClubId != clubId)
@@ -301,13 +302,40 @@ namespace Presentation.Controllers
         [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFund(int fundId)
         {
-            var fund = await _clubFundService.GetFundByIdAsync(fundId);
+            var userId = GetCurrentUserId();
+            var fund = await _clubFundService.GetFundByIdAsync(fundId, userId, User.IsInRole("Admin"));
             if (fund == null)
                 return NotFound(new { success = false, message = "Quỹ không tồn tại." });
-            var userId = GetCurrentUserId();
             if (!await CanAccessClubAsync(userId, fund.ClubId))
                 return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
             return Ok(new { success = true, data = fund });
+        }
+
+        [HttpDelete("{fundId:int}")]
+        [RequireClubPolicy("deletefinance")]
+        public async Task<IActionResult> SoftDeleteFund(int clubId, int fundId)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                if (!await CanAccessClubAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+                var isSystemAdmin = User.IsInRole("Admin");
+                await _clubFundService.SoftDeleteFundAsync(userId, clubId, fundId, isSystemAdmin);
+                return Ok(new { success = true, message = "Đã đóng quỹ (xóa mềm)." });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { success = false, message = ex.Message });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
         }
 
         [HttpGet]
@@ -354,8 +382,9 @@ namespace Presentation.Controllers
                 if (!await CanAccessClubAsync(userId, clubId))
                     return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
 
+                var isSystemAdmin = User.IsInRole("Admin");
                 var paged = await _clubFundService.GetMyFundsByClubIdPagedAsync(
-                    clubId, userId, mineType, status, search, sort, page, pageSize);
+                    clubId, userId, isSystemAdmin, mineType, status, search, sort, page, pageSize);
 
                 return Ok(new { success = true, data = paged });
             }
@@ -373,7 +402,9 @@ namespace Presentation.Controllers
                 var userId = GetCurrentUserId();
                 if (!await CanAccessClubAsync(userId, clubId))
                     return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
-                var fund = await _clubFundService.GetFundByIdAsync(request.FundId);
+                var isSystemAdmin = User.IsInRole("Admin");
+                var fund = await _clubFundService.GetFundByIdAsync(
+                    request.FundId, userId, isSystemAdmin, includeSoftDeletedIfPrivileged: false);
                 if (fund == null)
                     return NotFound(new { success = false, message = "Quỹ không tồn tại." });
                 if (fund.ClubId != clubId)
@@ -884,12 +915,12 @@ namespace Presentation.Controllers
                     return BadRequest(new { success = false, message = "Page phải >= 1." });
                 if (pageSize < 1 || pageSize > 100)
                     return BadRequest(new { success = false, message = "PageSize từ 1 đến 100." });
-                var fund = await _clubFundService.GetFundByIdAsync(fundId);
+                var userId = GetCurrentUserId();
+                var fund = await _clubFundService.GetFundByIdAsync(fundId, userId, User.IsInRole("Admin"));
                 if (fund == null)
                     return NotFound(new { success = false, message = "Quỹ không tồn tại." });
                 if (fund.ClubId != clubId)
                     return StatusCode(403, new { success = false, message = "Quỹ không thuộc câu lạc bộ này." });
-                var userId = GetCurrentUserId();
                 if (!await CanAccessClubAsync(userId, fund.ClubId))
                     return StatusCode(403, new { success = false, message = "Bạn không có quyền xem lịch sử quỹ của câu lạc bộ này." });
                 var history = await _clubFundService.GetFundHistoryPagedAsync(fundId, status, scope, userId, page, pageSize);
@@ -937,13 +968,13 @@ namespace Presentation.Controllers
         [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFundLocation(int fundId)
         {
-            var fund = await _clubFundService.GetFundByIdAsync(fundId);
+            var userId = GetCurrentUserId();
+            var fund = await _clubFundService.GetFundByIdAsync(fundId, userId, User.IsInRole("Admin"));
             if (fund == null)
             {
                 return NotFound(new { success = false, message = "Quỹ không tồn tại." });
             }
 
-            var userId = GetCurrentUserId();
             if (!await CanAccessClubAsync(userId, fund.ClubId))
             {
                 return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });

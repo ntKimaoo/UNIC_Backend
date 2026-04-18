@@ -33,6 +33,9 @@ namespace DataAccess.Models
         [MaxLength(2000)]
         public string? RejectReason { get; set; }
         public DateTime? RejectedAt { get; set; }
+        public bool IsDeleted { get; set; }
+        public DateTime? DeletedAtUtc { get; set; }
+        public Guid? DeletedBy { get; set; }
         [ForeignKey("ClubId")]
         public virtual Club Club { get; set; }
         public virtual ICollection<FundTransaction> FundTransactions { get; set; }
