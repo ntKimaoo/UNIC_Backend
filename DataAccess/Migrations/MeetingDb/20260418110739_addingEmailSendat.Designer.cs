@@ -4,6 +4,7 @@ using DataAccess.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace UNIC.DataAccess.Migrations.MeetingDb
 {
     [DbContext(typeof(MeetingDbContext))]
-    partial class MeetingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260418110739_addingEmailSendat")]
+    partial class addingEmailSendat
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -253,7 +256,7 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.Property<Guid>("CandidateUserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime?>("CreatedAt")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<Guid>("CreatedByUserId")
@@ -271,13 +274,10 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.Property<DateTime?>("ReminderSentAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("RescheduleReason")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<DateTime?>("RoomOpenedEmailSentAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime?>("ScheduledAt")
+                    b.Property<DateTime>("ScheduledAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Status")
@@ -348,6 +348,12 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("ScheduledEndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ScheduledStartAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("datetime2");

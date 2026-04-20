@@ -17,9 +17,8 @@ namespace BusinessLogic.Services.Implementation
         private readonly IUserRepository _userRepo;
         private readonly IEmailService _emailService;
         private readonly IRecruitmentCampaignRepository _campaignRepo;
-
         public InterviewService(
-            IInterviewRepository repo, 
+            IInterviewRepository repo,
             IUserRepository userRepo,
             IEmailService emailService,
             IRecruitmentCampaignRepository campaignRepo)
@@ -38,16 +37,16 @@ namespace BusinessLogic.Services.Implementation
         {
             var schedule = new InterviewSchedule
             {
-                ApplicationId   = dto.ApplicationId,
+                ApplicationId = dto.ApplicationId,
                 CandidateUserId = dto.CandidateUserId,
-                CampaignId      = dto.CampaignId,
+                CampaignId = dto.CampaignId,
                 CreatedByUserId = dto.CreatedByUserId,
-                Title           = dto.Title,
-                Description     = dto.Description,
-                ScheduledAt     = dto.ScheduledAt,
+                Title = dto.Title,
+                Description = dto.Description,
+                ScheduledAt = null,
                 DurationMinutes = dto.DurationMinutes,
-                Status          = InterviewStatus.Scheduled,
-                CreatedAt       = DateTime.UtcNow
+                Status = InterviewStatus.Scheduled,
+                CreatedAt = DateTime.UtcNow
             };
 
             var created = await _repo.CreateScheduleAsync(schedule);
@@ -62,9 +61,9 @@ namespace BusinessLogic.Services.Implementation
                         var timeSlot = new ProposedTimeSlot
                         {
                             InterviewScheduleId = created.Id,
-                            ProposedAt          = proposedAt,
-                            IsSelected          = false,
-                            CreatedAt           = DateTime.UtcNow
+                            ProposedAt = proposedAt,
+                            IsSelected = false,
+                            CreatedAt = DateTime.UtcNow
                         };
                         await _repo.CreateTimeSlotAsync(timeSlot);
                     }
@@ -75,14 +74,12 @@ namespace BusinessLogic.Services.Implementation
             var room = new MeetingRoom
             {
                 InterviewScheduleId = created.Id,
-                RoomType            = RoomType.Interview,
-                Title               = dto.Title,
-                CreatedByUserId     = dto.CreatedByUserId,
-                ScheduledStartAt    = dto.ScheduledAt,
-                ScheduledEndAt      = dto.ScheduledAt.AddMinutes(dto.DurationMinutes),
-                RoomCode            = GenerateRoomCode(),
-                Status              = RoomStatus.Idle,
-                CreatedAt           = DateTime.UtcNow
+                RoomType = RoomType.Interview,
+                Title = dto.Title,
+                CreatedByUserId = dto.CreatedByUserId,
+                RoomCode = GenerateRoomCode(),
+                Status = RoomStatus.Idle,
+                CreatedAt = DateTime.UtcNow
             };
             await _repo.CreateRoomAsync(room);
 
@@ -97,9 +94,9 @@ namespace BusinessLogic.Services.Implementation
                     var assignment = new InterviewAssignment
                     {
                         InterviewScheduleId = created.Id,
-                        InterviewerUserId   = item.InterviewerUserId,
-                        Role                = role,
-                        AssignedAt          = DateTime.UtcNow
+                        InterviewerUserId = item.InterviewerUserId,
+                        Role = role,
+                        AssignedAt = DateTime.UtcNow
                     };
                     await _repo.CreateAssignmentAsync(assignment);
                 }
@@ -109,7 +106,7 @@ namespace BusinessLogic.Services.Implementation
             var full = await _repo.GetScheduleByIdAsync(created.Id);
 
             // Gửi email thông báo lịch phỏng vấn mới cho ứng viên
-            await EnqueueInterviewStatusEmailAsync(created, InterviewStatus.Scheduled.ToString());
+            await EnqueueInterviewStatusEmailAsync(full!, InterviewStatus.Scheduled.ToString());
 
             return MapScheduleToDto(full!);
         }
@@ -136,17 +133,58 @@ namespace BusinessLogic.Services.Implementation
                 schedule.Title = dto.Title;
             if (dto.Description != null)
                 schedule.Description = dto.Description;
-            if (dto.ScheduledAt.HasValue)
-                schedule.ScheduledAt = dto.ScheduledAt.Value;
             if (dto.DurationMinutes.HasValue)
                 schedule.DurationMinutes = dto.DurationMinutes.Value;
+
+            // Nếu có chọn TimeSlotId, cập nhật ScheduledAt từ slot đó
+            if (dto.SelectedTimeSlotId.HasValue)
+            {
+                var slots = (await _repo.GetTimeSlotsByScheduleIdAsync(id)).ToList();
+                var selectedSlot = slots.FirstOrDefault(s => s.Id == dto.SelectedTimeSlotId.Value);
+                if (selectedSlot != null)
+                {
+                    schedule.ScheduledAt = selectedSlot.ProposedAt;
+                    // Cập nhật trạng thái IsSelected cho tất cả slots
+                    foreach (var slot in slots)
+                    {
+                        slot.IsSelected = (slot.Id == selectedSlot.Id);
+                        await _repo.UpdateTimeSlotAsync(slot);
+                    }
+                }
+            }
+            else if (dto.ScheduledAt.HasValue)
+            {
+                schedule.ScheduledAt = dto.ScheduledAt.Value;
+            }
+
+            // Đồng bộ trạng thái phòng khi thông tin lịch thay đổi
+            var room = await _repo.GetRoomByScheduleIdAsync(id);
+            if (room != null)
+            {
+                if (schedule.Status == InterviewStatus.Completed || schedule.Status == InterviewStatus.Cancelled)
+                {
+                    await CloseRoomAsync(room.RoomCode);
+                }
+                else if (schedule.Status == InterviewStatus.InProgress)
+                {
+                    await OpenRoomAsync(room.RoomCode);
+                }
+                else if (schedule.Status == InterviewStatus.Confirmed && schedule.ScheduledAt.HasValue)
+                {
+                    room.StartedAt = schedule.ScheduledAt.Value;
+                    room.EndedAt = schedule.ScheduledAt.Value.AddMinutes(schedule.DurationMinutes);
+                    await _repo.UpdateRoomAsync(room);
+                }
+            }
 
             schedule.UpdatedAt = DateTime.UtcNow;
 
             var ok = await _repo.UpdateScheduleAsync(schedule);
             if (!ok) return null;
 
-            return MapScheduleToDto(schedule);
+            // Re-fetch để đảm bảo dữ liệu trả về là mới nhất
+            var updatedFull = await _repo.GetScheduleByIdAsync(id);
+            return updatedFull == null ? null : MapScheduleToDto(updatedFull);
         }
 
         public async Task<bool> UpdateScheduleStatusAsync(int id, UpdateInterviewStatusDto dto)
@@ -261,8 +299,8 @@ namespace BusinessLogic.Services.Implementation
             // Cập nhật lại thời gian MeetingRoom nếu có báo phòng
             if (schedule.MeetingRoom != null)
             {
-                schedule.MeetingRoom.ScheduledStartAt = selectedSlot.ProposedAt;
-                schedule.MeetingRoom.ScheduledEndAt = selectedSlot.ProposedAt.AddMinutes(schedule.DurationMinutes);
+                schedule.MeetingRoom.StartedAt = selectedSlot.ProposedAt;
+                schedule.MeetingRoom.EndedAt = selectedSlot.ProposedAt.AddMinutes(schedule.DurationMinutes);
                 await _repo.UpdateRoomAsync(schedule.MeetingRoom);
             }
 
@@ -294,9 +332,9 @@ namespace BusinessLogic.Services.Implementation
                 var assignment = new InterviewAssignment
                 {
                     InterviewScheduleId = scheduleId,
-                    InterviewerUserId   = item.InterviewerUserId,
-                    Role                = role,
-                    AssignedAt          = DateTime.UtcNow
+                    InterviewerUserId = item.InterviewerUserId,
+                    Role = role,
+                    AssignedAt = DateTime.UtcNow
                 };
 
                 var created = await _repo.CreateAssignmentAsync(assignment);
@@ -360,19 +398,17 @@ namespace BusinessLogic.Services.Implementation
 
             var room = new MeetingRoom
             {
-                RoomType            = roomType,
-                Title               = dto.Title,
-                Description         = dto.Description,
-                CreatedByUserId     = dto.CreatedByUserId,
-                ScheduledStartAt    = dto.ScheduledStartAt,
-                ScheduledEndAt      = dto.ScheduledEndAt,
+                RoomType = roomType,
+                Title = dto.Title,
+                Description = dto.Description,
+                CreatedByUserId = dto.CreatedByUserId,
                 InterviewScheduleId = dto.InterviewScheduleId,
-                RoomCode            = GenerateRoomCode(),
-                MaxParticipants     = dto.MaxParticipants,
+                RoomCode = GenerateRoomCode(),
+                MaxParticipants = dto.MaxParticipants,
                 IsWaitingRoomEnabled = dto.IsWaitingRoomEnabled,
-                IsRecordingEnabled  = dto.IsRecordingEnabled,
-                Status              = RoomStatus.Idle,
-                CreatedAt           = DateTime.UtcNow
+                IsRecordingEnabled = dto.IsRecordingEnabled,
+                Status = RoomStatus.Idle,
+                CreatedAt = DateTime.UtcNow
             };
 
             var created = await _repo.CreateRoomAsync(room);
@@ -398,13 +434,13 @@ namespace BusinessLogic.Services.Implementation
             var peerId = Guid.NewGuid().ToString("N")[..12];
             var participant = new RoomParticipant
             {
-                MeetingRoomId   = room.Id,
-                UserId          = dto.UserId,
-                DisplayName     = dto.DisplayName,
-                Role            = dto.Role,
-                PeerId          = peerId,
+                MeetingRoomId = room.Id,
+                UserId = dto.UserId,
+                DisplayName = dto.DisplayName,
+                Role = dto.Role,
+                PeerId = peerId,
                 ConnectionState = ParticipantConnectionState.Joined,
-                JoinedAt        = DateTime.UtcNow
+                JoinedAt = DateTime.UtcNow
             };
             await _repo.CreateParticipantAsync(participant);
 
@@ -412,17 +448,10 @@ namespace BusinessLogic.Services.Implementation
             await _repo.CreateEventAsync(new RoomEvent
             {
                 MeetingRoomId = room.Id,
-                ActorUserId   = dto.UserId,
-                EventType     = "participant.joined",
-                OccurredAt    = DateTime.UtcNow
+                ActorUserId = dto.UserId,
+                EventType = "participant.joined",
+                OccurredAt = DateTime.UtcNow
             });
-
-            // Cập nhật trạng thái room nếu cần
-            if (room.Status == RoomStatus.Idle)
-            {
-                room.Status = RoomStatus.Waiting;
-                await _repo.UpdateRoomAsync(room);
-            }
 
             // Lấy danh sách active participants
             var allParticipants = await _repo.GetParticipantsByRoomIdAsync(room.Id);
@@ -433,16 +462,16 @@ namespace BusinessLogic.Services.Implementation
 
             return new JoinRoomResponseDto
             {
-                RoomCode                = room.RoomCode,
-                RoomType                = room.RoomType.ToString(),
-                PeerId                  = peerId,
-                StunServerUri           = room.StunServerUri,
-                TurnServerUri           = room.TurnServerUri,
-                TurnUsername            = room.TurnUsername,
-                TurnCredential          = room.TurnCredential,
+                RoomCode = room.RoomCode,
+                RoomType = room.RoomType.ToString(),
+                PeerId = peerId,
+                StunServerUri = room.StunServerUri,
+                TurnServerUri = room.TurnServerUri,
+                TurnUsername = room.TurnUsername,
+                TurnCredential = room.TurnCredential,
                 TurnCredentialExpiresAt = room.TurnCredentialExpiresAt,
-                RoomStatus              = room.Status.ToString(),
-                CurrentParticipants     = activeParticipants
+                RoomStatus = room.Status.ToString(),
+                CurrentParticipants = activeParticipants
             };
         }
 
@@ -462,9 +491,9 @@ namespace BusinessLogic.Services.Implementation
             await _repo.CreateEventAsync(new RoomEvent
             {
                 MeetingRoomId = room.Id,
-                ActorUserId   = dto.UserId,
-                EventType     = "participant.left",
-                OccurredAt    = DateTime.UtcNow
+                ActorUserId = dto.UserId,
+                EventType = "participant.left",
+                OccurredAt = DateTime.UtcNow
             });
 
             return true;
@@ -505,9 +534,31 @@ namespace BusinessLogic.Services.Implementation
             await _repo.CreateEventAsync(new RoomEvent
             {
                 MeetingRoomId = room.Id,
-                ActorUserId   = Guid.Empty, // System
-                EventType     = "room.closed",
-                OccurredAt    = DateTime.UtcNow
+                ActorUserId = Guid.Empty, // System
+                EventType = "room.closed",
+                OccurredAt = DateTime.UtcNow
+            });
+
+            return true;
+        }
+        public async Task<bool> OpenRoomAsync(string roomCode)
+        {
+            var room = await _repo.GetRoomByCodeAsync(roomCode);
+            if (room == null) return false;
+
+            if (room.Status == RoomStatus.Active) return true;
+
+            room.Status = RoomStatus.Active;
+            room.EndedAt = DateTime.UtcNow;
+
+            await _repo.UpdateRoomAsync(room);
+
+            await _repo.CreateEventAsync(new RoomEvent
+            {
+                MeetingRoomId = room.Id,
+                ActorUserId = Guid.Empty, // System
+                EventType = "room.opened",
+                OccurredAt = DateTime.UtcNow
             });
 
             return true;
@@ -541,8 +592,8 @@ namespace BusinessLogic.Services.Implementation
             return new FeedbackSummaryResponseDto
             {
                 InterviewScheduleId = schedule.Id,
-                Title               = schedule.Title,
-                Feedbacks           = schedule.Assignments.Select(MapAssignmentToDto).ToList()
+                Title = schedule.Title,
+                Feedbacks = schedule.Assignments.Select(MapAssignmentToDto).ToList()
             };
         }
 
@@ -571,34 +622,35 @@ namespace BusinessLogic.Services.Implementation
 
                 // Tính deadline xác nhận: 24h trước giờ phỏng vấn
                 string? confirmDeadline = null;
-                if (status == InterviewStatus.Scheduled.ToString() 
+                if (status == InterviewStatus.Scheduled.ToString()
                     || status == InterviewStatus.Rescheduled.ToString())
                 {
-                    var deadline = schedule.ScheduledAt.AddHours(-24);
+                    var deadline = schedule.ScheduledAt?.AddHours(-24);
                     if (deadline > DateTime.UtcNow)
                     {
-                        confirmDeadline = deadline.ToString("dd/MM/yyyy HH:mm");
+                        confirmDeadline = deadline?.ToString("dd/MM/yyyy HH:mm");
                     }
                     else
                     {
                         // Nếu phỏng vấn trong vòng 24h, đặt deadline là 4h trước
-                        var urgentDeadline = schedule.ScheduledAt.AddHours(-4);
+                        var urgentDeadline = schedule.ScheduledAt?.AddHours(-4);
                         if (urgentDeadline > DateTime.UtcNow)
-                            confirmDeadline = urgentDeadline.ToString("dd/MM/yyyy HH:mm");
+                            confirmDeadline = urgentDeadline?.ToString("dd/MM/yyyy HH:mm");
                     }
                 }
 
                 EmailQueueService.EnqueueEmail(new EmailQueueItem
                 {
-                    ToEmail                 = user.Email,
-                    FullName                = user.FullName,
-                    EmailType               = EmailType.InterviewStatusChange,
-                    InterviewTitle          = schedule.Title,
-                    InterviewStatus         = status,
-                    InterviewScheduledAt    = schedule.ScheduledAt,
+                    ToEmail = user.Email,
+                    FullName = user.FullName,
+                    EmailType = EmailType.InterviewStatusChange,
+                    InterviewTitle = schedule.Title,
+                    InterviewStatus = status,
+                    InterviewScheduledAt = schedule.ScheduledAt,
                     InterviewDurationMinutes = schedule.DurationMinutes,
-                    CancelReason            = cancelReason,
-                    ConfirmDeadline         = confirmDeadline
+                    CancelReason = cancelReason,
+                    ConfirmDeadline = confirmDeadline,
+                    ProposedTimes = schedule.ProposedTimeSlots?.Select(s => s.ProposedAt).ToList()
                 });
             }
             catch (Exception)
@@ -611,21 +663,21 @@ namespace BusinessLogic.Services.Implementation
         {
             return new InterviewScheduleResponseDto
             {
-                Id              = s.Id,
-                ApplicationId   = s.ApplicationId,
+                Id = s.Id,
+                ApplicationId = s.ApplicationId,
                 CandidateUserId = s.CandidateUserId,
-                CampaignId      = s.CampaignId,
+                CampaignId = s.CampaignId,
                 CreatedByUserId = s.CreatedByUserId,
-                Title           = s.Title,
-                Description     = s.Description,
-                ScheduledAt     = s.ScheduledAt,
+                Title = s.Title,
+                Description = s.Description,
+                ScheduledAt = s.ScheduledAt,
                 DurationMinutes = s.DurationMinutes,
-                Status          = s.Status.ToString(),
-                CancelReason    = s.CancelReason,
-                CreatedAt       = s.CreatedAt,
-                UpdatedAt       = s.UpdatedAt,
-                Assignments     = s.Assignments?.Select(MapAssignmentToDto).ToList() ?? new(),
-                MeetingRoom     = s.MeetingRoom != null ? MapRoomToDto(s.MeetingRoom) : null,
+                Status = s.Status.ToString(),
+                CancelReason = s.CancelReason,
+                CreatedAt = s.CreatedAt,
+                UpdatedAt = s.UpdatedAt,
+                Assignments = s.Assignments?.Select(MapAssignmentToDto).ToList() ?? new(),
+                MeetingRoom = s.MeetingRoom != null ? MapRoomToDto(s.MeetingRoom) : null,
                 ProposedTimeSlots = s.ProposedTimeSlots?.Select(MapProposedTimeSlotToDto).ToList() ?? new()
             };
         }
@@ -634,11 +686,11 @@ namespace BusinessLogic.Services.Implementation
         {
             return new ProposedTimeSlotResponseDto
             {
-                Id                  = t.Id,
+                Id = t.Id,
                 InterviewScheduleId = t.InterviewScheduleId,
-                ProposedAt          = t.ProposedAt,
-                IsSelected          = t.IsSelected,
-                CreatedAt           = t.CreatedAt
+                ProposedAt = t.ProposedAt,
+                IsSelected = t.IsSelected,
+                CreatedAt = t.CreatedAt
             };
         }
 
@@ -646,21 +698,21 @@ namespace BusinessLogic.Services.Implementation
         {
             return new InterviewAssignmentResponseDto
             {
-                Id                  = a.Id,
+                Id = a.Id,
                 InterviewScheduleId = a.InterviewScheduleId,
-                InterviewerUserId   = a.InterviewerUserId,
-                Role                = a.Role.ToString(),
-                HasConfirmed        = a.HasConfirmed,
-                FeedbackNotes       = a.FeedbackNotes,
-                Result              = a.Result?.ToString(),
-                AssignedAt          = a.AssignedAt,
+                InterviewerUserId = a.InterviewerUserId,
+                Role = a.Role.ToString(),
+                HasConfirmed = a.HasConfirmed,
+                FeedbackNotes = a.FeedbackNotes,
+                Result = a.Result?.ToString(),
+                AssignedAt = a.AssignedAt,
                 FeedbackSubmittedAt = a.FeedbackSubmittedAt,
-                CriteriaScores      = a.CriteriaScores?.Select(cs => new CriteriaScoreResponseDto
+                CriteriaScores = a.CriteriaScores?.Select(cs => new CriteriaScoreResponseDto
                 {
-                    Id                    = cs.Id,
+                    Id = cs.Id,
                     EvaluationCriterionId = cs.EvaluationCriterionId,
-                    Note                  = cs.Note,
-                    CreatedAt             = cs.CreatedAt
+                    Note = cs.Note,
+                    CreatedAt = cs.CreatedAt
                 }).ToList() ?? new()
             };
         }
@@ -669,27 +721,25 @@ namespace BusinessLogic.Services.Implementation
         {
             return new MeetingRoomResponseDto
             {
-                Id                     = r.Id,
-                RoomType               = r.RoomType.ToString(),
-                Title                  = r.Title,
-                Description            = r.Description,
-                CreatedByUserId        = r.CreatedByUserId,
-                ScheduledStartAt       = r.ScheduledStartAt,
-                ScheduledEndAt         = r.ScheduledEndAt,
-                InterviewScheduleId    = r.InterviewScheduleId,
-                RoomCode               = r.RoomCode,
-                StunServerUri          = r.StunServerUri,
-                TurnServerUri          = r.TurnServerUri,
-                TurnUsername           = r.TurnUsername,
-                TurnCredential         = r.TurnCredential,
+                Id = r.Id,
+                RoomType = r.RoomType.ToString(),
+                Title = r.Title,
+                Description = r.Description,
+                CreatedByUserId = r.CreatedByUserId,
+                StartedAt = r.StartedAt,
+                EndedAt = r.EndedAt,
+                InterviewScheduleId = r.InterviewScheduleId,
+                RoomCode = r.RoomCode,
+                StunServerUri = r.StunServerUri,
+                TurnServerUri = r.TurnServerUri,
+                TurnUsername = r.TurnUsername,
+                TurnCredential = r.TurnCredential,
                 TurnCredentialExpiresAt = r.TurnCredentialExpiresAt,
-                IsRecordingEnabled     = r.IsRecordingEnabled,
-                IsWaitingRoomEnabled   = r.IsWaitingRoomEnabled,
-                MaxParticipants        = r.MaxParticipants,
-                Status                 = r.Status.ToString(),
-                StartedAt              = r.StartedAt,
-                EndedAt                = r.EndedAt,
-                CreatedAt              = r.CreatedAt
+                IsRecordingEnabled = r.IsRecordingEnabled,
+                IsWaitingRoomEnabled = r.IsWaitingRoomEnabled,
+                MaxParticipants = r.MaxParticipants,
+                Status = r.Status.ToString(),
+                CreatedAt = r.CreatedAt
             };
         }
 
@@ -697,14 +747,14 @@ namespace BusinessLogic.Services.Implementation
         {
             return new RoomParticipantResponseDto
             {
-                Id              = p.Id,
-                UserId          = p.UserId,
-                DisplayName     = p.DisplayName,
-                Role            = p.Role,
-                PeerId          = p.PeerId,
+                Id = p.Id,
+                UserId = p.UserId,
+                DisplayName = p.DisplayName,
+                Role = p.Role,
+                PeerId = p.PeerId,
                 ConnectionState = p.ConnectionState.ToString(),
-                JoinedAt        = p.JoinedAt,
-                LeftAt          = p.LeftAt
+                JoinedAt = p.JoinedAt,
+                LeftAt = p.LeftAt
             };
         }
 
@@ -712,12 +762,12 @@ namespace BusinessLogic.Services.Implementation
         {
             return new RoomEventResponseDto
             {
-                Id            = e.Id,
+                Id = e.Id,
                 MeetingRoomId = e.MeetingRoomId,
-                ActorUserId   = e.ActorUserId,
-                EventType     = e.EventType,
-                Payload       = e.Payload,
-                OccurredAt    = e.OccurredAt
+                ActorUserId = e.ActorUserId,
+                EventType = e.EventType,
+                Payload = e.Payload,
+                OccurredAt = e.OccurredAt
             };
         }
 
@@ -749,11 +799,11 @@ namespace BusinessLogic.Services.Implementation
                 {
                     var c = new EvaluationCriterion
                     {
-                        CampaignId   = campaignId,
-                        Name         = name,
-                        Description  = desc,
-                        IsDefault    = true,
-                        CreatedAt    = DateTime.UtcNow
+                        CampaignId = campaignId,
+                        Name = name,
+                        Description = desc,
+                        IsDefault = true,
+                        CreatedAt = DateTime.UtcNow
                     };
                     var created = await _repo.CreateCriterionAsync(c);
                     list.Add(created);
@@ -767,11 +817,11 @@ namespace BusinessLogic.Services.Implementation
         {
             var criterion = new EvaluationCriterion
             {
-                CampaignId   = campaignId,
-                Name         = dto.Name,
-                Description  = dto.Description,
-                IsDefault    = false,
-                CreatedAt    = DateTime.UtcNow
+                CampaignId = campaignId,
+                Name = dto.Name,
+                Description = dto.Description,
+                IsDefault = false,
+                CreatedAt = DateTime.UtcNow
             };
 
             var created = await _repo.CreateCriterionAsync(criterion);
@@ -813,8 +863,8 @@ namespace BusinessLogic.Services.Implementation
                 {
                     InterviewAssignmentId = assignmentId,
                     EvaluationCriterionId = criterionId,
-                    Note                  = null,
-                    CreatedAt             = DateTime.UtcNow
+                    Note = null,
+                    CreatedAt = DateTime.UtcNow
                 };
                 await _repo.CreateCriteriaScoreAsync(score);
             }
@@ -851,8 +901,8 @@ namespace BusinessLogic.Services.Implementation
                     {
                         InterviewAssignmentId = assignmentId,
                         EvaluationCriterionId = item.CriterionId,
-                        Note                  = item.Note,
-                        CreatedAt             = DateTime.UtcNow
+                        Note = item.Note,
+                        CreatedAt = DateTime.UtcNow
                     };
                     await _repo.CreateCriteriaScoreAsync(note);
                 }
@@ -862,8 +912,8 @@ namespace BusinessLogic.Services.Implementation
             if (!Enum.TryParse<InterviewResult>(dto.Result, true, out var result))
                 throw new ArgumentException($"Invalid result: {dto.Result}");
 
-            assignment.FeedbackNotes       = dto.FeedbackNotes;
-            assignment.Result              = result;
+            assignment.FeedbackNotes = dto.FeedbackNotes;
+            assignment.Result = result;
             assignment.FeedbackSubmittedAt = DateTime.UtcNow;
 
             return await _repo.UpdateAssignmentAsync(assignment);
@@ -878,10 +928,10 @@ namespace BusinessLogic.Services.Implementation
             var scores = await _repo.GetCriteriaScoresByAssignmentIdAsync(assignmentId);
             return scores.Select(cs => new CriteriaScoreResponseDto
             {
-                Id                    = cs.Id,
+                Id = cs.Id,
                 EvaluationCriterionId = cs.EvaluationCriterionId,
-                Note                  = cs.Note,
-                CreatedAt             = cs.CreatedAt
+                Note = cs.Note,
+                CreatedAt = cs.CreatedAt
             }).ToList();
         }
 
@@ -899,15 +949,15 @@ namespace BusinessLogic.Services.Implementation
 
                 return new CriteriaSummaryItemDto
                 {
-                    CriterionId   = c.Id,
+                    CriterionId = c.Id,
                     CriterionName = c.Name,
                     IndividualNotes = notesForCriterion.Select(s => new CriteriaNoteResultDto
                     {
-                        CriterionId       = c.Id,
-                        CriterionName     = c.Name,
-                        Note              = s.Note,
+                        CriterionId = c.Id,
+                        CriterionName = c.Name,
+                        Note = s.Note,
                         InterviewerUserId = s.InterviewAssignment.InterviewerUserId,
-                        InterviewerRole   = s.InterviewAssignment.Role.ToString()
+                        InterviewerRole = s.InterviewAssignment.Role.ToString()
                     }).ToList()
                 };
             }).ToList();
@@ -915,18 +965,18 @@ namespace BusinessLogic.Services.Implementation
             return new EvaluationSummaryDto
             {
                 InterviewScheduleId = schedule.Id,
-                Title               = schedule.Title,
-                CandidateUserId     = schedule.CandidateUserId,
-                CampaignId          = schedule.CampaignId,
-                CriteriaSummaries   = criteriaSummaries,
-                Feedbacks           = schedule.Assignments?.Select(MapAssignmentToDto).ToList() ?? new()
+                Title = schedule.Title,
+                CandidateUserId = schedule.CandidateUserId,
+                CampaignId = schedule.CampaignId,
+                CriteriaSummaries = criteriaSummaries,
+                Feedbacks = schedule.Assignments?.Select(MapAssignmentToDto).ToList() ?? new()
             };
         }
 
         public async Task<List<CandidateComparisonItemDto>> GetCampaignComparisonAsync(int campaignId)
         {
             var schedules = (await _repo.GetSchedulesAsync(campaignId, null, null, null)).ToList();
-            var criteria  = (await _repo.GetCriteriaByCampaignIdAsync(campaignId)).ToList();
+            var criteria = (await _repo.GetCriteriaByCampaignIdAsync(campaignId)).ToList();
 
             var completedSchedules = schedules
                 .Where(s => s.Status == InterviewStatus.Completed)
@@ -945,15 +995,15 @@ namespace BusinessLogic.Services.Implementation
                     var notesForCriterion = allNotes.Where(n => n.EvaluationCriterionId == c.Id).ToList();
                     return new CriteriaSummaryItemDto
                     {
-                        CriterionId   = c.Id,
+                        CriterionId = c.Id,
                         CriterionName = c.Name,
                         IndividualNotes = notesForCriterion.Select(n => new CriteriaNoteResultDto
                         {
-                            CriterionId       = c.Id,
-                            CriterionName     = c.Name,
-                            Note              = n.Note,
+                            CriterionId = c.Id,
+                            CriterionName = c.Name,
+                            Note = n.Note,
                             InterviewerUserId = n.InterviewAssignment.InterviewerUserId,
-                            InterviewerRole   = n.InterviewAssignment.Role.ToString()
+                            InterviewerRole = n.InterviewAssignment.Role.ToString()
                         }).ToList()
                     };
                 }).ToList();
@@ -966,10 +1016,10 @@ namespace BusinessLogic.Services.Implementation
                 items.Add(new CandidateComparisonItemDto
                 {
                     InterviewScheduleId = schedule.Id,
-                    CandidateUserId     = schedule.CandidateUserId,
-                    Title               = schedule.Title,
-                    FeedbackNotes       = feedbackNotes,
-                    CriteriaSummaries   = criteriaSummaries
+                    CandidateUserId = schedule.CandidateUserId,
+                    Title = schedule.Title,
+                    FeedbackNotes = feedbackNotes,
+                    CriteriaSummaries = criteriaSummaries
                 });
             }
 
@@ -1003,13 +1053,13 @@ namespace BusinessLogic.Services.Implementation
                 {
                     var d = new CampaignDecision
                     {
-                        CampaignId          = campaignId,
+                        CampaignId = campaignId,
                         InterviewScheduleId = item.InterviewScheduleId,
-                        CandidateUserId     = item.CandidateUserId,
-                        Decision            = decision,
-                        DecidedByUserId     = dto.DecidedByUserId,
-                        DecidedAt           = DateTime.UtcNow,
-                        PublishStatus       = PublishStatus.Draft
+                        CandidateUserId = item.CandidateUserId,
+                        Decision = decision,
+                        DecidedByUserId = dto.DecidedByUserId,
+                        DecidedAt = DateTime.UtcNow,
+                        PublishStatus = PublishStatus.Draft
                     };
                     var created = await _repo.CreateDecisionAsync(d);
                     results.Add(MapDecisionToDto(created));
@@ -1045,12 +1095,12 @@ namespace BusinessLogic.Services.Implementation
                     {
                         var candidateUser = await _userRepo.GetByIdAsync(d.CandidateUserId);
                         var campaign = await _campaignRepo.GetByIdAsync(campaignId);
-                        
+
                         if (candidateUser != null && campaign != null)
                         {
                             await _emailService.SendClubAcceptanceEmailAsync(
-                                candidateUser.Email, 
-                                candidateUser.FullName, 
+                                candidateUser.Email,
+                                candidateUser.FullName,
                                 campaign.CampaignName);
                         }
                     }
@@ -1087,11 +1137,11 @@ namespace BusinessLogic.Services.Implementation
         {
             return new EvaluationCriterionDto
             {
-                Id           = c.Id,
-                CampaignId   = c.CampaignId,
-                Name         = c.Name,
-                Description  = c.Description,
-                IsDefault    = c.IsDefault
+                Id = c.Id,
+                CampaignId = c.CampaignId,
+                Name = c.Name,
+                Description = c.Description,
+                IsDefault = c.IsDefault
             };
         }
 
@@ -1099,16 +1149,16 @@ namespace BusinessLogic.Services.Implementation
         {
             return new CampaignDecisionResponseDto
             {
-                Id                  = d.Id,
-                CampaignId          = d.CampaignId,
+                Id = d.Id,
+                CampaignId = d.CampaignId,
                 InterviewScheduleId = d.InterviewScheduleId,
-                CandidateUserId     = d.CandidateUserId,
-                Decision            = d.Decision.ToString(),
-                DecidedByUserId     = d.DecidedByUserId,
-                DecidedAt           = d.DecidedAt,
-                PublishStatus       = d.PublishStatus.ToString(),
-                ScheduledPublishAt  = d.ScheduledPublishAt,
-                PublishedAt         = d.PublishedAt
+                CandidateUserId = d.CandidateUserId,
+                Decision = d.Decision.ToString(),
+                DecidedByUserId = d.DecidedByUserId,
+                DecidedAt = d.DecidedAt,
+                PublishStatus = d.PublishStatus.ToString(),
+                ScheduledPublishAt = d.ScheduledPublishAt,
+                PublishedAt = d.PublishedAt
             };
         }
 
@@ -1122,15 +1172,15 @@ namespace BusinessLogic.Services.Implementation
 
             return new PublishStatusResponseDto
             {
-                CampaignId         = campaignId,
-                OverallStatus      = overallStatus,
-                TotalDecisions     = decisions.Count,
-                AcceptCount        = decisions.Count(d => d.Decision == DecisionResult.Accept),
-                RejectCount        = decisions.Count(d => d.Decision == DecisionResult.Reject),
-                WaitlistCount      = decisions.Count(d => d.Decision == DecisionResult.Waitlist),
+                CampaignId = campaignId,
+                OverallStatus = overallStatus,
+                TotalDecisions = decisions.Count,
+                AcceptCount = decisions.Count(d => d.Decision == DecisionResult.Accept),
+                RejectCount = decisions.Count(d => d.Decision == DecisionResult.Reject),
+                WaitlistCount = decisions.Count(d => d.Decision == DecisionResult.Waitlist),
                 ScheduledPublishAt = decisions.FirstOrDefault(d => d.ScheduledPublishAt.HasValue)?.ScheduledPublishAt,
-                PublishedAt        = decisions.FirstOrDefault(d => d.PublishedAt.HasValue)?.PublishedAt,
-                Decisions          = decisions.Select(MapDecisionToDto).ToList()
+                PublishedAt = decisions.FirstOrDefault(d => d.PublishedAt.HasValue)?.PublishedAt,
+                Decisions = decisions.Select(MapDecisionToDto).ToList()
             };
         }
     }

@@ -132,6 +132,7 @@ builder.Services.AddScoped<INotificationHubContext, NotificationHubContext>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventReminderService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventStatusSyncService>();
+builder.Services.AddHostedService<BusinessLogic.Services.Background.InterviewRoomActivationService>();
 
 // Unit of Work and Repositories
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IUnitOfWork, DataAccess.Repositories.Implementation.UnitOfWork>();
@@ -222,7 +223,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     }
 });
 
-//builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
 
 IEdmModel GetEdmModel()
 {

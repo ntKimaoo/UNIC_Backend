@@ -60,6 +60,7 @@ namespace UNIC.DataAccess.Repositories.Implementation
         public async Task<Application?> GetByIdAsync(int applicationId, int clubId)
         {
             return await _context.Applications
+                .Include(a => a.User)
                 .Include(a => a.ApplicationForm)
                     .ThenInclude(f => f.RecruitmentCampaign)
                 .FirstOrDefaultAsync(a =>

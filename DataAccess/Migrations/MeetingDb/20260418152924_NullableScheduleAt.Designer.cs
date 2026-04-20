@@ -4,6 +4,7 @@ using DataAccess.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace UNIC.DataAccess.Migrations.MeetingDb
 {
     [DbContext(typeof(MeetingDbContext))]
-    partial class MeetingDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260418152924_NullableScheduleAt")]
+    partial class NullableScheduleAt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -348,6 +351,12 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("ScheduledEndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ScheduledStartAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("datetime2");

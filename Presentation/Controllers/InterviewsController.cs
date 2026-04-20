@@ -1,5 +1,6 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
+using DataAccess.Models.Meeting.Enums;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading.Tasks;
@@ -85,8 +86,8 @@ namespace Presentation.Controllers
                 var result = await _service.UpdateScheduleAsync(id, dto);
                 if (result == null)
                     return NotFound(new { success = false, message = "Interview schedule not found" });
-
-                return Ok(new { success = true, message = "Updated successfully", data = result });
+                
+                    return Ok(new { success = true, message = "Updated successfully", data = result });
             }
             catch (Exception ex)
             {
