@@ -1,6 +1,7 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Options;
 using BusinessLogic.Services.Implementation;
+using BusinessLogic.Services.Implementation.PaymentGateways;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
@@ -24,6 +25,7 @@ namespace UNIC.ServiceTest.Services
         private readonly Mock<IPayOSService> _payOS;
         private readonly Mock<IPolicyService> _policy;
         private readonly Mock<IClubPayOSSettingsRepository> _paySettingsRepo;
+        private readonly Mock<IFundTypeRepository> _fundTypeRepo;
         private readonly ClubFundService _service;
 
         public ClubFundServiceTest()
@@ -33,25 +35,31 @@ namespace UNIC.ServiceTest.Services
             _payOS = new Mock<IPayOSService>();
             _policy = new Mock<IPolicyService>();
             _paySettingsRepo = new Mock<IClubPayOSSettingsRepository>();
+            _fundTypeRepo = new Mock<IFundTypeRepository>();
             _fundRepo.Setup(r => r.ExistsNonRejectedFundNameInClubAsync(It.IsAny<int>(), It.IsAny<string>()))
                 .ReturnsAsync(false);
+            _fundTypeRepo.Setup(r => r.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new FundType { FundTypeId = 1, Name = "Hàng Tháng", IsActive = true, SortOrder = 0 });
 
             var payOpts = Options.Create(new PayOSOptions { LinkExpirationMinutes = 60 });
+            var payOsGateway = new PayOSFundPaymentGateway(_payOS.Object, payOpts);
+            var registry = new FundPaymentGatewayRegistry(new IFundPaymentGateway[] { payOsGateway });
             _service = new ClubFundService(
                 _fundRepo.Object,
                 _memberRepo.Object,
-                _payOS.Object,
+                registry,
                 _policy.Object,
                 _paySettingsRepo.Object,
+                _fundTypeRepo.Object,
                 payOpts);
         }
 
-        private static UserClubRole ActiveManagerMember(int clubId, int level = 1) =>
+        private static UserClubRole ActiveManagerMember(int clubId, int level = 0) =>
             new UserClubRole
             {
                 ClubId = clubId,
                 Status = "ACTIVE",
-                ClubRole = new ClubRole { Level = level, RoleName = "Role" }
+                RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { Level = level, RoleName = "Role" } } }
             };
 
         #region CreateFundAsync
@@ -60,7 +68,7 @@ namespace UNIC.ServiceTest.Services
         public async Task CreateFundAsync_ShouldThrow_WhenFundNameEmpty()
         {
             var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
-                _service.CreateFundAsync(Guid.NewGuid(), new CreateFundDto { ClubId = 1, FundName = "  " }));
+                _service.CreateFundAsync(Guid.NewGuid(), new CreateFundDto { ClubId = 1, FundName = "  ", FundTypeId = 1 }));
             Assert.Contains("Tên quỹ", ex.Message);
         }
 
@@ -69,13 +77,14 @@ namespace UNIC.ServiceTest.Services
         {
             var uid = Guid.NewGuid();
             _fundRepo.Setup(r => r.ExistsNonRejectedFundNameInClubAsync(1, "Q2")).ReturnsAsync(true);
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 2));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
 
             var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
                 _service.CreateFundAsync(uid, new CreateFundDto
                 {
                     ClubId = 1,
-                    FundName = "Q2"
+                    FundName = "Q2",
+                    FundTypeId = 1
                 }));
 
             Assert.Contains("Tên quỹ đã tồn tại", ex.Message);
@@ -89,6 +98,7 @@ namespace UNIC.ServiceTest.Services
                 {
                     ClubId = 1,
                     FundName = "Q",
+                    FundTypeId = 1,
                     ExpiresAt = DateTime.UtcNow.Date.AddDays(-1)
                 }));
         }
@@ -100,7 +110,7 @@ namespace UNIC.ServiceTest.Services
             _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync((UserClubRole?)null);
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-                _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q" }));
+                _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q", FundTypeId = 1 }));
         }
 
         [Fact]
@@ -110,11 +120,11 @@ namespace UNIC.ServiceTest.Services
             _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(new UserClubRole
             {
                 Status = "LEFT",
-                ClubRole = new ClubRole { Level = 1 }
+                RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { Level = 1 } } }
             });
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-                _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q" }));
+                _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q", FundTypeId = 1 }));
         }
 
         [Fact]
@@ -124,18 +134,18 @@ namespace UNIC.ServiceTest.Services
             _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(new UserClubRole
             {
                 Status = "ACTIVE",
-                ClubRole = new ClubRole { Level = 3 }
+                RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { Level = 3 } } }
             });
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-                _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q" }));
+                _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q", FundTypeId = 1 }));
         }
 
         [Fact]
         public async Task CreateFundAsync_ShouldSetApproved_WhenHighestLevelManager()
         {
             var uid = Guid.NewGuid();
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1));
 
             ClubFund? captured = null;
             _fundRepo.Setup(r => r.AddFundAsync(It.IsAny<ClubFund>()))
@@ -146,7 +156,8 @@ namespace UNIC.ServiceTest.Services
             {
                 ClubId = 1,
                 FundName = " Quỹ A ",
-                Description = "  Mo ta quy  "
+                Description = "  Mo ta quy  ",
+                FundTypeId = 1
             });
 
             Assert.NotNull(captured);
@@ -162,14 +173,14 @@ namespace UNIC.ServiceTest.Services
         public async Task CreateFundAsync_ShouldSetPending_WhenViceManager()
         {
             var uid = Guid.NewGuid();
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 2));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
 
             ClubFund? captured = null;
             _fundRepo.Setup(r => r.AddFundAsync(It.IsAny<ClubFund>()))
                 .Callback<ClubFund>(f => captured = f)
                 .ReturnsAsync((ClubFund f) => f);
 
-            await _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q" });
+            await _service.CreateFundAsync(uid, new CreateFundDto { ClubId = 1, FundName = "Q", FundTypeId = 1 });
 
             Assert.Equal("PENDING", captured!.Status);
         }
@@ -178,7 +189,7 @@ namespace UNIC.ServiceTest.Services
         public async Task CreateFundAsync_ShouldMapDescription_FromAliasKey()
         {
             var uid = Guid.NewGuid();
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1));
 
             ClubFund? captured = null;
             _fundRepo.Setup(r => r.AddFundAsync(It.IsAny<ClubFund>()))
@@ -190,6 +201,7 @@ namespace UNIC.ServiceTest.Services
             {
                 ClubId = 1,
                 FundName = "Q Alias",
+                FundTypeId = 1,
                 ExtraData = new Dictionary<string, JsonElement>
                 {
                     ["fundDescription"] = aliasJson
@@ -232,7 +244,7 @@ namespace UNIC.ServiceTest.Services
         [Fact]
         public async Task CreateContributionAsync_ShouldThrow_WhenFundMissing()
         {
-            _fundRepo.Setup(r => r.GetFundByIdAsync(99)).ReturnsAsync((ClubFund?)null);
+            _fundRepo.Setup(r => r.GetFundByIdAsync(99, false)).ReturnsAsync((ClubFund?)null);
 
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 _service.CreateContributionAsync(Guid.NewGuid(), new ContributeRequestDto
@@ -245,7 +257,7 @@ namespace UNIC.ServiceTest.Services
         [Fact]
         public async Task CreateContributionAsync_ShouldThrow_WhenFundNotApproved()
         {
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 1,
@@ -264,7 +276,7 @@ namespace UNIC.ServiceTest.Services
         [Fact]
         public async Task CreateContributionAsync_ShouldThrow_WhenFundExpired()
         {
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 1,
@@ -285,17 +297,18 @@ namespace UNIC.ServiceTest.Services
         public async Task CreateContributionAsync_ShouldReturnPayOsPayload_WhenValid()
         {
             var uid = Guid.NewGuid();
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 2,
                 Status = "APPROVED",
                 FundName = "F"
             });
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2));
             _paySettingsRepo.Setup(r => r.GetByClubIdAsync(2)).ReturnsAsync(new ClubPayOSSettings
             {
                 ClubId = 2,
+                PaymentProvider = "PAYOS",
                 ClientId = "c",
                 ApiKey = "a",
                 ChecksumKey = "k",
@@ -333,14 +346,14 @@ namespace UNIC.ServiceTest.Services
         public async Task CreateContributionAsync_ShouldThrow_WhenCategoryNotFound()
         {
             var uid = Guid.NewGuid();
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 2,
                 Status = "APPROVED",
                 FundName = "F"
             });
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2));
             _fundRepo.Setup(r => r.GetFundCategoryByIdAsync(99)).ReturnsAsync((FundCategory?)null);
 
             await Assert.ThrowsAsync<ArgumentException>(() =>
@@ -356,14 +369,14 @@ namespace UNIC.ServiceTest.Services
         public async Task CreateContributionAsync_ShouldThrow_WhenCategoryBelongsToOtherClub()
         {
             var uid = Guid.NewGuid();
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 2,
                 Status = "APPROVED",
                 FundName = "F"
             });
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2));
             _fundRepo.Setup(r => r.GetFundCategoryByIdAsync(5)).ReturnsAsync(new FundCategory
             {
                 CategoryId = 5,
@@ -385,17 +398,18 @@ namespace UNIC.ServiceTest.Services
         public async Task CreateContributionAsync_ShouldCallPayOS_WhenCategoryGlobal()
         {
             var uid = Guid.NewGuid();
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 2,
                 Status = "APPROVED",
                 FundName = "F"
             });
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2));
             _paySettingsRepo.Setup(r => r.GetByClubIdAsync(2)).ReturnsAsync(new ClubPayOSSettings
             {
                 ClubId = 2,
+                PaymentProvider = "PAYOS",
                 ClientId = "c",
                 ApiKey = "a",
                 ChecksumKey = "k",
@@ -429,17 +443,18 @@ namespace UNIC.ServiceTest.Services
         public async Task CreateContributionAsync_ShouldDeleteTransaction_WhenPayOSFails()
         {
             var uid = Guid.NewGuid();
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 2,
                 Status = "APPROVED",
                 FundName = "F"
             });
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2));
             _paySettingsRepo.Setup(r => r.GetByClubIdAsync(2)).ReturnsAsync(new ClubPayOSSettings
             {
                 ClubId = 2,
+                PaymentProvider = "PAYOS",
                 ClientId = "c",
                 ApiKey = "a",
                 ChecksumKey = "k",
@@ -613,8 +628,8 @@ namespace UNIC.ServiceTest.Services
         [Fact]
         public async Task GetFundByIdAsync_ShouldReturnNull_WhenMissing()
         {
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync((ClubFund?)null);
-            Assert.Null(await _service.GetFundByIdAsync(1));
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, true)).ReturnsAsync((ClubFund?)null);
+            Assert.Null(await _service.GetFundByIdAsync(1, Guid.NewGuid(), false));
         }
 
         [Fact]
@@ -630,8 +645,8 @@ namespace UNIC.ServiceTest.Services
                 CurrentBalance = 50,
                 CreatedAt = DateTime.UtcNow
             };
-            _fundRepo.Setup(r => r.GetFundByIdAsync(5)).ReturnsAsync(fund);
-            var dto = await _service.GetFundByIdAsync(5);
+            _fundRepo.Setup(r => r.GetFundByIdAsync(5, true)).ReturnsAsync(fund);
+            var dto = await _service.GetFundByIdAsync(5, Guid.NewGuid(), false);
             Assert.NotNull(dto);
             Assert.False(dto!.CanAcceptContributions);
             Assert.Contains("chưa được duyệt", dto.CannotContributeReasonVi ?? "", StringComparison.OrdinalIgnoreCase);
@@ -651,18 +666,41 @@ namespace UNIC.ServiceTest.Services
                 CurrentBalance = 0,
                 CreatedAt = DateTime.UtcNow
             };
-            _fundRepo.Setup(r => r.GetFundByIdAsync(6)).ReturnsAsync(fund);
-            var dto = await _service.GetFundByIdAsync(6);
+            _fundRepo.Setup(r => r.GetFundByIdAsync(6, true)).ReturnsAsync(fund);
+            var dto = await _service.GetFundByIdAsync(6, Guid.NewGuid(), false);
             Assert.NotNull(dto);
             Assert.True(dto!.CanAcceptContributions);
             Assert.Contains("Chưa có giao dịch", dto.BalanceContextVi ?? "", StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]
+        public async Task GetFundByIdAsync_ShouldMarkClosed_WhenApprovedAndPastExpiry()
+        {
+            var fund = new ClubFund
+            {
+                FundId = 7,
+                ClubId = 1,
+                FundName = "Z",
+                Status = "APPROVED",
+                ExpiresAt = DateTime.UtcNow.Date.AddDays(-1),
+                TotalAmount = 100,
+                CurrentBalance = 50,
+                CreatedAt = DateTime.UtcNow
+            };
+            _fundRepo.Setup(r => r.GetFundByIdAsync(7, true)).ReturnsAsync(fund);
+            var dto = await _service.GetFundByIdAsync(7, Guid.NewGuid(), false);
+            Assert.NotNull(dto);
+            Assert.True(dto!.IsClosed);
+            Assert.Equal("EXPIRED", dto.ClosedReasonCode);
+            Assert.Equal("Đã đóng", dto.LifecycleStatusVi);
+            Assert.False(dto.CanAcceptContributions);
+        }
+
+        [Fact]
         public async Task GetFundsByClubIdPagedAsync_ShouldReturnPagedDtos()
         {
             var uid = Guid.NewGuid();
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, level: 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2));
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 2, "editfinance")).ReturnsAsync(true);
 
             var list = new List<ClubFund>
@@ -678,7 +716,7 @@ namespace UNIC.ServiceTest.Services
                     CreatedAt = DateTime.UtcNow
                 }
             };
-            _fundRepo.Setup(r => r.GetFundsByClubIdPagedAsync(2, null, null, "NEWEST", 1, 10)).ReturnsAsync((list, 1));
+            _fundRepo.Setup(r => r.GetFundsByClubIdPagedAsync(2, null, null, "NEWEST", 1, 10, true)).ReturnsAsync((list, 1));
 
             var page = await _service.GetFundsByClubIdPagedAsync(2, uid, false, null, null, null, 1, 10);
             Assert.Single(page.Items);
@@ -705,39 +743,39 @@ namespace UNIC.ServiceTest.Services
             var uid = Guid.NewGuid();
             _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, level: 3));
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 2, "editfinance")).ReturnsAsync(true);
-            _fundRepo.Setup(r => r.GetFundsByClubIdPagedAsync(2, "APPROVED", null, "NEWEST", 1, 10))
+            _fundRepo.Setup(r => r.GetFundsByClubIdPagedAsync(2, "APPROVED", null, "NEWEST", 1, 10, false))
                 .ReturnsAsync((Enumerable.Empty<ClubFund>(), 0));
 
             await _service.GetFundsByClubIdPagedAsync(2, uid, false, "PENDING", null, null, 1, 10);
 
-            _fundRepo.Verify(r => r.GetFundsByClubIdPagedAsync(2, "APPROVED", null, "NEWEST", 1, 10), Times.Once);
+            _fundRepo.Verify(r => r.GetFundsByClubIdPagedAsync(2, "APPROVED", null, "NEWEST", 1, 10, false), Times.Once);
         }
 
         [Fact]
         public async Task GetFundsByClubIdPagedAsync_ShouldUsePending_WhenTopManagerRequestsPending()
         {
             var uid = Guid.NewGuid();
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2, level: 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync(ActiveManagerMember(2));
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 2, "editfinance")).ReturnsAsync(true);
-            _fundRepo.Setup(r => r.GetFundsByClubIdPagedAsync(2, "PENDING", null, "NEWEST", 1, 10))
+            _fundRepo.Setup(r => r.GetFundsByClubIdPagedAsync(2, "PENDING", null, "NEWEST", 1, 10, true))
                 .ReturnsAsync((Enumerable.Empty<ClubFund>(), 0));
 
             await _service.GetFundsByClubIdPagedAsync(2, uid, false, "PENDING", null, null, 1, 10);
 
-            _fundRepo.Verify(r => r.GetFundsByClubIdPagedAsync(2, "PENDING", null, "NEWEST", 1, 10), Times.Once);
+            _fundRepo.Verify(r => r.GetFundsByClubIdPagedAsync(2, "PENDING", null, "NEWEST", 1, 10, true), Times.Once);
         }
 
         [Fact]
         public async Task GetFundsByClubIdPagedAsync_ShouldBypassMemberGate_WhenSystemAdmin()
         {
             var uid = Guid.NewGuid();
-            _fundRepo.Setup(r => r.GetFundsByClubIdPagedAsync(2, "REJECTED", null, "NEWEST", 1, 10))
+            _fundRepo.Setup(r => r.GetFundsByClubIdPagedAsync(2, "REJECTED", null, "NEWEST", 1, 10, true))
                 .ReturnsAsync((Enumerable.Empty<ClubFund>(), 0));
 
             await _service.GetFundsByClubIdPagedAsync(2, uid, true, "REJECTED", null, null, 1, 10);
 
             _memberRepo.Verify(r => r.GetMemberAsync(It.IsAny<Guid>(), It.IsAny<int>()), Times.Never);
-            _fundRepo.Verify(r => r.GetFundsByClubIdPagedAsync(2, "REJECTED", null, "NEWEST", 1, 10), Times.Once);
+            _fundRepo.Verify(r => r.GetFundsByClubIdPagedAsync(2, "REJECTED", null, "NEWEST", 1, 10, true), Times.Once);
         }
 
         [Fact]
@@ -746,12 +784,12 @@ namespace UNIC.ServiceTest.Services
             var uid = Guid.NewGuid();
             _memberRepo.Setup(r => r.GetMemberAsync(uid, 2)).ReturnsAsync((UserClubRole?)null);
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 2, "editfinance")).ReturnsAsync(true);
-            _fundRepo.Setup(r => r.GetFundsByClubIdPagedAsync(2, "APPROVED", null, "NEWEST", 1, 10))
+            _fundRepo.Setup(r => r.GetFundsByClubIdPagedAsync(2, "APPROVED", null, "NEWEST", 1, 10, false))
                 .ReturnsAsync((Enumerable.Empty<ClubFund>(), 0));
 
             await _service.GetFundsByClubIdPagedAsync(2, uid, false, "PENDING", null, null, 1, 10);
 
-            _fundRepo.Verify(r => r.GetFundsByClubIdPagedAsync(2, "APPROVED", null, "NEWEST", 1, 10), Times.Once);
+            _fundRepo.Verify(r => r.GetFundsByClubIdPagedAsync(2, "APPROVED", null, "NEWEST", 1, 10, false), Times.Once);
         }
 
         [Fact]
@@ -759,13 +797,13 @@ namespace UNIC.ServiceTest.Services
         {
             var uid = Guid.NewGuid();
             _fundRepo.Setup(r => r.GetMyFundsByClubIdPagedAsync(
-                    2, uid, "CREATED", null, null, "NEWEST", 1, 10))
+                    2, uid, "CREATED", null, null, "NEWEST", 1, 10, false))
                 .ReturnsAsync((Enumerable.Empty<ClubFund>(), 0));
 
-            await _service.GetMyFundsByClubIdPagedAsync(2, uid, null, "ALL", null, null, 1, 10);
+            await _service.GetMyFundsByClubIdPagedAsync(2, uid, false, null, "ALL", null, null, 1, 10);
 
             _fundRepo.Verify(r => r.GetMyFundsByClubIdPagedAsync(
-                2, uid, "CREATED", null, null, "NEWEST", 1, 10), Times.Once);
+                2, uid, "CREATED", null, null, "NEWEST", 1, 10, false), Times.Once);
         }
 
         [Fact]
@@ -773,20 +811,20 @@ namespace UNIC.ServiceTest.Services
         {
             var uid = Guid.NewGuid();
             _fundRepo.Setup(r => r.GetMyFundsByClubIdPagedAsync(
-                    2, uid, "ALL", null, null, "NEWEST", 1, 10))
+                    2, uid, "ALL", null, null, "NEWEST", 1, 10, false))
                 .ReturnsAsync((Enumerable.Empty<ClubFund>(), 0));
 
-            await _service.GetMyFundsByClubIdPagedAsync(2, uid, "ALL", null, null, null, 1, 10);
+            await _service.GetMyFundsByClubIdPagedAsync(2, uid, false, "ALL", null, null, null, 1, 10);
 
             _fundRepo.Verify(r => r.GetMyFundsByClubIdPagedAsync(
-                2, uid, "ALL", null, null, "NEWEST", 1, 10), Times.Once);
+                2, uid, "ALL", null, null, "NEWEST", 1, 10, false), Times.Once);
         }
 
         [Fact]
         public async Task GetMyFundsByClubIdPagedAsync_ShouldThrow_WhenMineTypeInvalid()
         {
             await Assert.ThrowsAsync<ArgumentException>(() =>
-                _service.GetMyFundsByClubIdPagedAsync(2, Guid.NewGuid(), "INVALID", null, null, null, 1, 10));
+                _service.GetMyFundsByClubIdPagedAsync(2, Guid.NewGuid(), false, "INVALID", null, null, null, 1, 10));
         }
 
         [Fact]
@@ -794,27 +832,27 @@ namespace UNIC.ServiceTest.Services
         {
             var uid = Guid.NewGuid();
             _fundRepo.Setup(r => r.GetMyFundsByClubIdPagedAsync(
-                    2, uid, "RESPONSIBLE", null, null, "NEWEST", 1, 10))
+                    2, uid, "RESPONSIBLE", null, null, "NEWEST", 1, 10, false))
                 .ReturnsAsync((Enumerable.Empty<ClubFund>(), 0));
 
-            await _service.GetMyFundsByClubIdPagedAsync(2, uid, "RESPONSIBLE", null, null, null, 1, 10);
+            await _service.GetMyFundsByClubIdPagedAsync(2, uid, false, "RESPONSIBLE", null, null, null, 1, 10);
 
             _fundRepo.Verify(r => r.GetMyFundsByClubIdPagedAsync(
-                2, uid, "RESPONSIBLE", null, null, "NEWEST", 1, 10), Times.Once);
+                2, uid, "RESPONSIBLE", null, null, "NEWEST", 1, 10, false), Times.Once);
         }
 
         [Fact]
         public async Task GetMyFundsByClubIdPagedAsync_ShouldThrow_WhenStatusInvalid()
         {
             await Assert.ThrowsAsync<ArgumentException>(() =>
-                _service.GetMyFundsByClubIdPagedAsync(2, Guid.NewGuid(), null, "NOT_A_STATUS", null, null, 1, 10));
+                _service.GetMyFundsByClubIdPagedAsync(2, Guid.NewGuid(), false, null, "NOT_A_STATUS", null, null, 1, 10));
         }
 
         [Fact]
         public async Task GetMyFundsByClubIdPagedAsync_ShouldThrow_WhenSortInvalid()
         {
             await Assert.ThrowsAsync<ArgumentException>(() =>
-                _service.GetMyFundsByClubIdPagedAsync(2, Guid.NewGuid(), null, null, null, "BAD_SORT", 1, 10));
+                _service.GetMyFundsByClubIdPagedAsync(2, Guid.NewGuid(), false, null, null, null, "BAD_SORT", 1, 10));
         }
 
         #endregion
@@ -868,7 +906,7 @@ namespace UNIC.ServiceTest.Services
         [Fact]
         public async Task ApproveFundAsync_ShouldThrow_WhenFundNotFound()
         {
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync((ClubFund?)null);
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync((ClubFund?)null);
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 _service.ApproveFundAsync(Guid.NewGuid(), new ApproveFundDto { FundId = 1, Action = "APPROVE" }));
         }
@@ -876,7 +914,7 @@ namespace UNIC.ServiceTest.Services
         [Fact]
         public async Task ApproveFundAsync_ShouldThrow_WhenAlreadyApproved()
         {
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 1,
@@ -892,14 +930,14 @@ namespace UNIC.ServiceTest.Services
         public async Task ApproveFundAsync_ShouldThrow_WhenNotTopManager()
         {
             var mid = Guid.NewGuid();
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 2,
                 Status = "PENDING",
                 FundName = "F"
             });
-            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(ActiveManagerMember(2, level: 2));
+            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(ActiveManagerMember(2, level: 1));
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
                 _service.ApproveFundAsync(mid, new ApproveFundDto { FundId = 1, Action = "APPROVE" }));
@@ -909,14 +947,14 @@ namespace UNIC.ServiceTest.Services
         public async Task ApproveFundAsync_ShouldUpdate_WhenReject()
         {
             var mid = Guid.NewGuid();
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 2,
                 Status = "PENDING",
                 FundName = "F"
             });
-            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(ActiveManagerMember(2, level: 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(ActiveManagerMember(2));
             _fundRepo.Setup(r => r.UpdateClubFundAsync(It.IsAny<ClubFund>())).Returns(Task.CompletedTask);
 
             var ok = await _service.ApproveFundAsync(mid,
@@ -932,14 +970,14 @@ namespace UNIC.ServiceTest.Services
         public async Task ApproveFundAsync_ShouldThrow_WhenRejectWithoutReason()
         {
             var mid = Guid.NewGuid();
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 2,
                 Status = "PENDING",
                 FundName = "F"
             });
-            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(ActiveManagerMember(2, level: 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(ActiveManagerMember(2));
 
             var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
                 _service.ApproveFundAsync(mid, new ApproveFundDto { FundId = 1, Action = "REJECT" }));
@@ -950,14 +988,14 @@ namespace UNIC.ServiceTest.Services
         public async Task ApproveFundAsync_ShouldThrow_WhenRejectReasonTooShort()
         {
             var mid = Guid.NewGuid();
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 2,
                 Status = "PENDING",
                 FundName = "F"
             });
-            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(ActiveManagerMember(2, level: 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(ActiveManagerMember(2));
 
             await Assert.ThrowsAsync<ArgumentException>(() =>
                 _service.ApproveFundAsync(mid, new ApproveFundDto { FundId = 1, Action = "REJECT", RejectReason = "abc" }));
@@ -1041,28 +1079,57 @@ namespace UNIC.ServiceTest.Services
         public async Task GetFundCapabilitiesAsync_ShouldSetFlags_WhenActiveWithPolicies()
         {
             var uid = Guid.NewGuid();
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1));
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "viewfinance")).ReturnsAsync(true);
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "createfinance")).ReturnsAsync(true);
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "editfinance")).ReturnsAsync(true);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "deletefinance")).ReturnsAsync(true);
 
             var dto = await _service.GetFundCapabilitiesAsync(uid, 1);
             Assert.True(dto.CanViewFunds);
             Assert.True(dto.CanCreateFund);
             Assert.True(dto.CanApproveOrRejectFundEntity);
+            Assert.True(dto.HasDeleteFinancePolicy);
+            Assert.True(dto.CanSoftDeleteFund);
+            Assert.True(dto.CanManageOnlinePaymentSettings);
+            Assert.True(dto.CanRecordCashContributions);
+            Assert.True(dto.CanProcessClubRefunds);
+            Assert.True(dto.CanViewSoftDeletedFunds);
             Assert.Equal(5, dto.MenuItems.Count);
             Assert.Equal(new[] { "overview", "my-funds", "transactions", "reports", "settings" }, dto.MenuItems.Select(m => m.Id).ToArray());
             Assert.All(dto.MenuItems, m => Assert.True(m.Visible));
         }
 
         [Fact]
+        public async Task GetFundCapabilitiesAsync_ViceWithEditFinance_DoesNotGetManagerOnlyOps()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "viewfinance")).ReturnsAsync(true);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "createfinance")).ReturnsAsync(true);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "editfinance")).ReturnsAsync(true);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "deletefinance")).ReturnsAsync(true);
+
+            var dto = await _service.GetFundCapabilitiesAsync(uid, 1);
+            Assert.True(dto.CanViewFunds);
+            Assert.True(dto.CanCreateFund);
+            Assert.False(dto.CanApproveOrRejectFundEntity);
+            Assert.False(dto.CanSoftDeleteFund);
+            Assert.False(dto.CanManageOnlinePaymentSettings);
+            Assert.False(dto.CanRecordCashContributions);
+            Assert.False(dto.CanProcessClubRefunds);
+            Assert.False(dto.CanViewSoftDeletedFunds);
+        }
+
+        [Fact]
         public async Task GetFundCapabilitiesAsync_ShouldReturnEmptyMenu_WhenCannotViewFunds()
         {
             var uid = Guid.NewGuid();
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1));
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "viewfinance")).ReturnsAsync(false);
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "createfinance")).ReturnsAsync(false);
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "editfinance")).ReturnsAsync(false);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "deletefinance")).ReturnsAsync(false);
 
             var dto = await _service.GetFundCapabilitiesAsync(uid, 1);
             Assert.False(dto.CanViewFunds);
@@ -1132,7 +1199,7 @@ namespace UNIC.ServiceTest.Services
         public async Task CreateFundAsync_ShouldPersistExpiresAt_WhenDateIsInFuture()
         {
             var uid = Guid.NewGuid();
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1));
             ClubFund? captured = null;
             _fundRepo.Setup(r => r.AddFundAsync(It.IsAny<ClubFund>()))
                 .Callback<ClubFund>(f => captured = f)
@@ -1143,6 +1210,7 @@ namespace UNIC.ServiceTest.Services
             {
                 ClubId = 1,
                 FundName = "QExp",
+                FundTypeId = 1,
                 ExpiresAt = future
             });
 
@@ -1362,7 +1430,7 @@ namespace UNIC.ServiceTest.Services
             _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(new UserClubRole
             {
                 Status = "LEFT",
-                ClubRole = new ClubRole { Level = 1 }
+                RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { Level = 1 } } }
             });
 
             var dto = await _service.GetFundCapabilitiesAsync(uid, 1);
@@ -1374,23 +1442,40 @@ namespace UNIC.ServiceTest.Services
         public async Task GetFundCapabilitiesAsync_ShouldHintEditFinance_WhenManagerWithoutEdit()
         {
             var uid = Guid.NewGuid();
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1));
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "viewfinance")).ReturnsAsync(true);
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "createfinance")).ReturnsAsync(true);
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "editfinance")).ReturnsAsync(false);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "deletefinance")).ReturnsAsync(true);
 
             var dto = await _service.GetFundCapabilitiesAsync(uid, 1);
             Assert.Contains("duyệt quỹ", dto.FinanceAccessHintVi ?? "", StringComparison.OrdinalIgnoreCase);
         }
 
         [Fact]
+        public async Task GetFundCapabilitiesAsync_ShouldHintDeleteFinance_WhenManagerWithoutDeletePolicy()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1));
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "viewfinance")).ReturnsAsync(true);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "createfinance")).ReturnsAsync(true);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "editfinance")).ReturnsAsync(true);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "deletefinance")).ReturnsAsync(false);
+
+            var dto = await _service.GetFundCapabilitiesAsync(uid, 1);
+            Assert.False(dto.CanSoftDeleteFund);
+            Assert.Contains("deletefinance", dto.FinanceAccessHintVi ?? "", StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
         public async Task GetFundCapabilitiesAsync_ShouldHintCreateFinance_WhenViceWithoutCreate()
         {
             var uid = Guid.NewGuid();
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, 2));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "viewfinance")).ReturnsAsync(true);
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "createfinance")).ReturnsAsync(false);
             _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "editfinance")).ReturnsAsync(false);
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "deletefinance")).ReturnsAsync(false);
 
             var dto = await _service.GetFundCapabilitiesAsync(uid, 1);
             Assert.Contains("tạo quỹ", dto.FinanceAccessHintVi ?? "", StringComparison.OrdinalIgnoreCase);
@@ -1400,14 +1485,14 @@ namespace UNIC.ServiceTest.Services
         public async Task ApproveFundAsync_ShouldThrow_WhenActionInvalid()
         {
             var mid = Guid.NewGuid();
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 2,
                 Status = "PENDING",
                 FundName = "F"
             });
-            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(ActiveManagerMember(2));
 
             await Assert.ThrowsAsync<ArgumentException>(() =>
                 _service.ApproveFundAsync(mid, new ApproveFundDto { FundId = 1, Action = "HOLD" }));
@@ -1417,14 +1502,14 @@ namespace UNIC.ServiceTest.Services
         public async Task ApproveFundAsync_ShouldThrow_WhenRejectReasonTooLong()
         {
             var mid = Guid.NewGuid();
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 2,
                 Status = "PENDING",
                 FundName = "F"
             });
-            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(ActiveManagerMember(2, 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(ActiveManagerMember(2));
 
             var longReason = new string('x', 2001);
             await Assert.ThrowsAsync<ArgumentException>(() =>
@@ -1435,7 +1520,7 @@ namespace UNIC.ServiceTest.Services
         public async Task ApproveFundAsync_ShouldThrow_WhenMemberInactive()
         {
             var mid = Guid.NewGuid();
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 2,
@@ -1445,7 +1530,7 @@ namespace UNIC.ServiceTest.Services
             _memberRepo.Setup(r => r.GetMemberAsync(mid, 2)).ReturnsAsync(new UserClubRole
             {
                 Status = "LEFT",
-                ClubRole = new ClubRole { Level = 1 }
+                RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { Level = 1 } } }
             });
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
@@ -1455,7 +1540,7 @@ namespace UNIC.ServiceTest.Services
         [Fact]
         public async Task ApproveFundAsync_ShouldThrow_WhenFundAlreadyRejected()
         {
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 1,
@@ -1471,14 +1556,14 @@ namespace UNIC.ServiceTest.Services
         public async Task ApproveFundAsync_ShouldThrow_WhenFundStatusUnexpected()
         {
             var mid = Guid.NewGuid();
-            _fundRepo.Setup(r => r.GetFundByIdAsync(1)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(1, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 1,
                 ClubId = 1,
                 Status = "ARCHIVED",
                 FundName = "F"
             });
-            _memberRepo.Setup(r => r.GetMemberAsync(mid, 1)).ReturnsAsync(ActiveManagerMember(1, 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(mid, 1)).ReturnsAsync(ActiveManagerMember(1));
 
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 _service.ApproveFundAsync(mid, new ApproveFundDto { FundId = 1, Action = "APPROVE" }));
@@ -1635,7 +1720,7 @@ namespace UNIC.ServiceTest.Services
             {
                 ClubId = 2,
                 Status = "ACTIVE",
-                ClubRole = new ClubRole { Level = 3 }
+                RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { Level = 3 } } }
             });
             _fundRepo.Setup(r => r.GetTotalRefundedAmountForOriginalTransactionAsync(5)).ReturnsAsync(0m);
             _fundRepo.Setup(r => r.ExistsPendingRefundForOriginalTransactionAsync(5)).ReturnsAsync(false);
@@ -1672,7 +1757,7 @@ namespace UNIC.ServiceTest.Services
         public async Task GetClubFundRefundRequestsPagedAsync_ShouldThrow_WhenNotManager()
         {
             var uid = Guid.NewGuid();
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 2));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
                 _service.GetClubFundRefundRequestsPagedAsync(uid, 1, isSystemAdmin: false, status: null, 1, 9));
@@ -1682,7 +1767,7 @@ namespace UNIC.ServiceTest.Services
         public async Task RejectFundRefundRequestAsync_ShouldThrow_WhenReasonTooShort()
         {
             var uid = Guid.NewGuid();
-            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1));
             _fundRepo.Setup(r => r.GetRefundRequestByIdAsync(1)).ReturnsAsync(new FundRefundRequest
             {
                 RefundRequestId = 1,
@@ -1696,16 +1781,94 @@ namespace UNIC.ServiceTest.Services
                 _service.RejectFundRefundRequestAsync(uid, 1, false, 1, new RejectFundRefundRequestDto { RejectionReason = "no" }));
         }
 
+        [Fact]
+        public async Task CompleteFundRefundRequestAsync_ShouldThrow_WhenManagerNoteTooLong()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1));
+            _fundRepo.Setup(r => r.GetRefundRequestByIdAsync(1)).ReturnsAsync(new FundRefundRequest
+            {
+                RefundRequestId = 1,
+                ClubId = 1,
+                FundId = 1,
+                Status = "PENDING"
+            });
+
+            var dto = new CompleteFundRefundRequestDto
+            {
+                ManagerNote = new string('a', 501)
+            };
+
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.CompleteFundRefundRequestAsync(uid, 1, false, 1, dto));
+        }
+
+        [Fact]
+        public async Task ManagerRefundContributionAsync_ShouldReturnTransaction_WhenValid()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1));
+            _fundRepo.Setup(r => r.GetFundByIdAsync(2, false)).ReturnsAsync(new ClubFund { FundId = 2, ClubId = 1, FundName = "Q", Status = "APPROVED" });
+            _fundRepo.Setup(r => r.TryRecordApprovedManagerRefundExpenseAsync(
+                    1, 2, 5, uid, 10_000m,
+                    It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<string?>()))
+                .ReturnsAsync((99, 123m));
+            _fundRepo.Setup(r => r.GetTransactionByIdAsync(99)).ReturnsAsync(new FundTransaction
+            {
+                TransactionId = 99,
+                FundId = 2,
+                TransactionType = "EXPENSE",
+                Status = "APPROVED",
+                Amount = 10_000m,
+                Description = "refund",
+                TransactionDate = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                RefundForTransactionId = 5
+            });
+
+            var dto = await _service.ManagerRefundContributionAsync(uid, 1, 2, false, new ManagerRefundContributionDto
+            {
+                OriginalTransactionId = 5,
+                Amount = 10_000m,
+                Reason = "Hoàn",
+                TransferReference = "TR",
+                ManagerNote = "NOTE"
+            });
+
+            Assert.Equal(99, dto.TransactionId);
+            Assert.Equal("EXPENSE", dto.TransactionType);
+            Assert.Equal("APPROVED", dto.Status);
+            Assert.Equal(10_000m, dto.Amount);
+            Assert.Equal(5, dto.RefundForTransactionId);
+        }
+
+        [Fact]
+        public async Task ManagerRefundContributionAsync_ShouldThrow_WhenManagerNoteTooLong()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1));
+            _fundRepo.Setup(r => r.GetFundByIdAsync(2, false)).ReturnsAsync(new ClubFund { FundId = 2, ClubId = 1, FundName = "Q", Status = "APPROVED" });
+
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                _service.ManagerRefundContributionAsync(uid, 1, 2, false, new ManagerRefundContributionDto
+                {
+                    OriginalTransactionId = 5,
+                    Amount = 10_000m,
+                    ManagerNote = new string('a', 501)
+                }));
+        }
+
         #endregion
 
         #region Record cash contribution
 
         [Fact]
-        public async Task RecordCashContributionAsync_ShouldThrow_WhenNotManagerLevel1()
+        public async Task RecordCashContributionAsync_ShouldThrow_WhenNotHeadManager()
         {
             var mgr = Guid.NewGuid();
             var contrib = Guid.NewGuid();
-            _memberRepo.Setup(r => r.GetMemberAsync(mgr, 1)).ReturnsAsync(ActiveManagerMember(1, level: 2));
+            _memberRepo.Setup(r => r.GetMemberAsync(mgr, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
 
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
                 _service.RecordCashContributionAsync(mgr, 1, false, new RecordCashContributionRequestDto
@@ -1722,14 +1885,14 @@ namespace UNIC.ServiceTest.Services
         {
             var mgr = Guid.NewGuid();
             var contrib = Guid.NewGuid();
-            _memberRepo.Setup(r => r.GetMemberAsync(mgr, 1)).ReturnsAsync(ActiveManagerMember(1, level: 1));
+            _memberRepo.Setup(r => r.GetMemberAsync(mgr, 1)).ReturnsAsync(ActiveManagerMember(1));
             _memberRepo.Setup(r => r.GetMemberAsync(contrib, 1)).ReturnsAsync(new UserClubRole
             {
                 ClubId = 1,
                 Status = "ACTIVE",
-                ClubRole = new ClubRole { Level = 5 }
+                RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { Level = 5 } } }
             });
-            _fundRepo.Setup(r => r.GetFundByIdAsync(9)).ReturnsAsync(new ClubFund
+            _fundRepo.Setup(r => r.GetFundByIdAsync(9, false)).ReturnsAsync(new ClubFund
             {
                 FundId = 9,
                 ClubId = 1,
@@ -1760,6 +1923,98 @@ namespace UNIC.ServiceTest.Services
             Assert.Equal(220_000m, dto.NewCurrentBalance);
             Assert.Equal(contrib, dto.ContributorUserId);
             Assert.Equal(mgr, dto.RecordedByUserId);
+        }
+
+        #endregion
+
+        #region SoftDeleteFundAsync
+
+        [Fact]
+        public async Task SoftDeleteFundAsync_ShouldCallRepository_WhenBalanceZeroAndHeadManager()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1));
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "deletefinance")).ReturnsAsync(true);
+            _fundRepo.Setup(r => r.GetFundByIdAsync(5, false)).ReturnsAsync(new ClubFund
+            {
+                FundId = 5,
+                ClubId = 1,
+                CurrentBalance = 0m,
+                TotalAmount = 0m,
+                Status = "APPROVED",
+                FundName = "Q"
+            });
+            _fundRepo.Setup(r => r.SoftDeleteFundAsync(5, 1, uid)).ReturnsAsync(true);
+
+            await _service.SoftDeleteFundAsync(uid, 1, 5, false);
+
+            _fundRepo.Verify(r => r.SoftDeleteFundAsync(5, 1, uid), Times.Once);
+        }
+
+        [Fact]
+        public async Task SoftDeleteFundAsync_ShouldThrow_WhenNoDeleteFinancePolicy()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1));
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "deletefinance")).ReturnsAsync(false);
+            _fundRepo.Setup(r => r.GetFundByIdAsync(5, false)).ReturnsAsync(new ClubFund
+            {
+                FundId = 5,
+                ClubId = 1,
+                CurrentBalance = 0m,
+                TotalAmount = 0m,
+                Status = "APPROVED",
+                FundName = "Q"
+            });
+
+            var ex = await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+                _service.SoftDeleteFundAsync(uid, 1, 5, false));
+            Assert.Contains("deletefinance", ex.Message, StringComparison.OrdinalIgnoreCase);
+
+            _fundRepo.Verify(r => r.SoftDeleteFundAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Guid>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task SoftDeleteFundAsync_SystemAdmin_DoesNotRequireDeleteFinancePolicy()
+        {
+            var uid = Guid.NewGuid();
+            _fundRepo.Setup(r => r.GetFundByIdAsync(5, false)).ReturnsAsync(new ClubFund
+            {
+                FundId = 5,
+                ClubId = 1,
+                CurrentBalance = 0m,
+                TotalAmount = 0m,
+                Status = "APPROVED",
+                FundName = "Q"
+            });
+            _fundRepo.Setup(r => r.SoftDeleteFundAsync(5, 1, uid)).ReturnsAsync(true);
+
+            await _service.SoftDeleteFundAsync(uid, 1, 5, isSystemAdmin: true);
+
+            _policy.Verify(
+                p => p.HasMemberPolicyInClubAsync(It.IsAny<Guid>(), It.IsAny<int>(), "deletefinance"),
+                Times.Never);
+            _fundRepo.Verify(r => r.SoftDeleteFundAsync(5, 1, uid), Times.Once);
+        }
+
+        [Fact]
+        public async Task SoftDeleteFundAsync_ShouldThrow_WhenBalanceNotZero()
+        {
+            var uid = Guid.NewGuid();
+            _memberRepo.Setup(r => r.GetMemberAsync(uid, 1)).ReturnsAsync(ActiveManagerMember(1));
+            _policy.Setup(p => p.HasMemberPolicyInClubAsync(uid, 1, "deletefinance")).ReturnsAsync(true);
+            _fundRepo.Setup(r => r.GetFundByIdAsync(5, false)).ReturnsAsync(new ClubFund
+            {
+                FundId = 5,
+                ClubId = 1,
+                CurrentBalance = 100m,
+                Status = "APPROVED",
+                FundName = "Q"
+            });
+
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _service.SoftDeleteFundAsync(uid, 1, 5, false));
+            Assert.Contains("số dư", ex.Message, StringComparison.OrdinalIgnoreCase);
         }
 
         #endregion

@@ -24,11 +24,12 @@ namespace DataAccess.Repositories.Implementation
                 .FirstOrDefaultAsync(t => t.TransactionId == id);
         }
 
-        public async Task<ClubFund?> GetFundByIdAsync(int id)
+        public async Task<ClubFund?> GetFundByIdAsync(int id, bool includeDeleted = false)
         {
             return await _context.ClubFunds
                 .AsNoTracking()
-                .FirstOrDefaultAsync(f => f.FundId == id);
+                .Include(f => f.FundType)
+                .FirstOrDefaultAsync(f => f.FundId == id && (includeDeleted || !f.IsDeleted));
         }
 
         public async Task<bool> ExistsNonRejectedFundNameInClubAsync(int clubId, string fundNameNormalized)
@@ -40,6 +41,7 @@ namespace DataAccess.Repositories.Implementation
             return await _context.ClubFunds
                 .AsNoTracking()
                 .AnyAsync(f =>
+                    !f.IsDeleted &&
                     f.ClubId == clubId &&
                     f.FundName != null &&
                     f.FundName.Trim().ToUpper() == normalized &&
@@ -119,7 +121,8 @@ namespace DataAccess.Repositories.Implementation
                     || !string.Equals(entity.TransactionType, "INCOME", StringComparison.OrdinalIgnoreCase)
                     || entity.Status == null
                     || !string.Equals(entity.Status, "PENDING", StringComparison.OrdinalIgnoreCase)
-                    || entity.ClubFund == null)
+                    || entity.ClubFund == null
+                    || entity.ClubFund.IsDeleted)
                 {
                     await tx.RollbackAsync();
                     return false;
@@ -147,7 +150,8 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.ClubFunds
                 .AsNoTracking()
-                .Where(cf => cf.ClubId == clubId)
+                .Include(f => f.FundType)
+                .Where(cf => cf.ClubId == clubId && !cf.IsDeleted)
                 .OrderBy(cf => cf.FundName)
                 .ToListAsync();
         }
@@ -158,11 +162,13 @@ namespace DataAccess.Repositories.Implementation
             string? search,
             string sort,
             int pageNumber,
-            int pageSize)
+            int pageSize,
+            bool includeSoftDeletedFunds = false)
         {
             var query = _context.ClubFunds
                 .AsNoTracking()
-                .Where(cf => cf.ClubId == clubId);
+                .Include(f => f.FundType)
+                .Where(cf => cf.ClubId == clubId && (!cf.IsDeleted || includeSoftDeletedFunds));
 
             if (!string.IsNullOrWhiteSpace(status))
             {
@@ -216,11 +222,13 @@ namespace DataAccess.Repositories.Implementation
             string? search,
             string sort,
             int pageNumber,
-            int pageSize)
+            int pageSize,
+            bool includeSoftDeletedFunds = false)
         {
             var query = _context.ClubFunds
                 .AsNoTracking()
-                .Where(cf => cf.ClubId == clubId);
+                .Include(f => f.FundType)
+                .Where(cf => cf.ClubId == clubId && (!cf.IsDeleted || includeSoftDeletedFunds));
 
             if (mineType == "CREATED")
             {
@@ -335,7 +343,7 @@ namespace DataAccess.Repositories.Implementation
                 .Include(t => t.Creator)
                 .Include(t => t.FundCategory)
                 .Include(t => t.ClubFund)
-                .Where(t => t.ClubFund != null && t.ClubFund.ClubId == clubId);
+                .Where(t => t.ClubFund != null && t.ClubFund.ClubId == clubId && !t.ClubFund.IsDeleted);
 
             if (fundId.HasValue)
                 query = query.Where(t => t.FundId == fundId.Value);
@@ -416,7 +424,7 @@ namespace DataAccess.Repositories.Implementation
         {
             var statuses = await _context.ClubFunds
                 .AsNoTracking()
-                .Where(f => f.ClubId == clubId)
+                .Where(f => f.ClubId == clubId && !f.IsDeleted)
                 .Select(f => f.Status)
                 .ToListAsync();
 
@@ -436,13 +444,13 @@ namespace DataAccess.Repositories.Implementation
 
             var totalBalanceApproved = await _context.ClubFunds
                 .AsNoTracking()
-                .Where(f => f.ClubId == clubId && f.Status != null && f.Status.ToUpper() == "APPROVED")
+                .Where(f => f.ClubId == clubId && !f.IsDeleted && f.Status != null && f.Status.ToUpper() == "APPROVED")
                 .SumAsync(f => (decimal?)f.CurrentBalance) ?? 0m;
 
             var txQuery =
                 from t in _context.FundTransactions.AsNoTracking()
                 join f in _context.ClubFunds.AsNoTracking() on t.FundId equals f.FundId
-                where f.ClubId == clubId
+                where f.ClubId == clubId && !f.IsDeleted
                     && t.Status != null
                     && t.Status.ToUpper() == "APPROVED"
                     && t.TransactionType != null
@@ -579,6 +587,12 @@ namespace DataAccess.Repositories.Implementation
 
                 var orig = req.OriginalTransaction;
                 var fund = orig.ClubFund;
+
+                if (fund.IsDeleted)
+                {
+                    await tx.RollbackAsync();
+                    return false;
+                }
 
                 if (!orig.IsMemberContribution
                     || orig.TransactionType == null
@@ -729,6 +743,117 @@ namespace DataAccess.Repositories.Implementation
             }
         }
 
+        public async Task<(int TransactionId, decimal NewCurrentBalance)?> TryRecordApprovedManagerRefundExpenseAsync(
+            int clubId,
+            int fundId,
+            int originalTransactionId,
+            Guid managerId,
+            decimal amount,
+            string? reason,
+            string? transferReference,
+            string? managerNote)
+        {
+            await using var tx = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            try
+            {
+                if (amount <= 0m)
+                {
+                    await tx.RollbackAsync();
+                    return null;
+                }
+
+                var orig = await _context.FundTransactions
+                    .Include(t => t.ClubFund)
+                    .FirstOrDefaultAsync(t => t.TransactionId == originalTransactionId);
+
+                if (orig == null || orig.ClubFund == null)
+                {
+                    await tx.RollbackAsync();
+                    return null;
+                }
+
+                var fund = orig.ClubFund;
+                if (fund.ClubId != clubId || orig.FundId != fundId || fund.IsDeleted)
+                {
+                    await tx.RollbackAsync();
+                    return null;
+                }
+
+                if (!orig.IsMemberContribution
+                    || orig.TransactionType == null
+                    || !string.Equals(orig.TransactionType, "INCOME", StringComparison.OrdinalIgnoreCase)
+                    || orig.Status == null
+                    || !string.Equals(orig.Status, "APPROVED", StringComparison.OrdinalIgnoreCase))
+                {
+                    await tx.RollbackAsync();
+                    return null;
+                }
+
+                var alreadyRefunded = await _context.FundTransactions
+                    .Where(t =>
+                        t.RefundForTransactionId == orig.TransactionId
+                        && t.TransactionType != null
+                        && t.TransactionType.ToUpper() == "EXPENSE"
+                        && t.Status != null
+                        && t.Status.ToUpper() == "APPROVED")
+                    .SumAsync(t => (decimal?)t.Amount) ?? 0m;
+
+                if (amount + alreadyRefunded > orig.Amount)
+                {
+                    await tx.RollbackAsync();
+                    return null;
+                }
+
+                if (fund.CurrentBalance < amount)
+                {
+                    await tx.RollbackAsync();
+                    return null;
+                }
+
+                var utc = DateTime.UtcNow;
+                var tr = (transferReference ?? string.Empty).Trim();
+                if (tr.Length > 100) tr = tr[..100];
+                var note = (managerNote ?? string.Empty).Trim();
+                if (note.Length > 500) note = note[..500];
+                var rs = (reason ?? string.Empty).Trim();
+                if (rs.Length > 2000) rs = rs[..2000];
+
+                var desc = string.IsNullOrEmpty(rs)
+                    ? $"Hoàn tiền nộp quỹ (giao dịch #{orig.TransactionId})"
+                    : $"Hoàn tiền nộp quỹ (giao dịch #{orig.TransactionId}): {rs}";
+
+                var expense = new FundTransaction
+                {
+                    FundId = orig.FundId,
+                    TransactionType = "EXPENSE",
+                    Status = "APPROVED",
+                    Amount = amount,
+                    Description = desc,
+                    TransactionDate = utc,
+                    CreatedAt = utc,
+                    UpdatedAt = utc,
+                    CreatedBy = managerId,
+                    ApprovedBy = managerId,
+                    IsMemberContribution = false,
+                    RefundForTransactionId = orig.TransactionId,
+                    ContributionSource = "MANAGER_REFUND"
+                };
+
+                await _context.FundTransactions.AddAsync(expense);
+
+                fund.CurrentBalance -= amount;
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                return (expense.TransactionId, fund.CurrentBalance);
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
+        }
+
         public async Task<(int TransactionId, decimal NewCurrentBalance)?> TryRecordApprovedCashIncomeAsync(
             int clubId,
             int fundId,
@@ -746,7 +871,7 @@ namespace DataAccess.Repositories.Implementation
                 var fund = await _context.ClubFunds
                     .FirstOrDefaultAsync(f => f.FundId == fundId);
 
-                if (fund == null || fund.ClubId != clubId)
+                if (fund == null || fund.ClubId != clubId || fund.IsDeleted)
                 {
                     await tx.RollbackAsync();
                     return null;
@@ -799,6 +924,19 @@ namespace DataAccess.Repositories.Implementation
                 await tx.RollbackAsync();
                 throw;
             }
+        }
+
+        public async Task<bool> SoftDeleteFundAsync(int fundId, int clubId, Guid deletedByUserId)
+        {
+            var fund = await _context.ClubFunds.FirstOrDefaultAsync(f => f.FundId == fundId && f.ClubId == clubId && !f.IsDeleted);
+            if (fund == null)
+                return false;
+
+            fund.IsDeleted = true;
+            fund.DeletedAtUtc = DateTime.UtcNow;
+            fund.DeletedBy = deletedByUserId;
+            await _context.SaveChangesAsync();
+            return true;
         }
     }
 }

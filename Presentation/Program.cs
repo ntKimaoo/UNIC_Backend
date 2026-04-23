@@ -106,12 +106,23 @@ builder.Services.AddSingleton(sp =>
 // Register Background Services
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.Configure<BusinessLogic.Options.PayOSOptions>(builder.Configuration.GetSection(BusinessLogic.Options.PayOSOptions.SectionName));
+builder.Services.Configure<BusinessLogic.Options.VnPayOptions>(builder.Configuration.GetSection(BusinessLogic.Options.VnPayOptions.SectionName));
 builder.Services.AddHttpClient<IPayOSService, PayOSService>((sp, client) =>
 {
     var opt = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<BusinessLogic.Options.PayOSOptions>>().Value;
     client.BaseAddress = new Uri(opt.BaseUrl.TrimEnd('/') + "/");
 });
+builder.Services.AddScoped<BusinessLogic.Services.Implementation.PaymentGateways.PayOSFundPaymentGateway>();
+builder.Services.AddScoped<BusinessLogic.Services.Implementation.PaymentGateways.VnPayFundPaymentGateway>();
+builder.Services.AddScoped<BusinessLogic.Services.Interface.IFundPaymentGatewayRegistry>(sp =>
+    new BusinessLogic.Services.Implementation.PaymentGateways.FundPaymentGatewayRegistry(
+        new BusinessLogic.Services.Interface.IFundPaymentGateway[]
+        {
+            sp.GetRequiredService<BusinessLogic.Services.Implementation.PaymentGateways.PayOSFundPaymentGateway>(),
+            sp.GetRequiredService<BusinessLogic.Services.Implementation.PaymentGateways.VnPayFundPaymentGateway>()
+        }));
 builder.Services.AddScoped<IFundRepository, FundRepository>();
+builder.Services.AddScoped<DataAccess.Repositories.Interface.IFundTypeRepository, DataAccess.Repositories.Implementation.FundTypeRepository>();
 builder.Services.AddScoped<IClubPayOSSettingsRepository, ClubPayOSSettingsRepository>();
 builder.Services.AddScoped<IClubFundService, ClubFundService>();
 builder.Services.AddScoped<IClubRepository, ClubRepository>();

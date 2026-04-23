@@ -304,6 +304,12 @@ namespace UNIC.DataAccess.Migrations
                     b.Property<decimal>("CurrentBalance")
                         .HasColumnType("decimal(15,2)");
 
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
@@ -315,6 +321,15 @@ namespace UNIC.DataAccess.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("FundTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("GoalAmount")
+                        .HasColumnType("decimal(15,2)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
 
                     b.Property<string>("RejectReason")
                         .HasMaxLength(2000)
@@ -334,6 +349,8 @@ namespace UNIC.DataAccess.Migrations
                     b.HasKey("FundId");
 
                     b.HasIndex("ClubId");
+
+                    b.HasIndex("FundTypeId");
 
                     b.ToTable("ClubFunds");
                 });
@@ -360,6 +377,11 @@ namespace UNIC.DataAccess.Migrations
 
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("bit");
+
+                    b.Property<string>("PaymentProvider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
@@ -946,6 +968,10 @@ namespace UNIC.DataAccess.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("PaymentProvider")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
                     b.Property<int?>("RefundForTransactionId")
                         .HasColumnType("int");
 
@@ -978,6 +1004,33 @@ namespace UNIC.DataAccess.Migrations
                     b.ToTable("FundTransactions");
                 });
 
+            modelBuilder.Entity("DataAccess.Models.FundType", b =>
+                {
+                    b.Property<int>("FundTypeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FundTypeId"));
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("FundTypeId");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("FundTypes");
+                });
+
             modelBuilder.Entity("DataAccess.Models.Notification", b =>
                 {
                     b.Property<int>("NotificationId")
@@ -988,6 +1041,9 @@ namespace UNIC.DataAccess.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("FromUserId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<bool>("IsRead")
                         .HasColumnType("bit");
@@ -1010,6 +1066,8 @@ namespace UNIC.DataAccess.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("NotificationId");
+
+                    b.HasIndex("FromUserId");
 
                     b.HasIndex("UserId", "IsRead");
 
@@ -1056,6 +1114,55 @@ namespace UNIC.DataAccess.Migrations
                     b.HasIndex(new[] { "UserId" }, "IX_PasswordResetTokens_UserId");
 
                     b.ToTable("PasswordResetTokens");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.RecordOfChange", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ChangeType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("ChangedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("ClubId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EntityId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EntityName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("NewValue")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Notification")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("OldValue")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangedBy");
+
+                    b.HasIndex("ClubId")
+                        .IsUnique()
+                        .HasFilter("[ClubId] IS NOT NULL");
+
+                    b.ToTable("RecordsOfChange");
                 });
 
             modelBuilder.Entity("DataAccess.Models.RecruitmentCampaign", b =>
@@ -1280,9 +1387,6 @@ namespace UNIC.DataAccess.Migrations
                     b.Property<int>("ClubId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("ClubRoleId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime>("JoinDate")
                         .HasColumnType("datetime2");
 
@@ -1300,11 +1404,27 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasIndex("ClubId");
 
-                    b.HasIndex("ClubRoleId");
-
                     b.HasIndex("UserId");
 
                     b.ToTable("UserClubRoles");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.UserClubRoleAssignment", b =>
+                {
+                    b.Property<int>("ClubMemberId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ClubRoleId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("ClubMemberId", "ClubRoleId");
+
+                    b.HasIndex("ClubRoleId");
+
+                    b.ToTable("UserClubRoleAssignments");
                 });
 
             modelBuilder.Entity("DataAccess.Models.UserClubRoleDepartment", b =>
@@ -1614,7 +1734,15 @@ namespace UNIC.DataAccess.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
+                    b.HasOne("DataAccess.Models.FundType", "FundType")
+                        .WithMany()
+                        .HasForeignKey("FundTypeId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
                     b.Navigation("Club");
+
+                    b.Navigation("FundType");
                 });
 
             modelBuilder.Entity("DataAccess.Models.ClubPayOSSettings", b =>
@@ -1847,11 +1975,18 @@ namespace UNIC.DataAccess.Migrations
 
             modelBuilder.Entity("DataAccess.Models.Notification", b =>
                 {
+                    b.HasOne("DataAccess.Models.User", "FromUser")
+                        .WithMany("SentNotifications")
+                        .HasForeignKey("FromUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("DataAccess.Models.User", "User")
                         .WithMany("Notifications")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("FromUser");
 
                     b.Navigation("User");
                 });
@@ -1866,6 +2001,23 @@ namespace UNIC.DataAccess.Migrations
                         .HasConstraintName("FK__PasswordR__User__412EB0B6");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.RecordOfChange", b =>
+                {
+                    b.HasOne("DataAccess.Models.User", "ChangedByUser")
+                        .WithMany("RecordsOfChange")
+                        .HasForeignKey("ChangedBy")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("DataAccess.Models.Club", "Club")
+                        .WithOne("RecordOfChange")
+                        .HasForeignKey("DataAccess.Models.RecordOfChange", "ClubId");
+
+                    b.Navigation("ChangedByUser");
+
+                    b.Navigation("Club");
                 });
 
             modelBuilder.Entity("DataAccess.Models.RecruitmentCampaign", b =>
@@ -1914,11 +2066,6 @@ namespace UNIC.DataAccess.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
-                    b.HasOne("DataAccess.Models.ClubRole", "ClubRole")
-                        .WithMany("ClubMembers")
-                        .HasForeignKey("ClubRoleId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
                     b.HasOne("DataAccess.Models.User", "User")
                         .WithMany("ClubMembers")
                         .HasForeignKey("UserId")
@@ -1929,9 +2076,26 @@ namespace UNIC.DataAccess.Migrations
 
                     b.Navigation("Club");
 
-                    b.Navigation("ClubRole");
-
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.UserClubRoleAssignment", b =>
+                {
+                    b.HasOne("DataAccess.Models.UserClubRole", "ClubMember")
+                        .WithMany("RoleAssignments")
+                        .HasForeignKey("ClubMemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("DataAccess.Models.ClubRole", "ClubRole")
+                        .WithMany("MemberAssignments")
+                        .HasForeignKey("ClubRoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ClubMember");
+
+                    b.Navigation("ClubRole");
                 });
 
             modelBuilder.Entity("DataAccess.Models.UserClubRoleDepartment", b =>
@@ -2092,6 +2256,9 @@ namespace UNIC.DataAccess.Migrations
 
                     b.Navigation("Events");
 
+                    b.Navigation("RecordOfChange")
+                        .IsRequired();
+
                     b.Navigation("RecruitmentCampaigns");
                 });
 
@@ -2102,11 +2269,11 @@ namespace UNIC.DataAccess.Migrations
 
             modelBuilder.Entity("DataAccess.Models.ClubRole", b =>
                 {
-                    b.Navigation("ClubMembers");
-
                     b.Navigation("ClubRolePolicies");
 
                     b.Navigation("ManagedDepartments");
+
+                    b.Navigation("MemberAssignments");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Department", b =>
@@ -2171,7 +2338,11 @@ namespace UNIC.DataAccess.Migrations
 
                     b.Navigation("PasswordResetTokens");
 
+                    b.Navigation("RecordsOfChange");
+
                     b.Navigation("RefreshTokens");
+
+                    b.Navigation("SentNotifications");
 
                     b.Navigation("UserRoles");
                 });
@@ -2181,6 +2352,8 @@ namespace UNIC.DataAccess.Migrations
                     b.Navigation("ClubMemberPolicies");
 
                     b.Navigation("MemberDepartments");
+
+                    b.Navigation("RoleAssignments");
                 });
 
             modelBuilder.Entity("DataAccess.Models.UserEventRole", b =>

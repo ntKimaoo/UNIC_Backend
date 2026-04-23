@@ -1,7 +1,6 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Implementation;
 using DataAccess.Models;
-using DataAccess.Repositories.Interface;
 using FluentAssertions;
 using Moq;
 using System;
@@ -11,8 +10,10 @@ using System.Threading.Tasks;
 using UNIC.BusinessLogic.DTOs;
 using UNIC.BusinessLogic.Services.Implementation;
 using UNIC.DataAccess.Models;
-using UNIC.DataAccess.Repositories.Interface;
 using Xunit;
+using DataAccess.Repositories.Interface;
+using DataAccess.Repositories.Implementation;
+using UNIC.DataAccess.Repositories.Interface;
 
 namespace UNIC.ServiceTest.Services
 {
@@ -324,21 +325,21 @@ namespace UNIC.ServiceTest.Services
                 { 
                     ClubMemberId = 1, UserId = userId1, Status = "Active", JoinDate = DateTime.Now,
                     User = new User { FullName = "U1", Email = "E1", Avatar = "A1", StudentId = "S1" },
-                    ClubRole = new ClubRole { ClubRoleId = 100, RoleName = "R1", Description = "D1", Level = 1, DepartmentId = 10 }
+                    RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { ClubRoleId = 100, RoleName = "R1", Description = "D1", Level = 1, DepartmentId = 10 } } }
                 },
                 // Member 2: No User (null Check), Role in different department
                 new UserClubRole
                 {
                     ClubMemberId = 2, UserId = userId2, Status = "Pending", JoinDate = DateTime.Now,
                     User = null,
-                    ClubRole = new ClubRole { ClubRoleId = 101, RoleName = "R2", DepartmentId = 20 }
+                    RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { ClubRoleId = 101, RoleName = "R2", DepartmentId = 20 } } }
                 },
                 // Member 3: Has User, Role is null
                 new UserClubRole
                 {
                     ClubMemberId = 3, UserId = userId3, Status = "Active",
                     User = new User { FullName = "U3", Email = "E3" },
-                    ClubRole = null
+                    RoleAssignments = new List<UserClubRoleAssignment>()
                 }
             };
 
@@ -370,70 +371,119 @@ namespace UNIC.ServiceTest.Services
         #endregion
 
         #region Add/Remove Member
-
         [Fact]
         public async Task AddMemberTodepartment_ShouldThrowException_WhenUserNotClubMember()
         {
-            // Arrange
-            var userId = Guid.NewGuid();
-            _mockClubMemberRepository.Setup(r => r.GetMemberAsync(userId, 1)).ReturnsAsync((UserClubRole?)null);
+            var clubId = 1;
+            var clubMemberId = 1;
+            var departmentId = 10;
 
-            // Act & Assert
-            await Assert.ThrowsAsync<KeyNotFoundException>(() => 
-                _departmentService.AddMemberTodepartment(1, userId, 10));
+            _mockClubMemberRepository
+                .Setup(r => r.GetMemberByIdAsync(clubMemberId))
+                .ReturnsAsync((UserClubRole?)null);
+
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                _departmentService.AddMemberToDepartment(clubId, clubMemberId, departmentId));
         }
-
         [Fact]
         public async Task AddMemberTodepartment_ShouldSucceed()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            var clubMember = new UserClubRole { ClubMemberId = 50 };
-            _mockClubMemberRepository.Setup(r => r.GetMemberAsync(userId, 1)).ReturnsAsync(clubMember);
-            
-            var created = new UserClubRoleDepartment { ClubMemberId = 50, DepartmentId = 10 };
-            _mockDepartmentRepository.Setup(r => r.AddMemberTodepartment(It.IsAny<UserClubRoleDepartment>()))
+            var clubId = 1;
+            var clubMemberId = 50;
+            var departmentId = 10;
+
+            var clubMember = new UserClubRole
+            {
+                ClubMemberId = clubMemberId,
+                ClubId = clubId 
+            };
+
+            _mockClubMemberRepository
+                .Setup(r => r.GetMemberByIdAsync(clubMemberId))
+                .ReturnsAsync(clubMember);
+
+            var created = new UserClubRoleDepartment
+            {
+                ClubMemberId = clubMemberId,
+                DepartmentId = departmentId
+            };
+
+            _mockDepartmentRepository
+                .Setup(r => r.AddMemberTodepartment(It.IsAny<UserClubRoleDepartment>()))
                 .ReturnsAsync(created);
 
             // Act
-            var result = await _departmentService.AddMemberTodepartment(1, userId, 10);
+            var result = await _departmentService.AddMemberToDepartment(clubId, clubMemberId, departmentId);
 
             // Assert
-            result.ClubMemberId.Should().Be(50);
-            result.DepartmentId.Should().Be(10);
-            _mockDepartmentRepository.Verify(r => r.AddMemberTodepartment(It.Is<UserClubRoleDepartment>(m => m.ClubMemberId == 50 && m.DepartmentId == 10)), Times.Once);
+            result.ClubMemberId.Should().Be(clubMemberId);
+            result.DepartmentId.Should().Be(departmentId);
+
+            _mockDepartmentRepository.Verify(r =>
+                r.AddMemberTodepartment(It.Is<UserClubRoleDepartment>(m =>
+                    m.ClubMemberId == clubMemberId &&
+                    m.DepartmentId == departmentId)),
+                Times.Once);
         }
 
         [Fact]
         public async Task RemoveMemberFromDepartment_ShouldThrowException_WhenUserNotClubMember()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            _mockClubMemberRepository.Setup(r => r.GetMemberAsync(userId, 1)).ReturnsAsync((UserClubRole?)null);
+            var clubId = 1;
+            var clubMemberId = 1; 
+            var departmentId = 10;
+
+            _mockClubMemberRepository
+                .Setup(r => r.GetMemberByIdAsync(clubMemberId))
+                .ReturnsAsync((UserClubRole?)null);
 
             // Act & Assert
-            await Assert.ThrowsAsync<KeyNotFoundException>(() => 
-                _departmentService.RemoveMemberFromDepartment(1, userId, 10));
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                _departmentService.RemoveMemberFromDepartment(clubId, clubMemberId, departmentId));
         }
 
         [Fact]
         public async Task RemoveMemberFromDepartment_ShouldSucceed()
         {
             // Arrange
-            var userId = Guid.NewGuid();
-            var clubMember = new UserClubRole { ClubMemberId = 50 };
-            _mockClubMemberRepository.Setup(r => r.GetMemberAsync(userId, 1)).ReturnsAsync(clubMember);
-            
-            var deleted = new UserClubRoleDepartment { ClubMemberId = 50, DepartmentId = 10 };
-            _mockDepartmentRepository.Setup(r => r.RemoveMemberFromDepartment(It.IsAny<UserClubRoleDepartment>()))
+            var clubId = 1;
+            var clubMemberId = 50;
+            var departmentId = 10;
+
+            var clubMember = new UserClubRole
+            {
+                ClubMemberId = clubMemberId,
+                ClubId = clubId 
+            };
+
+            _mockClubMemberRepository
+                .Setup(r => r.GetMemberByIdAsync(clubMemberId))
+                .ReturnsAsync(clubMember);
+
+            var deleted = new UserClubRoleDepartment
+            {
+                ClubMemberId = clubMemberId,
+                DepartmentId = departmentId
+            };
+
+            _mockDepartmentRepository
+                .Setup(r => r.RemoveMemberFromDepartment(It.IsAny<UserClubRoleDepartment>()))
                 .ReturnsAsync(deleted);
 
             // Act
-            var result = await _departmentService.RemoveMemberFromDepartment(1, userId, 10);
+            var result = await _departmentService.RemoveMemberFromDepartment(clubId, clubMemberId, departmentId);
 
             // Assert
-            result.ClubMemberId.Should().Be(50);
-            result.DepartmentId.Should().Be(10);
+            result.ClubMemberId.Should().Be(clubMemberId);
+            result.DepartmentId.Should().Be(departmentId);
+
+            _mockDepartmentRepository.Verify(r =>
+                r.RemoveMemberFromDepartment(It.Is<UserClubRoleDepartment>(m =>
+                    m.ClubMemberId == clubMemberId &&
+                    m.DepartmentId == departmentId)),
+                Times.Once);
         }
 
         #endregion

@@ -397,12 +397,14 @@ public class AuthService : IAuthService
             Major = user.Major,
             Status = user.Status,
             Roles = user.UserRoles?.Select(ur => ur.RoleName).ToList() ?? new List<string>(),
-            ClubRoles = user.ClubMembers?.Where(cm => string.Equals(cm.Status, "Active", StringComparison.OrdinalIgnoreCase)).Select(cm => new UserClubRoleDto
-            {
-                ClubId = cm.ClubId,
-                RoleName = cm.ClubRole?.RoleName ?? "Unknown",
-                Level = cm.ClubRole?.Level ?? 3
-            }).ToList() ?? new List<UserClubRoleDto>()
+            ClubRoles = user.ClubMembers?.Where(cm => string.Equals(cm.Status, "Active", StringComparison.OrdinalIgnoreCase))
+                .SelectMany(cm => cm.RoleAssignments?.Select(ra => new UserClubRoleDto
+                {
+                    ClubId = cm.ClubId,
+                    RoleName = ra.ClubRole?.RoleName ?? "Unknown",
+                    Level = ra.ClubRole?.Level ?? 3
+                }) ?? new List<UserClubRoleDto>())
+                .ToList() ?? new List<UserClubRoleDto>()
         };
     }
 }

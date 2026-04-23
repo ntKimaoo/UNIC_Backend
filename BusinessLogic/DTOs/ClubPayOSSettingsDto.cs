@@ -4,6 +4,9 @@ namespace BusinessLogic.DTOs
 {
     public class UpsertClubPayOSSettingsDto
     {
+        [MaxLength(32)]
+        public string? PaymentProvider { get; set; }
+
         [MaxLength(100)]
         public string ClientId { get; set; } = string.Empty;
 
@@ -19,6 +22,7 @@ namespace BusinessLogic.DTOs
     public class ClubPayOSSettingsResponseDto
     {
         public int ClubId { get; set; }
+        public string PaymentProvider { get; set; } = "PAYOS";
         public bool IsConfigured { get; set; }
         public bool IsEnabled { get; set; }
         public string? ClientId { get; set; }

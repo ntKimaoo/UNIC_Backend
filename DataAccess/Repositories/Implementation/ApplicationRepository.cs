@@ -305,6 +305,16 @@ namespace UNIC.DataAccess.Repositories.Implementation
 
             if (existing == null) return false;
 
+            var answer = await _context.ApplicationAnswers.Where(aa => aa.QuestionId == existing.QuestionId).ToListAsync();
+            if (answer != null)
+            {
+                foreach (ApplicationAnswer a in answer)
+                {
+                    _context.ApplicationAnswers.Remove(a);
+                }
+                await _context.SaveChangesAsync();
+            }
+
             _context.ApplicationQuestions.Remove(existing);
             await _context.SaveChangesAsync();
             return true;

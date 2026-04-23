@@ -119,7 +119,7 @@ namespace UNIC.DataAccess.Repositories.Implementation
                 .Include(ud => ud.ClubMember)
                     .ThenInclude(ucr => ucr.User)
                 .Include(ud => ud.ClubMember)
-                    .ThenInclude(ucr => ucr.ClubRole)
+                    .ThenInclude(ucr => ucr.RoleAssignments).ThenInclude(ra => ra.ClubRole)
                 .Select(ud => ud.ClubMember)
                 .ToListAsync();
         }
@@ -146,7 +146,7 @@ namespace UNIC.DataAccess.Repositories.Implementation
             return await _context.UserClubRoles
                 .Where(ucr => ucr.ClubId == clubId && !memberIdsInDepartment.Contains(ucr.ClubMemberId))
                 .Include(ucr => ucr.User)
-                .Include(ucr => ucr.ClubRole)
+                .Include(ucr => ucr.RoleAssignments).ThenInclude(ra => ra.ClubRole)
                 .ToListAsync();
         }
 

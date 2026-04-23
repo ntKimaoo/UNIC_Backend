@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-
+using DataAccess.Models;
 namespace BusinessLogic.DTOs
 {
     /// <summary>
@@ -13,9 +13,9 @@ namespace BusinessLogic.DTOs
         public Guid UserId { get; set; }
 
         /// <summary>
-        /// ClubRoleId để assign cho user (tùy chọn)
+        /// Danh sách ClubRoleId để assign cho user (tùy chọn)
         /// </summary>
-        public int? ClubRoleId { get; set; }
+        public List<int> ClubRoleIds { get; set; } = new();
     }
 
     /// <summary>
@@ -23,7 +23,7 @@ namespace BusinessLogic.DTOs
     /// </summary>
     public class UpdateMemberRoleDto
     {
-        public int ClubRoleId { get; set; }
+        public List<int> ClubRoleIds { get; set; } = new();
     }
 
     /// <summary>
@@ -59,8 +59,7 @@ namespace BusinessLogic.DTOs
         public string? Avatar { get; set; }
         public string? StudentId { get; set; }
         public int ClubId { get; set; }
-        public int? ClubRoleId { get; set; }
-        public string? RoleName { get; set; }
+        public List<ClubRoleInfoDto> Roles { get; set; } = new();
         public DateTime JoinDate { get; set; }
         public string Status { get; set; }
         public Guid? AssignedBy { get; set; }
@@ -69,5 +68,13 @@ namespace BusinessLogic.DTOs
         /// Danh sách departments trong club mà user thuộc về
         /// </summary>
         public List<DepartmentInfoDto> Departments { get; set; } = new();
+    }
+
+    public class ClubRoleInfoDto
+    {
+        public int ClubRoleId { get; set; }
+        public string RoleName { get; set; }
+        public int Level { get; set; }
+        public DateTime AssignedAt { get; set; }
     }
 }

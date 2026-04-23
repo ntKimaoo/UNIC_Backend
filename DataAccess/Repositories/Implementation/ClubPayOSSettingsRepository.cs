@@ -31,6 +31,7 @@ namespace DataAccess.Repositories.Implementation
             }
             else
             {
+                existing.PaymentProvider = settings.PaymentProvider;
                 existing.ClientId = settings.ClientId;
                 existing.ApiKey = settings.ApiKey;
                 existing.ChecksumKey = settings.ChecksumKey;

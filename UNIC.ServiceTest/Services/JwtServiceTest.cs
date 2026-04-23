@@ -89,7 +89,7 @@ namespace UNIC.ServiceTest.Services
                     {
                         ClubId = 1,
                         Status = "Active",
-                        ClubRole = new ClubRole { RoleName = "President", Level = 1 }
+                        RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { RoleName = "President", Level = 1 } } }
                     }
                 }
             };
@@ -116,7 +116,7 @@ namespace UNIC.ServiceTest.Services
                     {
                         ClubId = 1,
                         Status = "Inactive",
-                        ClubRole = new ClubRole { RoleName = "Member", Level = 5 }
+                        RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { RoleName = "Member", Level = 5 } } }
                     }
                 }
             };
@@ -260,13 +260,13 @@ namespace UNIC.ServiceTest.Services
                     {
                         ClubId = 1,
                         Status = "Active",
-                        ClubRole = new ClubRole { RoleName = "President", Level = 1 }
+                        RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { RoleName = "President", Level = 1 } } }
                     },
                     new UserClubRole
                     {
                         ClubId = 2,
                         Status = "Active",
-                        ClubRole = new ClubRole { RoleName = "Member", Level = 5 }
+                        RoleAssignments = new List<UserClubRoleAssignment> { new UserClubRoleAssignment { ClubRole = new ClubRole { RoleName = "Member", Level = 5 } } }
                     }
                 }
             };

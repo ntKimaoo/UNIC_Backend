@@ -3,6 +3,7 @@ using DataAccess.Repositories.Interface;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -21,7 +22,7 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.UserClubRoles
                 .Include(m => m.User)
-                .Include(m => m.ClubRole)
+                .Include(m => m.RoleAssignments).ThenInclude(ra => ra.ClubRole)
                 .Where(m => m.ClubId == clubId)
                 .OrderBy(m => m.JoinDate)
                 .ToListAsync();
@@ -32,7 +33,7 @@ namespace DataAccess.Repositories.Implementation
         {
             var query = _context.UserClubRoles
                 .Include(m => m.User)
-                .Include(m => m.ClubRole)
+                .Include(m => m.RoleAssignments).ThenInclude(ra => ra.ClubRole)
                 .Where(m => m.ClubId == clubId)
                 .AsQueryable();
 
@@ -44,7 +45,7 @@ namespace DataAccess.Repositories.Implementation
                     (m.User != null && m.User.FullName != null && m.User.FullName.ToLower().Contains(keyword)) ||
                     (m.User != null && m.User.Email != null && m.User.Email.ToLower().Contains(keyword)) ||
                     (m.User != null && m.User.StudentId != null && m.User.StudentId.ToLower().Contains(keyword)) ||
-                    (m.ClubRole != null && m.ClubRole.RoleName != null && m.ClubRole.RoleName.ToLower().Contains(keyword)) ||
+                    (m.RoleAssignments.Any(ra => ra.ClubRole != null && ra.ClubRole.RoleName != null && ra.ClubRole.RoleName.ToLower().Contains(keyword))) ||
                     (m.Status != null && m.Status.ToLower().Contains(keyword)));
             }
 
@@ -59,7 +60,7 @@ namespace DataAccess.Repositories.Implementation
                     "fullname" => isAscending ? query.OrderBy(m => m.User!.FullName) : query.OrderByDescending(m => m.User!.FullName),
                     "email" => isAscending ? query.OrderBy(m => m.User!.Email) : query.OrderByDescending(m => m.User!.Email),
                     "studentid" => isAscending ? query.OrderBy(m => m.User!.StudentId) : query.OrderByDescending(m => m.User!.StudentId),
-                    "rolename" => isAscending ? query.OrderBy(m => m.ClubRole!.RoleName) : query.OrderByDescending(m => m.ClubRole!.RoleName),
+                    "rolename" => isAscending ? query.OrderBy(m => m.RoleAssignments.Max(ra => ra.ClubRole.RoleName)) : query.OrderByDescending(m => m.RoleAssignments.Max(ra => ra.ClubRole.RoleName)),
                     "joindate" => isAscending ? query.OrderBy(m => m.JoinDate) : query.OrderByDescending(m => m.JoinDate),
                     "status" => isAscending ? query.OrderBy(m => m.Status) : query.OrderByDescending(m => m.Status),
                     _ => query.OrderBy(m => m.JoinDate) // Default fallback
@@ -87,7 +88,7 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.UserClubRoles
                 .Include(m => m.User)
-                .Include(m => m.ClubRole)
+                .Include(m => m.RoleAssignments).ThenInclude(ra => ra.ClubRole)
                 .FirstOrDefaultAsync(m => m.ClubMemberId == clubMemberId);
         }
 
@@ -95,7 +96,7 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.UserClubRoles
                 .Include(m => m.User)
-                .Include(m => m.ClubRole)
+                .Include(m => m.RoleAssignments).ThenInclude(ra => ra.ClubRole)
                 .FirstOrDefaultAsync(m => m.UserId == userId && m.ClubId == clubId);
         }
 
@@ -126,7 +127,7 @@ namespace DataAccess.Repositories.Implementation
             {
                 var member = await _context.UserClubRoles.FindAsync(clubMemberId);
                 if (member == null) return false;
-                
+
                 _context.UserClubRoles.Remove(member);
                 await _context.SaveChangesAsync();
                 return true;
@@ -147,28 +148,25 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.UserClubRoles
                 .Include(m => m.Club)
-                .Include(m => m.ClubRole)
+                .Include(m => m.RoleAssignments).ThenInclude(ra => ra.ClubRole)
                 .Include(m => m.User)
                 .Where(m => m.UserId == userId && m.Status != null && m.Status.ToUpper() == "ACTIVE")
                 .OrderBy(m => m.JoinDate)
                 .ToListAsync();
         }
+        public async Task<bool> isMemberActive(Guid userId, int clubId)
+        {
+            var member = await _context.UserClubRoles
+                .FirstOrDefaultAsync(m => m.UserId == userId && m.ClubId == clubId);
+            return member != null && member.Status != null && member.Status.ToUpper() == "ACTIVE";
+        }
 
         public async Task<bool> HasClubManager(int clubId)
         {
-            var clubManager = _context.UserClubRoles.Include(u => u.ClubRole).FirstOrDefaultAsync(uc => uc.ClubId == clubId && uc.ClubRole.Level == 0);
+            var clubManager = await _context.UserClubRoleAssignments
+                .Include(u => u.ClubRole)
+                .FirstOrDefaultAsync(uc => uc.ClubMember.ClubId == clubId && uc.ClubRole.Level == 0);
             return clubManager != null;
-
-        }
-
-        public async Task<bool> RemoveMemberRole(int clubMemberId)
-        {
-            var member = await _context.UserClubRoles.FindAsync(clubMemberId);
-            if (member == null) return false;
-
-            member.ClubRoleId = null;
-            await _context.SaveChangesAsync();
-            return true;
         }
     }
 }

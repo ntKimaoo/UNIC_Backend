@@ -9,6 +9,10 @@ namespace DataAccess.Models
         [DatabaseGenerated(DatabaseGeneratedOption.None)]
         public int ClubId { get; set; }
 
+        [Required]
+        [MaxLength(32)]
+        public string PaymentProvider { get; set; } = "PAYOS";
+
         [MaxLength(100)]
         public string ClientId { get; set; } = string.Empty;
 
