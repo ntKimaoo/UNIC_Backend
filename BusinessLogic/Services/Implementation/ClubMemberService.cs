@@ -115,7 +115,26 @@ namespace BusinessLogic.Services.Implementation
         {
             var member = await _memberRepository.GetMemberByIdAsync(clubMemberId);
             if (member == null) return null;
-            
+
+            var isCurrentClubManager = member.RoleAssignments
+                .Any(ra => ra.ClubRole != null && ra.ClubRole.Level == 0);
+
+            if (isCurrentClubManager)
+            {
+                bool hasManagerRoleInDto = false;
+                foreach (var roleId in dto.ClubRoleIds ?? new List<int>())
+                {
+                    var role = await _clubRoleRepo.GetByIdAsync(roleId, member.ClubId);
+                    if (role != null && role.Level == 0)
+                    {
+                        hasManagerRoleInDto = true;
+                        break;
+                    }
+                }
+                if (!hasManagerRoleInDto)
+                    throw new InvalidOperationException("Không thể xóa role Club Manager khỏi thành viên đang là Club Manager của câu lạc bộ.");
+            }
+
             if (dto.ClubRoleIds == null || !dto.ClubRoleIds.Any())
             {
                 await _clubRoleRepo.SetMemberRolesAsync(clubMemberId, new List<int>());

@@ -20,6 +20,7 @@ namespace DataAccess.Repositories.Interface
         Task<IEnumerable<User>> GetAllAsync();
         Task<(IEnumerable<User> Items, int TotalCount)> GetPagedAsync(int pageNumber, int pageSize);
         Task<IEnumerable<Club>> GetAllClubByUser(Guid userId);
+        Task<IEnumerable<User>> Search(string query);
 
         /// <summary>
         /// Returns all departments a user belongs to within a specific club,

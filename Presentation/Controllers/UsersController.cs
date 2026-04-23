@@ -222,5 +222,16 @@ namespace Presentation.Controllers
                 return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
             }
         }
+
+        [HttpGet("search")]
+        public async Task<IActionResult> Search([FromQuery] string query)
+        {
+            var results = await _userService.Search(query);
+            if (results == null || !results.Any())
+            {
+                return Ok(new { success = true, message = "No users found matching the query" });
+            }
+            return Ok(new { success = true, data = results });
+        }
     }
 }
