@@ -64,7 +64,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubService.Setup(s => s.GetAllAsync())
                             .ReturnsAsync(clubs);
 
-            var result = await _controller.GetAll(1, null, "all");
+            var result = await _controller.GetAll(1, null, null, "all");
 
             var okResult = Assert.IsType<OkObjectResult>(result);
             Assert.Equal(200, okResult.StatusCode);
@@ -76,7 +76,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubService.Setup(s => s.GetAllAsync())
                             .ReturnsAsync(new List<ClubResponseDto>());
 
-            var result = await _controller.GetAll(10, null, "all");
+            var result = await _controller.GetAll(10, null, null, "all");
 
             Assert.IsType<OkObjectResult>(result);
         }
@@ -86,7 +86,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubService.Setup(s => s.GetAllAsync())
                             .ThrowsAsync(new Exception("Error"));
 
-            var result = await _controller.GetAll(10, null, "all");
+            var result = await _controller.GetAll(10, null, null, "all");
 
             var obj = Assert.IsType<ObjectResult>(result);
             Assert.Equal(500, obj.StatusCode);

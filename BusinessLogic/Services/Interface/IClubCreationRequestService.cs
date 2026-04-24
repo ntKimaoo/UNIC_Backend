@@ -16,7 +16,7 @@ namespace BusinessLogic.Services.Interface
         Task<bool> CreateAsync(CreateClubCreationRequestDto dto);
 
         Task<bool> UpdateAsync(int id, UpdateClubCreationRequestDto dto);
-        Task<bool> UpdateStatusAsync(int id, UpdateClubRequestStatusDto dto);
+        Task<ClubCreationRequestDto?> UpdateStatusAsync(int id, UpdateClubRequestStatusDto dto);
         Task<bool> DeleteAsync(int id);
     }
 }

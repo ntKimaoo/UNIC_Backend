@@ -1,5 +1,6 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Implementation;
+using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using FluentAssertions.Common;
@@ -15,12 +16,16 @@ namespace UNIC.ServiceTest.Services
     public class ClubServiceTest
     {
         private readonly Mock<IClubRepository> _mockClubRepository;
+        private readonly Mock<IClubRoleService> _mockClubRoleService;
+        private readonly Mock<IClubMemberService> _mockClubMemberService;
         private readonly ClubService _clubService;
 
         public ClubServiceTest()
         {
             _mockClubRepository = new Mock<IClubRepository>();
-            _clubService = new ClubService(_mockClubRepository.Object);
+            _mockClubRoleService = new Mock<IClubRoleService>();
+            _mockClubMemberService = new Mock<IClubMemberService>();
+            _clubService = new ClubService(_mockClubRepository.Object, _mockClubRoleService.Object, _mockClubMemberService.Object);
         }
         #region GetById
         [Fact]
@@ -159,6 +164,14 @@ namespace UNIC.ServiceTest.Services
             _mockClubRepository
                 .Setup(repo => repo.CreateAsync(uid, It.IsAny<Club>()))
                 .ReturnsAsync(createdClub);
+
+            _mockClubRoleService
+                .Setup(s => s.CreateAsync(It.IsAny<CreateClubRoleDto>(), createdClub.ClubId))
+                .ReturnsAsync(new ClubRoleResponseDto { ClubRoleId = 1, RoleName = "Club Manager" });
+
+            _mockClubMemberService
+                .Setup(s => s.AddUserToClubAsync(createdClub.ClubId, It.IsAny<AddUserToClubDto>(), uid))
+                .ReturnsAsync(new ClubMemberResponseDto());
 
             // Act
             var result = await _clubService.CreateAsync(uid, createDto);

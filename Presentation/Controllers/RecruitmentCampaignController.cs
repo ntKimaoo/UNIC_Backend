@@ -1,6 +1,9 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.Exceptions;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Mvc;
+using Presentation.Authorization;
+using System;
 using System.Threading.Tasks;
 
 namespace Presentation.Controllers
@@ -71,18 +74,9 @@ namespace Presentation.Controllers
         /// Create a new recruitment campaign
         /// </summary>
         [HttpPost]
+        [RequireClubPolicyOrRole("CreateCampaign")]
         public async Task<IActionResult> Create([FromBody] CreateRecruitmentCampaignDto dto)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = "Invalid data",
-                    errors = ModelState
-                });
-            }
-
             try
             {
                 var campaign = await _service.CreateAsync(dto);
@@ -96,13 +90,17 @@ namespace Presentation.Controllers
                         data = campaign
                     });
             }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { success = false, message = ex.Message });
+            }
+            catch (DomainException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
             catch (Exception ex)
             {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = ex.Message
-                });
+                return StatusCode(500, new { success = false, message = "An error occurred.", details = ex.Message });
             }
         }
 
@@ -112,16 +110,6 @@ namespace Presentation.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateRecruitmentCampaignDto dto)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = "Invalid data",
-                    errors = ModelState
-                });
-            }
-
             try
             {
                 var campaign = await _service.UpdateAsync(id, dto);
@@ -141,13 +129,17 @@ namespace Presentation.Controllers
                     data = campaign
                 });
             }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { success = false, message = ex.Message });
+            }
+            catch (DomainException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
             catch (Exception ex)
             {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = ex.Message
-                });
+                return StatusCode(500, new { success = false, message = "An error occurred.", details = ex.Message });
             }
         }
 

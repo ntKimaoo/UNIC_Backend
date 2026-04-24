@@ -1,4 +1,5 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.Exceptions;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -30,7 +31,7 @@ namespace UNIC.ControllerTest.Controllers
         #region GetAll
 
         [Fact]
-        public async Task GetAll_ReturnsOk_WithList()
+        public async Task GetAll_ReturnsOk_WithCampaignList()
         {
             var campaigns = new List<RecruitmentCampaignResponseDto>
             {
@@ -41,7 +42,8 @@ namespace UNIC.ControllerTest.Controllers
 
             var result = await _controller.GetAll();
 
-            Assert.IsType<OkObjectResult>(result);
+            var ok = Assert.IsType<OkObjectResult>(result);
+            Assert.NotNull(ok.Value);
         }
 
         [Fact]
@@ -60,7 +62,7 @@ namespace UNIC.ControllerTest.Controllers
         #region GetAllByClubId
 
         [Fact]
-        public async Task GetAllByClubId_ReturnsOk()
+        public async Task GetAllByClubId_ReturnsOk_WithCampaigns()
         {
             var campaigns = new List<RecruitmentCampaignResponseDto>
             {
@@ -75,7 +77,7 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         [Fact]
-        public async Task GetAllByClubId_ReturnsOk_WhenEmpty()
+        public async Task GetAllByClubId_ReturnsOk_WithEmptyList_WhenNoMatch()
         {
             _mockService.Setup(s => s.GetByClubIdAsync(99))
                         .ReturnsAsync(new List<RecruitmentCampaignResponseDto>());
@@ -92,11 +94,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetById_ReturnsOk_WhenFound()
         {
-            var campaign = new RecruitmentCampaignResponseDto
-            {
-                CampaignId = 1,
-                CampaignName = "Test"
-            };
+            var campaign = new RecruitmentCampaignResponseDto { CampaignId = 1, CampaignName = "Test" };
 
             _mockService.Setup(s => s.GetByIdAsync(1)).ReturnsAsync(campaign);
 
@@ -106,7 +104,7 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         [Fact]
-        public async Task GetById_ReturnsNotFound_WhenNull()
+        public async Task GetById_ReturnsNotFound_WhenCampaignDoesNotExist()
         {
             _mockService.Setup(s => s.GetByIdAsync(99))
                         .ReturnsAsync((RecruitmentCampaignResponseDto?)null);
@@ -123,45 +121,56 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task Create_ReturnsCreated_WhenSuccess()
         {
-            var dto = new CreateRecruitmentCampaignDto
-            {
-                ClubId = 1,
-                CampaignName = "New Campaign"
-            };
-            var response = new RecruitmentCampaignResponseDto
-            {
-                CampaignId = 1,
-                CampaignName = "New Campaign"
-            };
+            var dto = new CreateRecruitmentCampaignDto { ClubId = 1, CampaignName = "New Campaign" };
+            var response = new RecruitmentCampaignResponseDto { CampaignId = 1, CampaignName = "New Campaign" };
 
             _mockService.Setup(s => s.CreateAsync(dto)).ReturnsAsync(response);
 
             var result = await _controller.Create(dto);
 
-            Assert.IsType<CreatedAtActionResult>(result);
+            var created = Assert.IsType<CreatedAtActionResult>(result);
+            Assert.Equal(nameof(_controller.GetById), created.ActionName);
         }
 
         [Fact]
-        public async Task Create_ReturnsBadRequest_WhenServiceThrows()
+        public async Task Create_ReturnsNotFound_WhenClubNotFound()
         {
-            var dto = new CreateRecruitmentCampaignDto { ClubId = 1, CampaignName = "Bad" };
+            var dto = new CreateRecruitmentCampaignDto { ClubId = 99, CampaignName = "Test" };
 
             _mockService.Setup(s => s.CreateAsync(dto))
-                        .ThrowsAsync(new Exception("Creation failed"));
+                        .ThrowsAsync(new NotFoundException("Club", 99));
 
             var result = await _controller.Create(dto);
 
-            Assert.IsType<BadRequestObjectResult>(result);
+            Assert.IsType<NotFoundObjectResult>(result);
         }
 
         [Fact]
-        public async Task Create_ReturnsBadRequest_WhenModelStateInvalid()
+        public async Task Create_ReturnsBadRequest_WhenDomainRuleViolated()
         {
-            _controller.ModelState.AddModelError("CampaignName", "Required");
+            var dto = new CreateRecruitmentCampaignDto { ClubId = 1, CampaignName = "Test" };
 
-            var result = await _controller.Create(new CreateRecruitmentCampaignDto());
+            _mockService.Setup(s => s.CreateAsync(dto))
+                        .ThrowsAsync(new DomainException("StartDate must be earlier than EndDate."));
 
-            Assert.IsType<BadRequestObjectResult>(result);
+            var result = await _controller.Create(dto);
+
+            var bad = Assert.IsType<BadRequestObjectResult>(result);
+            Assert.NotNull(bad.Value);
+        }
+
+        [Fact]
+        public async Task Create_Returns500_WhenUnexpectedExceptionThrown()
+        {
+            var dto = new CreateRecruitmentCampaignDto { ClubId = 1, CampaignName = "Test" };
+
+            _mockService.Setup(s => s.CreateAsync(dto))
+                        .ThrowsAsync(new Exception("Unexpected error"));
+
+            var result = await _controller.Create(dto);
+
+            var status = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(500, status.StatusCode);
         }
 
         #endregion
@@ -172,11 +181,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task Update_ReturnsOk_WhenSuccess()
         {
             var dto = new UpdateRecruitmentCampaignDto { CampaignName = "Updated" };
-            var response = new RecruitmentCampaignResponseDto
-            {
-                CampaignId = 1,
-                CampaignName = "Updated"
-            };
+            var response = new RecruitmentCampaignResponseDto { CampaignId = 1, CampaignName = "Updated" };
 
             _mockService.Setup(s => s.UpdateAsync(1, dto)).ReturnsAsync(response);
 
@@ -186,7 +191,7 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         [Fact]
-        public async Task Update_ReturnsNotFound_WhenNull()
+        public async Task Update_ReturnsNotFound_WhenCampaignDoesNotExist()
         {
             var dto = new UpdateRecruitmentCampaignDto { CampaignName = "Missing" };
 
@@ -199,12 +204,25 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         [Fact]
-        public async Task Update_ReturnsBadRequest_WhenServiceThrows()
+        public async Task Update_ReturnsNotFound_WhenNotFoundExceptionThrown()
         {
-            var dto = new UpdateRecruitmentCampaignDto { CampaignName = "Error" };
+            var dto = new UpdateRecruitmentCampaignDto { CampaignName = "Test" };
+
+            _mockService.Setup(s => s.UpdateAsync(99, dto))
+                        .ThrowsAsync(new NotFoundException("Campaign", 99));
+
+            var result = await _controller.Update(99, dto);
+
+            Assert.IsType<NotFoundObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task Update_ReturnsBadRequest_WhenDomainRuleViolated()
+        {
+            var dto = new UpdateRecruitmentCampaignDto { CampaignName = "Test" };
 
             _mockService.Setup(s => s.UpdateAsync(1, dto))
-                        .ThrowsAsync(new Exception("Update failed"));
+                        .ThrowsAsync(new DomainException("StartDate must be earlier than EndDate."));
 
             var result = await _controller.Update(1, dto);
 
@@ -212,13 +230,17 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         [Fact]
-        public async Task Update_ReturnsBadRequest_WhenModelStateInvalid()
+        public async Task Update_Returns500_WhenUnexpectedExceptionThrown()
         {
-            _controller.ModelState.AddModelError("CampaignName", "Too long");
+            var dto = new UpdateRecruitmentCampaignDto { CampaignName = "Error" };
 
-            var result = await _controller.Update(1, new UpdateRecruitmentCampaignDto());
+            _mockService.Setup(s => s.UpdateAsync(1, dto))
+                        .ThrowsAsync(new Exception("Unexpected error"));
 
-            Assert.IsType<BadRequestObjectResult>(result);
+            var result = await _controller.Update(1, dto);
+
+            var status = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(500, status.StatusCode);
         }
 
         #endregion
@@ -233,10 +255,11 @@ namespace UNIC.ControllerTest.Controllers
             var result = await _controller.Delete(1);
 
             Assert.IsType<OkObjectResult>(result);
+            _mockService.Verify(s => s.DeleteAsync(1), Times.Once);
         }
 
         [Fact]
-        public async Task Delete_ReturnsNotFound_WhenNotFound()
+        public async Task Delete_ReturnsNotFound_WhenCampaignDoesNotExist()
         {
             _mockService.Setup(s => s.DeleteAsync(99)).ReturnsAsync(false);
 
