@@ -6,7 +6,8 @@ namespace BusinessLogic.Services.Interface
 {
     public interface IReportService
     {
-        Task<ClubReportSummaryDto> GetClubSummaryAsync(int clubId, Guid currentUserId, bool isSystemAdmin, int? year, int? month);
+        Task<ReportSummaryResponseDto> GetSummaryAsync(int clubId, Guid currentUserId, bool isSystemAdmin, int? year, int? month);
+        Task<ReportAnalyticsResponseDto> GetAnalyticsAsync(int clubId, int? year);
     }
 }
 
