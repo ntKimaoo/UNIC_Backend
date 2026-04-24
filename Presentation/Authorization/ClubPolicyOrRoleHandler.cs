@@ -1,4 +1,5 @@
 using BusinessLogic.Services.Interface;
+using DataAccess.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using System;
@@ -18,14 +19,20 @@ namespace Presentation.Authorization
     public class ClubPolicyOrRoleHandler : AuthorizationHandler<ClubPolicyOrRoleRequirement>
     {
         private readonly IPolicyService _policyService;
+        private readonly IUserService _userService;
+        private readonly IClubService _clubService;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IClubMemberService _memberService;
 
         public ClubPolicyOrRoleHandler(
             IPolicyService policyService,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor, IUserService userService, IClubService clubService, IClubMemberService memberService)
         {
             _policyService = policyService;
             _httpContextAccessor = httpContextAccessor;
+            _userService = userService;
+            _clubService = clubService;
+            _memberService = memberService;
         }
 
         protected override async Task HandleRequirementAsync(
@@ -45,8 +52,7 @@ namespace Presentation.Authorization
                     return;
                 }
 
-                var userRoles = await _policyService.GetUserRole(userId); 
-
+                var userRoles = await _policyService.GetUserRole(userId);
                 var roleSet = userRoles.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
                 if (requirement.Roles.Any(r => roleSet.Contains(r)))
@@ -86,7 +92,19 @@ namespace Presentation.Authorization
                     context.Fail();
                     return;
                 }
+                var userRoles = await _policyService.GetUserRole(userId);
+                var isAdmin = userRoles.Any(r => string.Equals(r, "admin", StringComparison.OrdinalIgnoreCase));
 
+                if (!isAdmin)
+                {
+                    if (await _clubService.isDeleted(clubId)
+                        || !(await _userService.isActiveAccount(userId))
+                        || !(await _memberService.IsMemberActiveAsync(userId, clubId)))
+                    {
+                        context.Fail();
+                        return;
+                    }
+                }
                 var hasPolicy = await _policyService.HasMemberPolicyInClubAsync(
                     userId, clubId, requirement.PolicyTitle);
 

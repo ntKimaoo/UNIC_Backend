@@ -16,6 +16,8 @@ namespace BusinessLogic.Services.Interface
         Task<bool> UpdateUserAsync(Guid id, UpdateUserDto request);
         Task<bool> DeleteUserAsync(Guid id);
         Task<IEnumerable<Club>> GetAllClubsById(Guid UserId);
+        Task<UserResponseDto> GetByEmail(string email);
+        Task<IEnumerable<UserResponseDto>> Search(string query);
 
         /// <summary>
         /// Returns all departments the user has joined within a club,
@@ -23,5 +25,8 @@ namespace BusinessLogic.Services.Interface
         /// Returns null when the user is not a member of the club.
         /// </summary>
         Task<IEnumerable<UserDepartmentDto>?> GetUserDepartmentsInClubAsync(Guid userId, int clubId);
+        Task<bool> isActiveAccount(Guid userId);
+        Task<bool> AssignUserRole(Guid userId, string roleName);
+        Task<string> GetUserRole(Guid userId);
     }
 }

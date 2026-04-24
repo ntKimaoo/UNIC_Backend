@@ -200,6 +200,17 @@ namespace UNIC.ControllerTest.Controllers
         }
 
         [Fact]
+        public async Task UploadEditorImage_ReturnsBadRequest_WhenEmptyFile()
+        {
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.Length).Returns(0);
+
+            var result = await _controller.UploadEditorImage(mockFile.Object);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
         public async Task UploadEditorImage_ReturnsOk_WhenSuccess()
         {
             var mockFile = new Mock<IFormFile>();
@@ -210,6 +221,108 @@ namespace UNIC.ControllerTest.Controllers
                                    .ReturnsAsync("https://storage.example.com/image.png");
 
             var result = await _controller.UploadEditorImage(1, mockFile.Object);
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task UploadEditorImage_ReturnsBadRequest_WhenServiceThrows()
+        {
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.Length).Returns(100);
+
+            _mockFileStorageService.Setup(s => s.SaveFileAsync(mockFile.Object, "clubposts"))
+                                   .ThrowsAsync(new Exception("Upload failed"));
+
+            var result = await _controller.UploadEditorImage(mockFile.Object);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        #endregion
+
+        #region Create_Additional
+
+        [Fact]
+        public async Task Create_ReturnsBadRequest_WhenModelStateInvalid()
+        {
+            _controller.ModelState.AddModelError("Title", "Required");
+
+            var result = await _controller.Create(new CreateClubPostDto(), null);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task Create_ReturnsCreated_WithImageFile()
+        {
+            var dto = new CreateClubPostDto { ClubId = 1, UserId = Guid.NewGuid(), Title = "With Image" };
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.Length).Returns(1024);
+            var created = new ClubPostResponseDto { PostId = 1, Title = "With Image" };
+
+            _mockClubPostService.Setup(s => s.CreateAsync(dto, mockFile.Object))
+                                .ReturnsAsync(created);
+
+            var result = await _controller.Create(dto, mockFile.Object);
+
+            Assert.IsType<CreatedAtActionResult>(result);
+        }
+
+        #endregion
+
+        #region Update_Additional
+
+        [Fact]
+        public async Task Update_ReturnsBadRequest_WhenModelStateInvalid()
+        {
+            _controller.ModelState.AddModelError("Title", "Too long");
+
+            var result = await _controller.Update(1, new UpdateClubPostDto(), null);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task Update_ReturnsBadRequest_WhenServiceThrows()
+        {
+            var dto = new UpdateClubPostDto { Title = "Error" };
+
+            _mockClubPostService.Setup(s => s.UpdateAsync(1, dto, null))
+                                .ThrowsAsync(new Exception("Update error"));
+
+            var result = await _controller.Update(1, dto, null);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task Update_ReturnsOk_WithImageFile()
+        {
+            var dto = new UpdateClubPostDto { Title = "Updated with img" };
+            var mockFile = new Mock<IFormFile>();
+            mockFile.Setup(f => f.Length).Returns(512);
+            var updated = new ClubPostResponseDto { PostId = 1, Title = "Updated with img" };
+
+            _mockClubPostService.Setup(s => s.UpdateAsync(1, dto, mockFile.Object))
+                                .ReturnsAsync(updated);
+
+            var result = await _controller.Update(1, dto, mockFile.Object);
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+
+        #endregion
+
+        #region GetByClubId
+
+        [Fact]
+        public async Task GetByClubId_ReturnsOk()
+        {
+            _mockClubPostService.Setup(s => s.GetByClubIdAsync(1))
+                                .ReturnsAsync(new List<ClubPostResponseDto>());
+
+            var result = await _controller.GetByClubId(1);
 
             Assert.IsType<OkObjectResult>(result);
         }

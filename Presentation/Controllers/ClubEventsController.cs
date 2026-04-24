@@ -111,7 +111,7 @@ namespace UNIC.Presentation.Controllers
         /// </summary>
         [HttpPut("{id}")]
         [Consumes("multipart/form-data")]
-        [RequireEventPolicy("editevent")]
+        //[RequireEventPolicy("editevent")]
         public async Task<ActionResult<EventDetailDto>> UpdateEvent(int clubId, int id, [FromForm] UpdateEventRequest request, IFormFile? image)
         {
             try
@@ -139,7 +139,7 @@ namespace UNIC.Presentation.Controllers
         /// </summary>
         [HttpPost("{id}/image")]
         [Consumes("multipart/form-data")]
-        [RequireEventPolicy("editevent")]
+        //[RequireEventPolicy("editevent")]
         public async Task<IActionResult> UploadEventImage(int clubId, int id, IFormFile image)
         {
             try
@@ -170,7 +170,7 @@ namespace UNIC.Presentation.Controllers
         /// Create a session for an event within a club
         /// </summary>
         [HttpPost("{id}/sessions")]
-        [RequireEventPolicy("managesession")]
+        //[RequireEventPolicy("managesession")]
         public async Task<ActionResult<SessionDto>> CreateSession(int clubId, int id, [FromBody] CreateSessionRequest request)
         {
             try
@@ -196,7 +196,7 @@ namespace UNIC.Presentation.Controllers
         /// Update an existing session for an event within a club
         /// </summary>
         [HttpPut("{id}/sessions/{scheduleId}")]
-        [RequireEventPolicy("managesession")]
+        //[RequireEventPolicy("managesession")]
         public async Task<ActionResult<SessionDto>> UpdateSession(int clubId, int id, int scheduleId, [FromBody] UpdateSessionRequest request)
         {
             try
@@ -223,7 +223,7 @@ namespace UNIC.Presentation.Controllers
         /// Delete a session for an event within a club
         /// </summary>
         [HttpDelete("{id}/sessions/{scheduleId}")]
-        [RequireEventPolicy("managesession")]
+        //[RequireEventPolicy("managesession")]
         public async Task<IActionResult> DeleteSession(int clubId, int id, int scheduleId)
         {
             try
@@ -248,7 +248,7 @@ namespace UNIC.Presentation.Controllers
         /// Open registration for an event within a club
         /// </summary>
         [HttpPatch("{id}/open-registration")]
-        [RequireEventPolicy("openregistration")]
+        //[RequireEventPolicy("openregistration")]
         public async Task<ActionResult<EventDetailDto>> OpenRegistration(int clubId, int id, [FromBody] OpenRegistrationRequest request)
         {
             try
@@ -269,7 +269,7 @@ namespace UNIC.Presentation.Controllers
         /// Start an event (generates check-in code)
         /// </summary>
         [HttpPut("{id}/start")]
-        [RequireEventPolicy("startevent")]
+        //[RequireEventPolicy("startevent")]
         public async Task<IActionResult> StartEvent(int clubId, int id)
         {
             try
@@ -288,7 +288,7 @@ namespace UNIC.Presentation.Controllers
         /// Complete an event
         /// </summary>
         [HttpPut("{id}/complete")]
-        [RequireEventPolicy("completeevent")]
+        //[RequireEventPolicy("completeevent")]
         public async Task<IActionResult> CompleteEvent(int clubId, int id)
         {
             try

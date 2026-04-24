@@ -45,22 +45,29 @@ public class InterviewSchedule
 
     // ── Thông tin buổi phỏng vấn ─────────────────────────────────
 
-    public string  Title            { get; set; } = null!;   // "Vòng 1 – Năng lực"
-    public string? Description      { get; set; }
+    public string Title { get; set; } = null!;
+    public string? Description { get; set; }
 
-    public DateTime ScheduledAt     { get; set; }            // Thời điểm bắt đầu
-    public int      DurationMinutes { get; set; } = 60;
+    public DateTime? ScheduledAt { get; set; }            // Thời điểm bắt đầu
+    public int DurationMinutes { get; set; } = 60;
 
     // ── Trạng thái ───────────────────────────────────────────────
 
-    public InterviewStatus Status       { get; set; } = InterviewStatus.Scheduled;
-    public string?         CancelReason { get; set; }
+    public InterviewStatus Status { get; set; } = InterviewStatus.Scheduled;
+    public string? CancelReason { get; set; }
+    public string? RescheduleReason { get; set; }
 
-    public DateTime  CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
+
+    // ── Email tracking ────────────────────────────────────────
+    public DateTime? ReminderSentAt { get; set; }
+    public DateTime? RoomOpenedEmailSentAt { get; set; }
+    public DateTime? FeedbackNudgeSentAt { get; set; }
 
     // ── Navigation ───────────────────────────────────────────────
 
     public ICollection<InterviewAssignment> Assignments { get; set; } = new List<InterviewAssignment>();
-    public MeetingRoom?                     MeetingRoom { get; set; }
+    public ICollection<ProposedTimeSlot> ProposedTimeSlots { get; set; } = new List<ProposedTimeSlot>();
+    public MeetingRoom? MeetingRoom { get; set; }
 }

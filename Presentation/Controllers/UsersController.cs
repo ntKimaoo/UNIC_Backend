@@ -143,12 +143,12 @@ namespace Presentation.Controllers
             var user = await _userService.GetUserByIdAsync(id);
             if (user == null)
             {
-                return NotFound(new { success = false, message = "User not found" });
+                return Ok(new { success = false, message = "User not found" });
             }
             var result = await _userService.GetAllClubsById(id);
             if (result == null || !result.Any())
             {
-                return NotFound(new { success = true, message = "You have not join any club!" });
+                return Ok(new { success = true, message = "You have not join any club!" });
             }
             return Ok(new { success = true, data = result });
         }
@@ -191,6 +191,47 @@ namespace Presentation.Controllers
                 success = true,
                 data = departments
             });
+        }
+
+        [HttpPost("assignUserRole/{uid}")]
+        public async Task<IActionResult> AssignUserRole(Guid uid, [FromBody] string roleName)
+        {
+            try
+            {
+                var result = await _userService.AssignUserRole(uid, roleName);
+                if (!result)
+                    return BadRequest(new { success = false, message = "Failed to assign role" });
+                return Ok(new { success = true, message = "Role assigned successfully" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+            }
+        }
+
+        [HttpGet("{uid}/userRole")]
+        public async Task<IActionResult> GetUserRole(Guid uid)
+        {
+            try
+            {
+                var roles = await _userService.GetUserRole(uid);
+                return Ok(new { success = true, data = roles });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+            }
+        }
+
+        [HttpGet("search")]
+        public async Task<IActionResult> Search([FromQuery] string query)
+        {
+            var results = await _userService.Search(query);
+            if (results == null || !results.Any())
+            {
+                return Ok(new { success = true, message = "No users found matching the query" });
+            }
+            return Ok(new { success = true, data = results });
         }
     }
 }

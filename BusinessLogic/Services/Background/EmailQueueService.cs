@@ -79,6 +79,29 @@ namespace BusinessLogic.Services.Background
                         item.ToEmail, item.Token!, item.FullName),
                     EmailType.Welcome => await emailService.SendWelcomeEmailAsync(
                         item.ToEmail, item.FullName),
+                    EmailType.EventRegistration => await emailService.SendEventRegistrationSuccessAsync(
+                        item.ToEmail, item.FullName, item.EventName!, item.StartDate, item.Token),
+                    EmailType.EventCheckIn => await emailService.SendEventCheckInCodeAsync(
+                        item.ToEmail, item.FullName, item.EventName!, item.CheckInCode!),
+                    EmailType.InterviewStatusChange => await emailService.SendInterviewStatusChangeEmailAsync(
+                        item.ToEmail, item.FullName, item.InterviewTitle!,
+                        item.InterviewStatus!,
+                        item.InterviewScheduledAt ?? DateTime.UtcNow, item.InterviewDurationMinutes,
+                        item.ProposedTimes,
+                        item.CancelReason, item.ConfirmDeadline),
+                    EmailType.InterviewReminder => await emailService.SendInterviewReminderEmailAsync(
+                        item.ToEmail, item.FullName, item.InterviewTitle!,
+                        item.InterviewScheduledAt ?? DateTime.UtcNow, item.InterviewDurationMinutes),
+                    EmailType.InterviewRoomOpened => await emailService.SendInterviewRoomOpenedEmailAsync(
+                        item.ToEmail, item.FullName, item.InterviewTitle!,
+                        item.InterviewScheduledAt ?? DateTime.UtcNow, item.RoomCode!),
+                    EmailType.InterviewFeedbackNudge => await emailService.SendInterviewFeedbackNudgeEmailAsync(
+                        item.ToEmail, item.FullName, item.InterviewTitle!,
+                        item.InterviewScheduledAt ?? DateTime.UtcNow),
+                    EmailType.ApplicationSuccess => await emailService.SendApplicationSuccessEmailAsync(
+                        item.ToEmail, item.FullName, item.CampaignName ?? "Campaign"),
+                    EmailType.ApplicationRejected => await emailService.SendApplicationRejectedEmailAsync(
+                        item.ToEmail, item.FullName, item.CampaignName ?? "Campaign"),
                     _ => false
                 };
 

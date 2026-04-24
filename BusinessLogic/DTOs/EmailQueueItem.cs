@@ -13,12 +13,36 @@ namespace BusinessLogic.DTOs
         public string? Token { get; set; }
         public EmailType EmailType { get; set; }
         public int RetryCount { get; set; } = 0;
+
+        // Event-specific fields
+        public string? EventName { get; set; }
+        public DateTime? StartDate { get; set; }
+        public string? CheckInCode { get; set; }
+
+        // Interview-specific fields
+        public string? InterviewTitle { get; set; }
+        public string? InterviewStatus { get; set; }
+        public DateTime? InterviewScheduledAt { get; set; }
+        public int InterviewDurationMinutes { get; set; }
+        public string? CancelReason { get; set; }
+        public string? ConfirmDeadline { get; set; }
+        public string? RoomCode { get; set; }
+        public string? CampaignName { get; set; }
+        public List<DateTime>? ProposedTimes { get; set; }
     }
 
     public enum EmailType
     {
         Verification,
         PasswordReset,
-        Welcome
+        Welcome,
+        EventRegistration,
+        EventCheckIn,
+        InterviewStatusChange,
+        InterviewReminder,
+        InterviewRoomOpened,
+        InterviewFeedbackNudge,
+        ApplicationSuccess,
+        ApplicationRejected
     }
 }

@@ -65,7 +65,10 @@ namespace BusinessLogic.Services.Implementation
         public async Task<UserResponseDto?> GetUserByIdAsync(Guid id)
         {
             var user = await _userRepository.GetByIdAsync(id);
-            return user == null ? null : MapToDto(user);
+            if (user == null) return null;
+            var dto = MapToDto(user);
+            dto.Role = await _userRepository.GetUserRole(id);
+            return dto;
         }
 
         public async Task<UserResponseDto> CreateUserAsync(CreateUserDto request)
@@ -155,27 +158,52 @@ namespace BusinessLogic.Services.Implementation
 
             return rows.Select(r => new UserDepartmentDto
             {
-                DepartmentId   = r.Department.DepartmentId,
+                DepartmentId = r.Department.DepartmentId,
                 DepartmentName = r.Department.DepartmentName,
-                Description    = r.Department.Description,
+                Description = r.Department.Description,
                 DepartmentRole = r.DepartmentRole == null ? null : new DepartmentMemberRoleDto
                 {
-                    ClubRoleId  = r.DepartmentRole.ClubRoleId,
-                    RoleName    = r.DepartmentRole.RoleName,
+                    ClubRoleId = r.DepartmentRole.ClubRoleId,
+                    RoleName = r.DepartmentRole.RoleName,
                     Description = r.DepartmentRole.Description,
-                    Level       = r.DepartmentRole.Level
+                    Level = r.DepartmentRole.Level
                 },
                 Roles = (r.Department.ClubRoles ?? Enumerable.Empty<ClubRole>())
                     .Select(cr => new DepartmentMemberRoleDto
                     {
-                        ClubRoleId  = cr.ClubRoleId,
-                        RoleName    = cr.RoleName,
+                        ClubRoleId = cr.ClubRoleId,
+                        RoleName = cr.RoleName,
                         Description = cr.Description,
-                        Level       = cr.Level
+                        Level = cr.Level
                     })
                     .ToList(),
                 MemberCount = r.MemberCount
             });
+        }
+
+        public Task<bool> AssignUserRole(Guid userId, string roleName)
+        {
+            return _userRepository.AssignUserRole(userId, roleName);
+        }
+
+        public Task<string> GetUserRole(Guid userId)
+        {
+            return _userRepository.GetUserRole(userId);
+        }
+        public async Task<bool> isActiveAccount(Guid userId)
+        {
+            return await _userRepository.isActiveAccount(userId);
+        }
+
+        public async Task<UserResponseDto> GetByEmail(string email)
+        {
+            var user = await _userRepository.GetByEmailAsync(email);
+            return user == null ? null : MapToDto(user);
+        }
+
+        public async Task<IEnumerable<UserResponseDto>> Search(string query)
+        {
+            return await _userRepository.Search(query).ContinueWith(t => t.Result.Select(MapToDto));
         }
     }
 }

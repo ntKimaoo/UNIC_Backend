@@ -27,6 +27,7 @@ public partial class UnicContext : DbContext
     public DbSet<Club> Clubs { get; set; }
     public DbSet<ClubRole> ClubRoles { get; set; }
     public DbSet<UserClubRole> UserClubRoles { get; set; }
+    public DbSet<UserClubRoleAssignment> UserClubRoleAssignments { get; set; }
     public DbSet<Department> Departments { get; set; }
     public DbSet<ClubPost> ClubPosts { get; set; }
     public DbSet<Notification> Notifications { get; set; }
@@ -39,6 +40,9 @@ public partial class UnicContext : DbContext
     public DbSet<FundCategory> FundCategories { get; set; }
     public DbSet<ClubFund> ClubFunds { get; set; }
     public DbSet<FundTransaction> FundTransactions { get; set; }
+    public DbSet<FundRefundRequest> FundRefundRequests { get; set; }
+    public DbSet<FundType> FundTypes { get; set; }
+    public DbSet<ClubPayOSSettings> ClubPayOSSettings { get; set; }
     public DbSet<RecruitmentCampaign> RecruitmentCampaigns { get; set; }
     public DbSet<ApplicationForm> ApplicationForms { get; set; }
     public DbSet<ApplicationQuestion> ApplicationQuestions { get; set; }
@@ -54,6 +58,7 @@ public partial class UnicContext : DbContext
     public DbSet<EventMember> EventMembers { get; set; }
     public DbSet<EventRolePolicy> EventRolePolicies { get; set; }
     public DbSet<EventMemberPolicy> EventMemberPolicies { get; set; }
+    public virtual DbSet<RecordOfChange> RecordsOfChange { get; set; }
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.ConfigureWarnings(w =>
@@ -180,11 +185,21 @@ public partial class UnicContext : DbContext
             .HasForeignKey(ucr => ucr.ClubId)
             .OnDelete(DeleteBehavior.NoAction);
 
-        modelBuilder.Entity<UserClubRole>()
-            .HasOne(ucr => ucr.ClubRole)
-            .WithMany(cr => cr.ClubMembers)
-            .HasForeignKey(ucr => ucr.ClubRoleId)
-            .OnDelete(DeleteBehavior.NoAction);
+        // UserClubRoleAssignment (Composite PK)
+        modelBuilder.Entity<UserClubRoleAssignment>()
+            .HasKey(ura => new { ura.ClubMemberId, ura.ClubRoleId });
+
+        modelBuilder.Entity<UserClubRoleAssignment>()
+            .HasOne(ura => ura.ClubMember)
+            .WithMany(ucr => ucr.RoleAssignments)
+            .HasForeignKey(ura => ura.ClubMemberId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserClubRoleAssignment>()
+            .HasOne(ura => ura.ClubRole)
+            .WithMany(cr => cr.MemberAssignments)
+            .HasForeignKey(ura => ura.ClubRoleId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         // ClubRole - Department relationship
         modelBuilder.Entity<ClubRole>()
@@ -226,6 +241,12 @@ public partial class UnicContext : DbContext
             .WithMany(u => u.Notifications)
             .HasForeignKey(n => n.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Notification>()
+            .HasOne(n => n.FromUser)
+            .WithMany(u => u.SentNotifications)
+            .HasForeignKey(n => n.FromUserId)
+            .OnDelete(DeleteBehavior.NoAction);
 
         // Event - Club
         modelBuilder.Entity<Event>()
@@ -287,11 +308,33 @@ public partial class UnicContext : DbContext
             .HasForeignKey(cf => cf.ClubId)
             .OnDelete(DeleteBehavior.NoAction);
 
+        modelBuilder.Entity<FundType>()
+            .HasIndex(x => x.Name)
+            .IsUnique();
+
+        modelBuilder.Entity<ClubFund>()
+            .HasOne(cf => cf.FundType)
+            .WithMany()
+            .HasForeignKey(cf => cf.FundTypeId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<ClubPayOSSettings>()
+            .HasOne(s => s.Club)
+            .WithMany()
+            .HasForeignKey(s => s.ClubId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // FundTransaction relationships
         modelBuilder.Entity<FundTransaction>()
             .HasOne(ft => ft.ClubFund)
             .WithMany(cf => cf.FundTransactions)
             .HasForeignKey(ft => ft.FundId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<FundCategory>()
+            .HasOne(fc => fc.Club)
+            .WithMany()
+            .HasForeignKey(fc => fc.ClubId)
             .OnDelete(DeleteBehavior.NoAction);
 
         modelBuilder.Entity<FundTransaction>()
@@ -305,6 +348,32 @@ public partial class UnicContext : DbContext
             .WithMany()
             .HasForeignKey(ft => ft.CreatedBy)
             .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<FundTransaction>()
+            .HasOne(ft => ft.RefundForOriginalTransaction)
+            .WithMany()
+            .HasForeignKey(ft => ft.RefundForTransactionId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<FundRefundRequest>()
+            .HasOne(r => r.OriginalTransaction)
+            .WithMany()
+            .HasForeignKey(r => r.OriginalTransactionId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<FundRefundRequest>()
+            .HasOne(r => r.ClubFund)
+            .WithMany()
+            .HasForeignKey(r => r.FundId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<FundRefundRequest>()
+            .HasIndex(r => new { r.ClubId, r.Status });
+
+        modelBuilder.Entity<FundRefundRequest>()
+            .HasIndex(r => r.OriginalTransactionId)
+            .IsUnique()
+            .HasFilter("[Status] = N'PENDING'");
 
         // RecruitmentCampaign - Club
         modelBuilder.Entity<RecruitmentCampaign>()
@@ -363,6 +432,17 @@ public partial class UnicContext : DbContext
 
         modelBuilder.Entity<Club>()
             .HasIndex(c => c.ClubName);
+
+        modelBuilder.Entity<Club>()
+            .HasOne(c => c.RecordOfChange)
+            .WithOne(r => r.Club)
+            .HasForeignKey<RecordOfChange>(r => r.ClubId);
+
+        modelBuilder.Entity<RecordOfChange>()
+            .HasOne(r => r.ChangedByUser)
+            .WithMany(u => u.RecordsOfChange)
+            .HasForeignKey(r => r.ChangedBy)
+            .OnDelete(DeleteBehavior.NoAction);
 
         modelBuilder.Entity<Event>()
             .HasIndex(e => e.StartDate);

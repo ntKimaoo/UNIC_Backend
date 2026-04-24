@@ -16,6 +16,9 @@ namespace UNIC.DataAccess.Models
         public string? Description { get; set; }
         public virtual IList<ClubRolePolicy> ClubRolePolicies { get; set; }
         public virtual IList<ClubMemberPolicy> ClubMemberPolicies { get; set; }
+
+        public virtual IList<EventRolePolicy> EventRolePolicies { get; set; }
+        public virtual IList<EventMemberPolicy> EventMemberPolicies { get; set; }
         public int? PolicyGroupId { get; set; }
         public PolicyGroup PolicyGroup { get; set; }
     }

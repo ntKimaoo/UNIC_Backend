@@ -69,6 +69,16 @@ namespace UNIC.ControllerTest.Controllers
             Assert.IsType<BadRequestObjectResult>(result);
         }
 
+        [Fact]
+        public async Task JoinRoom_ReturnsBadRequest_WhenModelStateInvalid()
+        {
+            _controller.ModelState.AddModelError("UserId", "Required");
+
+            var result = await _controller.JoinRoom("abc", new JoinRoomDto());
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
         #endregion
 
         #region LeaveRoom
@@ -99,7 +109,18 @@ namespace UNIC.ControllerTest.Controllers
             Assert.IsType<NotFoundObjectResult>(result);
         }
 
+        [Fact]
+        public async Task LeaveRoom_ReturnsBadRequest_WhenModelStateInvalid()
+        {
+            _controller.ModelState.AddModelError("UserId", "Required");
+
+            var result = await _controller.LeaveRoom("abc", new LeaveRoomDto());
+
+            Assert.IsType<BadRequestObjectResult>(result);
+        }
+
         #endregion
+
 
         #region GetParticipants
 

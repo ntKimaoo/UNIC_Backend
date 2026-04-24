@@ -52,8 +52,10 @@ namespace BusinessLogic.Services.Implementation
             if (user.ClubMembers != null)
             {
                 var activeClubRoles = user.ClubMembers
-                    .Where(cm => string.Equals(cm.Status, "Active", StringComparison.OrdinalIgnoreCase) && cm.ClubRole != null)
-                    .Select(cm => new { cm.ClubId, cm.ClubRole.RoleName, cm.ClubRole.Level })
+                    .Where(cm => string.Equals(cm.Status, "Active", StringComparison.OrdinalIgnoreCase))
+                    .SelectMany(cm => cm.RoleAssignments != null 
+                        ? cm.RoleAssignments.Where(ra => ra.ClubRole != null).Select(ra => (object)new { cm.ClubId, ra.ClubRole!.RoleName, ra.ClubRole.Level }) 
+                        : Enumerable.Empty<object>())
                     .ToList();
                 
                 if (activeClubRoles.Any())

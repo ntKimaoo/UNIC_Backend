@@ -111,18 +111,20 @@ namespace UNIC.DataAccess.Repositories.Implementation
         }
 
         public async Task<IEnumerable<UserClubRole>> GetMembersWithRolesByDepartmentAsync(
-            int clubId, int departmentId)
-        {
-            return await _context.UserClubRoleDepartments
-                .Where(ud => ud.DepartmentId == departmentId
-                          && ud.ClubMember.ClubId == clubId)
-                .Include(ud => ud.ClubMember)
-                    .ThenInclude(ucr => ucr.User)
-                .Include(ud => ud.ClubMember)
-                    .ThenInclude(ucr => ucr.ClubRole)
-                .Select(ud => ud.ClubMember)
-                .ToListAsync();
-        }
+    int clubId, int departmentId)
+{
+    return await _context.UserClubRoleDepartments
+        .Where(ud => ud.DepartmentId == departmentId
+                  && ud.ClubMember.ClubId == clubId)
+        .Include(ud => ud.ClubMember)
+            .ThenInclude(cm => cm.User)
+        .Include(ud => ud.ClubMember)
+            .ThenInclude(cm => cm.RoleAssignments)
+                .ThenInclude(ra => ra.ClubRole)
+        .Select(ud => ud.ClubMember)
+        .Distinct()
+        .ToListAsync();
+}
         public async Task<UserClubRoleDepartment> AddMemberTodepartment(UserClubRoleDepartment departMember)
         {
             await _context.UserClubRoleDepartments.AddAsync(departMember);
@@ -131,9 +133,54 @@ namespace UNIC.DataAccess.Repositories.Implementation
         }
         public async Task<UserClubRoleDepartment> RemoveMemberFromDepartment(UserClubRoleDepartment departMember)
         {
-            _context.UserClubRoleDepartments.Remove(departMember);
+            var tracked = _context.UserClubRoleDepartments.Local.FirstOrDefault(e => e.ClubMemberId == departMember.ClubMemberId && e.DepartmentId == departMember.DepartmentId);
+            if (tracked != null)
+            {
+                _context.UserClubRoleDepartments.Remove(tracked);
+            }
+            else
+            {
+                _context.UserClubRoleDepartments.Remove(departMember);
+            }
             await _context.SaveChangesAsync();
             return departMember;
+        }
+
+        public async Task<IEnumerable<UserClubRole>> GetClubMembersNotInDepartmentAsync(int clubId, int departmentId)
+        {
+            var memberIdsInDepartment = await _context.UserClubRoleDepartments
+                .Where(ud => ud.DepartmentId == departmentId)
+                .Select(ud => ud.ClubMemberId)
+                .ToListAsync();
+
+            return await _context.UserClubRoles
+                .Where(ucr => ucr.ClubId == clubId && !memberIdsInDepartment.Contains(ucr.ClubMemberId))
+                .Include(ucr => ucr.User)
+                .Include(ucr => ucr.RoleAssignments).ThenInclude(ra => ra.ClubRole)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Department>> GetDepartmentsJoinedByMemberAsync(int clubId, int clubMemberId)
+        {
+            return await _context.UserClubRoleDepartments
+                .Where(ud => ud.ClubMemberId == clubMemberId && ud.Department.ClubId == clubId)
+                .Include(ud => ud.Department)
+                    .ThenInclude(d => d.ManagerRole)
+                .Select(ud => ud.Department)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Department>> GetDepartmentsNotJoinedByMemberAsync(int clubId, int clubMemberId)
+        {
+            var joinedDepartmentIds = await _context.UserClubRoleDepartments
+                .Where(ud => ud.ClubMemberId == clubMemberId)
+                .Select(ud => ud.DepartmentId)
+                .ToListAsync();
+
+            return await _context.Departments
+                .Where(d => d.ClubId == clubId && !joinedDepartmentIds.Contains(d.DepartmentId))
+                .Include(d => d.ManagerRole)
+                .ToListAsync();
         }
     }
 }

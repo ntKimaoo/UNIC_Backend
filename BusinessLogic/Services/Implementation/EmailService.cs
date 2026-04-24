@@ -1,6 +1,7 @@
-using BusinessLogic.Services.Interface;
 using Microsoft.Extensions.Configuration;
+using BusinessLogic.Services.Interface;
 using System;
+using System.Globalization;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -198,6 +199,501 @@ namespace BusinessLogic.Services.Implementation
             </body>
             </html>
         ";
+            return await SendEmailAsync(toEmail, subject, body);
+        }
+        public async Task<bool> SendInterviewStatusChangeEmailAsync(
+    string toEmail, string fullName, string interviewTitle,
+    string status, DateTime scheduledAt, int durationMinutes,
+    List<DateTime>? proposedTimes = null,
+    string? cancelReason = null, string? confirmDeadline = null)
+        {
+            var vnTime = scheduledAt.AddHours(7);
+            var dateStr = vnTime.ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"));
+            var endTimeStr = vnTime.AddMinutes(durationMinutes).ToString("HH:mm");
+            var subject = $"[UniClub] Cập nhật lịch phỏng vấn: {interviewTitle}";
+
+            string badgeLabel, badgeBg, badgeColor, badgeEmoji;
+            string headerBg, titleColor, subColor;
+            string infoBg, infoBorder;
+            string contentHtml;
+
+            // Gmail-safe info row using <table>
+            string InfoRow(string label, string value) => $@"
+        <tr>
+            <td style='padding:8px 0;border-bottom:1px solid #f1f5f9;vertical-align:top;width:110px;font-size:13px;color:#64748b;font-family:Arial,sans-serif;'>{label}</td>
+            <td style='padding:8px 0 8px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;font-weight:bold;color:#1e293b;vertical-align:top;font-family:Arial,sans-serif;'>{value}</td>
+        </tr>";
+
+            // Gmail-safe alert box
+            string AlertBox(string bg, string border, string color, string text) => $@"
+        <table width='100%' cellpadding='0' cellspacing='0' style='margin-bottom:20px;'>
+            <tr><td style='background:{bg};border:1px solid {border};border-radius:8px;padding:12px 16px;font-size:13px;font-weight:bold;color:{color};font-family:Arial,sans-serif;'>
+                Lưu ý: {text}
+            </td></tr>
+        </table>";
+
+            // Gmail-safe CTA button using <table>
+            string CtaButton(string bg, string label, string url) => $@"
+        <table cellpadding='0' cellspacing='0' style='margin-top:8px;'>
+            <tr><td style='background:{bg};border-radius:8px;text-align:center;'>
+                <a href='{url}' style='display:inline-block;padding:12px 24px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;font-family:Arial,sans-serif;'>{label} &rarr;</a>
+            </td></tr>
+        </table>";
+
+            switch (status)
+            {
+                case "Scheduled":
+                    badgeLabel = "Đã lên lịch"; badgeBg = "#dbeafe"; badgeColor = "#1e40af"; badgeEmoji = "";
+                    headerBg = "#eff6ff"; titleColor = "#1e3a8a"; subColor = "#3b82f6";
+                    infoBg = "#eff6ff"; infoBorder = "#bfdbfe";
+
+                    var deadlineText = !string.IsNullOrEmpty(confirmDeadline)
+                        ? $"Vui lòng xác nhận trước <strong>{confirmDeadline}</strong>"
+                        : "Vui lòng xác nhận lịch phỏng vấn sớm nhất có thể.";
+                    var deadlineHtml = AlertBox("#fff7ed", "#fdba74", "#c2410c", deadlineText);
+
+                    string timesHtml;
+                    if (proposedTimes != null && proposedTimes.Any())
+                    {
+                        var slotsHtml = string.Join("", proposedTimes.Select(t => $@"
+                        <tr><td style='padding:10px 14px;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>
+                            {t.AddHours(7).ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"))}
+                        </td></tr>
+                        <tr><td style='height:6px;'></td></tr>"));
+
+                        timesHtml = $@"
+                        <p style='font-size:14px;color:#475569;margin-bottom:10px;font-weight:bold;font-family:Arial,sans-serif;'>Vui lòng xác nhận lịch phỏng vấn:</p>
+                        <table width='100%' cellpadding='0' cellspacing='0' style='margin-bottom:18px;'>{slotsHtml}</table>";
+                    }
+                    else
+                    {
+                        timesHtml = $@"
+                        <table width='100%' cellpadding='0' cellspacing='0' style='background:{infoBg};border:1px solid {infoBorder};border-radius:10px;padding:6px 18px;margin-bottom:18px;'>
+                            {InfoRow("Tiêu đề", interviewTitle)}
+                            {InfoRow("Thời gian", $"{dateStr} &ndash; {endTimeStr}")}
+                            {InfoRow("Thời lượng", $"{durationMinutes} phút")}
+                        </table>";
+                    }
+
+                    contentHtml = $@"
+                <p style='font-size:15px;color:#1e293b;margin-bottom:14px;font-family:Arial,sans-serif;'>Bạn đã được mời tham gia buổi phỏng vấn. Vui lòng xem thông tin và xác nhận sớm!</p>
+                {timesHtml}
+                {deadlineHtml}
+                {CtaButton("#1e40af", "Xác nhận lịch phỏng vấn", _appBaseUrl + "/profile?tab=candidate")}";
+                    break;
+
+                case "Confirmed":
+                    badgeLabel = "Đã xác nhận"; badgeBg = "#dcfce7"; badgeColor = "#166534"; badgeEmoji = "";
+                    headerBg = "#f0fdf4"; titleColor = "#14532d"; subColor = "#16a34a";
+                    infoBg = "#f0fdf4"; infoBorder = "#86efac";
+
+                    contentHtml = $@"
+                <p style='font-size:15px;color:#1e293b;margin-bottom:14px;font-family:Arial,sans-serif;'>Lịch phỏng vấn của bạn đã được <strong>xác nhận thành công</strong>. Hãy chuẩn bị thật tốt và đến đúng giờ!</p>
+                <table width='100%' cellpadding='0' cellspacing='0' style='background:{infoBg};border:1px solid {infoBorder};border-radius:10px;padding:6px 18px;margin-bottom:18px;'>
+                    {InfoRow("Tiêu đề", interviewTitle)}
+                    {InfoRow("Thời gian", $"{dateStr} &ndash; {endTimeStr}")}
+                    {InfoRow("Thời lượng", $"{durationMinutes} phút")}
+                </table>
+                <p style='font-size:14px;color:#555;line-height:1.65;font-family:Arial,sans-serif;'>Chúc bạn có buổi phỏng vấn thật tốt!</p>";
+                    break;
+
+                case "InProgress":
+                    badgeLabel = "Đang diễn ra"; badgeBg = "#ffedd5"; badgeColor = "#9a3412"; badgeEmoji = "";
+                    headerBg = "#fff7ed"; titleColor = "#7c2d12"; subColor = "#ea580c";
+                    infoBg = "#fff7ed"; infoBorder = "#fdba74";
+
+                    contentHtml = $@"
+                <p style='font-size:15px;color:#1e293b;margin-bottom:14px;font-family:Arial,sans-serif;'>Buổi phỏng vấn <strong>{interviewTitle}</strong> đã chính thức bắt đầu. Nếu chưa tham gia, vào ngay nhé!</p>
+                <table width='100%' cellpadding='0' cellspacing='0' style='background:{infoBg};border:1px solid {infoBorder};border-radius:10px;padding:6px 18px;margin-bottom:18px;'>
+                    {InfoRow("Bắt đầu lúc", dateStr)}
+                    {InfoRow("Thời lượng", $"{durationMinutes} phút")}
+                </table>
+                {CtaButton("#ea580c", "Tham gia phỏng vấn", _appBaseUrl)}";
+                    break;
+
+                case "Completed":
+                    badgeLabel = "Đã hoàn thành"; badgeBg = "#dcfce7"; badgeColor = "#14532d"; badgeEmoji = "";
+                    headerBg = "#f0fdf4"; titleColor = "#14532d"; subColor = "#16a34a";
+                    infoBg = "#f0fdf4"; infoBorder = "#86efac";
+
+                    contentHtml = $@"
+                <p style='font-size:15px;color:#1e293b;margin-bottom:14px;font-family:Arial,sans-serif;'>Buổi phỏng vấn <strong>{interviewTitle}</strong> đã kết thúc. Cảm ơn bạn đã tham gia!</p>
+                <table width='100%' cellpadding='0' cellspacing='0' style='background:{infoBg};border:1px solid {infoBorder};border-radius:10px;padding:6px 18px;margin-bottom:18px;'>
+                    {InfoRow("Thời gian", dateStr)}
+                </table>
+                <p style='font-size:14px;color:#555;line-height:1.65;font-family:Arial,sans-serif;'>Kết quả sẽ được thông báo sớm nhất qua email và hệ thống. Hãy theo dõi nhé!</p>";
+                    break;
+
+                case "Cancelled":
+                    badgeLabel = "Đã hủy"; badgeBg = "#ffe4e6"; badgeColor = "#9f1239"; badgeEmoji = "";
+                    headerBg = "#fff1f2"; titleColor = "#881337"; subColor = "#e11d48";
+                    infoBg = "#fff1f2"; infoBorder = "#fda4af";
+
+                    var reasonRow = !string.IsNullOrEmpty(cancelReason)
+                        ? InfoRow("Lý do", cancelReason)
+                        : "";
+
+                    contentHtml = $@"
+                <p style='font-size:15px;color:#1e293b;margin-bottom:14px;font-family:Arial,sans-serif;'>Rất tiếc, buổi phỏng vấn <strong>{interviewTitle}</strong> đã bị hủy.</p>
+                <table width='100%' cellpadding='0' cellspacing='0' style='background:{infoBg};border:1px solid {infoBorder};border-radius:10px;padding:6px 18px;margin-bottom:18px;'>
+                    {InfoRow("Dự kiến lúc", dateStr)}
+                    {reasonRow}
+                </table>
+                <p style='font-size:14px;color:#555;line-height:1.65;font-family:Arial,sans-serif;'>Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ ban tổ chức qua hệ thống.</p>";
+                    break;
+
+                case "Rescheduled":
+                    badgeLabel = "Đã đổi lịch"; badgeBg = "#f3e8ff"; badgeColor = "#6b21a8"; badgeEmoji = "";
+                    headerBg = "#fdf4ff"; titleColor = "#581c87"; subColor = "#9333ea";
+                    infoBg = "#fdf4ff"; infoBorder = "#d8b4fe";
+
+                    var rescheduleAlertText = !string.IsNullOrEmpty(confirmDeadline)
+                        ? $"Vui lòng xác nhận trước <strong>{confirmDeadline}</strong>"
+                        : "Vui lòng xác nhận lịch mới sớm nhất có thể.";
+                    var rescheduleAlert = AlertBox("#fdf4ff", "#d8b4fe", "#7e22ce", rescheduleAlertText);
+
+                    string rescheduleTimesHtml;
+                    if (proposedTimes != null && proposedTimes.Any())
+                    {
+                        var slotsHtml = string.Join("", proposedTimes.Select(t => $@"
+                        <tr><td style='padding:10px 14px;background:#ffffff;border:1px solid #f3e8ff;border-radius:8px;font-size:13px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>
+                            {t.AddHours(7).ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"))}
+                        </td></tr>
+                        <tr><td style='height:6px;'></td></tr>"));
+
+                        rescheduleTimesHtml = $@"
+                        <p style='font-size:14px;color:#475569;margin-bottom:10px;font-weight:bold;font-family:Arial,sans-serif;'>Các khung giờ đề xuất mới:</p>
+                        <table width='100%' cellpadding='0' cellspacing='0' style='margin-bottom:18px;'>{slotsHtml}</table>";
+                    }
+                    else
+                    {
+                        rescheduleTimesHtml = $@"
+                        <table width='100%' cellpadding='0' cellspacing='0' style='background:{infoBg};border:1px solid {infoBorder};border-radius:10px;padding:6px 18px;margin-bottom:18px;'>
+                            {InfoRow("Tiêu đề", interviewTitle)}
+                            {InfoRow("Lịch mới", $"{dateStr} &ndash; {endTimeStr}")}
+                            {InfoRow("Thời lượng", $"{durationMinutes} phút")}
+                        </table>";
+                    }
+
+                    contentHtml = $@"
+                <p style='font-size:15px;color:#1e293b;margin-bottom:14px;font-family:Arial,sans-serif;'>Lịch phỏng vấn <strong>{interviewTitle}</strong> đã được thay đổi. Xem thời gian mới bên dưới!</p>
+                {rescheduleTimesHtml}
+                {rescheduleAlert}
+                {CtaButton("#7c3aed", "Xác nhận lịch mới", _appBaseUrl)}";
+                    break;
+
+                default:
+                    badgeLabel = "Cập nhật"; badgeBg = "#f1f5f9"; badgeColor = "#475569"; badgeEmoji = "";
+                    headerBg = "#f8fafc"; titleColor = "#1e293b"; subColor = "#64748b";
+                    infoBg = ""; infoBorder = "";
+                    contentHtml = $"<p style='font-size:14px;color:#555;font-family:Arial,sans-serif;'>Trạng thái lịch phỏng vấn <strong>{interviewTitle}</strong> đã được cập nhật thành: <strong>{status}</strong>.</p>";
+                    break;
+            }
+
+            var body = $@"
+    <html>
+    <body style='margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;'>
+        <table width='100%' cellpadding='0' cellspacing='0' style='padding:32px 16px;'>
+            <tr><td align='center'>
+                <table width='560' cellpadding='0' cellspacing='0' style='background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;'>
+
+                    <!-- HEADER -->
+                    <tr><td style='background:{headerBg};padding:28px 32px 24px;'>
+                        <table cellpadding='0' cellspacing='0' style='margin-bottom:12px;'>
+                            <tr><td style='background:{badgeBg};color:{badgeColor};padding:5px 14px;border-radius:20px;font-size:12px;font-weight:bold;font-family:Arial,sans-serif;'>
+                                {badgeLabel}
+                            </td></tr>
+                        </table>
+                        <div style='font-size:19px;font-weight:bold;color:{titleColor};line-height:1.3;margin-bottom:4px;font-family:Arial,sans-serif;'>{interviewTitle}</div>
+                        <div style='font-size:12px;color:{subColor};font-family:Arial,sans-serif;'>UniClub &middot; Thông báo tự động</div>
+                    </td></tr>
+
+                    <!-- BODY -->
+                    <tr><td style='padding:26px 32px;'>
+                        <p style='font-size:15px;color:#1e293b;margin:0 0 14px;font-family:Arial,sans-serif;'>Chào <strong>{fullName}</strong>,</p>
+                        {contentHtml}
+                    </td></tr>
+
+                    <!-- FOOTER -->
+                    <tr><td style='padding:18px 32px 24px;border-top:1px solid #e2e8f0;'>
+                        <table cellpadding='0' cellspacing='0'>
+                            <tr>
+                                <td style='width:22px;height:22px;background:#1e40af;border-radius:6px;text-align:center;vertical-align:middle;padding:0;font-size:12px;color:#ffffff;font-weight:bold;font-family:Arial,sans-serif;'>U</td>
+                                <td style='padding-left:8px;font-size:13px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>UniClub</td>
+                            </tr>
+                        </table>
+                        <p style='font-size:11px;color:#94a3b8;line-height:1.6;margin:6px 0 0;font-family:Arial,sans-serif;'>
+                            Email này được gửi tự động từ hệ thống UniClub. Vui lòng không trả lời email này.
+                        </p>
+                    </td></tr>
+
+                </table>
+            </td></tr>
+        </table>
+    </body>
+    </html>";
+
+            return await SendEmailAsync(toEmail, subject, body);
+        }
+
+        public async Task<bool> SendInterviewReminderEmailAsync(
+            string toEmail, string fullName, string interviewTitle,
+            DateTime scheduledAt, int durationMinutes)
+        {
+            var vnTime = scheduledAt.AddHours(7);
+            var dateStr = vnTime.ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"));
+            var endTimeStr = vnTime.AddMinutes(durationMinutes).ToString("HH:mm");
+            var subject = $"[UniClub] Nhắc nhở: Buổi phỏng vấn \"{interviewTitle}\" diễn ra lúc {vnTime:HH:mm} hôm nay";
+
+            var body = $@"
+    <html>
+    <body style='margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;'>
+        <table width='100%' cellpadding='0' cellspacing='0' style='padding:32px 16px;'>
+            <tr><td align='center'>
+                <table width='560' cellpadding='0' cellspacing='0' style='background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;'>
+                    <tr><td style='background:#eff6ff;padding:28px 32px 24px;'>
+                        <table cellpadding='0' cellspacing='0' style='margin-bottom:12px;'>
+                            <tr><td style='background:#dbeafe;color:#1e40af;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:bold;font-family:Arial,sans-serif;'>Nhắc nhở phỏng vấn</td></tr>
+                        </table>
+                        <div style='font-size:19px;font-weight:bold;color:#1e3a8a;line-height:1.3;margin-bottom:4px;font-family:Arial,sans-serif;'>{interviewTitle}</div>
+                        <div style='font-size:12px;color:#3b82f6;font-family:Arial,sans-serif;'>UniClub &middot; Thông báo tự động</div>
+                    </td></tr>
+                    <tr><td style='padding:26px 32px;'>
+                        <p style='font-size:15px;color:#1e293b;margin:0 0 14px;font-family:Arial,sans-serif;'>Chào <strong>{fullName}</strong>,</p>
+                        <p style='font-size:15px;color:#1e293b;margin-bottom:14px;font-family:Arial,sans-serif;'>Bạn có buổi phỏng vấn diễn ra trong <strong>khoảng 2 giờ nữa</strong>. Hãy chuẩn bị sẵn sàng nhé!</p>
+                        <table width='100%' cellpadding='0' cellspacing='0' style='background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 18px;margin-bottom:18px;'>
+                            <tr><td style='padding:8px 0;font-size:13px;color:#64748b;width:110px;font-family:Arial,sans-serif;'>Tiêu đề</td><td style='padding:8px 0 8px 12px;font-size:13px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>{interviewTitle}</td></tr>
+                            <tr><td style='padding:8px 0;font-size:13px;color:#64748b;font-family:Arial,sans-serif;'>Thời gian</td><td style='padding:8px 0 8px 12px;font-size:13px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>{dateStr} (kết thúc {endTimeStr})</td></tr>
+                            <tr><td style='padding:8px 0;font-size:13px;color:#64748b;font-family:Arial,sans-serif;'>Thời lượng</td><td style='padding:8px 0 8px 12px;font-size:13px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>{durationMinutes} phút</td></tr>
+                        </table>
+                        <table width='100%' cellpadding='0' cellspacing='0' style='margin-bottom:20px;'>
+                            <tr><td style='background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:12px 16px;font-size:13px;font-weight:bold;color:#c2410c;font-family:Arial,sans-serif;'>
+                                Lưu ý: Hãy kiểm tra micro, camera và kết nối mạng trước khi buổi phỏng vấn bắt đầu.
+                            </td></tr>
+                        </table>
+                    </td></tr>
+                    <tr><td style='padding:18px 32px 24px;border-top:1px solid #e2e8f0;'>
+                        <p style='font-size:11px;color:#94a3b8;line-height:1.6;margin:0;font-family:Arial,sans-serif;'>Email này được gửi tự động từ hệ thống UniClub.</p>
+                    </td></tr>
+                </table>
+            </td></tr>
+        </table>
+    </body>
+    </html>";
+
+            return await SendEmailAsync(toEmail, subject, body);
+        }
+
+        public async Task<bool> SendInterviewRoomOpenedEmailAsync(
+            string toEmail, string fullName, string interviewTitle,
+            DateTime scheduledAt, string roomCode)
+        {
+            var vnTime = scheduledAt.AddHours(7);
+            var dateStr = vnTime.ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"));
+            var roomUrl = $"{_appBaseUrl}/interview/room/{roomCode}";
+            var subject = $"[UniClub] Phòng phỏng vấn \"{interviewTitle}\" đã mở – Hãy vào chuẩn bị!";
+
+            var body = $@"
+    <html>
+    <body style='margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;'>
+        <table width='100%' cellpadding='0' cellspacing='0' style='padding:32px 16px;'>
+            <tr><td align='center'>
+                <table width='560' cellpadding='0' cellspacing='0' style='background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;'>
+                    <tr><td style='background:#f0fdf4;padding:28px 32px 24px;'>
+                        <table cellpadding='0' cellspacing='0' style='margin-bottom:12px;'>
+                            <tr><td style='background:#dcfce7;color:#166534;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:bold;font-family:Arial,sans-serif;'>Phòng đã mở</td></tr>
+                        </table>
+                        <div style='font-size:19px;font-weight:bold;color:#14532d;line-height:1.3;margin-bottom:4px;font-family:Arial,sans-serif;'>{interviewTitle}</div>
+                        <div style='font-size:12px;color:#16a34a;font-family:Arial,sans-serif;'>UniClub &middot; Thông báo tự động</div>
+                    </td></tr>
+                    <tr><td style='padding:26px 32px;'>
+                        <p style='font-size:15px;color:#1e293b;margin:0 0 14px;font-family:Arial,sans-serif;'>Chào <strong>{fullName}</strong>,</p>
+                        <p style='font-size:15px;color:#1e293b;margin-bottom:14px;font-family:Arial,sans-serif;'>Phòng phỏng vấn cho buổi <strong>{interviewTitle}</strong> đã được mở. Bạn có thể vào ngay để chuẩn bị trước khi buổi phỏng vấn bắt đầu lúc <strong>{vnTime:HH:mm}</strong>.</p>
+                        <table width='100%' cellpadding='0' cellspacing='0' style='background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 18px;margin-bottom:18px;'>
+                            <tr><td style='padding:8px 0;font-size:13px;color:#64748b;width:110px;font-family:Arial,sans-serif;'>Thời gian</td><td style='padding:8px 0 8px 12px;font-size:13px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>{dateStr}</td></tr>
+                            <tr><td style='padding:8px 0;font-size:13px;color:#64748b;font-family:Arial,sans-serif;'>Mã phòng</td><td style='padding:8px 0 8px 12px;font-size:13px;font-weight:bold;color:#166534;font-family:Arial,sans-serif;'>{roomCode}</td></tr>
+                        </table>
+                        <table cellpadding='0' cellspacing='0' align='center' style='margin-bottom:16px;'>
+                            <tr><td style='background:#16a34a;border-radius:8px;text-align:center;'>
+                                <a href='{roomUrl}' style='display:inline-block;padding:12px 28px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;font-family:Arial,sans-serif;'>Vào phòng phỏng vấn &rarr;</a>
+                            </td></tr>
+                        </table>
+                    </td></tr>
+                    <tr><td style='padding:18px 32px 24px;border-top:1px solid #e2e8f0;'>
+                        <p style='font-size:11px;color:#94a3b8;line-height:1.6;margin:0;font-family:Arial,sans-serif;'>Email này được gửi tự động từ hệ thống UniClub.</p>
+                    </td></tr>
+                </table>
+            </td></tr>
+        </table>
+    </body>
+    </html>";
+
+            return await SendEmailAsync(toEmail, subject, body);
+        }
+
+        public async Task<bool> SendInterviewFeedbackNudgeEmailAsync(
+            string toEmail, string fullName, string interviewTitle, DateTime scheduledAt)
+        {
+            var vnTime = scheduledAt.AddHours(7);
+            var dateStr = vnTime.ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"));
+            var subject = $"[UniClub] Nhắc nhở: Hãy gửi đánh giá cho buổi phỏng vấn \"{interviewTitle}\"";
+
+            var body = $@"
+    <html>
+    <body style='margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;'>
+        <table width='100%' cellpadding='0' cellspacing='0' style='padding:32px 16px;'>
+            <tr><td align='center'>
+                <table width='560' cellpadding='0' cellspacing='0' style='background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;'>
+                    <tr><td style='background:#fff7ed;padding:28px 32px 24px;'>
+                        <table cellpadding='0' cellspacing='0' style='margin-bottom:12px;'>
+                            <tr><td style='background:#ffedd5;color:#9a3412;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:bold;font-family:Arial,sans-serif;'>Nhắc đánh giá</td></tr>
+                        </table>
+                        <div style='font-size:19px;font-weight:bold;color:#7c2d12;line-height:1.3;margin-bottom:4px;font-family:Arial,sans-serif;'>{interviewTitle}</div>
+                        <div style='font-size:12px;color:#ea580c;font-family:Arial,sans-serif;'>UniClub &middot; Thông báo tự động</div>
+                    </td></tr>
+                    <tr><td style='padding:26px 32px;'>
+                        <p style='font-size:15px;color:#1e293b;margin:0 0 14px;font-family:Arial,sans-serif;'>Chào <strong>{fullName}</strong>,</p>
+                        <p style='font-size:15px;color:#1e293b;margin-bottom:14px;font-family:Arial,sans-serif;'>Buổi phỏng vấn <strong>{interviewTitle}</strong> (diễn ra vào {dateStr}) đã kết thúc, nhưng bạn <strong>chưa gửi đánh giá</strong>.</p>
+                        <p style='font-size:15px;color:#1e293b;margin-bottom:18px;font-family:Arial,sans-serif;'>Vui lòng đăng nhập hệ thống và hoàn tất đánh giá ứng viên sớm nhất có thể!</p>
+                        <table width='100%' cellpadding='0' cellspacing='0' style='margin-bottom:20px;'>
+                            <tr><td style='background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;font-size:13px;font-weight:bold;color:#92400e;font-family:Arial,sans-serif;'>
+                                Lưu ý: Đánh giá của bạn rất quan trọng để ban quản lý có thể so sánh và đưa ra quyết định cuối cùng.
+                            </td></tr>
+                        </table>
+                        <table cellpadding='0' cellspacing='0' align='center' style='margin-bottom:16px;'>
+                            <tr><td style='background:#ea580c;border-radius:8px;text-align:center;'>
+                                <a href='{_appBaseUrl}/interview/schedule' style='display:inline-block;padding:12px 28px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;font-family:Arial,sans-serif;'>Đánh giá ngay &rarr;</a>
+                            </td></tr>
+                        </table>
+                    </td></tr>
+                    <tr><td style='padding:18px 32px 24px;border-top:1px solid #e2e8f0;'>
+                        <p style='font-size:11px;color:#94a3b8;line-height:1.6;margin:0;font-family:Arial,sans-serif;'>Email này được gửi tự động từ hệ thống UniClub.</p>
+                    </td></tr>
+                </table>
+            </td></tr>
+        </table>
+    </body>
+    </html>";
+
+            return await SendEmailAsync(toEmail, subject, body);
+        }
+
+        public async Task<bool> SendClubAcceptanceEmailAsync(string toEmail, string fullName, string campaignName)
+        {
+            var subject = $"[UniClub] Chúc mừng bạn đã trúng tuyển đợt: {campaignName}";
+
+            string body = $@"
+    <html>
+    <body style='margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;'>
+        <table align='center' border='0' cellpadding='0' cellspacing='0' width='100%' style='max-width:540px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;margin:24px auto;'>
+            <tr><td style='padding:40px 40px 32px;'>
+                <h2 style='text-align:center;margin:0 0 24px;font-size:22px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>Chúc mừng bạn đã trúng tuyển!</h2>
+
+                <p style='font-size:15px;color:#475569;line-height:1.6;margin:0 0 20px;font-family:Arial,sans-serif;'>
+                    Xin chào <strong style='color:#1e293b;'>{fullName}</strong>,
+                </p>
+                <p style='font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px;font-family:Arial,sans-serif;'>
+                    Chúng tôi rất vui mừng thông báo bạn đã xuất sắc vượt qua các vòng phỏng vấn và chính thức trở thành thành viên Câu lạc bộ thông qua chiến dịch tuyển dụng: <strong style='color:#4f46e5;'>{campaignName}</strong>.
+                </p>
+
+                <table width='100%' cellpadding='0' cellspacing='0' style='margin-bottom:24px;'>
+                    <tr><td style='background:#f8fafc;border-left:4px solid #4f46e5;padding:16px 20px;border-radius:0 8px 8px 0;font-size:14px;color:#334155;line-height:1.5;font-family:Arial,sans-serif;'>
+                        Chào mừng bạn gia nhập gia đình UniClub. Các quản lý câu lạc bộ sẽ sớm liên hệ với bạn để phổ biến công việc và lịch sinh hoạt!
+                    </td></tr>
+                </table>
+
+                <p style='font-size:15px;color:#475569;line-height:1.5;margin:0;font-family:Arial,sans-serif;'>
+                    Trân trọng,<br><strong style='color:#1e293b;'>Đội ngũ UniClub</strong>
+                </p>
+            </td></tr>
+            <tr><td style='background:#f1f5f9;padding:24px 40px;text-align:center;'>
+                <p style='font-size:12px;color:#94a3b8;margin:0;font-family:Arial,sans-serif;'>&copy; {DateTime.UtcNow.Year} UniClub System. Email này được gửi tự động.</p>
+            </td></tr>
+        </table>
+    </body>
+    </html>";
+
+            return await SendEmailAsync(toEmail, subject, body);
+        }
+
+
+        public async Task<bool> SendApplicationSuccessEmailAsync(string toEmail, string fullName, string campaignName)
+        {
+            var subject = $"[UniClub] Chúc mừng! Bạn đã vượt qua vòng đơn: {campaignName}";
+
+            string body = $@"
+    <html>
+    <body style='margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;'>
+        <table align='center' border='0' cellpadding='0' cellspacing='0' width='100%' style='max-width:540px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;margin:24px auto;'>
+            <tr><td style='padding:40px 40px 32px;'>
+                <h2 style='text-align:center;margin:0 0 24px;font-size:22px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>Chúc mừng bạn!</h2>
+
+                <p style='font-size:15px;color:#475569;line-height:1.6;margin:0 0 20px;font-family:Arial,sans-serif;'>
+                    Xin chào <strong style='color:#1e293b;'>{fullName}</strong>,
+                </p>
+                <p style='font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px;font-family:Arial,sans-serif;'>
+                    Chúc mừng bạn đã xuất sắc vượt qua vòng xét duyệt đơn đăng ký của chiến dịch tuyển dụng: <strong style='color:#4f46e5;'>{campaignName}</strong>.
+                </p>
+
+                <table width='100%' cellpadding='0' cellspacing='0' style='margin-bottom:24px;'>
+                    <tr><td style='background:#f0f9ff;border-left:4px solid #0ea5e9;padding:16px 20px;border-radius:0 8px 8px 0;font-size:14px;color:#0c4a6e;line-height:1.5;font-family:Arial,sans-serif;'>
+                        <strong>Bước tiếp theo:</strong> Ban tổ chức sẽ sớm liên hệ với bạn để sắp xếp lịch phỏng vấn. Vui lòng thường xuyên kiểm tra email và hệ thống UniClub để không bỏ lỡ thông báo mới nhất!
+                    </td></tr>
+                </table>
+
+                <p style='font-size:15px;color:#475569;line-height:1.5;margin:0;font-family:Arial,sans-serif;'>
+                    Hẹn gặp lại bạn sớm tại buổi phỏng vấn,<br><strong style='color:#1e293b;'>Đội ngũ UniClub</strong>
+                </p>
+            </td></tr>
+            <tr><td style='background:#f1f5f9;padding:24px 40px;text-align:center;'>
+                <p style='font-size:12px;color:#94a3b8;margin:0;font-family:Arial,sans-serif;'>&copy; {DateTime.UtcNow.Year} UniClub System. Email này được gửi tự động.</p>
+            </td></tr>
+        </table>
+    </body>
+    </html>";
+
+            return await SendEmailAsync(toEmail, subject, body);
+        }
+
+        public async Task<bool> SendApplicationRejectedEmailAsync(string toEmail, string fullName, string campaignName)
+        {
+            var subject = $"[UniClub] Thông báo kết quả vòng đơn: {campaignName}";
+
+            string body = $@"
+    <html>
+    <body style='margin:0;padding:0;background:#f8fafc;font-family:Arial,sans-serif;'>
+        <table align='center' border='0' cellpadding='0' cellspacing='0' width='100%' style='max-width:540px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;margin:24px auto;'>
+            <tr><td style='padding:40px 40px 32px;'>
+                <h2 style='text-align:center;margin:0 0 24px;font-size:22px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>Cảm ơn bạn đã quan tâm</h2>
+
+                <p style='font-size:15px;color:#475569;line-height:1.6;margin:0 0 20px;font-family:Arial,sans-serif;'>
+                    Xin chào <strong style='color:#1e293b;'>{fullName}</strong>,
+                </p>
+                <p style='font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px;font-family:Arial,sans-serif;'>
+                    Lời đầu tiên, chúng tôi xin cảm ơn bạn đã dành thời gian và tâm huyết để đăng ký tham gia chiến dịch tuyển dụng: <strong style='color:#1e293b;'>{campaignName}</strong>.
+                </p>
+
+                <p style='font-size:15px;color:#475569;line-height:1.6;margin:0 0 24px;font-family:Arial,sans-serif;'>
+                    Dựa trên số lượng hồ sơ rất lớn và tiêu chí tuyển chọn của giai đoạn này, rất tiếc chúng tôi chưa thể mời bạn đi tiếp vào vòng phỏng vấn. Tuy nhiên, hồ sơ của bạn vẫn rất ấn tượng và chúng tôi hy vọng sẽ có cơ hội hợp tác với bạn trong các chiến dịch tương lai.
+                </p>
+
+                <table width='100%' cellpadding='0' cellspacing='0' style='margin-bottom:24px;'>
+                    <tr><td style='background:#f8fafc;border-left:4px solid #94a3b8;padding:16px 20px;border-radius:0 8px 8px 0;font-size:14px;color:#475569;line-height:1.5;font-family:Arial,sans-serif;'>
+                        Chúc bạn luôn giữ vững đam mê và gặt hái được nhiều thành công trong con đường sắp tới!
+                    </td></tr>
+                </table>
+
+                <p style='font-size:15px;color:#475569;line-height:1.5;margin:0;font-family:Arial,sans-serif;'>
+                    Trân trọng,<br><strong style='color:#1e293b;'>Đội ngũ UniClub</strong>
+                </p>
+            </td></tr>
+            <tr><td style='background:#f1f5f9;padding:24px 40px;text-align:center;'>
+                <p style='font-size:12px;color:#94a3b8;margin:0;font-family:Arial,sans-serif;'>&copy; {DateTime.UtcNow.Year} UniClub System. Email này được gửi tự động.</p>
+            </td></tr>
+        </table>
+    </body>
+    </html>";
+
             return await SendEmailAsync(toEmail, subject, body);
         }
 

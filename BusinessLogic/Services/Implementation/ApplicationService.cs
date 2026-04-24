@@ -8,6 +8,9 @@ using DataAccess.Repositories.Interface;
 using UNIC.BusinessLogic.Constants;
 using UNIC.BusinessLogic.DTOs;
 using UNIC.BusinessLogic.Services.Interface;
+using BusinessLogic.Services.Interface;
+using BusinessLogic.Services.Background;
+using BusinessLogic.DTOs;
 using UNIC.DataAccess.Repositories.Interface;
 
 namespace UNIC.BusinessLogic.Services.Implementation
@@ -137,15 +140,45 @@ namespace UNIC.BusinessLogic.Services.Implementation
             var existing = await _applicationRepository.GetByIdAsync(id, clubId);
             if (existing == null) return null;
 
+            var oldStatus = existing.Status;
             existing.Status = status;
             existing.ReviewedAt = DateTime.UtcNow;
             var updated = await _applicationRepository.UpdateAsync(existing);
+
+            if (updated && !string.Equals(oldStatus, status, StringComparison.OrdinalIgnoreCase))
+            {
+                var user = existing.User;
+                var campaignName = existing.ApplicationForm?.RecruitmentCampaign?.CampaignName ?? "Campaign";
+
+                if (status.Equals(ApplicationStatus.Success, StringComparison.OrdinalIgnoreCase))
+                {
+                    EmailQueueService.EnqueueEmail(new EmailQueueItem
+                    {
+                        ToEmail = user.Email,
+                        FullName = user.FullName,
+                        CampaignName = campaignName,
+                        EmailType = EmailType.ApplicationSuccess
+                    });
+                }
+                else if (status.Equals(ApplicationStatus.Rejected, StringComparison.OrdinalIgnoreCase))
+                {
+                    EmailQueueService.EnqueueEmail(new EmailQueueItem
+                    {
+                        ToEmail = user.Email,
+                        FullName = user.FullName,
+                        CampaignName = campaignName,
+                        EmailType = EmailType.ApplicationRejected
+                    });
+                }
+            }
+
             return updated ? MapToDto(existing) : null;
         }
 
-        public async Task<IEnumerable<ApplicationResponseDto>> GetApplicationsByUserAsync(Guid userId, int clubId)
+        // change
+        public async Task<IEnumerable<ApplicationResponseDto>> GetApplicationsByUserAsync(Guid userId)
         {
-            var applications = await _applicationRepository.GetByUserIdAsync(userId, clubId);
+            var applications = await _applicationRepository.GetByUserIdAsync(userId);
             return applications.Select(MapToDto);
         }
 
@@ -161,9 +194,10 @@ namespace UNIC.BusinessLogic.Services.Implementation
             return applications.Select(MapToDto);
         }
 
-        public async Task<ApplicationResponseDto?> GetApplicationByUserAndFormAsync(Guid userId, int formId, int clubId)
+        // change
+        public async Task<ApplicationResponseDto?> GetApplicationByUserAndFormAsync(Guid userId, int formId)
         {
-            var application = await _applicationRepository.GetByUserIdAndFormIdAsync(userId, formId, clubId);
+            var application = await _applicationRepository.GetByUserIdAndFormIdAsync(userId, formId);
             if (application == null) return null;
             return MapToDto(application);
         }
@@ -192,9 +226,10 @@ namespace UNIC.BusinessLogic.Services.Implementation
             return forms.Select(MapFormToDto);
         }
 
-        public async Task<ApplicationFormResponseDto?> GetFormByIdAsync(int id, int clubId)
+        // change
+        public async Task<ApplicationFormResponseDto?> GetFormByIdAsync(int id)
         {
-            var form = await _applicationRepository.GetFormByIdAsync(id, clubId);
+            var form = await _applicationRepository.GetFormByIdAsync(id);
             if (form == null) return null;
             return MapFormToDto(form);
         }
@@ -216,8 +251,8 @@ namespace UNIC.BusinessLogic.Services.Implementation
 
         public async Task<bool> UpdateFormAsync(int id, int clubId, ApplicationFormResponseDto form)
         {
-            var existing = await _applicationRepository.GetFormByIdAsync(id, clubId);
-            if (existing == null) return false;
+            var existing = await _applicationRepository.GetFormByIdAsync(id);
+            if (existing == null || existing.RecruitmentCampaign.ClubId != clubId) return false;
             if (form.FormId != existing.FormId) return false;
 
             existing.CampaignId = form.CampaignId;
@@ -233,9 +268,10 @@ namespace UNIC.BusinessLogic.Services.Implementation
             return await _applicationRepository.DeleteFormAsync(id, clubId);
         }
 
-        public async Task<IEnumerable<ApplicationQuestionResponseDto>> GetQuestionsByFormAsync(int formId, int clubId)
+        // change
+        public async Task<IEnumerable<ApplicationQuestionResponseDto>> GetQuestionsByFormAsync(int formId)
         {
-            var qs = await _applicationRepository.GetQuestionsByFormIdAsync(formId, clubId);
+            var qs = await _applicationRepository.GetQuestionsByFormIdAsync(formId);
             return qs.Select(MapQuestionToDto);
         }
 
@@ -318,17 +354,18 @@ namespace UNIC.BusinessLogic.Services.Implementation
             return MapAnswerToDto(created);
         }
 
-        public async Task<ApplicationResponseDto> SubmitApplicationWithAnswersAsync(int clubId, SubmitApplicationWithAnswersDto request)
+        // change
+        public async Task<ApplicationResponseDto> SubmitApplicationWithAnswersAsync(SubmitApplicationWithAnswersDto request)
         {
             var user = await _userRepository.GetByIdAsync(request.UserId);
             if (user == null)
                 throw new ArgumentException("Tài khoản không tồn tại. Vui lòng đăng nhập hoặc dùng UserId hợp lệ.");
 
-            var form = await _applicationRepository.GetFormByIdAsync(request.FormId, clubId);
+            var form = await _applicationRepository.GetFormByIdAsync(request.FormId);
             if (form == null)
                 throw new ArgumentException("Form không tồn tại.");
 
-            var questionsOfForm = (await _applicationRepository.GetQuestionsByFormIdAsync(request.FormId, clubId)).ToList();
+            var questionsOfForm = (await _applicationRepository.GetQuestionsByFormIdAsync(request.FormId)).ToList();
             var questionsById = questionsOfForm.ToDictionary(q => q.QuestionId);
 
             if (request.Answers != null)

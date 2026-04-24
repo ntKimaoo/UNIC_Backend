@@ -81,6 +81,6 @@ namespace BusinessLogic.DTOs
     {
         public Guid UserId { get; set; }
         public int ClubId { get; set; }
-        public int ClubRoleId { get; set; }
+        public List<int> ClubRoleIds { get; set; } = new();
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -30,8 +30,12 @@ namespace DataAccess.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
-        [ForeignKey("UserId")]
         public virtual User User { get; set; }
+
+        public Guid? FromUserId { get; set; }
+
+        [ForeignKey("FromUserId")]
+        public virtual User FromUser { get; set; }
 
     }
 }

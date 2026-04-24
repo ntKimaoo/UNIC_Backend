@@ -22,7 +22,10 @@ namespace UNIC.BusinessLogic.Services.Interface
         /// Returns null when the department does not exist or belongs to a different club.
         /// </summary>
         Task<IEnumerable<DepartmentMemberDto>?> GetDepartmentMembersAsync(int clubId, int departmentId);
-        Task<UserClubRoleDepartment> AddMemberTodepartment(int clubId, Guid userId, int departmentId);
-        Task<UserClubRoleDepartment> RemoveMemberFromDepartment(int clubId, Guid userId, int departmentId);
+        Task<UserClubRoleDepartment> AddMemberToDepartment(int clubId, int clubMemberId, int departmentId);
+        Task<UserClubRoleDepartment> RemoveMemberFromDepartment(int clubId, int clubMemberId, int departmentId);
+        Task<IEnumerable<DepartmentMemberDto>?> GetClubMembersNotInDepartmentAsync(int clubId, int departmentId);
+        Task<IEnumerable<DepartmentResponseDto>?> GetDepartmentsJoinedByMemberAsync(int clubId, int clubMemberId);
+        Task<IEnumerable<DepartmentResponseDto>?> GetDepartmentsNotJoinedByMemberAsync(int clubId, int clubMemberId);
     }
 }

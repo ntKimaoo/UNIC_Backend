@@ -5,7 +5,7 @@ using Moq;
 using UNIC.BusinessLogic.DTOs;
 using UNIC.Presentation.Controllers;
 
-namespace UNIC.ServiceTest.Controllers
+namespace UNIC.ControllerTest.Controllers
 {
 
     public class ClubCreationRequestControllerTest

@@ -1,4 +1,6 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.Hubs;
+using BusinessLogic.Options;
 using BusinessLogic.Services;
 using BusinessLogic.Services.Background;
 using BusinessLogic.Services.Implementation;
@@ -11,17 +13,19 @@ using DataAccess.Repositories.Interface;
 using DataAccess.Seed;
 using FluentValidation;
 using FluentValidation.AspNetCore;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
 using Presentation.Authorization;
+using Presentation.Hubs;
 using System;
 using System.Text;
+using UNIC.BusinessLogic.Services;
 using UNIC.BusinessLogic.Services.Implementation;
 using UNIC.BusinessLogic.Services.Interface;
 using UNIC.DataAccess.Repositories.Implementation;
@@ -29,8 +33,6 @@ using UNIC.DataAccess.Repositories.Interface;
 using UNIC.DataAccess.Seed;
 using UNIC.Presentation.Helpers;
 using UNIC.Presentation.Hubs;
-using BusinessLogic.Hubs;
-using Presentation.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -85,7 +87,7 @@ builder.Services.AddScoped<IInterviewRepository, InterviewRepository>();
 builder.Services.AddScoped<IInterviewService, InterviewService>();
 builder.Services.AddScoped<IClubCreationRequestRepository, ClubCreationRequestRepository>();
 builder.Services.AddScoped<IClubCreationRequestService, ClubCreationRequestService>();
-
+builder.Services.AddScoped<IAiAnalysisService,AiAnalysisService>();
 // Register Cloudinary as a singleton
 builder.Services.AddSingleton(sp =>
 {
@@ -104,12 +106,24 @@ builder.Services.AddSingleton(sp =>
 // Register Background Services
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.Configure<BusinessLogic.Options.PayOSOptions>(builder.Configuration.GetSection(BusinessLogic.Options.PayOSOptions.SectionName));
+builder.Services.Configure<BusinessLogic.Options.VnPayOptions>(builder.Configuration.GetSection(BusinessLogic.Options.VnPayOptions.SectionName));
 builder.Services.AddHttpClient<IPayOSService, PayOSService>((sp, client) =>
 {
     var opt = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<BusinessLogic.Options.PayOSOptions>>().Value;
     client.BaseAddress = new Uri(opt.BaseUrl.TrimEnd('/') + "/");
 });
+builder.Services.AddScoped<BusinessLogic.Services.Implementation.PaymentGateways.PayOSFundPaymentGateway>();
+builder.Services.AddScoped<BusinessLogic.Services.Implementation.PaymentGateways.VnPayFundPaymentGateway>();
+builder.Services.AddScoped<BusinessLogic.Services.Interface.IFundPaymentGatewayRegistry>(sp =>
+    new BusinessLogic.Services.Implementation.PaymentGateways.FundPaymentGatewayRegistry(
+        new BusinessLogic.Services.Interface.IFundPaymentGateway[]
+        {
+            sp.GetRequiredService<BusinessLogic.Services.Implementation.PaymentGateways.PayOSFundPaymentGateway>(),
+            sp.GetRequiredService<BusinessLogic.Services.Implementation.PaymentGateways.VnPayFundPaymentGateway>()
+        }));
 builder.Services.AddScoped<IFundRepository, FundRepository>();
+builder.Services.AddScoped<DataAccess.Repositories.Interface.IFundTypeRepository, DataAccess.Repositories.Implementation.FundTypeRepository>();
+builder.Services.AddScoped<IClubPayOSSettingsRepository, ClubPayOSSettingsRepository>();
 builder.Services.AddScoped<IClubFundService, ClubFundService>();
 builder.Services.AddScoped<IClubRepository, ClubRepository>();
 builder.Services.AddScoped<IClubService, ClubService>();
@@ -117,6 +131,8 @@ builder.Services.AddScoped<IClubRoleRepository, ClubRoleRepository>();
 builder.Services.AddScoped<IClubRoleService, ClubRoleService>();
 builder.Services.AddScoped<IClubMemberRepository, ClubMemberRepository>();
 builder.Services.AddScoped<IClubMemberService, ClubMemberService>();
+builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IClubPayOSSettingsService, ClubPayOSSettingsService>();
 builder.Services.AddScoped<IPolicyRepository, PolicyRepository>();
 builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddHostedService<TokenCleanupService>();
@@ -128,6 +144,7 @@ builder.Services.AddScoped<INotificationHubContext, NotificationHubContext>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventReminderService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventStatusSyncService>();
+builder.Services.AddHostedService<BusinessLogic.Services.Background.InterviewRoomActivationService>();
 
 // Unit of Work and Repositories
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IUnitOfWork, DataAccess.Repositories.Implementation.UnitOfWork>();
@@ -143,7 +160,7 @@ builder.Services.AddScoped<BusinessLogic.Services.Interface.IQRCodeGeneratorServ
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<BusinessLogic.Validators.CreateEventRequestValidator>();
-
+builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection("Gemini"));
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(BusinessLogic.Mappings.EventMappingProfile).Assembly);
 
@@ -187,7 +204,10 @@ builder.Services.AddScoped<IAuthorizationHandler, ClubPolicyOrRoleHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, EventPolicyHandler>();
 
 // Event Permission Service
-builder.Services.AddScoped<BusinessLogic.Services.Interface.IEventPermissionService, BusinessLogic.Services.Implementation.EventPermissionService>();
+builder.Services.AddScoped<IEventPermissionService, EventPermissionService>();
+
+// Register club-scoped authorization handler
+builder.Services.AddScoped<IAuthorizationHandler, ClubMemberAuthorizationHandler>();
 
 // Dynamic policy provider (ClubPolicy_ / Role_ / ClubPolicyOrRole_ / EventPolicy_ prefixes)
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
@@ -210,7 +230,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     }
 });
 
-//builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
 
 IEdmModel GetEdmModel()
 {
@@ -223,19 +243,35 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<UnicContext>();
     var meetingDb = scope.ServiceProvider.GetRequiredService<MeetingDbContext>();
 
-    var retry = 0;
-    while (!db.Database.CanConnect())
+    // Connect to 'master' to check SQL Server readiness (target DB may not exist yet)
+    var connString = builder.Configuration.GetConnectionString("DefaultConnection")!;
+    var masterConn = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(connString)
     {
-        retry++;
-        if (retry > 10)
-        {
-            throw new Exception("SQL Server is not ready after waiting.");
-        }
+        InitialCatalog = "master"
+    }.ConnectionString;
 
-        Console.WriteLine("Waiting for SQL Server...");
-        Thread.Sleep(3000);
+    var retry = 0;
+    while (true)
+    {
+        try
+        {
+            using var conn = new Microsoft.Data.SqlClient.SqlConnection(masterConn);
+            conn.Open();
+            break;
+        }
+        catch
+        {
+            retry++;
+            if (retry > 30)
+            {
+                throw new Exception("SQL Server is not ready after waiting 150s.");
+            }
+            Console.WriteLine($"Waiting for SQL Server... ({retry}/30)");
+            Thread.Sleep(5000);
+        }
     }
 
+    Console.WriteLine("SQL Server is ready. Running migrations...");
     db.Database.Migrate();
     meetingDb.Database.Migrate();
 
@@ -267,7 +303,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFE");
-app.UseStaticFiles(); // Enable serving files from wwwroot
+app.UseStaticFiles(); 
 app.MapHub<WebRtcHub>("/webrtc");
 app.MapHub<NotificationHub>("/notifications");
 app.UseHttpsRedirection();
@@ -275,11 +311,5 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
-if (app.Environment.IsDevelopment())
-{
-    // Tránh 404 khi mở base URL qua ngrok (GET / không có controller).
-    app.MapGet("/", () => Results.Redirect("/swagger"));
-}
 
 app.Run();

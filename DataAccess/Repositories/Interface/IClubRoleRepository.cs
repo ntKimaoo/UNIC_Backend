@@ -23,6 +23,10 @@ namespace DataAccess.Repositories.Interface
         Task<List<Guid>> GetManagerIdsForClubsAsync(List<int> clubIds);
         Task<bool> CheckDepartementRole(int roleId);
         Task<UserClubRole> GetUserClubRoleByIdAsync(int clubId);
-
+        Task<bool> AddMemberRoleAsync(int clubMemberId, int clubRoleId);
+        Task<bool> RemoveMemberRoleAsync(int clubMemberId, int clubRoleId);
+        Task SetMemberRolesAsync(int clubMemberId, IEnumerable<int> clubRoleIds);
+        Task<IEnumerable<ClubRole>> GetRolesOfMemberAsync(int clubMemberId);
+        Task<IEnumerable<UserClubRole>> GetMembersByRoleAsync(int clubId, int roleId);
     }
 }

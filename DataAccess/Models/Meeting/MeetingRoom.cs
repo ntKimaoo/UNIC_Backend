@@ -12,9 +12,36 @@ public class MeetingRoom
 {
     public int Id { get; set; }
 
-    // ── 1-1 với InterviewSchedule ────────────────────────────────
-    public int               InterviewScheduleId { get; set; }
-    public InterviewSchedule InterviewSchedule   { get; set; } = null!;
+    // ── Phân loại phòng ──────────────────────────────────────────
+
+    /// <summary>
+    /// Loại phòng: Interview, Internal, Training, General
+    /// </summary>
+    public RoomType RoomType { get; set; } = RoomType.General;
+
+    /// <summary>
+    /// Tiêu đề phòng. Ví dụ: "Họp ban chủ nhiệm", "PV Vòng 1 – Năng lực"
+    /// </summary>
+    public string Title { get; set; } = null!;
+
+    /// <summary>
+    /// Mô tả mục đích / nội dung cuộc họp.
+    /// </summary>
+    public string? Description { get; set; }
+
+    /// <summary>
+    /// Users.UserId – người tạo phòng.
+    /// </summary>
+    public Guid CreatedByUserId { get; set; }
+
+    // ── Liên kết Interview (optional) ────────────────────────────
+
+    /// <summary>
+    /// FK tới InterviewSchedule – chỉ có giá trị khi RoomType = Interview.
+    /// Nullable để room có thể tồn tại độc lập.
+    /// </summary>
+    public int? InterviewScheduleId { get; set; }
+    public InterviewSchedule? InterviewSchedule { get; set; }
 
     // ── Định danh phòng ──────────────────────────────────────────
 
@@ -42,18 +69,17 @@ public class MeetingRoom
     public DateTime? TurnCredentialExpiresAt { get; set; }
 
     // ── Cấu hình phòng ───────────────────────────────────────────
-    public bool IsRecordingEnabled   { get; set; } = false;
+    public bool IsRecordingEnabled { get; set; } = false;
     public bool IsWaitingRoomEnabled { get; set; } = true;
-    public int  MaxParticipants      { get; set; } = 10;
+    public int MaxParticipants { get; set; } = 10;
 
     // ── Trạng thái phòng ─────────────────────────────────────────
-    public RoomStatus Status    { get; set; } = RoomStatus.Idle;
-    public DateTime?  StartedAt { get; set; }
-    public DateTime?  EndedAt   { get; set; }
-
+    public RoomStatus Status { get; set; } = RoomStatus.Idle;
+    public DateTime? StartedAt { get; set; }
+    public DateTime? EndedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation
     public ICollection<RoomParticipant> Participants { get; set; } = new List<RoomParticipant>();
-    public ICollection<RoomEvent>       Events       { get; set; } = new List<RoomEvent>();
+    public ICollection<RoomEvent> Events { get; set; } = new List<RoomEvent>();
 }

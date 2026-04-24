@@ -27,7 +27,9 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.InterviewSchedules
                 .Include(s => s.Assignments)
+                    .ThenInclude(a => a.CriteriaScores)
                 .Include(s => s.MeetingRoom)
+                .Include(s => s.ProposedTimeSlots)
                 .FirstOrDefaultAsync(s => s.Id == id);
         }
 
@@ -36,7 +38,9 @@ namespace DataAccess.Repositories.Implementation
         {
             var query = _context.InterviewSchedules
                 .Include(s => s.Assignments)
+                    .ThenInclude(a => a.CriteriaScores)
                 .Include(s => s.MeetingRoom)
+                .Include(s => s.ProposedTimeSlots)
                 .AsQueryable();
 
             if (campaignId.HasValue)
@@ -84,18 +88,79 @@ namespace DataAccess.Repositories.Implementation
             return true;
         }
 
+        public async Task<int> AutoCompleteExpiredInterviewsAsync(int gracePeriodMinutes)
+        {
+            var now = DateTime.UtcNow;
+            var maxPossibleStartDate = now.AddMinutes(-gracePeriodMinutes);
+
+            var candidates = await _context.InterviewSchedules
+                .Include(s => s.MeetingRoom)
+                .Where(s => (s.Status == InterviewStatus.InProgress || s.Status == InterviewStatus.Confirmed)
+                            && s.ScheduledAt <= maxPossibleStartDate)
+                .ToListAsync();
+
+            var expiredSchedules = candidates
+                .Where(s => s.ScheduledAt?.AddMinutes(s.DurationMinutes + gracePeriodMinutes) <= now)
+                .ToList();
+
+            if (!expiredSchedules.Any())
+                return 0;
+
+            foreach (var schedule in expiredSchedules)
+            {
+                schedule.Status = InterviewStatus.Completed;
+
+                if (schedule.MeetingRoom != null && schedule.MeetingRoom.Status != RoomStatus.Closed)
+                {
+                    schedule.MeetingRoom.Status = RoomStatus.Closed;
+                    schedule.MeetingRoom.EndedAt = now;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return expiredSchedules.Count;
+        }
+
+        public async Task<IEnumerable<InterviewSchedule>> GetSchedulesNeedingReminderAsync(TimeSpan reminderBefore)
+        {
+            var now = DateTime.UtcNow;
+            var reminderThreshold = now.Add(reminderBefore);
+
+            return await _context.InterviewSchedules
+                .Include(s => s.Assignments)
+                .Include(s => s.MeetingRoom)
+                .Where(s => (s.Status == InterviewStatus.Scheduled || s.Status == InterviewStatus.Confirmed)
+                            && s.ReminderSentAt == null
+                            && s.ScheduledAt <= reminderThreshold
+                            && s.ScheduledAt > now)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<InterviewSchedule>> GetCompletedSchedulesWithPendingFeedbackAsync()
+        {
+            return await _context.InterviewSchedules
+                .Include(s => s.Assignments)
+                .Where(s => s.Status == InterviewStatus.Completed
+                            && s.FeedbackNudgeSentAt == null
+                            && s.Assignments.Any(a => a.FeedbackSubmittedAt == null))
+                .ToListAsync();
+        }
+
         // ═══════════════════════════════════════════════════════════
         //  InterviewAssignment
         // ═══════════════════════════════════════════════════════════
 
         public async Task<InterviewAssignment?> GetAssignmentByIdAsync(int id)
         {
-            return await _context.InterviewAssignments.FindAsync(id);
+            return await _context.InterviewAssignments
+                .Include(a => a.CriteriaScores)
+                .FirstOrDefaultAsync(a => a.Id == id);
         }
 
         public async Task<IEnumerable<InterviewAssignment>> GetAssignmentsByScheduleIdAsync(int scheduleId)
         {
             return await _context.InterviewAssignments
+                .Include(a => a.CriteriaScores)
                 .Where(a => a.InterviewScheduleId == scheduleId)
                 .OrderBy(a => a.AssignedAt)
                 .ToListAsync();
@@ -132,6 +197,14 @@ namespace DataAccess.Repositories.Implementation
         // ═══════════════════════════════════════════════════════════
         //  MeetingRoom
         // ═══════════════════════════════════════════════════════════
+
+        public async Task<MeetingRoom?> GetRoomByIdAsync(int roomId)
+        {
+            return await _context.MeetingRooms
+                .Include(r => r.Participants)
+                .Include(r => r.Events)
+                .FirstOrDefaultAsync(r => r.Id == roomId);
+        }
 
         public async Task<MeetingRoom?> GetRoomByScheduleIdAsync(int scheduleId)
         {
@@ -170,6 +243,35 @@ namespace DataAccess.Repositories.Implementation
         // ═══════════════════════════════════════════════════════════
         //  RoomParticipant
         // ═══════════════════════════════════════════════════════════
+
+        public async Task<int> SyncRoomStatusesAsync(TimeSpan preOpenDuration)
+        {
+            var thresholdTime = DateTime.UtcNow.Add(preOpenDuration);
+            var roomsToActivate = await _context.MeetingRooms
+                .Include(r => r.InterviewSchedule)
+                .Where(r => r.Status == RoomStatus.Idle 
+                            && r.RoomType == RoomType.Interview
+                            && r.InterviewSchedule != null
+                            && r.InterviewSchedule.Status == InterviewStatus.Confirmed
+                            && r.InterviewSchedule.ScheduledAt <= thresholdTime)
+                .ToListAsync();
+
+            if (!roomsToActivate.Any())
+                return 0;
+
+            foreach (var room in roomsToActivate)
+            {
+                room.Status = RoomStatus.Active;
+                if (room.InterviewSchedule != null)
+                {
+                    room.InterviewSchedule.Status = InterviewStatus.InProgress;
+                    room.InterviewSchedule.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return roomsToActivate.Count;
+        }
 
         public async Task<RoomParticipant?> GetActiveParticipantAsync(int roomId, Guid userId)
         {
@@ -224,5 +326,220 @@ namespace DataAccess.Repositories.Implementation
             await _context.SaveChangesAsync();
             return roomEvent;
         }
+
+        // ═══════════════════════════════════════════════════════════
+        //  EvaluationCriterion
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<IEnumerable<EvaluationCriterion>> GetCriteriaByCampaignIdAsync(int campaignId)
+        {
+            return await _context.EvaluationCriteria
+                .Where(c => c.CampaignId == campaignId)
+                .OrderBy(c => c.Name)
+                .ToListAsync();
+        }
+
+        public async Task<EvaluationCriterion?> GetCriterionByIdAsync(int id)
+        {
+            return await _context.EvaluationCriteria.FindAsync(id);
+        }
+
+        public async Task<EvaluationCriterion> CreateCriterionAsync(EvaluationCriterion criterion)
+        {
+            await _context.EvaluationCriteria.AddAsync(criterion);
+            await _context.SaveChangesAsync();
+            return criterion;
+        }
+
+        public async Task<bool> UpdateCriterionAsync(EvaluationCriterion criterion)
+        {
+            try
+            {
+                _context.EvaluationCriteria.Update(criterion);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public async Task<bool> DeleteCriterionAsync(int id)
+        {
+            var criterion = await _context.EvaluationCriteria.FindAsync(id);
+            if (criterion == null) return false;
+
+            _context.EvaluationCriteria.Remove(criterion);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  CriteriaScore
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<CriteriaScore> CreateCriteriaScoreAsync(CriteriaScore score)
+        {
+            await _context.CriteriaScores.AddAsync(score);
+            await _context.SaveChangesAsync();
+            return score;
+        }
+
+        public async Task<CriteriaScore?> GetCriteriaScoreAsync(int assignmentId, int criterionId)
+        {
+            return await _context.CriteriaScores
+                .FirstOrDefaultAsync(cs => cs.InterviewAssignmentId == assignmentId
+                                        && cs.EvaluationCriterionId == criterionId);
+        }
+
+        public async Task<bool> UpdateCriteriaScoreAsync(CriteriaScore score)
+        {
+            try
+            {
+                _context.CriteriaScores.Update(score);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public async Task<IEnumerable<CriteriaScore>> GetCriteriaScoresByAssignmentIdAsync(int assignmentId)
+        {
+            return await _context.CriteriaScores
+                .Include(cs => cs.EvaluationCriterion)
+                .Where(cs => cs.InterviewAssignmentId == assignmentId)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<CriteriaScore>> GetCriteriaScoresByScheduleIdAsync(int scheduleId)
+        {
+            return await _context.CriteriaScores
+                .Include(cs => cs.EvaluationCriterion)
+                .Include(cs => cs.InterviewAssignment)
+                .Where(cs => cs.InterviewAssignment.InterviewScheduleId == scheduleId)
+                .ToListAsync();
+        }
+
+        public async Task DeleteCriteriaScoresByAssignmentIdAsync(int assignmentId)
+        {
+            var scores = await _context.CriteriaScores
+                .Where(cs => cs.InterviewAssignmentId == assignmentId)
+                .ToListAsync();
+
+            if (scores.Any())
+            {
+                _context.CriteriaScores.RemoveRange(scores);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  CampaignDecision
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<IEnumerable<CampaignDecision>> GetDecisionsByCampaignIdAsync(int campaignId)
+        {
+            return await _context.CampaignDecisions
+                .Where(d => d.CampaignId == campaignId)
+                .OrderBy(d => d.DecidedAt)
+                .ToListAsync();
+        }
+
+        public async Task<CampaignDecision?> GetDecisionByScheduleIdAsync(int scheduleId)
+        {
+            return await _context.CampaignDecisions
+                .FirstOrDefaultAsync(d => d.InterviewScheduleId == scheduleId);
+        }
+
+        public async Task<CampaignDecision> CreateDecisionAsync(CampaignDecision decision)
+        {
+            await _context.CampaignDecisions.AddAsync(decision);
+            await _context.SaveChangesAsync();
+            return decision;
+        }
+
+        public async Task<bool> UpdateDecisionAsync(CampaignDecision decision)
+        {
+            try
+            {
+                _context.CampaignDecisions.Update(decision);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch { return false; }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  ProposedTimeSlot
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<IEnumerable<ProposedTimeSlot>> GetTimeSlotsByScheduleIdAsync(int scheduleId)
+        {
+            return await _context.ProposedTimeSlots
+                .Where(t => t.InterviewScheduleId == scheduleId)
+                .OrderBy(t => t.ProposedAt)
+                .ToListAsync();
+        }
+
+        public async Task<ProposedTimeSlot?> GetTimeSlotByIdAsync(int id)
+        {
+            return await _context.ProposedTimeSlots.FindAsync(id);
+        }
+
+        public async Task<ProposedTimeSlot> CreateTimeSlotAsync(ProposedTimeSlot slot)
+        {
+            await _context.ProposedTimeSlots.AddAsync(slot);
+            await _context.SaveChangesAsync();
+            return slot;
+        }
+
+        public async Task<bool> UpdateTimeSlotAsync(ProposedTimeSlot slot)
+        {
+            try
+            {
+                _context.ProposedTimeSlots.Update(slot);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public async Task DeleteTimeSlotsByScheduleIdAsync(int scheduleId)
+        {
+            var slots = await _context.ProposedTimeSlots
+                .Where(t => t.InterviewScheduleId == scheduleId)
+                .ToListAsync();
+
+            if (slots.Any())
+            {
+                _context.ProposedTimeSlots.RemoveRange(slots);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  AiAnalysisResult
+        // ════════════════════════════════════════════════════════════
+
+        public async Task<IEnumerable<AiCandidateAnalysisResult>> GetAiAnalysisResultsByCampaignIdAsync(int campaignId)
+        {
+            return await _context.AiCandidateAnalysisResults
+                .Where(a => a.CampaignId == campaignId)
+                .OrderByDescending(a => a.AnalyzedAt)
+                .ToListAsync();
+        }
+
+        public async Task<AiCandidateAnalysisResult> CreateAiAnalysisResultAsync(AiCandidateAnalysisResult result)
+        {
+            await _context.AiCandidateAnalysisResults.AddAsync(result);
+            await _context.SaveChangesAsync();
+            return result;
+        }
+
+        public async Task<IEnumerable<AiCandidateAnalysisResult>> CreateAiAnalysisResultsAsync(IEnumerable<AiCandidateAnalysisResult> results)
+        {
+            await _context.AiCandidateAnalysisResults.AddRangeAsync(results);
+            await _context.SaveChangesAsync();
+            return results;
+        }
     }
 }
+
