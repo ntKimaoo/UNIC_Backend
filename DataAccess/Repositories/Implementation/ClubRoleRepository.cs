@@ -199,13 +199,19 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task SetMemberRolesAsync(int clubMemberId, IEnumerable<int> clubRoleIds)
         {
+            var newRoleIdSet = clubRoleIds.ToHashSet();
+
             var existing = await _context.UserClubRoleAssignments
                 .Where(ura => ura.ClubMemberId == clubMemberId)
                 .ToListAsync();
-            
-            _context.UserClubRoleAssignments.RemoveRange(existing);
 
-            foreach (var roleId in clubRoleIds)
+            var toRemove = existing.Where(e => !newRoleIdSet.Contains(e.ClubRoleId)).ToList();
+            var existingRoleIds = existing.Select(e => e.ClubRoleId).ToHashSet();
+            var toAdd = newRoleIdSet.Where(id => !existingRoleIds.Contains(id)).ToList();
+
+            _context.UserClubRoleAssignments.RemoveRange(toRemove);
+
+            foreach (var roleId in toAdd)
             {
                 await _context.UserClubRoleAssignments.AddAsync(new UserClubRoleAssignment
                 {
@@ -214,7 +220,9 @@ namespace DataAccess.Repositories.Implementation
                     AssignedAt = System.DateTime.UtcNow
                 });
             }
-            await _context.SaveChangesAsync();
+
+            if (toRemove.Count > 0 || toAdd.Count > 0)
+                await _context.SaveChangesAsync();
         }
 
         public async Task<IEnumerable<ClubRole>> GetRolesOfMemberAsync(int clubMemberId)
@@ -222,6 +230,17 @@ namespace DataAccess.Repositories.Implementation
             return await _context.UserClubRoleAssignments
                 .Where(ura => ura.ClubMemberId == clubMemberId)
                 .Select(ura => ura.ClubRole)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<UserClubRole>> GetMembersByRoleAsync(int clubId, int roleId)
+        {
+            return await _context.UserClubRoles
+                .Include(m => m.User)
+                .Include(m => m.RoleAssignments)
+                    .ThenInclude(ra => ra.ClubRole)
+                .Where(m => m.ClubId == clubId && m.RoleAssignments.Any(ra => ra.ClubRoleId == roleId))
+                .OrderBy(m => m.JoinDate)
                 .ToListAsync();
         }
     }

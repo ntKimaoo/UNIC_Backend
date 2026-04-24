@@ -197,15 +197,16 @@ namespace UNIC.BusinessLogic.Services.Implementation
                 StudentId    = ucr.User?.StudentId,
                 Status       = ucr.Status,
                 JoinDate     = ucr.JoinDate,
-                DepartmentRole    = ucr.RoleAssignments.FirstOrDefault(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == departmentId)?.ClubRole != null
-                    ? new DepartmentMemberRoleDto
+                DepartmentRoles   = ucr.RoleAssignments
+                    .Where(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == departmentId)
+                    .Select(ra => new DepartmentMemberRoleDto
                     {
-                        ClubRoleId  = ucr.RoleAssignments.First(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == departmentId).ClubRole.ClubRoleId,
-                        RoleName    = ucr.RoleAssignments.First(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == departmentId).ClubRole.RoleName,
-                        Description = ucr.RoleAssignments.First(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == departmentId).ClubRole.Description,
-                        Level       = ucr.RoleAssignments.First(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == departmentId).ClubRole.Level
-                    }
-                    : null
+                        ClubRoleId  = ra.ClubRole!.ClubRoleId,
+                        RoleName    = ra.ClubRole.RoleName,
+                        Description = ra.ClubRole.Description,
+                        Level       = ra.ClubRole.Level
+                    })
+                    .ToList()
             });
         }
         public async Task<UserClubRoleDepartment> AddMemberToDepartment(int clubId, int clubMemberId, int departmentId)
@@ -226,12 +227,27 @@ namespace UNIC.BusinessLogic.Services.Implementation
             var clubMember = await _clubMemberRepository.GetMemberByIdAsync(clubMemberId);
             if (clubMember == null || clubMember.ClubId != clubId)
                 throw new KeyNotFoundException("Member not found in this club!");
-            var member = new UserClubRoleDepartment
+
+            var departmentRoles = clubMember.RoleAssignments
+                .Where(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == departmentId)
+                .Select(ra => ra.ClubRoleId)
+                .ToList();
+
+            foreach (var roleId in departmentRoles)
             {
-                ClubMemberId = clubMemberId,
-                DepartmentId = departmentId
-            };
-            return await _departmentRepository.RemoveMemberFromDepartment(member);
+                await _clubRoleRepository.RemoveMemberRoleAsync(clubMemberId, roleId);
+            }
+
+            var memberDept = clubMember.MemberDepartments?.FirstOrDefault(d => d.DepartmentId == departmentId);
+            if (memberDept == null)
+            {
+                memberDept = new UserClubRoleDepartment
+                {
+                    ClubMemberId = clubMemberId,
+                    DepartmentId = departmentId
+                };
+            }
+            return await _departmentRepository.RemoveMemberFromDepartment(memberDept);
         }
 
         public async Task<IEnumerable<DepartmentMemberDto>?> GetClubMembersNotInDepartmentAsync(int clubId, int departmentId)
@@ -250,7 +266,7 @@ namespace UNIC.BusinessLogic.Services.Implementation
                 StudentId      = ucr.User?.StudentId,
                 Status         = ucr.Status,
                 JoinDate       = ucr.JoinDate,
-                DepartmentRole = null
+                DepartmentRoles = new List<DepartmentMemberRoleDto>()
             });
         }
 

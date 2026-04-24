@@ -21,8 +21,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
+using DataAccess.Interceptors;
 using Presentation.Authorization;
 using Presentation.Hubs;
+using Presentation.Interceptors;
 using System;
 using System.Text;
 using UNIC.BusinessLogic.Services;
@@ -36,9 +38,16 @@ using UNIC.Presentation.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Audit infrastructure (singleton — shared across all requests)
+builder.Services.AddSingleton<AuditChannel>();
+builder.Services.AddSingleton<AuditInterceptor>();
+
 //database
-builder.Services.AddDbContext<UnicContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDbContext<UnicContext>((sp, options) =>
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.AddInterceptors(sp.GetRequiredService<AuditInterceptor>());
+});
 builder.Services.AddDbContext<MeetingDbContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("MeetingRoomConnection"));
@@ -131,9 +140,12 @@ builder.Services.AddScoped<IClubRoleRepository, ClubRoleRepository>();
 builder.Services.AddScoped<IClubRoleService, ClubRoleService>();
 builder.Services.AddScoped<IClubMemberRepository, ClubMemberRepository>();
 builder.Services.AddScoped<IClubMemberService, ClubMemberService>();
+builder.Services.AddScoped<DataAccess.Repositories.Interface.IReportRepository, DataAccess.Repositories.Implementation.ReportRepository>();
+builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IClubPayOSSettingsService, ClubPayOSSettingsService>();
 builder.Services.AddScoped<IPolicyRepository, PolicyRepository>();
 builder.Services.AddScoped<IPolicyService, PolicyService>();
+builder.Services.AddHostedService<RecordOfChangeProcessorService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
 builder.Services.AddHostedService<ImageUploadQueueService>();

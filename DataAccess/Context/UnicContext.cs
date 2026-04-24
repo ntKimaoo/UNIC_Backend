@@ -497,9 +497,9 @@ public partial class UnicContext : DbContext
             .HasIndex(c => c.ClubName);
 
         modelBuilder.Entity<Club>()
-            .HasOne(c => c.RecordOfChange)
+            .HasMany(c => c.RecordsOfChange)
             .WithOne(r => r.Club)
-            .HasForeignKey<RecordOfChange>(r => r.ClubId);
+            .HasForeignKey(r => r.ClubId);
 
         modelBuilder.Entity<RecordOfChange>()
             .HasOne(r => r.ChangedByUser)

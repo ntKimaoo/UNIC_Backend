@@ -140,6 +140,38 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
+        /// Active/deactive member trong club
+        /// </summary>
+        [HttpPut("api/clubs/{clubId}/members/{memberId}/status")]
+        public async Task<IActionResult> UpdateMemberStatus(int clubId, int memberId, [FromBody] UpdateMemberStatusDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
+
+            try
+            {
+                var member = await _service.GetMemberByIdAsync(memberId);
+                if (member == null || member.ClubId != clubId)
+                    return NotFound(new { success = false, message = "Member not found" });
+
+                var updated = await _service.UpdateMemberStatusAsync(memberId, dto.IsActive);
+                if (updated == null)
+                    return StatusCode(500, new { success = false, message = "Failed to update member status" });
+
+                return Ok(new
+                {
+                    success = true,
+                    message = dto.IsActive ? "Member activated successfully" : "Member deactivated successfully",
+                    data = updated
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Xóa member khỏi club
         /// </summary>
         [HttpDelete("api/clubs/{clubId}/members/{memberId}")]

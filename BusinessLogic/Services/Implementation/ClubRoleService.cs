@@ -248,6 +248,13 @@ namespace BusinessLogic.Services.Implementation
         {
             return _repository.GetUserClubRoleAsync(userId, clubId);
         }
+
+        public async Task<IEnumerable<ClubMemberResponseDto>> GetUsersByRoleAsync(int clubId, int roleId)
+        {
+            var members = await _repository.GetMembersByRoleAsync(clubId, roleId);
+            return members.Select(MapToClubMemberResponseDto);
+        }
+
         public async Task<List<ClubResponseDto>> GetManagedClubsAsync(Guid userId)
         {
             var clubs = await _repository.GetManagedClubsAsync(userId);
@@ -258,6 +265,30 @@ namespace BusinessLogic.Services.Implementation
                 ClubName = c.ClubName,
                 Description = c.Description
             }).ToList();
+        }
+
+        private static ClubMemberResponseDto MapToClubMemberResponseDto(UserClubRole member)
+        {
+            return new ClubMemberResponseDto
+            {
+                ClubMemberId = member.ClubMemberId,
+                UserId = member.UserId,
+                FullName = member.User?.FullName ?? string.Empty,
+                Email = member.User?.Email ?? string.Empty,
+                Avatar = member.User?.Avatar,
+                StudentId = member.User?.StudentId,
+                ClubId = member.ClubId,
+                Roles = member.RoleAssignments?.Select(ra => new ClubRoleInfoDto
+                {
+                    ClubRoleId = ra.ClubRoleId,
+                    RoleName = ra.ClubRole?.RoleName ?? string.Empty,
+                    Level = ra.ClubRole?.Level ?? 0,
+                    AssignedAt = ra.AssignedAt
+                }).ToList() ?? new List<ClubRoleInfoDto>(),
+                JoinDate = member.JoinDate,
+                Status = member.Status,
+                AssignedBy = member.AssignedBy
+            };
         }
     }
 }

@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using UNIC.DataAccess.Repositories.Interface;
 
 namespace BusinessLogic.Services.Implementation
 {
@@ -15,17 +16,20 @@ namespace BusinessLogic.Services.Implementation
         private readonly IClubRepository _clubRepository;
         private readonly IUserRepository _userRepository;
         private readonly IClubRoleRepository _clubRoleRepo;
+        private readonly IDepartmentRepository _departmentRepository;
 
         public ClubMemberService(
             IClubMemberRepository memberRepository,
             IClubRepository clubRepository,
             IUserRepository userRepository,
-            IClubRoleRepository clubRoleRepo)
+            IClubRoleRepository clubRoleRepo,
+            IDepartmentRepository departmentRepository)
         {
             _memberRepository = memberRepository;
             _clubRepository = clubRepository;
             _userRepository = userRepository;
             _clubRoleRepo = clubRoleRepo;
+            _departmentRepository = departmentRepository;
         }
 
         public async Task<IEnumerable<ClubMemberResponseDto>> GetMembersByClubAsync(int clubId)
@@ -112,37 +116,73 @@ namespace BusinessLogic.Services.Implementation
             var member = await _memberRepository.GetMemberByIdAsync(clubMemberId);
             if (member == null) return null;
             
-            if (dto.ClubRoleIds == null || !dto.ClubRoleIds.Any())
-            {
-                await _clubRoleRepo.SetMemberRolesAsync(clubMemberId, new List<int>());
-                var result1 = await _memberRepository.GetMemberByIdAsync(clubMemberId);
-                return MapToResponseDto(result1!);
-            }
+            var currentRoleIds = member.RoleAssignments.Select(ra => ra.ClubRoleId).ToHashSet();
+            var newRoleIds = (dto.ClubRoleIds ?? new List<int>()).ToHashSet();
+            var rolesToAdd = newRoleIds.Where(id => !currentRoleIds.Contains(id)).ToList();
 
-            foreach (var roleId in dto.ClubRoleIds)
+            // Business checks chỉ cần chạy cho role mới thêm vào.
+            foreach (var roleId in rolesToAdd)
             {
                 var clubRole = await _clubRoleRepo.GetByIdAsync(roleId, member.ClubId);
-                if (clubRole != null && clubRole.Level == 0)
+                if (clubRole == null) continue;
+
+                if (clubRole.Level == 0)
                 {
                     if (await _memberRepository.HasClubManager(member.ClubId))
+                        throw new Exception("Each club has only one Club Manager");
+                }
+
+                if (clubRole.DepartmentId.HasValue)
+                {
+                    var departmentId = clubRole.DepartmentId.Value;
+                    var department = await _departmentRepository.GetByIdAsync(departmentId);
+
+                    if (department != null && department.ManagerRoleId == clubRole.ClubRoleId)
                     {
-                        var isCurrentManager = member.RoleAssignments.Any(ra => ra.ClubRole.Level == 0);
-                        if (!isCurrentManager)
+                        var allMembers = await _memberRepository.GetMembersByClubIdAsync(member.ClubId);
+                        var existingManager = allMembers.FirstOrDefault(m =>
+                            m.RoleAssignments.Any(ra => ra.ClubRoleId == clubRole.ClubRoleId) &&
+                            m.ClubMemberId != clubMemberId);
+
+                        if (existingManager != null)
+                            throw new Exception("1 department manager role chỉ có thể có ít hơn 2( chỉ có thể có 1 hoặc là không có)");
+                    }
+
+                    var isMemberInDept = member.MemberDepartments.Any(d => d.DepartmentId == departmentId);
+                    if (!isMemberInDept)
+                    {
+                        await _departmentRepository.AddMemberTodepartment(new UserClubRoleDepartment
                         {
-                            throw new Exception("Each club has only one Club Manager");
-                        }
+                            ClubMemberId = clubMemberId,
+                            DepartmentId = departmentId
+                        });
                     }
                 }
             }
 
-            await _clubRoleRepo.SetMemberRolesAsync(clubMemberId, dto.ClubRoleIds);
+            await _clubRoleRepo.SetMemberRolesAsync(clubMemberId, newRoleIds);
 
             var result = await _memberRepository.GetMemberByIdAsync(clubMemberId);
             return MapToResponseDto(result!);
         }
 
+        public async Task<ClubMemberResponseDto?> UpdateMemberStatusAsync(int clubMemberId, bool isActive)
+        {
+            var member = await _memberRepository.GetMemberByIdAsync(clubMemberId);
+            if (member == null) return null;
+
+            member.Status = isActive ? "ACTIVE" : "INACTIVE";
+            var updated = await _memberRepository.UpdateMemberAsync(member);
+            if (!updated) return null;
+
+            var result = await _memberRepository.GetMemberByIdAsync(clubMemberId);
+            return result == null ? null : MapToResponseDto(result);
+        }
+
         public async Task<bool> RemoveMemberAsync(int clubMemberId)
         {
+            // Remove all role assignments of the member before removing the member
+            await _clubRoleRepo.SetMemberRolesAsync(clubMemberId, new List<int>());
             return await _memberRepository.RemoveMemberAsync(clubMemberId);
         }
 

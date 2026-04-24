@@ -24,7 +24,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Get all club roles
         /// </summary>      
-        //[RequireClubPolicyOrRole("ViewRole", "Admin")]
+        [RequireClubPolicyOrRole("ViewRole", "Admin")]
         [HttpGet("api/club/{clubId}/role")]
         public async Task<IActionResult> GetAll(int clubId)
         {
@@ -186,6 +186,20 @@ namespace Presentation.Controllers
                 if (role == null)
                     return NotFound(new { success = false, message = "User club role not found" });
                 return Ok(new { success = true, data = role });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+            }
+        }
+
+        [HttpGet("api/club/{clubId}/role/{roleId}/users")]
+        public async Task<IActionResult> GetUsersByRole(int clubId, int roleId)
+        {
+            try
+            {
+                var users = await _service.GetUsersByRoleAsync(clubId, roleId);
+                return Ok(new { success = true, data = users });
             }
             catch (Exception ex)
             {
