@@ -249,6 +249,22 @@ namespace Presentation.Controllers
             return Ok(new { success = true, data = clubs });
         }
 
+        /// <summary>
+        /// Lấy danh sách club kèm Policies chi tiết (Dùng token)
+        /// GET /api/me/my-clubs
+        /// </summary>
+        [Authorize]
+        [HttpGet("api/me/my-clubs")]
+        public async Task<IActionResult> GetMyClubsDetailed()
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return Unauthorized(new { success = false, message = "Unauthorized: User ID not found in token." });
+
+            var clubs = await _service.GetMyClubsDetailedAsync(userId.Value);
+            return Ok(new { success = true, data = clubs });
+        }
+
         // ─── Policy Endpoints ────────────────────────────────────────────────
 
         /// <summary>
