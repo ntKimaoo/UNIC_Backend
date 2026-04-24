@@ -131,6 +131,7 @@ builder.Services.AddScoped<IClubRoleRepository, ClubRoleRepository>();
 builder.Services.AddScoped<IClubRoleService, ClubRoleService>();
 builder.Services.AddScoped<IClubMemberRepository, ClubMemberRepository>();
 builder.Services.AddScoped<IClubMemberService, ClubMemberService>();
+builder.Services.AddScoped<DataAccess.Repositories.Interface.IReportRepository, DataAccess.Repositories.Implementation.ReportRepository>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IClubPayOSSettingsService, ClubPayOSSettingsService>();
 builder.Services.AddScoped<IPolicyRepository, PolicyRepository>();
