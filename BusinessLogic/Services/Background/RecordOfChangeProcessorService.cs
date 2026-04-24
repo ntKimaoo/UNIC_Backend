@@ -98,7 +98,15 @@ namespace BusinessLogic.Services.Background
         private static string BuildNotification(string actorName, PendingAuditEntry p)
         {
             var entityLabel = EntityLabel(p.EntityName);
-
+            if(p.EntityName=="UserClubRoleAssignment")
+            {
+                return p.ChangeType switch
+                {
+                    "CREATE" => $"{actorName} đã phân thêm vai trò cho thành viên #{p.EntityId}",
+                    "DELETE" => $"{actorName} đã xóa vai trò của thành viên #{p.EntityId}",
+                    _ => $"{actorName} đã thay đổi thành viên #{p.EntityId} trong câu lạc bộ #{p.ClubId}"
+                };
+            }
             return p.ChangeType switch
             {
                 "CREATE" => $"{actorName} đã tạo {entityLabel} #{p.EntityId}",
@@ -118,6 +126,7 @@ namespace BusinessLogic.Services.Background
             "UserClubRole" => "thành viên",
             "ClubRole" => "vai trò",
             "RecruitmentCampaign" => "chiến dịch tuyển dụng",
+            "UserClubRoleAssignment" => "phân quyền thành viên",
             _ => entityName
         };
     }

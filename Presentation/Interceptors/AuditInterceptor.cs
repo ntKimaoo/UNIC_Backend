@@ -25,7 +25,8 @@ namespace Presentation.Interceptors
             "Event", "Club", "Department",
             "ClubFund", "FundTransaction",
             "UserClubRole", "ClubRole",
-            "RecruitmentCampaign"
+            "RecruitmentCampaign",
+            "UserClubRoleAssignment"
         };
 
         private readonly IHttpContextAccessor _httpContextAccessor;
