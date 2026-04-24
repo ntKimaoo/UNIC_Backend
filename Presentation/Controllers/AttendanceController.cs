@@ -93,8 +93,8 @@ namespace UNIC.Presentation.Controllers
                 }
 
                 request.Code = code;
-                await _attendanceService.CheckInMemberAsync(request);
-                return Ok(new { success = true, message = "Điểm danh thành công!" });
+                var result = await _attendanceService.CheckInMemberAsync(request);
+                return Ok(result);
             }
             catch (NotFoundException ex)
             {

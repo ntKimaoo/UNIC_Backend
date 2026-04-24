@@ -86,11 +86,23 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task RemoveEventMemberAsync(int eventMemberId)
         {
+            // Guard: cannot remove Creator
+            var member = await _eventPermRepo.GetEventMemberByIdAsync(eventMemberId)
+                ?? throw new InvalidOperationException("Event member not found.");
+            if (member.EventRole != null && member.EventRole.Level == 0)
+                throw new InvalidOperationException("Cannot remove the Creator.");
+
             await _eventPermRepo.RemoveEventMemberAsync(eventMemberId);
         }
 
         public async Task UpdateEventMemberRoleAsync(int eventMemberId, int? eventRoleId)
         {
+            // Guard: cannot change Creator's role
+            var member = await _eventPermRepo.GetEventMemberByIdAsync(eventMemberId)
+                ?? throw new InvalidOperationException("Event member not found.");
+            if (member.EventRole != null && member.EventRole.Level == 0)
+                throw new InvalidOperationException("Cannot change the Creator's role.");
+
             await _eventPermRepo.UpdateEventMemberRoleAsync(eventMemberId, eventRoleId);
         }
 
@@ -112,6 +124,11 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<EventRoleDto> CreateEventRoleAsync(int eventId, CreateEventRoleRequest request)
         {
+            // Guard: duplicate role name
+            var existingRoles = await _eventPermRepo.GetEventRolesAsync(eventId);
+            if (existingRoles.Any(r => r.RoleName.Equals(request.RoleName, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("Role name already exists in this event.");
+
             var role = new EventRole
             {
                 EventId = eventId,
@@ -144,6 +161,12 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task RemoveEventRoleAsync(int eventRoleId)
         {
+            // Guard: cannot delete Creator role
+            var role = await _eventPermRepo.GetEventRoleByIdAsync(eventRoleId)
+                ?? throw new Exception("Event role not found.");
+            if (role.Level == 0)
+                throw new InvalidOperationException("Cannot delete the Creator role.");
+
             await _eventPermRepo.RemoveEventRoleAsync(eventRoleId);
         }
 
@@ -151,6 +174,11 @@ namespace BusinessLogic.Services.Implementation
         {
             var role = await _eventPermRepo.GetEventRoleByIdAsync(eventRoleId)
                 ?? throw new Exception("Event role not found.");
+
+            // Guard: cannot modify Creator role
+            if (role.Level == 0)
+                throw new InvalidOperationException("Cannot modify the Creator role.");
+
             role.RoleName = roleName;
             role.Description = description;
             await _eventPermRepo.UpdateEventRoleAsync(role);

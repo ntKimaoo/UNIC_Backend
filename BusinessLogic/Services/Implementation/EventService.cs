@@ -90,10 +90,10 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("Event", request.EventId);
             }
 
-            // Check status - cannot update if canceled or closed
-            if (existingEvent.Status == "CANCELED" || existingEvent.Status == "CLOSED")
+            // Check status - cannot update if canceled, closed, or ended
+            if (existingEvent.Status == "CANCELED" || existingEvent.Status == "CLOSED" || existingEvent.Status == "ENDED")
             {
-                throw new DomainException($"Không thể cập nhật sự kiện có trạng thái '{existingEvent.Status}'");
+                throw new DomainException($"Cannot update event with status '{existingEvent.Status}'");
             }
 
             // Map updates
@@ -158,12 +158,12 @@ namespace BusinessLogic.Services.Implementation
             {
                 if (eventEntity.StartDate.HasValue && request.StartTime < eventEntity.StartDate.Value)
                 {
-                    throw new DomainException("Thời gian bắt đầu phiên không được trước ngày bắt đầu sự kiện");
+                    throw new DomainException("Session start time cannot be before event start date");
                 }
 
                 if (eventEntity.EndDate.HasValue && request.EndTime > eventEntity.EndDate.Value)
                 {
-                    throw new DomainException("Thời gian kết thúc phiên không được sau ngày kết thúc sự kiện");
+                    throw new DomainException("Session end time cannot be after event end date");
                 }
             }
 
@@ -327,9 +327,9 @@ namespace BusinessLogic.Services.Implementation
             if (eventEntity == null)
                 throw new NotFoundException("Event", eventId);
 
-            var allowedStatuses = new[] { "REGISTRATION_OPEN", "OPEN_REGISTRATION", "REGISTRATION_CLOSED", "PLANNED" };
+            var allowedStatuses = new[] { "REGISTRATION_OPEN", "OPEN_REGISTRATION", "REGISTRATION_CLOSED" };
             if (!allowedStatuses.Contains(eventEntity.Status))
-                throw new DomainException($"Không thể bắt đầu sự kiện từ trạng thái '{eventEntity.Status}'.");
+                throw new DomainException($"Cannot start event from status '{eventEntity.Status}'.");
 
             eventEntity.Status = "ONGOING";
             string generatedCode = Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper();

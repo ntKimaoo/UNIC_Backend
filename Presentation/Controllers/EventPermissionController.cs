@@ -142,7 +142,7 @@ namespace UNIC.Presentation.Controllers
             try
             {
                 await _eventPermService.RemoveEventRoleAsync(roleId);
-                return NoContent();
+                return Ok(new { success = true });
             }
             catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
         }

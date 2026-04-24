@@ -207,7 +207,7 @@ namespace BusinessLogic.Services.Implementation
             return _mapper.Map<CheckInCodeResponse>(eventEntity);
         }
 
-        public async Task CheckInMemberAsync(CheckInRequest request)
+        public async Task<CheckInResult> CheckInMemberAsync(CheckInRequest request)
         {
             // Check if event exists
             var eventEntity = await _unitOfWork.Events.GetByIdAsync(request.EventId);
@@ -235,12 +235,31 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("Không tìm thấy bản ghi điểm danh. Người dùng phải đăng ký sự kiện trước.");
             }
 
+            // Idempotent: if already PRESENT, return without updating
+            if (attendance.AttendanceStatus == nameof(AttendanceStatus.PRESENT)
+                || attendance.AttendanceStatus == nameof(AttendanceStatus.CHECKED_IN))
+            {
+                return new CheckInResult
+                {
+                    Success = true,
+                    Message = "Đã điểm danh trước đó.",
+                    AlreadyCheckedIn = true
+                };
+            }
+
             // Update attendance status
             attendance.AttendanceStatus = nameof(AttendanceStatus.PRESENT);
             attendance.CheckInTime = DateTime.UtcNow;
 
             _unitOfWork.Attendances.Update(attendance);
             await _unitOfWork.SaveChangesAsync();
+
+            return new CheckInResult
+            {
+                Success = true,
+                Message = "Điểm danh thành công!",
+                AlreadyCheckedIn = false
+            };
         }
 
         public async Task<CheckInQrResponse?> GetMyCheckInQrAsync(int eventId, Guid userId)

@@ -155,5 +155,15 @@ namespace BusinessLogic.DTOs
         public int PageSize { get; set; }
     }
 
+    /// <summary>
+    /// Result of a code-based check-in attempt.
+    /// </summary>
+    public class CheckInResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = null!;
+        public bool AlreadyCheckedIn { get; set; }
+    }
+
     
 }
