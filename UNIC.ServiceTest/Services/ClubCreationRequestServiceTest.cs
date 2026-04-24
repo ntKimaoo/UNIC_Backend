@@ -1,21 +1,30 @@
-﻿using BusinessLogic.DTOs;
+using BusinessLogic.DTOs;
 using BusinessLogic.Services;
+using BusinessLogic.Services.Interface;
+using DataAccess.Models;
 using DataAccess.Repositories.Interface;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Moq;
 using UNIC.BusinessLogic.DTOs;
 using UNIC.DataAccess.Models;
 
 namespace UNIC.ServiceTest.Services
 {
-
     public class ClubCreationRequestServiceTest
     {
         private readonly Mock<IClubCreationRequestRepository> _repoMock = new();
+        private readonly Mock<IClubService> _clubServiceMock = new();
         private readonly ClubCreationRequestService _sut;
 
         public ClubCreationRequestServiceTest()
         {
-            _sut = new ClubCreationRequestService(_repoMock.Object);
+            var options = new DbContextOptionsBuilder<UnicContext>()
+                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .ConfigureWarnings(x => x.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+                .Options;
+            var context = new UnicContext(options);
+            _sut = new ClubCreationRequestService(_repoMock.Object, _clubServiceMock.Object, context);
         }
 
         private static ClubCreationRequest BuildRequest(int id = 1, Guid? userId = null) => new()
@@ -145,24 +154,27 @@ namespace UNIC.ServiceTest.Services
             Assert.Equal("Approved", request.Status);
         }
 
+        // B2 FIX: result is now ClubCreationRequestDto?, not bool
         [Fact]
         public async Task UpdateStatusAsync_WhenFound_UpdatesStatusAdminCommentAndReviewedAt()
         {
             var request = BuildRequest(1);
             _repoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(request);
-            _repoMock.Setup(r => r.UpdateAsync(request)).Returns(Task.CompletedTask);
+            _repoMock.Setup(r => r.UpdateAsync(It.IsAny<ClubCreationRequest>())).Returns(Task.CompletedTask);
 
             var result = await _sut.UpdateStatusAsync(1,
                 new UpdateClubRequestStatusDto { Status = "Rejected", AdminComment = "Not eligible" });
 
-            Assert.True(result);
+            Assert.NotNull(result);
+            Assert.Equal("Rejected", result!.Status);
             Assert.Equal("Rejected", request.Status);
             Assert.Equal("Not eligible", request.AdminComment);
             Assert.NotNull(request.ReviewedAt);
         }
 
+        // B3 FIX: result is now null, not false
         [Fact]
-        public async Task UpdateStatusAsync_WhenNotFound_ReturnsFalse()
+        public async Task UpdateStatusAsync_WhenNotFound_ReturnsNull()
         {
             _repoMock.Setup(r => r.GetByIdAsync(It.IsAny<int>()))
                      .ReturnsAsync((ClubCreationRequest?)null);
@@ -170,7 +182,27 @@ namespace UNIC.ServiceTest.Services
             var result = await _sut.UpdateStatusAsync(99,
                 new UpdateClubRequestStatusDto { Status = "Approved" });
 
-            Assert.False(result);
+            Assert.Null(result);
+        }
+
+        // M1 NEW: approved status triggers club creation
+        [Fact]
+        public async Task UpdateStatusAsync_WhenStatusIsApproved_CallsClubServiceCreate()
+        {
+            var userId = Guid.NewGuid();
+            var request = BuildRequest(1, userId);
+
+            _repoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(request);
+            _repoMock.Setup(r => r.UpdateAsync(It.IsAny<ClubCreationRequest>())).Returns(Task.CompletedTask);
+            _clubServiceMock.Setup(s => s.CreateAsync(userId, It.IsAny<CreateClubDto>()))
+                            .ReturnsAsync(new ClubResponseDto { ClubId = 1, ClubName = request.ClubName });
+
+            var result = await _sut.UpdateStatusAsync(1,
+                new UpdateClubRequestStatusDto { Status = "approved" });
+
+            Assert.NotNull(result);
+            Assert.Equal("approved", result!.Status);
+            _clubServiceMock.Verify(s => s.CreateAsync(userId, It.IsAny<CreateClubDto>()), Times.Once);
         }
 
         [Fact]

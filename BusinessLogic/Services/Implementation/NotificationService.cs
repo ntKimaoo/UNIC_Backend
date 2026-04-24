@@ -49,7 +49,7 @@ namespace BusinessLogic.Services.Implementation
                 Message = message,
                 Type = type,
                 IsRead = false,
-                CreatedAt = DateTime.Now
+                CreatedAt = DateTime.UtcNow
             };
 
             var saved = await _notificationRepository.CreateAsync(notification);
