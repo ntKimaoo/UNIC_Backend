@@ -20,6 +20,10 @@ namespace Presentation.Controllers
             _aiService = aiService;
         }
 
+        // ═══════════════════════════════════════════════════════════
+        //  Interview Schedule CRUD
+        // ═══════════════════════════════════════════════════════════
+
         /// <summary>
         /// POST /api/interviews – Tạo lịch phỏng vấn từ ApplicationId
         /// </summary>
@@ -531,4 +535,3 @@ namespace Presentation.Controllers
         }
     }
 }
-

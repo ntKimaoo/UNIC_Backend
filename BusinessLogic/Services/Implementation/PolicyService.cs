@@ -52,8 +52,13 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<bool> HasMemberPolicyInClubAsync(Guid userId, int clubId, string policyTitle)
             => await _policyRepository.HasMemberPolicyInClubAsync(userId, clubId, policyTitle);
-        public async Task<string> GetUserRole(Guid userId)
+
+           //lay list role 
+        public async Task<List<string>> GetUserRole(Guid userId)
             => await _policyRepository.GetUserRoleAsync(userId);
+
+        // public async Task<string> GetUserRole(Guid userId)
+        //     => await _policyRepository.GetUserRoleAsync(userId);
 
         public async Task<IEnumerable<string>> GetPoliciesInClubAsync(Guid userId, int clubId)
             => await _policyRepository.GetPoliciesInClubAsync(userId, clubId);

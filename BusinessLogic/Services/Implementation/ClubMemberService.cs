@@ -191,7 +191,8 @@ namespace BusinessLogic.Services.Implementation
         public async Task<IEnumerable<UserClubDetailedInfoDto>> GetMyClubsDetailedAsync(Guid userId)
         {
             var memberships = await _memberRepository.GetClubsByUserIdAsync(userId);
-            var systemRole = await _policyRepository.GetUserRoleAsync(userId);
+            var systemRoles = await _policyRepository.GetUserRoleAsync(userId);
+            var systemRole = systemRoles.FirstOrDefault() ?? "User";
 
             var result = new List<UserClubDetailedInfoDto>();
 

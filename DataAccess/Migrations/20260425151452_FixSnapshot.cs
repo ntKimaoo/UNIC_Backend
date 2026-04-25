@@ -1,11 +1,12 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using System;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace DataAccess.Migrations
 {
     /// <inheritdoc />
-    public partial class AddCollaboratorPoliciesColumn : Migration
+    public partial class FixSnapshot : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -23,15 +24,8 @@ namespace DataAccess.Migrations
                 type: "nvarchar(500)",
                 maxLength: 500,
                 nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "Policies",
-                table: "EventCollaborators",
-                type: "nvarchar(max)",
-                nullable: true);
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
@@ -41,10 +35,6 @@ namespace DataAccess.Migrations
             migrationBuilder.DropColumn(
                 name: "MeetLink",
                 table: "Events");
-
-            migrationBuilder.DropColumn(
-                name: "Policies",
-                table: "EventCollaborators");
         }
     }
 }

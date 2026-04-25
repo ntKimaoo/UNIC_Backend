@@ -129,7 +129,7 @@ namespace DataAccess.Repositories.Implementation
             {
                 var member = await _context.UserClubRoles.FindAsync(clubMemberId);
                 if (member == null) return false;
-
+                
                 _context.UserClubRoles.Remove(member);
                 await _context.SaveChangesAsync();
                 return true;

@@ -160,6 +160,7 @@ builder.Services.AddHostedService<BusinessLogic.Services.Background.InterviewRoo
 // Unit of Work and Repositories
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IUnitOfWork, DataAccess.Repositories.Implementation.UnitOfWork>();
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventRepository, DataAccess.Repositories.Implementation.EventRepository>();
+builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventPermissionRepository, DataAccess.Repositories.Implementation.EventPermissionRepository>();
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IAttendanceRepository, DataAccess.Repositories.Implementation.AttendanceRepository>();
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventScheduleRepository, DataAccess.Repositories.Implementation.EventScheduleRepository>();
 
@@ -184,12 +185,7 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new NullableDateTimeUtcJsonConverter());
 }); ;
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    c.IncludeXmlComments(xmlPath);
-});
+builder.Services.AddSwaggerGen();
 //signalR
 builder.Services.AddSignalR();
 //jwt
@@ -214,18 +210,17 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(key)
     };
 });
-// Register authorization handler
-builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
-
+// Single handler: club-scoped policy check OR UserRole claim check (OR logic)
 builder.Services.AddScoped<IAuthorizationHandler, ClubPolicyOrRoleHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, EventPolicyHandler>();
+
+// Event Permission Service
+builder.Services.AddScoped<IEventPermissionService, EventPermissionService>();
 
 // Register club-scoped authorization handler
 builder.Services.AddScoped<IAuthorizationHandler, ClubMemberAuthorizationHandler>();
 
-// Register event-scoped authorization handler
-builder.Services.AddScoped<IAuthorizationHandler, EventPermissionAuthorizationHandler>();
-
-// Register dynamic policy provider
+// Dynamic policy provider (ClubPolicy_ / Role_ / ClubPolicyOrRole_ / EventPolicy_ prefixes)
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 
 // Configure file upload size limits

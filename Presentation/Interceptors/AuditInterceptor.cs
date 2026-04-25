@@ -22,11 +22,11 @@ namespace Presentation.Interceptors
         // Entity types (by EF short name) that should be audited.
         private static readonly HashSet<string> AuditedNames = new(StringComparer.Ordinal)
         {
-            "Event", "Club", "Department",
-            "ClubFund", "FundTransaction",
-            "UserClubRole", "ClubRole",
-            "RecruitmentCampaign",
-            "UserClubRoleAssignment"
+            //"Event", "Club", "Department",
+            //"ClubFund", "FundTransaction",
+            //"UserClubRole", "ClubRole",
+            //"RecruitmentCampaign",
+            //"UserClubRoleAssignment"
         };
 
         private readonly IHttpContextAccessor _httpContextAccessor;

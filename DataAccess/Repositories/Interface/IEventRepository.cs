@@ -16,6 +16,7 @@ namespace DataAccess.Repositories.Interface
         Task<bool> TryDecrementSlotAsync(int eventId);
         Task<bool> TryDirectPromoteOldestWaitlistAsync(int eventId, string targetStatus);
         Task IncrementSlotAsync(int eventId);
+        Task SetAvailableSlotsAsync(int eventId, int value);
         Task AddAsync(Event @event);
         void Update(Event @event);
         Task<int> BulkSyncStatusAsync();

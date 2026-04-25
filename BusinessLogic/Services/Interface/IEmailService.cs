@@ -13,6 +13,7 @@ namespace BusinessLogic.Services.Interface
         Task<bool> SendWelcomeEmailAsync(string toEmail, string fullName);
         Task<bool> SendEventRegistrationSuccessAsync(string toEmail, string fullName, string eventName, DateTime? startDate, string? checkInQrToken = null, string? apiBaseUrl = null);
         Task<bool> SendEventCheckInCodeAsync(string toEmail, string fullName, string eventName, string checkInCode);
+        Task<bool> SendRegistrationRejectedAsync(string toEmail, string fullName, string eventName);
         Task<bool> SendInterviewStatusChangeEmailAsync(string toEmail, string fullName, string interviewTitle, string status, DateTime scheduledAt, int durationMinutes, List<DateTime>? proposedTimes = null, string? cancelReason = null, string? confirmDeadline = null);
         Task<bool> SendInterviewReminderEmailAsync(string toEmail, string fullName, string interviewTitle, DateTime scheduledAt, int durationMinutes);
         Task<bool> SendInterviewRoomOpenedEmailAsync(string toEmail, string fullName, string interviewTitle, DateTime scheduledAt, string roomCode);

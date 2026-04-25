@@ -32,8 +32,6 @@ namespace BusinessLogic.DTOs
         public bool IsPublic { get; set; } = true;
 
         public bool IsOnline { get; set; } = false;
-
-        [MaxLength(500)]
         public string? MeetLink { get; set; }
 
         [Range(1, int.MaxValue, ErrorMessage = "So luong nguoi phai lon hon 0")]
@@ -67,8 +65,6 @@ namespace BusinessLogic.DTOs
         public bool RequiresApproval { get; set; }
 
         public bool IsOnline { get; set; } = false;
-
-        [MaxLength(500)]
         public string? MeetLink { get; set; }
 
         [Range(1, int.MaxValue, ErrorMessage = "So luong nguoi phai lon hon 0")]

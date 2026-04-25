@@ -10,8 +10,6 @@ namespace DataAccess.Repositories.Interface
         IAttendanceRepository Attendances { get; }
         IEventScheduleRepository EventSchedules { get; }
         IUserRepository Users { get; }
-        IUserEventRoleRepository EventMembers { get; }
-        IEventRoleRepository EventRoles { get; }
 
         Task<int> SaveChangesAsync();
         Task<IDbContextTransaction> BeginTransactionAsync();
