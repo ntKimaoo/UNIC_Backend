@@ -112,26 +112,52 @@ namespace BusinessLogic.Services.Implementation
         {
             var member = await _memberRepository.GetMemberByIdAsync(clubMemberId);
             if (member == null) return null;
+            
+            var currentRoleIds = member.RoleAssignments.Select(ra => ra.ClubRoleId).ToHashSet();
+            var newRoleIds = (dto.ClubRoleIds ?? new List<int>()).ToHashSet();
+            var rolesToAdd = newRoleIds.Where(id => !currentRoleIds.Contains(id)).ToList();
 
-            var isCurrentClubManager = member.RoleAssignments.Any(ra => ra.ClubRole != null && ra.ClubRole.Level == 0);
-
-            if (isCurrentClubManager)
+            // Business checks chỉ cần chạy cho role mới thêm vào.
+            foreach (var roleId in rolesToAdd)
             {
-                bool hasManagerRoleInDto = false;
-                foreach (var roleId in dto.ClubRoleIds ?? new List<int>())
+                var clubRole = await _clubRoleRepo.GetByIdAsync(roleId, member.ClubId);
+                if (clubRole == null) continue;
+
+                if (clubRole.Level == 0)
                 {
-                    var role = await _clubRoleRepo.GetByIdAsync(roleId, member.ClubId);
-                    if (role != null && role.Level == 0)
+                    if (await _memberRepository.HasClubManager(member.ClubId))
+                        throw new Exception("Each club has only one Club Manager");
+                }
+
+                if (clubRole.DepartmentId.HasValue)
+                {
+                    var departmentId = clubRole.DepartmentId.Value;
+                    var department = await _departmentRepository.GetByIdAsync(departmentId);
+
+                    if (department != null && department.ManagerRoleId == clubRole.ClubRoleId)
                     {
-                        hasManagerRoleInDto = true;
-                        break;
+                        var allMembers = await _memberRepository.GetMembersByClubIdAsync(member.ClubId);
+                        var existingManager = allMembers.FirstOrDefault(m =>
+                            m.RoleAssignments.Any(ra => ra.ClubRoleId == clubRole.ClubRoleId) &&
+                            m.ClubMemberId != clubMemberId);
+
+                        if (existingManager != null)
+                            throw new Exception("1 department manager role chỉ có thể có ít hơn 2( chỉ có thể có 1 hoặc là không có)");
+                    }
+
+                    var isMemberInDept = member.MemberDepartments.Any(d => d.DepartmentId == departmentId);
+                    if (!isMemberInDept)
+                    {
+                        await _departmentRepository.AddMemberTodepartment(new UserClubRoleDepartment
+                        {
+                            ClubMemberId = clubMemberId,
+                            DepartmentId = departmentId
+                        });
                     }
                 }
-                if (!hasManagerRoleInDto)
-                    throw new InvalidOperationException("Không thể xóa role Club Manager khỏi thành viên đang là Club Manager của câu lạc bộ.");
             }
 
-            await _clubRoleRepo.SetMemberRolesAsync(clubMemberId, dto.ClubRoleIds ?? new List<int>());
+            await _clubRoleRepo.SetMemberRolesAsync(clubMemberId, newRoleIds);
 
             var result = await _memberRepository.GetMemberByIdAsync(clubMemberId);
             return MapToResponseDto(result!);
