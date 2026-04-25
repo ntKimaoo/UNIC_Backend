@@ -8,6 +8,9 @@ using DataAccess.Repositories.Interface;
 using UNIC.BusinessLogic.Constants;
 using UNIC.BusinessLogic.DTOs;
 using UNIC.BusinessLogic.Services.Interface;
+using BusinessLogic.Services.Interface;
+using BusinessLogic.Services.Background;
+using BusinessLogic.DTOs;
 using UNIC.DataAccess.Repositories.Interface;
 
 namespace UNIC.BusinessLogic.Services.Implementation
@@ -137,9 +140,38 @@ namespace UNIC.BusinessLogic.Services.Implementation
             var existing = await _applicationRepository.GetByIdAsync(id, clubId);
             if (existing == null) return null;
 
+            var oldStatus = existing.Status;
             existing.Status = status;
             existing.ReviewedAt = DateTime.UtcNow;
             var updated = await _applicationRepository.UpdateAsync(existing);
+
+            if (updated && !string.Equals(oldStatus, status, StringComparison.OrdinalIgnoreCase))
+            {
+                var user = existing.User;
+                var campaignName = existing.ApplicationForm?.RecruitmentCampaign?.CampaignName ?? "Campaign";
+
+                if (status.Equals(ApplicationStatus.Success, StringComparison.OrdinalIgnoreCase))
+                {
+                    EmailQueueService.EnqueueEmail(new EmailQueueItem
+                    {
+                        ToEmail = user.Email,
+                        FullName = user.FullName,
+                        CampaignName = campaignName,
+                        EmailType = EmailType.ApplicationSuccess
+                    });
+                }
+                else if (status.Equals(ApplicationStatus.Rejected, StringComparison.OrdinalIgnoreCase))
+                {
+                    EmailQueueService.EnqueueEmail(new EmailQueueItem
+                    {
+                        ToEmail = user.Email,
+                        FullName = user.FullName,
+                        CampaignName = campaignName,
+                        EmailType = EmailType.ApplicationRejected
+                    });
+                }
+            }
+
             return updated ? MapToDto(existing) : null;
         }
 

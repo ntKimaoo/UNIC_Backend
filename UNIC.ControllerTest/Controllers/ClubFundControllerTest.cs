@@ -1,4 +1,5 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.PaymentGateways;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -13,6 +14,9 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DataAccess.Models;
+using DataAccess.Repositories.Interface;
+using UNIC.DataAccess.Repositories.Interface;
 using Xunit;
 
 namespace UNIC.ControllerTest.Controllers
@@ -21,7 +25,11 @@ namespace UNIC.ControllerTest.Controllers
     {
         private readonly Mock<IClubFundService> _fundService;
         private readonly Mock<IClubMemberService> _memberService;
-        private readonly Mock<IPayOSService> _payOSService;
+        private readonly Mock<IClubPayOSSettingsService> _clubPayOSSettingsService;
+        private readonly Mock<IFundPaymentGatewayRegistry> _paymentGatewayRegistry;
+        private readonly Mock<IFundPaymentGateway> _fundPaymentGateway;
+        private readonly Mock<IFundRepository> _fundRepository;
+        private readonly Mock<IClubPayOSSettingsRepository> _clubPayOSSettingsRepository;
         private readonly Mock<IWebHostEnvironment> _environment;
         private readonly ClubFundController _controller;
         private readonly Guid _userId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
@@ -30,18 +38,61 @@ namespace UNIC.ControllerTest.Controllers
         {
             _fundService = new Mock<IClubFundService>();
             _memberService = new Mock<IClubMemberService>();
-            _payOSService = new Mock<IPayOSService>();
+            _clubPayOSSettingsService = new Mock<IClubPayOSSettingsService>();
+            _fundPaymentGateway = new Mock<IFundPaymentGateway>();
+            _fundPaymentGateway.Setup(g => g.CredentialFields).Returns(Array.Empty<PaymentCredentialFieldDescriptor>());
+            _paymentGatewayRegistry = new Mock<IFundPaymentGatewayRegistry>();
+            _paymentGatewayRegistry.Setup(r => r.Get(It.IsAny<string>())).Returns(_fundPaymentGateway.Object);
+            _paymentGatewayRegistry.Setup(r => r.ListOnlineProviders()).Returns(new List<PaymentGatewayDescriptor>
+            {
+                new(
+                    PaymentGatewayProviderCodes.PayOS,
+                    "PayOS",
+                    new List<PaymentCredentialFieldDescriptor>
+                    {
+                        new(PaymentCredentialFieldDescriptor.FieldNames.ClientId, "Client ID", true, 100, "text", null, 0)
+                    }),
+                new(
+                    PaymentGatewayProviderCodes.VNPay,
+                    "VNPay",
+                    new List<PaymentCredentialFieldDescriptor>
+                    {
+                        new(PaymentCredentialFieldDescriptor.FieldNames.ClientId, "TMN Code", true, 100, "text", null, 0)
+                    })
+            });
+            _fundRepository = new Mock<IFundRepository>();
+            _clubPayOSSettingsRepository = new Mock<IClubPayOSSettingsRepository>();
             _environment = new Mock<IWebHostEnvironment>();
 
             _controller = new ClubFundController(
                 _fundService.Object,
                 _memberService.Object,
-                _payOSService.Object,
+                _clubPayOSSettingsService.Object,
+                _paymentGatewayRegistry.Object,
+                _fundRepository.Object,
+                _clubPayOSSettingsRepository.Object,
                 _environment.Object);
 
             var http = new DefaultHttpContext();
             _controller.ControllerContext = new ControllerContext { HttpContext = http };
             SetAuthenticatedUser(_userId);
+        }
+
+        [Fact]
+        public async Task ManagerRefundContribution_ReturnsOk_WhenSuccess()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 8)).ReturnsAsync(true);
+            _fundService.Setup(s => s.ManagerRefundContributionAsync(
+                    _userId,
+                    8,
+                    3,
+                    It.IsAny<bool>(),
+                    It.IsAny<ManagerRefundContributionDto>()))
+                .ReturnsAsync(new FundTransactionResponseDto { TransactionId = 9, FundId = 3, TransactionType = "EXPENSE", Status = "APPROVED", Amount = 10_000m });
+
+            var result = await _controller.ManagerRefundContribution(8, 3, new ManagerRefundContributionDto { OriginalTransactionId = 5, Amount = 10_000m });
+
+            Assert.IsType<OkObjectResult>(result);
         }
 
         private void SetAuthenticatedUser(Guid userId, bool isAdmin = false)
@@ -136,6 +187,29 @@ namespace UNIC.ControllerTest.Controllers
             _fundService.Verify(s => s.CreateFundAsync(_userId, It.IsAny<CreateFundDto>()), Times.Once);
         }
 
+        [Fact]
+        public async Task SoftDeleteFund_ReturnsOk_WhenSuccess()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.SoftDeleteFundAsync(_userId, 1, 9, false)).Returns(Task.CompletedTask);
+
+            var result = await _controller.SoftDeleteFund(1, 9);
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task SoftDeleteFund_ReturnsNotFound_WhenMissingFund()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.SoftDeleteFundAsync(_userId, 1, 9, false))
+                .ThrowsAsync(new KeyNotFoundException("Quỹ không tồn tại hoặc đã được đóng (ẩn)."));
+
+            var result = await _controller.SoftDeleteFund(1, 9);
+
+            Assert.IsType<NotFoundObjectResult>(result);
+        }
+
         #endregion
 
         #region GetMyClubs
@@ -178,7 +252,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task GetFundCapabilities_ReturnsOk_WhenMember()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 5)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundCapabilitiesAsync(_userId, 5))
+            _fundService.Setup(s => s.GetFundCapabilitiesAsync(_userId, 5, It.IsAny<bool>()))
                 .ReturnsAsync(new FundCapabilitiesDto { ClubId = 5, CanViewFunds = true });
 
             var result = await _controller.GetFundCapabilities(5);
@@ -190,7 +264,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task GetFundCapabilities_ReturnsUnauthorized_WhenServiceThrows()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 5)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundCapabilitiesAsync(_userId, 5))
+            _fundService.Setup(s => s.GetFundCapabilitiesAsync(_userId, 5, It.IsAny<bool>()))
                 .ThrowsAsync(new UnauthorizedAccessException());
 
             var result = await _controller.GetFundCapabilities(5);
@@ -354,7 +428,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task GetClubFundTransactions_ReturnsBadRequest_WhenFundNotInClub()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundByIdAsync(5)).ReturnsAsync(new FundResponseDto
+            _fundService.Setup(s => s.GetFundByIdAsync(5, _userId, false, true)).ReturnsAsync(new FundResponseDto
             {
                 FundId = 5,
                 ClubId = 99
@@ -369,7 +443,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task GetClubFundTransactions_ReturnsNotFound_WhenFundMissing()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundByIdAsync(999)).ReturnsAsync((FundResponseDto?)null);
+            _fundService.Setup(s => s.GetFundByIdAsync(999, _userId, false, true)).ReturnsAsync((FundResponseDto?)null);
 
             var result = await _controller.GetClubFundTransactions(1, 999, null, null, null, null, 1, 20);
 
@@ -428,7 +502,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetFund_ReturnsNotFound_WhenMissing()
         {
-            _fundService.Setup(s => s.GetFundByIdAsync(9)).ReturnsAsync((FundResponseDto?)null);
+            _fundService.Setup(s => s.GetFundByIdAsync(9, _userId, false, true)).ReturnsAsync((FundResponseDto?)null);
 
             var result = await _controller.GetFund(9);
 
@@ -438,7 +512,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetFund_Returns403_WhenCannotAccessClub()
         {
-            _fundService.Setup(s => s.GetFundByIdAsync(1)).ReturnsAsync(new FundResponseDto
+            _fundService.Setup(s => s.GetFundByIdAsync(1, _userId, false, true)).ReturnsAsync(new FundResponseDto
             {
                 FundId = 1,
                 ClubId = 99
@@ -455,7 +529,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task GetFund_ReturnsOk_WhenAdminWithoutMembership()
         {
             SetAuthenticatedUser(_userId, isAdmin: true);
-            _fundService.Setup(s => s.GetFundByIdAsync(1)).ReturnsAsync(new FundResponseDto { FundId = 1, ClubId = 99 });
+            _fundService.Setup(s => s.GetFundByIdAsync(1, _userId, true, true)).ReturnsAsync(new FundResponseDto { FundId = 1, ClubId = 99 });
 
             var result = await _controller.GetFund(1);
 
@@ -543,7 +617,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task GetMyFunds_ReturnsBadRequest_WhenMineTypeInvalid()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 2)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetMyFundsByClubIdPagedAsync(2, _userId, "WRONG", null, null, null, 1, 10))
+            _fundService.Setup(s => s.GetMyFundsByClubIdPagedAsync(2, _userId, false, "WRONG", null, null, null, 1, 10))
                 .ThrowsAsync(new ArgumentException("mineType invalid"));
 
             var result = await _controller.GetMyFunds(2, "WRONG", null, null, null, 1, 10);
@@ -555,7 +629,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task GetMyFunds_ReturnsOk_WhenAllowed()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 2)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetMyFundsByClubIdPagedAsync(2, _userId, "ALL", "APPROVED", "quy", "NEWEST", 1, 10))
+            _fundService.Setup(s => s.GetMyFundsByClubIdPagedAsync(2, _userId, false, "ALL", "APPROVED", "quy", "NEWEST", 1, 10))
                 .ReturnsAsync(new PagedResultDto<FundResponseDto>
                 {
                     Items = Array.Empty<FundResponseDto>(),
@@ -588,7 +662,7 @@ namespace UNIC.ControllerTest.Controllers
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(false);
 
-            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 1, Amount = 5000 }, CancellationToken.None);
+            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 1, Amount = 10_000 }, CancellationToken.None);
 
             var obj = Assert.IsType<ObjectResult>(result);
             Assert.Equal(403, obj.StatusCode);
@@ -598,9 +672,9 @@ namespace UNIC.ControllerTest.Controllers
         public async Task Contribute_ReturnsNotFound_WhenFundMissing()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundByIdAsync(2)).ReturnsAsync((FundResponseDto?)null);
+            _fundService.Setup(s => s.GetFundByIdAsync(2, _userId, false, false)).ReturnsAsync((FundResponseDto?)null);
 
-            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 5000 }, CancellationToken.None);
+            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 10_000 }, CancellationToken.None);
 
             Assert.IsType<NotFoundObjectResult>(result);
         }
@@ -609,13 +683,13 @@ namespace UNIC.ControllerTest.Controllers
         public async Task Contribute_Returns403_WhenFundWrongClub()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundByIdAsync(2)).ReturnsAsync(new FundResponseDto
+            _fundService.Setup(s => s.GetFundByIdAsync(2, _userId, false, false)).ReturnsAsync(new FundResponseDto
             {
                 FundId = 2,
                 ClubId = 99
             });
 
-            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 5000 }, CancellationToken.None);
+            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 10_000 }, CancellationToken.None);
 
             var obj = Assert.IsType<ObjectResult>(result);
             Assert.Equal(403, obj.StatusCode);
@@ -625,11 +699,11 @@ namespace UNIC.ControllerTest.Controllers
         public async Task Contribute_ReturnsOk_WhenSuccess()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundByIdAsync(2)).ReturnsAsync(new FundResponseDto { FundId = 2, ClubId = 1 });
+            _fundService.Setup(s => s.GetFundByIdAsync(2, _userId, false, false)).ReturnsAsync(new FundResponseDto { FundId = 2, ClubId = 1 });
             _fundService.Setup(s => s.CreateContributionAsync(_userId, It.IsAny<ContributeRequestDto>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new ContributeResponseDto { TransactionId = 1, CheckoutUrl = "u" });
 
-            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 5000 }, CancellationToken.None);
+            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 10_000 }, CancellationToken.None);
 
             Assert.IsType<OkObjectResult>(result);
         }
@@ -638,11 +712,11 @@ namespace UNIC.ControllerTest.Controllers
         public async Task Contribute_Returns403_WhenServiceThrowsUnauthorized()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundByIdAsync(2)).ReturnsAsync(new FundResponseDto { FundId = 2, ClubId = 1 });
+            _fundService.Setup(s => s.GetFundByIdAsync(2, _userId, false, false)).ReturnsAsync(new FundResponseDto { FundId = 2, ClubId = 1 });
             _fundService.Setup(s => s.CreateContributionAsync(_userId, It.IsAny<ContributeRequestDto>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new UnauthorizedAccessException("no"));
 
-            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 5000 }, CancellationToken.None);
+            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 10_000 }, CancellationToken.None);
 
             var obj = Assert.IsType<ObjectResult>(result);
             Assert.Equal(403, obj.StatusCode);
@@ -652,11 +726,11 @@ namespace UNIC.ControllerTest.Controllers
         public async Task Contribute_ReturnsBadRequest_WhenArgumentExceptionFromService()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundByIdAsync(2)).ReturnsAsync(new FundResponseDto { FundId = 2, ClubId = 1 });
+            _fundService.Setup(s => s.GetFundByIdAsync(2, _userId, false, false)).ReturnsAsync(new FundResponseDto { FundId = 2, ClubId = 1 });
             _fundService.Setup(s => s.CreateContributionAsync(_userId, It.IsAny<ContributeRequestDto>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new ArgumentException("amount"));
 
-            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 5000 }, CancellationToken.None);
+            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 10_000 }, CancellationToken.None);
 
             Assert.IsType<BadRequestObjectResult>(result);
         }
@@ -665,11 +739,11 @@ namespace UNIC.ControllerTest.Controllers
         public async Task Contribute_ReturnsBadRequest_WhenInvalidOperationFromService()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundByIdAsync(2)).ReturnsAsync(new FundResponseDto { FundId = 2, ClubId = 1 });
+            _fundService.Setup(s => s.GetFundByIdAsync(2, _userId, false, false)).ReturnsAsync(new FundResponseDto { FundId = 2, ClubId = 1 });
             _fundService.Setup(s => s.CreateContributionAsync(_userId, It.IsAny<ContributeRequestDto>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new InvalidOperationException("pay"));
 
-            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 5000 }, CancellationToken.None);
+            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 10_000 }, CancellationToken.None);
 
             Assert.IsType<BadRequestObjectResult>(result);
         }
@@ -678,11 +752,11 @@ namespace UNIC.ControllerTest.Controllers
         public async Task Contribute_ReturnsBadRequest_WhenGenericExceptionFromService()
         {
             _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
-            _fundService.Setup(s => s.GetFundByIdAsync(2)).ReturnsAsync(new FundResponseDto { FundId = 2, ClubId = 1 });
+            _fundService.Setup(s => s.GetFundByIdAsync(2, _userId, false, false)).ReturnsAsync(new FundResponseDto { FundId = 2, ClubId = 1 });
             _fundService.Setup(s => s.CreateContributionAsync(_userId, It.IsAny<ContributeRequestDto>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new Exception("surprise"));
 
-            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 5000 }, CancellationToken.None);
+            var result = await _controller.Contribute(1, new ContributeRequestDto { FundId = 2, Amount = 10_000 }, CancellationToken.None);
 
             Assert.IsType<BadRequestObjectResult>(result);
         }
@@ -775,7 +849,7 @@ namespace UNIC.ControllerTest.Controllers
                     TransactionId = 9,
                     FundId = 2,
                     Status = "APPROVED",
-                    Amount = 5000m,
+                    Amount = 10_000m,
                     IsPaid = true
                 });
 
@@ -956,7 +1030,20 @@ namespace UNIC.ControllerTest.Controllers
         public async Task PayOSWebhook_ReturnsBadRequest_WhenSignatureInvalid()
         {
             SetJsonBody("{\"code\":\"00\",\"success\":true,\"data\":{\"orderCode\":5},\"signature\":\"sig\"}");
-            _payOSService.Setup(p => p.VerifyWebhookSignature("sig", It.IsAny<System.Text.Json.JsonElement>())).Returns(false);
+            _fundRepository.Setup(r => r.GetTransactionByIdAsync(5)).ReturnsAsync(new FundTransaction
+            {
+                TransactionId = 5,
+                PaymentProvider = PaymentGatewayProviderCodes.PayOS,
+                ClubFund = new ClubFund { ClubId = 1 }
+            });
+            _clubPayOSSettingsRepository.Setup(r => r.GetByClubIdAsync(1)).ReturnsAsync(new ClubPayOSSettings
+            {
+                ClubId = 1,
+                PaymentProvider = PaymentGatewayProviderCodes.PayOS,
+                ChecksumKey = "club-key",
+                IsEnabled = true
+            });
+            _fundPaymentGateway.Setup(g => g.VerifyWebhookSignature(It.IsAny<ClubPayOSSettings>(), "sig", It.IsAny<System.Text.Json.JsonElement>())).Returns(false);
 
             var result = await _controller.PayOSWebhookClubScoped(CancellationToken.None);
 
@@ -967,7 +1054,20 @@ namespace UNIC.ControllerTest.Controllers
         public async Task PayOSWebhook_ReturnsOk_WhenProcessed()
         {
             SetJsonBody("{\"code\":\"00\",\"success\":true,\"data\":{\"orderCode\":5},\"signature\":\"good\"}");
-            _payOSService.Setup(p => p.VerifyWebhookSignature("good", It.IsAny<System.Text.Json.JsonElement>())).Returns(true);
+            _fundRepository.Setup(r => r.GetTransactionByIdAsync(5)).ReturnsAsync(new FundTransaction
+            {
+                TransactionId = 5,
+                PaymentProvider = PaymentGatewayProviderCodes.PayOS,
+                ClubFund = new ClubFund { ClubId = 1 }
+            });
+            _clubPayOSSettingsRepository.Setup(r => r.GetByClubIdAsync(1)).ReturnsAsync(new ClubPayOSSettings
+            {
+                ClubId = 1,
+                PaymentProvider = PaymentGatewayProviderCodes.PayOS,
+                ChecksumKey = "club-key",
+                IsEnabled = true
+            });
+            _fundPaymentGateway.Setup(g => g.VerifyWebhookSignature(It.IsAny<ClubPayOSSettings>(), "good", It.IsAny<System.Text.Json.JsonElement>())).Returns(true);
             _fundService.Setup(s => s.ProcessPayOSPaymentSuccessAsync(5)).ReturnsAsync(true);
 
             var result = await _controller.PayOSWebhookClubScoped(CancellationToken.None);
@@ -980,7 +1080,6 @@ namespace UNIC.ControllerTest.Controllers
         public async Task PayOSWebhook_ReturnsBadRequest_WhenOrderCodeInvalid()
         {
             SetJsonBody("{\"code\":\"00\",\"success\":true,\"data\":{\"orderCode\":0},\"signature\":\"good\"}");
-            _payOSService.Setup(p => p.VerifyWebhookSignature("good", It.IsAny<System.Text.Json.JsonElement>())).Returns(true);
 
             var result = await _controller.PayOSWebhook(CancellationToken.None);
 
@@ -1014,9 +1113,22 @@ namespace UNIC.ControllerTest.Controllers
         public async Task PayOSWebhook_ReturnsBadRequest_WhenSignatureJsonNull()
         {
             SetJsonBody("{\"code\":\"00\",\"success\":true,\"data\":{\"orderCode\":1},\"signature\":null}");
+            _fundRepository.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(new FundTransaction
+            {
+                TransactionId = 1,
+                PaymentProvider = PaymentGatewayProviderCodes.PayOS,
+                ClubFund = new ClubFund { ClubId = 1 }
+            });
+            _clubPayOSSettingsRepository.Setup(r => r.GetByClubIdAsync(1)).ReturnsAsync(new ClubPayOSSettings
+            {
+                ClubId = 1,
+                PaymentProvider = PaymentGatewayProviderCodes.PayOS,
+                ChecksumKey = "club-key",
+                IsEnabled = true
+            });
             var result = await _controller.PayOSWebhookClubScoped(CancellationToken.None);
             Assert.IsType<BadRequestObjectResult>(result);
-            _payOSService.Verify(p => p.VerifyWebhookSignature(It.IsAny<string>(), It.IsAny<System.Text.Json.JsonElement>()), Times.Never);
+            _fundPaymentGateway.Verify(g => g.VerifyWebhookSignature(It.IsAny<ClubPayOSSettings>(), It.IsAny<string>(), It.IsAny<System.Text.Json.JsonElement>()), Times.Never);
         }
 
         private void SetJsonBody(string json)
@@ -1046,7 +1158,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetHistory_ReturnsUnauthorized_WhenServiceThrowsUnauthorized()
         {
-            _fundService.Setup(s => s.GetFundByIdAsync(3)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
+            _fundService.Setup(s => s.GetFundByIdAsync(3, _userId, false, true)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
             _memberService.Setup(m => m.IsMemberAsync(_userId, 8)).ReturnsAsync(true);
             _fundService.Setup(s => s.GetFundHistoryPagedAsync(3, null, null, _userId, 1, 10))
                 .ThrowsAsync(new UnauthorizedAccessException());
@@ -1059,7 +1171,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetHistory_ReturnsBadRequest_WhenServiceThrowsGenericException()
         {
-            _fundService.Setup(s => s.GetFundByIdAsync(3)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
+            _fundService.Setup(s => s.GetFundByIdAsync(3, _userId, false, true)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
             _memberService.Setup(m => m.IsMemberAsync(_userId, 8)).ReturnsAsync(true);
             _fundService.Setup(s => s.GetFundHistoryPagedAsync(3, null, null, _userId, 1, 10))
                 .ThrowsAsync(new Exception("db"));
@@ -1072,7 +1184,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetHistory_ReturnsBadRequest_WhenPageSizeZero()
         {
-            _fundService.Setup(s => s.GetFundByIdAsync(3)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
+            _fundService.Setup(s => s.GetFundByIdAsync(3, _userId, false, true)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
             _memberService.Setup(m => m.IsMemberAsync(_userId, 8)).ReturnsAsync(true);
 
             var result = await _controller.GetHistory(8, 3, null, null, 1, 0);
@@ -1083,7 +1195,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetHistory_ReturnsNotFound_WhenFundMissing()
         {
-            _fundService.Setup(s => s.GetFundByIdAsync(3)).ReturnsAsync((FundResponseDto?)null);
+            _fundService.Setup(s => s.GetFundByIdAsync(3, _userId, false, true)).ReturnsAsync((FundResponseDto?)null);
 
             var result = await _controller.GetHistory(1, 3, null, null, 1, 10);
 
@@ -1093,7 +1205,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetHistory_Returns403_WhenFundNotInRouteClub()
         {
-            _fundService.Setup(s => s.GetFundByIdAsync(3)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
+            _fundService.Setup(s => s.GetFundByIdAsync(3, _userId, false, true)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
 
             var result = await _controller.GetHistory(1, 3, null, null, 1, 10);
 
@@ -1104,7 +1216,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetHistory_Returns403_WhenCannotAccessClub()
         {
-            _fundService.Setup(s => s.GetFundByIdAsync(3)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
+            _fundService.Setup(s => s.GetFundByIdAsync(3, _userId, false, true)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
             _memberService.Setup(m => m.IsMemberAsync(_userId, 8)).ReturnsAsync(false);
 
             var result = await _controller.GetHistory(8, 3, null, null, 1, 10);
@@ -1116,7 +1228,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetHistory_ReturnsOk_WhenSuccess()
         {
-            _fundService.Setup(s => s.GetFundByIdAsync(3)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
+            _fundService.Setup(s => s.GetFundByIdAsync(3, _userId, false, true)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
             _memberService.Setup(m => m.IsMemberAsync(_userId, 8)).ReturnsAsync(true);
             _fundService.Setup(s => s.GetFundHistoryPagedAsync(3, null, null, _userId, 1, 10))
                 .ReturnsAsync(new PagedResultDto<FundTransactionResponseDto>
@@ -1136,7 +1248,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task GetHistory_ReturnsOk_WhenAdminWithoutClubMembership()
         {
             SetAuthenticatedUser(_userId, isAdmin: true);
-            _fundService.Setup(s => s.GetFundByIdAsync(3)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
+            _fundService.Setup(s => s.GetFundByIdAsync(3, _userId, true, true)).ReturnsAsync(new FundResponseDto { FundId = 3, ClubId = 8 });
             _fundService.Setup(s => s.GetFundHistoryPagedAsync(3, null, null, _userId, 1, 10))
                 .ReturnsAsync(new PagedResultDto<FundTransactionResponseDto>
                 {
@@ -1155,7 +1267,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetFundLocation_Returns403_WhenCannotAccessClub()
         {
-            _fundService.Setup(s => s.GetFundByIdAsync(4)).ReturnsAsync(new FundResponseDto { FundId = 4, ClubId = 9 });
+            _fundService.Setup(s => s.GetFundByIdAsync(4, _userId, false, true)).ReturnsAsync(new FundResponseDto { FundId = 4, ClubId = 9 });
             _memberService.Setup(m => m.IsMemberAsync(_userId, 9)).ReturnsAsync(false);
 
             var result = await _controller.GetFundLocation(4);
@@ -1167,7 +1279,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetFundLocation_ReturnsNotFound_WhenFundMissing()
         {
-            _fundService.Setup(s => s.GetFundByIdAsync(4)).ReturnsAsync((FundResponseDto?)null);
+            _fundService.Setup(s => s.GetFundByIdAsync(4, _userId, false, true)).ReturnsAsync((FundResponseDto?)null);
 
             var result = await _controller.GetFundLocation(4);
 
@@ -1177,10 +1289,96 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task GetFundLocation_ReturnsOk_WhenAllowed()
         {
-            _fundService.Setup(s => s.GetFundByIdAsync(4)).ReturnsAsync(new FundResponseDto { FundId = 4, ClubId = 2 });
+            _fundService.Setup(s => s.GetFundByIdAsync(4, _userId, false, true)).ReturnsAsync(new FundResponseDto { FundId = 4, ClubId = 2 });
             _memberService.Setup(m => m.IsMemberAsync(_userId, 2)).ReturnsAsync(true);
 
             var result = await _controller.GetFundLocation(4);
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+
+        #endregion
+
+        #region Refund requests
+
+        [Fact]
+        public async Task CreateFundRefundRequest_Returns403_WhenNotMember()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(false);
+
+            var result = await _controller.CreateFundRefundRequest(1, new CreateFundRefundRequestDto
+            {
+                OriginalTransactionId = 5,
+                Amount = 10_000m,
+                BankName = "VCB",
+                BankAccountNumber = "1",
+                AccountHolderName = "A"
+            });
+
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(403, obj.StatusCode);
+        }
+
+        [Fact]
+        public async Task CreateFundRefundRequest_ReturnsOk_WhenSuccess()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.CreateFundRefundRequestAsync(_userId, 1, It.IsAny<CreateFundRefundRequestDto>()))
+                .ReturnsAsync(new FundRefundRequestResponseDto { RefundRequestId = 3, ClubId = 1, Amount = 10_000m });
+
+            var result = await _controller.CreateFundRefundRequest(1, new CreateFundRefundRequestDto
+            {
+                OriginalTransactionId = 5,
+                Amount = 10_000m,
+                BankName = "VCB",
+                BankAccountNumber = "1",
+                AccountHolderName = "A"
+            });
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+
+        [Fact]
+        public async Task RecordCashContribution_Returns403_WhenNotMember()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(false);
+
+            var result = await _controller.RecordCashContribution(1, new RecordCashContributionRequestDto
+            {
+                FundId = 1,
+                ContributorUserId = Guid.NewGuid(),
+                Amount = 10_000m,
+                Note = "Nộp mặt"
+            });
+
+            var obj = Assert.IsType<ObjectResult>(result);
+            Assert.Equal(403, obj.StatusCode);
+        }
+
+        [Fact]
+        public async Task RecordCashContribution_ReturnsOk_WhenSuccess()
+        {
+            _memberService.Setup(m => m.IsMemberAsync(_userId, 1)).ReturnsAsync(true);
+            _fundService.Setup(s => s.RecordCashContributionAsync(_userId, 1, false, It.IsAny<RecordCashContributionRequestDto>()))
+                .ReturnsAsync(new RecordCashContributionResponseDto
+                {
+                    TransactionId = 50,
+                    FundId = 2,
+                    Amount = 15_000m,
+                    Status = "APPROVED",
+                    ContributionSource = "CASH",
+                    NewCurrentBalance = 99_000m,
+                    ContributorUserId = Guid.NewGuid(),
+                    RecordedByUserId = _userId
+                });
+
+            var result = await _controller.RecordCashContribution(1, new RecordCashContributionRequestDto
+            {
+                FundId = 2,
+                ContributorUserId = Guid.NewGuid(),
+                Amount = 15_000m,
+                Note = "Nộp mặt buổi họp"
+            });
 
             Assert.IsType<OkObjectResult>(result);
         }

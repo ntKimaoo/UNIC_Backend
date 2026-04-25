@@ -2,7 +2,6 @@ using AutoMapper;
 using BusinessLogic.DTOs;
 using BusinessLogic.Exceptions;
 using BusinessLogic.Services.Interface;
-using BusinessLogic.Services.Background;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using DataAccess.Enums;
@@ -45,7 +44,7 @@ namespace BusinessLogic.Services.Implementation
             _attendanceService = attendanceService;
         }
 
-        public async Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null, Guid? creatorUserId = null)
+        public async Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null)
         {
             // Validate input
             var validationResult = await _createValidator.ValidateAsync(request);
@@ -56,7 +55,7 @@ namespace BusinessLogic.Services.Implementation
 
             // Map to entity
             var eventEntity = _mapper.Map<Event>(request);
-            eventEntity.CreatedAt = DateTime.Now;
+            eventEntity.CreatedAt = DateTime.UtcNow;
             eventEntity.Status = "PLANNED";
             eventEntity.CheckInCode = Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper();
             // Set ImageUrl from Cloudinary upload (null if no image provided)
@@ -64,46 +63,13 @@ namespace BusinessLogic.Services.Implementation
 
             if (!eventEntity.IsPublic)
             {
-                // Generate a WebRTC room code for private events
+                // Online/private events → generate a WebRTC room code
                 eventEntity.Location = $"/webrtc/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
             }
 
             // Add to repository
             await _unitOfWork.Events.AddAsync(eventEntity);
             await _unitOfWork.SaveChangesAsync();
-
-            // Auto-assign CREATOR role to event creator
-            if (creatorUserId.HasValue)
-            {
-                var role = new EventRole
-                {
-                    EventId = eventEntity.EventId,
-                    RoleName = "Trưởng ban tổ chức",
-                    Description = "Người tạo sự kiện, toàn quyền quản trị",
-                    Level = 1
-                };
-                await _unitOfWork.EventRoles.CreateAsync(role);
-                // Get all Event policies from Policy table
-                var allEventPolicyNames = await _unitOfWork.EventRoles.GetEventPolicyNamesAsync();
-                
-                // Assign to user
-                var collaborator = new UserEventRole
-                {
-                    EventId = eventEntity.EventId,
-                    UserId = creatorUserId.Value,
-                    EventRole = role,
-                    JoinDate = DateTime.Now,
-                    AssignedBy = creatorUserId.Value
-                };
-                await _unitOfWork.EventMembers.AddAsync(collaborator);
-                await _unitOfWork.SaveChangesAsync();
-                
-                // Seed policies for Trưởng ban (all event policies)
-                if (allEventPolicyNames.Any())
-                {
-                    await _unitOfWork.EventRoles.SetPoliciesAsync(role.EventRoleId, allEventPolicyNames);
-                }
-            }
 
             return _mapper.Map<EventDetailDto>(eventEntity);
         }
@@ -124,8 +90,8 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("Event", request.EventId);
             }
 
-            // Check status - cannot update if canceled or closed
-            if (existingEvent.Status == "CANCELED" || existingEvent.Status == "CLOSED")
+            // Check status - cannot update if canceled, closed, or ended
+            if (existingEvent.Status == "CANCELED" || existingEvent.Status == "CLOSED" || existingEvent.Status == "ENDED")
             {
                 throw new DomainException($"Cannot update event with status '{existingEvent.Status}'");
             }
@@ -133,26 +99,27 @@ namespace BusinessLogic.Services.Implementation
             // Map updates
             existingEvent.EventName = request.EventName;
             existingEvent.Description = request.Description;
+            existingEvent.RequiresApproval = request.RequiresApproval;
             existingEvent.IsOnline = request.IsOnline;
             existingEvent.MeetLink = request.MeetLink;
-
+            
             // Handle Type switch (Offline <-> Online)
             if (request.IsOnline)
             {
-                // Online event: use provided MeetLink; generate internal room code if none provided
-                if (string.IsNullOrWhiteSpace(request.MeetLink))
+                // If switching to or staying Online, ensure we have a WebRTC link
+                if (string.IsNullOrEmpty(existingEvent.Location) || !existingEvent.Location.StartsWith("/webrtc/"))
                 {
-                    if (string.IsNullOrEmpty(existingEvent.MeetLink))
-                        existingEvent.MeetLink = $"/event-room/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+                    existingEvent.Location = $"/webrtc/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
                 }
-                // Location is optional for online events (clear it or keep as-is)
             }
             else
             {
-                // Offline event: clear MeetLink, require Location
-                existingEvent.MeetLink = null;
-                if (!string.IsNullOrWhiteSpace(request.Location))
-                    existingEvent.Location = request.Location;
+                // If staying or switching to Offline, ensure they provided a physical location
+                if (string.IsNullOrWhiteSpace(request.Location))
+                {
+                    throw new DomainException("Địa điểm là bắt buộc cho sự kiện trực tiếp.");
+                }
+                existingEvent.Location = request.Location;
             }
             
             existingEvent.StartDate = request.StartDate;
@@ -184,15 +151,20 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("Event", request.EventId);
             }
 
-            // Validate session time is within event time
-            if (eventEntity.StartDate.HasValue && request.StartTime < eventEntity.StartDate.Value)
+            // Validate session time is within event time (chỉ áp dụng cho type 'main')
+            // Setup sessions có thể bắt đầu trước event, break sessions linh hoạt
+            var sessionType = request.SessionType?.ToLower() ?? "main";
+            if (sessionType == "main")
             {
-                throw new DomainException("Session start time cannot be before event start date");
-            }
+                if (eventEntity.StartDate.HasValue && request.StartTime < eventEntity.StartDate.Value)
+                {
+                    throw new DomainException("Session start time cannot be before event start date");
+                }
 
-            if (eventEntity.EndDate.HasValue && request.EndTime > eventEntity.EndDate.Value)
-            {
-                throw new DomainException("Session end time cannot be after event end date");
+                if (eventEntity.EndDate.HasValue && request.EndTime > eventEntity.EndDate.Value)
+                {
+                    throw new DomainException("Session end time cannot be after event end date");
+                }
             }
 
             // Map to entity
@@ -213,7 +185,7 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("Session", request.ScheduleId);
 
             if (schedule.EventId != request.EventId)
-                throw new DomainException("Session does not belong to this event.");
+                throw new DomainException("Phiên không thuộc sự kiện này.");
 
             schedule.ScheduleName = request.SessionName;
             schedule.StartTime    = request.StartTime;
@@ -236,7 +208,7 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("Session", scheduleId);
 
             if (schedule.EventId != eventId)
-                throw new DomainException("Session does not belong to this event.");
+                throw new DomainException("Phiên không thuộc sự kiện này.");
 
             _unitOfWork.EventSchedules.Delete(schedule);
             await _unitOfWork.SaveChangesAsync();
@@ -261,23 +233,43 @@ namespace BusinessLogic.Services.Implementation
             // Check event status is PLANNED or REGISTRATION_OPEN (allow editing dates)
             if (eventEntity.Status != "PLANNED" && eventEntity.Status != "REGISTRATION_OPEN")
             {
-                throw new DomainException($"Cannot open/update registration for event with status '{eventEntity.Status}'. Event must be in PLANNED or REGISTRATION_OPEN status.");
+                throw new DomainException($"Không thể mở/cập nhật đăng ký cho sự kiện có trạng thái '{eventEntity.Status}'. Sự kiện phải ở trạng thái PLANNED hoặc REGISTRATION_OPEN.");
             }
 
             // Validate registration end date is before event start date
             if (eventEntity.StartDate.HasValue && request.RegistrationEndDate >= eventEntity.StartDate.Value)
             {
-                throw new DomainException("Registration end date must be before event start date");
+                throw new DomainException("Ngày kết thúc đăng ký phải trước ngày bắt đầu sự kiện");
             }
 
             // Update event
             eventEntity.Status = "REGISTRATION_OPEN";
             eventEntity.RegistrationStartDate = request.RegistrationStartDate;
             eventEntity.RegistrationEndDate = request.RegistrationEndDate;
-            eventEntity.MaxAttendees = request.MaxAttendees;
-            // Sync AvailableSlots = MaxAttendees khi mở đăng ký (bắt đầu đếm slot)
+
+            // Validate MaxAttendees vs current registered count
             if (request.MaxAttendees.HasValue)
-                eventEntity.AvailableSlots = request.MaxAttendees.Value;
+            {
+                var allAttendances = await _unitOfWork.Attendances.GetAttendeesByEventAsync(request.EventId);
+                // Option B: chỉ đếm status thật sự chiếm slot (PENDING/WAITLIST không chiếm)
+                var slotOccupyingStatuses = new[] { "REGISTERED", "CHECKED_IN", "PRESENT", "ABSENT" };
+                var occupiedSlots = allAttendances.Count(a => slotOccupyingStatuses.Contains(a.AttendanceStatus));
+
+                // Validation: không cho set maxAttendees nhỏ hơn số đã chiếm slot
+                if (request.MaxAttendees.Value < occupiedSlots)
+                {
+                    throw new DomainException(
+                        $"Không thể đặt giới hạn {request.MaxAttendees.Value} người vì hiện đã có {occupiedSlots} người đã được duyệt.");
+                }
+
+                eventEntity.MaxAttendees = request.MaxAttendees;
+                eventEntity.AvailableSlots = request.MaxAttendees.Value - occupiedSlots;
+            }
+            else
+            {
+                eventEntity.MaxAttendees = null;
+                eventEntity.AvailableSlots = null;
+            }
 
             _unitOfWork.Events.Update(eventEntity);
             await _unitOfWork.SaveChangesAsync();
@@ -320,7 +312,7 @@ namespace BusinessLogic.Services.Implementation
         public async Task RegisterForEventAsync(int eventId, string userId, string? apiBaseUrl = null)
         {
             if (!Guid.TryParse(userId, out var userGuid))
-                throw new DomainException("Invalid user ID format");
+                throw new DomainException("Định dạng ID người dùng không hợp lệ");
 
             await _attendanceService.RegisterMemberAsync(new EventRegistrationRequest 
             { 
@@ -335,13 +327,14 @@ namespace BusinessLogic.Services.Implementation
             if (eventEntity == null)
                 throw new NotFoundException("Event", eventId);
 
-            if (eventEntity.Status != "REGISTRATION_OPEN" && eventEntity.Status != "OPEN_REGISTRATION")
+            var allowedStatuses = new[] { "REGISTRATION_OPEN", "OPEN_REGISTRATION", "REGISTRATION_CLOSED" };
+            if (!allowedStatuses.Contains(eventEntity.Status))
                 throw new DomainException($"Cannot start event from status '{eventEntity.Status}'.");
 
             eventEntity.Status = "ONGOING";
             string generatedCode = Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper();
             eventEntity.CheckInCode = generatedCode;
-            DateTime expiry = DateTime.Now.AddHours(2);
+            DateTime expiry = DateTime.UtcNow.AddHours(2);
             eventEntity.CodeExpiresAt = expiry;
 
             _unitOfWork.Events.Update(eventEntity);
@@ -355,14 +348,7 @@ namespace BusinessLogic.Services.Implementation
                 var user = await _unitOfWork.Users.GetByIdAsync(att.UserId);
                 if (user != null)
                 {
-                    EmailQueueService.EnqueueEmail(new EmailQueueItem
-                    {
-                        ToEmail = user.Email,
-                        FullName = user.FullName,
-                        EmailType = EmailType.EventCheckIn,
-                        EventName = eventEntity.EventName,
-                        CheckInCode = generatedCode
-                    });
+                    _ = _emailService.SendEventCheckInCodeAsync(user.Email, user.FullName, eventEntity.EventName, generatedCode);
                 }
             }
 
@@ -372,31 +358,31 @@ namespace BusinessLogic.Services.Implementation
         public async Task CheckInEventAsync(int eventId, string userId, string checkInCode)
         {
             if (!Guid.TryParse(userId, out var userGuid))
-                throw new DomainException("Invalid user ID format");
+                throw new DomainException("Định dạng ID người dùng không hợp lệ");
 
             var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
             if (eventEntity == null)
                 throw new NotFoundException("Event", eventId);
 
             if (eventEntity.Status != "ONGOING")
-                throw new DomainException("Event is not currently ongoing.");
+                throw new DomainException("Sự kiện hiện không đang diễn ra.");
 
             if (string.IsNullOrEmpty(eventEntity.CheckInCode) || !eventEntity.CheckInCode.Equals(checkInCode, StringComparison.OrdinalIgnoreCase))
-                throw new DomainException("Invalid check-in code.");
+                throw new DomainException("Mã điểm danh không hợp lệ hoặc đã hết hạn");
 
-            if (eventEntity.CodeExpiresAt.HasValue && DateTime.Now > eventEntity.CodeExpiresAt.Value)
-                throw new DomainException("Check-in code has expired.");
+            if (eventEntity.CodeExpiresAt.HasValue && DateTime.UtcNow > eventEntity.CodeExpiresAt.Value)
+                throw new DomainException("Mã điểm danh đã hết hạn.");
 
             var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, userGuid);
             if (attendance == null)
-                throw new DomainException("User is not registered for this event.");
+                throw new DomainException("Người dùng chưa đăng ký sự kiện này.");
 
             if (attendance.AttendanceStatus == nameof(AttendanceStatus.PRESENT)
                 || attendance.AttendanceStatus == nameof(AttendanceStatus.CHECKED_IN))
-                throw new DomainException("User has already checked in.");
+                throw new DomainException("Người dùng đã điểm danh rồi.");
 
             attendance.AttendanceStatus = nameof(AttendanceStatus.PRESENT);
-            attendance.CheckInTime = DateTime.Now;
+            attendance.CheckInTime = DateTime.UtcNow;
 
             _unitOfWork.Attendances.Update(attendance);
             await _unitOfWork.SaveChangesAsync();
@@ -409,7 +395,7 @@ namespace BusinessLogic.Services.Implementation
                 throw new NotFoundException("Event", eventId);
 
             if (eventEntity.Status != "ONGOING")
-                throw new DomainException($"Cannot complete event from status '{eventEntity.Status}'.");
+                throw new DomainException($"Không thể kết thúc sự kiện từ trạng thái '{eventEntity.Status}'.");
 
             eventEntity.Status = "COMPLETED";
 
@@ -430,12 +416,14 @@ namespace BusinessLogic.Services.Implementation
         /// <summary>
         /// Lazily corrects stale event status based on current time.
         /// Rules:
+        ///   0. PLANNED + no manual registration setup + within 2 days of start → auto REGISTRATION_OPEN
         ///   1. REGISTRATION_OPEN + registrationEndDate passed  → REGISTRATION_CLOSED
         ///   2. Any non-terminal status + endDate passed        → ENDED
+        /// If user manually calls OpenRegistration, those dates take precedence (override).
         /// </summary>
         private async Task<bool> AutoSyncStatusAsync(Event eventEntity, bool saveImmediately = true)
         {
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
             var originalStatus = eventEntity.Status;
 
             // Rule 2 first (higher priority): if event's own end time has passed, mark ENDED
@@ -452,6 +440,17 @@ namespace BusinessLogic.Services.Implementation
                 && eventEntity.RegistrationEndDate.Value <= now)
             {
                 eventEntity.Status = "REGISTRATION_CLOSED";
+            }
+            // Rule 0: auto-open registration if no manual setup and within 2 days of start
+            else if (eventEntity.Status == "PLANNED"
+                && eventEntity.StartDate.HasValue
+                && !eventEntity.RegistrationStartDate.HasValue  // user didn't manually set
+                && eventEntity.StartDate.Value.AddDays(-2) <= now
+                && eventEntity.StartDate.Value.AddHours(-12) > now) // still before auto-close
+            {
+                eventEntity.Status = "REGISTRATION_OPEN";
+                eventEntity.RegistrationStartDate = eventEntity.StartDate.Value.AddDays(-2);
+                eventEntity.RegistrationEndDate = eventEntity.StartDate.Value.AddHours(-12);
             }
 
             if (eventEntity.Status == originalStatus)

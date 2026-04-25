@@ -21,8 +21,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
+using DataAccess.Interceptors;
 using Presentation.Authorization;
 using Presentation.Hubs;
+using Presentation.Interceptors;
 using System;
 using System.Text;
 using UNIC.BusinessLogic.Services;
@@ -36,9 +38,16 @@ using UNIC.Presentation.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Audit infrastructure (singleton — shared across all requests)
+builder.Services.AddSingleton<AuditChannel>();
+builder.Services.AddSingleton<AuditInterceptor>();
+
 //database
-builder.Services.AddDbContext<UnicContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDbContext<UnicContext>((sp, options) =>
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.AddInterceptors(sp.GetRequiredService<AuditInterceptor>());
+});
 builder.Services.AddDbContext<MeetingDbContext>(options =>
 {
     options.UseSqlServer(builder.Configuration.GetConnectionString("MeetingRoomConnection"));
@@ -106,12 +115,24 @@ builder.Services.AddSingleton(sp =>
 // Register Background Services
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.Configure<BusinessLogic.Options.PayOSOptions>(builder.Configuration.GetSection(BusinessLogic.Options.PayOSOptions.SectionName));
+builder.Services.Configure<BusinessLogic.Options.VnPayOptions>(builder.Configuration.GetSection(BusinessLogic.Options.VnPayOptions.SectionName));
 builder.Services.AddHttpClient<IPayOSService, PayOSService>((sp, client) =>
 {
     var opt = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<BusinessLogic.Options.PayOSOptions>>().Value;
     client.BaseAddress = new Uri(opt.BaseUrl.TrimEnd('/') + "/");
 });
+builder.Services.AddScoped<BusinessLogic.Services.Implementation.PaymentGateways.PayOSFundPaymentGateway>();
+builder.Services.AddScoped<BusinessLogic.Services.Implementation.PaymentGateways.VnPayFundPaymentGateway>();
+builder.Services.AddScoped<BusinessLogic.Services.Interface.IFundPaymentGatewayRegistry>(sp =>
+    new BusinessLogic.Services.Implementation.PaymentGateways.FundPaymentGatewayRegistry(
+        new BusinessLogic.Services.Interface.IFundPaymentGateway[]
+        {
+            sp.GetRequiredService<BusinessLogic.Services.Implementation.PaymentGateways.PayOSFundPaymentGateway>(),
+            sp.GetRequiredService<BusinessLogic.Services.Implementation.PaymentGateways.VnPayFundPaymentGateway>()
+        }));
 builder.Services.AddScoped<IFundRepository, FundRepository>();
+builder.Services.AddScoped<DataAccess.Repositories.Interface.IFundTypeRepository, DataAccess.Repositories.Implementation.FundTypeRepository>();
+builder.Services.AddScoped<IClubPayOSSettingsRepository, ClubPayOSSettingsRepository>();
 builder.Services.AddScoped<IClubFundService, ClubFundService>();
 builder.Services.AddScoped<IClubRepository, ClubRepository>();
 builder.Services.AddScoped<IClubService, ClubService>();
@@ -119,8 +140,12 @@ builder.Services.AddScoped<IClubRoleRepository, ClubRoleRepository>();
 builder.Services.AddScoped<IClubRoleService, ClubRoleService>();
 builder.Services.AddScoped<IClubMemberRepository, ClubMemberRepository>();
 builder.Services.AddScoped<IClubMemberService, ClubMemberService>();
+builder.Services.AddScoped<DataAccess.Repositories.Interface.IReportRepository, DataAccess.Repositories.Implementation.ReportRepository>();
+builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IClubPayOSSettingsService, ClubPayOSSettingsService>();
 builder.Services.AddScoped<IPolicyRepository, PolicyRepository>();
 builder.Services.AddScoped<IPolicyService, PolicyService>();
+builder.Services.AddHostedService<RecordOfChangeProcessorService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();
 builder.Services.AddHostedService<ImageUploadQueueService>();
@@ -130,10 +155,12 @@ builder.Services.AddScoped<INotificationHubContext, NotificationHubContext>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventReminderService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventStatusSyncService>();
+builder.Services.AddHostedService<BusinessLogic.Services.Background.InterviewRoomActivationService>();
 
 // Unit of Work and Repositories
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IUnitOfWork, DataAccess.Repositories.Implementation.UnitOfWork>();
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventRepository, DataAccess.Repositories.Implementation.EventRepository>();
+builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventPermissionRepository, DataAccess.Repositories.Implementation.EventPermissionRepository>();
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IAttendanceRepository, DataAccess.Repositories.Implementation.AttendanceRepository>();
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventScheduleRepository, DataAccess.Repositories.Implementation.EventScheduleRepository>();
 
@@ -158,12 +185,7 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new NullableDateTimeUtcJsonConverter());
 }); ;
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    c.IncludeXmlComments(xmlPath);
-});
+builder.Services.AddSwaggerGen();
 //signalR
 builder.Services.AddSignalR();
 //jwt
@@ -188,16 +210,17 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(key)
     };
 });
-// Register authorization handler
-builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
+// Single handler: club-scoped policy check OR UserRole claim check (OR logic)
+builder.Services.AddScoped<IAuthorizationHandler, ClubPolicyOrRoleHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, EventPolicyHandler>();
+
+// Event Permission Service
+builder.Services.AddScoped<IEventPermissionService, EventPermissionService>();
 
 // Register club-scoped authorization handler
 builder.Services.AddScoped<IAuthorizationHandler, ClubMemberAuthorizationHandler>();
 
-// Register event-scoped authorization handler
-builder.Services.AddScoped<IAuthorizationHandler, EventPermissionAuthorizationHandler>();
-
-// Register dynamic policy provider
+// Dynamic policy provider (ClubPolicy_ / Role_ / ClubPolicyOrRole_ / EventPolicy_ prefixes)
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 
 // Configure file upload size limits
@@ -218,7 +241,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     }
 });
 
-//builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
 
 IEdmModel GetEdmModel()
 {

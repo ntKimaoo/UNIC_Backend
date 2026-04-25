@@ -197,41 +197,95 @@ namespace UNIC.BusinessLogic.Services.Implementation
                 StudentId    = ucr.User?.StudentId,
                 Status       = ucr.Status,
                 JoinDate     = ucr.JoinDate,
-                DepartmentRole    = (ucr.ClubRole != null && ucr.ClubRole.DepartmentId == departmentId)
-                    ? new DepartmentMemberRoleDto
+                DepartmentRoles   = ucr.RoleAssignments
+                    .Where(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == departmentId)
+                    .Select(ra => new DepartmentMemberRoleDto
                     {
-                        ClubRoleId  = ucr.ClubRole.ClubRoleId,
-                        RoleName    = ucr.ClubRole.RoleName,
-                        Description = ucr.ClubRole.Description,
-                        Level       = ucr.ClubRole.Level
-                    }
-                    : null
+                        ClubRoleId  = ra.ClubRole!.ClubRoleId,
+                        RoleName    = ra.ClubRole.RoleName,
+                        Description = ra.ClubRole.Description,
+                        Level       = ra.ClubRole.Level
+                    })
+                    .ToList()
             });
         }
-        public async Task<UserClubRoleDepartment> AddMemberTodepartment(int clubId,Guid userId,int departmentId)
+        public async Task<UserClubRoleDepartment> AddMemberToDepartment(int clubId, int clubMemberId, int departmentId)
         {
-            var clubMember = await _clubMemberRepository.GetMemberAsync(userId, clubId);
-            if (clubMember == null) throw new KeyNotFoundException("User not a club member!");
+            var clubMember = await _clubMemberRepository.GetMemberByIdAsync(clubMemberId);
+            if (clubMember == null || clubMember.ClubId != clubId)
+                throw new KeyNotFoundException("Member not found in this club!");
             var member = new UserClubRoleDepartment
             {
-                ClubMemberId=clubMember.ClubMemberId,
-                DepartmentId=departmentId
-            };
-
-            var created = await _departmentRepository.AddMemberTodepartment(member);
-            return created;
-        }
-        public async Task<UserClubRoleDepartment> RemoveMemberFromDepartment(int clubId, Guid userId, int departmentId)
-        {
-            var clubMember = await _clubMemberRepository.GetMemberAsync(userId, clubId);
-            if (clubMember == null) throw new KeyNotFoundException("User not a club member!");
-            var member = new UserClubRoleDepartment
-            {
-                ClubMemberId = clubMember.ClubMemberId,
+                ClubMemberId = clubMemberId,
                 DepartmentId = departmentId
             };
-            var deleted= await _departmentRepository.RemoveMemberFromDepartment(member);
-            return deleted;
+            return await _departmentRepository.AddMemberTodepartment(member);
+        }
+
+        public async Task<UserClubRoleDepartment> RemoveMemberFromDepartment(int clubId, int clubMemberId, int departmentId)
+        {
+            var clubMember = await _clubMemberRepository.GetMemberByIdAsync(clubMemberId);
+            if (clubMember == null || clubMember.ClubId != clubId)
+                throw new KeyNotFoundException("Member not found in this club!");
+
+            var departmentRoles = clubMember.RoleAssignments
+                .Where(ra => ra.ClubRole != null && ra.ClubRole.DepartmentId == departmentId)
+                .Select(ra => ra.ClubRoleId)
+                .ToList();
+
+            foreach (var roleId in departmentRoles)
+            {
+                await _clubRoleRepository.RemoveMemberRoleAsync(clubMemberId, roleId);
+            }
+
+            var memberDept = clubMember.MemberDepartments?.FirstOrDefault(d => d.DepartmentId == departmentId);
+            if (memberDept == null)
+            {
+                memberDept = new UserClubRoleDepartment
+                {
+                    ClubMemberId = clubMemberId,
+                    DepartmentId = departmentId
+                };
+            }
+            return await _departmentRepository.RemoveMemberFromDepartment(memberDept);
+        }
+
+        public async Task<IEnumerable<DepartmentMemberDto>?> GetClubMembersNotInDepartmentAsync(int clubId, int departmentId)
+        {
+            var department = await _departmentRepository.GetByIdAsync(departmentId);
+            if (department == null || department.ClubId != clubId) return null;
+
+            var members = await _departmentRepository.GetClubMembersNotInDepartmentAsync(clubId, departmentId);
+            return members.Select(ucr => new DepartmentMemberDto
+            {
+                ClubMemberId   = ucr.ClubMemberId,
+                UserId         = ucr.UserId,
+                FullName       = ucr.User?.FullName ?? string.Empty,
+                Email          = ucr.User?.Email ?? string.Empty,
+                Avatar         = ucr.User?.Avatar,
+                StudentId      = ucr.User?.StudentId,
+                Status         = ucr.Status,
+                JoinDate       = ucr.JoinDate,
+                DepartmentRoles = new List<DepartmentMemberRoleDto>()
+            });
+        }
+
+        public async Task<IEnumerable<DepartmentResponseDto>?> GetDepartmentsJoinedByMemberAsync(int clubId, int clubMemberId)
+        {
+            var clubMember = await _clubMemberRepository.GetMemberByIdAsync(clubMemberId);
+            if (clubMember == null || clubMember.ClubId != clubId) return null;
+
+            var departments = await _departmentRepository.GetDepartmentsJoinedByMemberAsync(clubId, clubMemberId);
+            return departments.Select(MapToDto);
+        }
+
+        public async Task<IEnumerable<DepartmentResponseDto>?> GetDepartmentsNotJoinedByMemberAsync(int clubId, int clubMemberId)
+        {
+            var clubMember = await _clubMemberRepository.GetMemberByIdAsync(clubMemberId);
+            if (clubMember == null || clubMember.ClubId != clubId) return null;
+
+            var departments = await _departmentRepository.GetDepartmentsNotJoinedByMemberAsync(clubId, clubMemberId);
+            return departments.Select(MapToDto);
         }
     }
 }

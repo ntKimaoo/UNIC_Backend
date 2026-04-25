@@ -83,6 +83,17 @@ namespace UNIC.DataAccess.Seed
                 context.SaveChanges();
                 logger.LogInformation("Seeded Club UIT.");
             }
+
+            if (!context.FundTypes.Any())
+            {
+                context.FundTypes.AddRange(
+                    new FundType { Name = "Hàng Tháng", IsActive = true, SortOrder = 0 },
+                    new FundType { Name = "Sự Kiện", IsActive = true, SortOrder = 1 },
+                    new FundType { Name = "Quyên Góp", IsActive = true, SortOrder = 2 }
+                );
+                context.SaveChanges();
+                logger.LogInformation("Seeded FundTypes.");
+            }
         }
 
         private static void SeedMeetingContext(MeetingDbContext context, ILogger logger)
@@ -112,8 +123,8 @@ namespace UNIC.DataAccess.Seed
                     RoomType = RoomType.Interview,
                     Title = interviewSchedule.Title,
                     CreatedByUserId = interviewSchedule.CreatedByUserId,
-                    ScheduledStartAt = interviewSchedule.ScheduledAt,
-                    ScheduledEndAt = interviewSchedule.ScheduledAt.AddMinutes(interviewSchedule.DurationMinutes),
+                    StartedAt = interviewSchedule.ScheduledAt,
+                    EndedAt = interviewSchedule.ScheduledAt?.AddMinutes(interviewSchedule.DurationMinutes),
                     RoomCode = "ROOM-IT-001",
                     Status = RoomStatus.Idle,
                     CreatedAt = DateTime.UtcNow

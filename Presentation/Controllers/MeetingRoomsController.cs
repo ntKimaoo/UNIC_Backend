@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Presentation.Controllers
 {
     [ApiController]
-    [Route("api/meeting-rooms")]
+    [Route("api/rooms")]
     public class MeetingRoomsController : ControllerBase
     {
         private readonly IInterviewService _service;

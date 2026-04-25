@@ -3,6 +3,10 @@ using DataAccess.Repositories.Interface;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data.SqlTypes;
+using System.Diagnostics;
+using System.Formats.Asn1;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -47,10 +51,18 @@ namespace DataAccess.Repositories.Implementation
                 .ToListAsync();
         }
 
-        public async Task<Club> CreateAsync(Club club)
+        public async Task<Club> CreateAsync(Guid uid, Club club)
         {
+            if (!await _context.UserRoles.AnyAsync(u => u.UserId == uid && u.RoleName.ToLower().Equals("admin")))
+            {
+                if (await _context.UserClubRoleAssignments.AnyAsync(ura => ura.ClubMember.UserId == uid && ura.ClubRole.Level == 0))
+                {
+                    throw new InvalidOperationException("A club manager already exists. Cannot create a new club without this manager.");
+                }
+            }
             club.CreatedAt = DateTime.UtcNow;
             club.IsDeleted = false;
+            club.IsActive = true;
             await _context.Clubs.AddAsync(club);
             await _context.SaveChangesAsync();
             return club;
@@ -134,6 +146,16 @@ namespace DataAccess.Repositories.Implementation
                 club.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
             }
+        }
+        public async Task<bool> isDeleted(int clubId)
+        {
+            var club = await GetByIdAsync(clubId);
+            if (club != null)
+            {
+                return !club.IsActive;
+            }
+            return false;
+
         }
     }
 }

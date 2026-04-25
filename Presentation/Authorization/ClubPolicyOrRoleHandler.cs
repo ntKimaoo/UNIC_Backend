@@ -1,4 +1,5 @@
 using BusinessLogic.Services.Interface;
+using DataAccess.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using System;
@@ -18,32 +19,43 @@ namespace Presentation.Authorization
     public class ClubPolicyOrRoleHandler : AuthorizationHandler<ClubPolicyOrRoleRequirement>
     {
         private readonly IPolicyService _policyService;
+        private readonly IUserService _userService;
+        private readonly IClubService _clubService;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IClubMemberService _memberService;
 
         public ClubPolicyOrRoleHandler(
             IPolicyService policyService,
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor, IUserService userService, IClubService clubService, IClubMemberService memberService)
         {
             _policyService = policyService;
             _httpContextAccessor = httpContextAccessor;
+            _userService = userService;
+            _clubService = clubService;
+            _memberService = memberService;
         }
 
         protected override async Task HandleRequirementAsync(
             AuthorizationHandlerContext context,
             ClubPolicyOrRoleRequirement requirement)
         {
-            // ── 1. Role check (fast, no DB) ───────────────────────────────────────
+            // ── 1. Role  ───────────────────────────────────────
             if (requirement.Roles.Length > 0)
             {
                 // JwtService adds UserRole names as ClaimTypes.Role.
                 // We also support a custom "UserRole" claim for flexibility.
-                var userRoleClaims = context.User
-                    .FindAll(ClaimTypes.Role)
-                    .Concat(context.User.FindAll("UserRole"))
-                    .Select(c => c.Value)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var userIdClaim = context.User.FindFirst(ClaimTypes.NameIdentifier)
+                   ?? context.User.FindFirst("UserId");
 
-                if (requirement.Roles.Any(r => userRoleClaims.Contains(r)))
+                if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+                {
+                    return;
+                }
+
+                var userRoles = await _policyService.GetUserRole(userId);
+                var roleSet = userRoles.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                if (requirement.Roles.Any(r => roleSet.Contains(r)))
                 {
                     context.Succeed(requirement);
                     return;
@@ -80,7 +92,19 @@ namespace Presentation.Authorization
                     context.Fail();
                     return;
                 }
+                var userRoles = await _policyService.GetUserRole(userId);
+                var isAdmin = userRoles.Any(r => string.Equals(r, "admin", StringComparison.OrdinalIgnoreCase));
 
+                if (!isAdmin)
+                {
+                    if (await _clubService.isDeleted(clubId)
+                        || !(await _userService.isActiveAccount(userId))
+                        || !(await _memberService.IsMemberActiveAsync(userId, clubId)))
+                    {
+                        context.Fail();
+                        return;
+                    }
+                }
                 var hasPolicy = await _policyService.HasMemberPolicyInClubAsync(
                     userId, clubId, requirement.PolicyTitle);
 

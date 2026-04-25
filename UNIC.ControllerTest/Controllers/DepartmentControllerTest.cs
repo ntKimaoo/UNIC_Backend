@@ -262,9 +262,9 @@ namespace UNIC.ControllerTest.Controllers
 
 
         [Fact]
-        public async Task UpdateDepartment_Returns500_WhenExceptionThrown()
+        public async Task UpdateDepartment_ThrowsException_WhenServiceThrows()
         {
-            // Arrange
+            // Arrange — controller no longer has a try-catch; exception propagates to middleware
             int clubId = 1;
             int id = 1;
             var request = new UpdateDepartmentDto { Name = "Updated" };
@@ -272,12 +272,8 @@ namespace UNIC.ControllerTest.Controllers
             _mockDepartmentService.Setup(s => s.UpdateDepartmentAsync(clubId, id, request))
                 .ThrowsAsync(new Exception("Error"));
 
-            // Act
-            var result = await _controller.UpdateDepartment(clubId, id, request);
-
-            // Assert
-            var objectResult = Assert.IsType<ObjectResult>(result);
-            Assert.Equal(500, objectResult.StatusCode);
+            // Act & Assert
+            await Assert.ThrowsAsync<Exception>(() => _controller.UpdateDepartment(clubId, id, request));
         }
 
         #endregion
@@ -377,11 +373,11 @@ namespace UNIC.ControllerTest.Controllers
             Guid userId = Guid.NewGuid();
             var returnedModel = new UserClubRoleDepartment();
 
-            _mockDepartmentService.Setup(s => s.AddMemberTodepartment(clubId, userId, departmentId))
+            _mockDepartmentService.Setup(s => s.AddMemberToDepartment(clubId, 1, departmentId))
                 .ReturnsAsync(returnedModel);
 
             // Act
-            var result = await _controller.AddMemberToDepartment(clubId, departmentId, userId);
+            var result = await _controller.AddMemberToDepartment(clubId, departmentId, 1);
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result);
@@ -401,11 +397,11 @@ namespace UNIC.ControllerTest.Controllers
             Guid userId = Guid.NewGuid();
             var returnedModel = new UserClubRoleDepartment();
 
-            _mockDepartmentService.Setup(s => s.RemoveMemberFromDepartment(clubId, userId, departmentId))
+            _mockDepartmentService.Setup(s => s.RemoveMemberFromDepartment(clubId, 1, departmentId))
                 .ReturnsAsync(returnedModel);
 
             // Act
-            var result = await _controller.RemoveMemberFromDepartment(clubId, departmentId, userId);
+            var result = await _controller.RemoveMemberFromDepartment(clubId, departmentId, 1);
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result);

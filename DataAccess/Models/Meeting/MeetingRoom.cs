@@ -35,22 +35,14 @@ public class MeetingRoom
     /// </summary>
     public Guid CreatedByUserId { get; set; }
 
-    // ── Lịch trình ───────────────────────────────────────────────
-
-    /// <summary>Thời gian dự kiến bắt đầu.</summary>
-    public DateTime? ScheduledStartAt { get; set; }
-
-    /// <summary>Thời gian dự kiến kết thúc.</summary>
-    public DateTime? ScheduledEndAt { get; set; }
-
     // ── Liên kết Interview (optional) ────────────────────────────
 
     /// <summary>
     /// FK tới InterviewSchedule – chỉ có giá trị khi RoomType = Interview.
     /// Nullable để room có thể tồn tại độc lập.
     /// </summary>
-    public int?               InterviewScheduleId { get; set; }
-    public InterviewSchedule? InterviewSchedule   { get; set; }
+    public int? InterviewScheduleId { get; set; }
+    public InterviewSchedule? InterviewSchedule { get; set; }
 
     // ── Định danh phòng ──────────────────────────────────────────
 
@@ -78,18 +70,17 @@ public class MeetingRoom
     public DateTime? TurnCredentialExpiresAt { get; set; }
 
     // ── Cấu hình phòng ───────────────────────────────────────────
-    public bool IsRecordingEnabled   { get; set; } = false;
+    public bool IsRecordingEnabled { get; set; } = false;
     public bool IsWaitingRoomEnabled { get; set; } = true;
-    public int  MaxParticipants      { get; set; } = 10;
+    public int MaxParticipants { get; set; } = 10;
 
     // ── Trạng thái phòng ─────────────────────────────────────────
-    public RoomStatus Status    { get; set; } = RoomStatus.Idle;
-    public DateTime?  StartedAt { get; set; }
-    public DateTime?  EndedAt   { get; set; }
-
+    public RoomStatus Status { get; set; } = RoomStatus.Idle;
+    public DateTime? StartedAt { get; set; }
+    public DateTime? EndedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation
     public ICollection<RoomParticipant> Participants { get; set; } = new List<RoomParticipant>();
-    public ICollection<RoomEvent>       Events       { get; set; } = new List<RoomEvent>();
+    public ICollection<RoomEvent> Events { get; set; } = new List<RoomEvent>();
 }

@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using UNIC.DataAccess.Repositories.Interface;
 
 namespace BusinessLogic.Services.Implementation
 {
@@ -14,15 +15,24 @@ namespace BusinessLogic.Services.Implementation
         private readonly IClubMemberRepository _memberRepository;
         private readonly IClubRepository _clubRepository;
         private readonly IUserRepository _userRepository;
+        private readonly IClubRoleRepository _clubRoleRepo;
+        private readonly IDepartmentRepository _departmentRepository;
+        private readonly IPolicyRepository _policyRepository;
 
         public ClubMemberService(
             IClubMemberRepository memberRepository,
             IClubRepository clubRepository,
-            IUserRepository userRepository)
+            IUserRepository userRepository,
+            IClubRoleRepository clubRoleRepo,
+            IDepartmentRepository departmentRepository,
+            IPolicyRepository policyRepository)
         {
             _memberRepository = memberRepository;
             _clubRepository = clubRepository;
             _userRepository = userRepository;
+            _clubRoleRepo = clubRoleRepo;
+            _departmentRepository = departmentRepository;
+            _policyRepository = policyRepository;
         }
 
         public async Task<IEnumerable<ClubMemberResponseDto>> GetMembersByClubAsync(int clubId)
@@ -38,7 +48,7 @@ namespace BusinessLogic.Services.Implementation
                 clubId, pagination, page, filter, ascending, sortBy);
 
             var dtos = items.Select(MapToResponseDto).ToList();
-            var pageSize = pagination ?? totalCount; // if no pagination, pageSize logic defaults to total
+            var pageSize = pagination ?? totalCount;
             if (pageSize == 0) pageSize = 1;
 
             return new PagedResultDto<ClubMemberResponseDto>
@@ -56,22 +66,26 @@ namespace BusinessLogic.Services.Implementation
         public async Task<ClubMemberResponseDto?> GetMemberByIdAsync(int clubMemberId)
         {
             var member = await _memberRepository.GetMemberByIdAsync(clubMemberId);
-            return member == null ? null : MapToResponseDto(member);
+            if (member == null) return null;
+            var member_response = MapToResponseDto(member);
+            var member_role = await _clubRoleRepo.GetRolesOfMemberAsync(clubMemberId);
+            member_response.Roles = member_role.Select(ra => new ClubRoleInfoDto
+            {
+                ClubRoleId = ra.ClubRoleId,
+                RoleName = ra?.RoleName ?? "",
+                Level = ra?.Level ?? 0,
+            }).ToList() ?? new List<ClubRoleInfoDto>();
+            return member_response;
         }
 
         public async Task<ClubMemberResponseDto> AddUserToClubAsync(int clubId, AddUserToClubDto dto, Guid? assignedBy)
         {
-            // Kiểm tra club có tồn tại không
             var club = await _clubRepository.GetByIdAsync(clubId);
-            if (club == null)
-                throw new KeyNotFoundException($"Club with ID {clubId} not found.");
+            if (club == null) throw new KeyNotFoundException($"Club with ID {clubId} not found.");
 
-            // Kiểm tra user có tồn tại không
             var user = await _userRepository.GetByIdAsync(dto.UserId);
-            if (user == null)
-                throw new KeyNotFoundException($"User with ID {dto.UserId} not found.");
+            if (user == null) throw new KeyNotFoundException($"User with ID {dto.UserId} not found.");
 
-            // Kiểm tra user đã là member chưa
             if (await _memberRepository.IsMemberAsync(dto.UserId, clubId))
                 throw new InvalidOperationException("User is already a member of this club.");
 
@@ -79,15 +93,17 @@ namespace BusinessLogic.Services.Implementation
             {
                 UserId = dto.UserId,
                 ClubId = clubId,
-                ClubRoleId = dto.ClubRoleId,
                 JoinDate = DateTime.UtcNow,
                 Status = "ACTIVE",
                 AssignedBy = assignedBy
             };
 
             var created = await _memberRepository.AddMemberAsync(member);
+            if (dto.ClubRoleIds != null && dto.ClubRoleIds.Any())
+            {
+                await _clubRoleRepo.SetMemberRolesAsync(created.ClubMemberId, dto.ClubRoleIds);
+            }
 
-            // Load lại để có navigation properties
             var result = await _memberRepository.GetMemberByIdAsync(created.ClubMemberId);
             return MapToResponseDto(result!);
         }
@@ -96,16 +112,73 @@ namespace BusinessLogic.Services.Implementation
         {
             var member = await _memberRepository.GetMemberByIdAsync(clubMemberId);
             if (member == null) return null;
+            
+            var currentRoleIds = member.RoleAssignments.Select(ra => ra.ClubRoleId).ToHashSet();
+            var newRoleIds = (dto.ClubRoleIds ?? new List<int>()).ToHashSet();
+            var rolesToAdd = newRoleIds.Where(id => !currentRoleIds.Contains(id)).ToList();
 
-            member.ClubRoleId = dto.ClubRoleId;
-            await _memberRepository.UpdateMemberAsync(member);
+            // Business checks chỉ cần chạy cho role mới thêm vào.
+            foreach (var roleId in rolesToAdd)
+            {
+                var clubRole = await _clubRoleRepo.GetByIdAsync(roleId, member.ClubId);
+                if (clubRole == null) continue;
+
+                if (clubRole.Level == 0)
+                {
+                    if (await _memberRepository.HasClubManager(member.ClubId))
+                        throw new Exception("Each club has only one Club Manager");
+                }
+
+                if (clubRole.DepartmentId.HasValue)
+                {
+                    var departmentId = clubRole.DepartmentId.Value;
+                    var department = await _departmentRepository.GetByIdAsync(departmentId);
+
+                    if (department != null && department.ManagerRoleId == clubRole.ClubRoleId)
+                    {
+                        var allMembers = await _memberRepository.GetMembersByClubIdAsync(member.ClubId);
+                        var existingManager = allMembers.FirstOrDefault(m =>
+                            m.RoleAssignments.Any(ra => ra.ClubRoleId == clubRole.ClubRoleId) &&
+                            m.ClubMemberId != clubMemberId);
+
+                        if (existingManager != null)
+                            throw new Exception("1 department manager role chỉ có thể có ít hơn 2( chỉ có thể có 1 hoặc là không có)");
+                    }
+
+                    var isMemberInDept = member.MemberDepartments.Any(d => d.DepartmentId == departmentId);
+                    if (!isMemberInDept)
+                    {
+                        await _departmentRepository.AddMemberTodepartment(new UserClubRoleDepartment
+                        {
+                            ClubMemberId = clubMemberId,
+                            DepartmentId = departmentId
+                        });
+                    }
+                }
+            }
+
+            await _clubRoleRepo.SetMemberRolesAsync(clubMemberId, newRoleIds);
 
             var result = await _memberRepository.GetMemberByIdAsync(clubMemberId);
             return MapToResponseDto(result!);
         }
 
+        public async Task<ClubMemberResponseDto?> UpdateMemberStatusAsync(int clubMemberId, bool isActive)
+        {
+            var member = await _memberRepository.GetMemberByIdAsync(clubMemberId);
+            if (member == null) return null;
+
+            member.Status = isActive ? "ACTIVE" : "INACTIVE";
+            var updated = await _memberRepository.UpdateMemberAsync(member);
+            if (!updated) return null;
+
+            var result = await _memberRepository.GetMemberByIdAsync(clubMemberId);
+            return result == null ? null : MapToResponseDto(result);
+        }
+
         public async Task<bool> RemoveMemberAsync(int clubMemberId)
         {
+            await _clubRoleRepo.SetMemberRolesAsync(clubMemberId, new List<int>());
             return await _memberRepository.RemoveMemberAsync(clubMemberId);
         }
 
@@ -115,6 +188,38 @@ namespace BusinessLogic.Services.Implementation
             return memberships.Select(MapToResponseDto);
         }
 
+        public async Task<IEnumerable<UserClubDetailedInfoDto>> GetMyClubsDetailedAsync(Guid userId)
+        {
+            var memberships = await _memberRepository.GetClubsByUserIdAsync(userId);
+            var systemRoles = await _policyRepository.GetUserRoleAsync(userId);
+            var systemRole = systemRoles.FirstOrDefault() ?? "User";
+
+            var result = new List<UserClubDetailedInfoDto>();
+
+            foreach (var m in memberships)
+            {
+                var policies = await _policyRepository.GetPoliciesInClubAsync(userId, m.ClubId);
+                var roles = m.RoleAssignments?
+                    .Where(ra => ra.ClubRole != null)
+                    .Select(ra => new ClubRoleInfoDto
+                    {
+                        ClubRoleId = ra.ClubRoleId,
+                        RoleName = ra.ClubRole?.RoleName ?? "",
+                        Level = ra.ClubRole?.Level ?? 99,
+                        AssignedAt = ra.AssignedAt
+                    }).ToList() ?? new List<ClubRoleInfoDto>();
+
+                result.Add(new UserClubDetailedInfoDto
+                {
+                    ClubId = m.ClubId,
+                    GlobalRole = systemRole,
+                    ClubRoles = roles,
+                    Policies = policies.ToList()
+                });
+            }
+            return result;
+        }
+
         public async Task<bool> IsMemberAsync(Guid userId, int clubId)
         {
             return await _memberRepository.IsMemberAsync(userId, clubId);
@@ -122,8 +227,6 @@ namespace BusinessLogic.Services.Implementation
 
         private static ClubMemberResponseDto MapToResponseDto(UserClubRole m)
         {
-           
-
             return new ClubMemberResponseDto
             {
                 ClubMemberId = m.ClubMemberId,
@@ -133,12 +236,22 @@ namespace BusinessLogic.Services.Implementation
                 Avatar = m.User?.Avatar,
                 StudentId = m.User?.StudentId,
                 ClubId = m.ClubId,
-                ClubRoleId = m.ClubRoleId,
-                RoleName = m.ClubRole?.RoleName,
+                Roles = m.RoleAssignments?.Select(ra => new ClubRoleInfoDto
+                {
+                    ClubRoleId = ra.ClubRoleId,
+                    RoleName = ra.ClubRole?.RoleName ?? "",
+                    Level = ra.ClubRole?.Level ?? 0,
+                    AssignedAt = ra.AssignedAt
+                }).ToList() ?? new List<ClubRoleInfoDto>(),
                 JoinDate = m.JoinDate,
                 Status = m.Status,
-                AssignedBy = m.AssignedBy,
+                AssignedBy = m.AssignedBy
             };
+        }
+
+        public async Task<bool> IsMemberActiveAsync(Guid userId, int clubId)
+        {
+            return await _memberRepository.isMemberActive(userId, clubId);
         }
     }
 }

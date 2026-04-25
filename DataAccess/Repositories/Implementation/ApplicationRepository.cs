@@ -60,6 +60,7 @@ namespace UNIC.DataAccess.Repositories.Implementation
         public async Task<Application?> GetByIdAsync(int applicationId, int clubId)
         {
             return await _context.Applications
+                .Include(a => a.User)
                 .Include(a => a.ApplicationForm)
                     .ThenInclude(f => f.RecruitmentCampaign)
                 .FirstOrDefaultAsync(a =>
@@ -209,9 +210,38 @@ namespace UNIC.DataAccess.Repositories.Implementation
 
             if (existing == null) return false;
 
-            _context.ApplicationForms.Remove(existing);
-            await _context.SaveChangesAsync();
-            return true;
+            using var transaction = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                var applications = await _context.Applications
+                    .Where(a => a.FormId == formId)
+                    .Select(a => a.ApplicationId)
+                    .ToListAsync();
+
+                await _context.ApplicationAnswers
+                    .Where(a => applications.Contains(a.ApplicationId))
+                    .ExecuteDeleteAsync();
+
+                await _context.Applications
+                    .Where(a => a.FormId == formId)
+                    .ExecuteDeleteAsync();
+
+                await _context.ApplicationQuestions
+                    .Where(q => q.FormId == formId)
+                    .ExecuteDeleteAsync();
+
+                _context.ApplicationForms.Remove(existing);
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+                return true;
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
         }
 
         // ================= QUESTION =================
@@ -274,6 +304,16 @@ namespace UNIC.DataAccess.Repositories.Implementation
                     q.ApplicationForm.RecruitmentCampaign.ClubId == clubId);
 
             if (existing == null) return false;
+
+            var answer = await _context.ApplicationAnswers.Where(aa => aa.QuestionId == existing.QuestionId).ToListAsync();
+            if (answer != null)
+            {
+                foreach (ApplicationAnswer a in answer)
+                {
+                    _context.ApplicationAnswers.Remove(a);
+                }
+                await _context.SaveChangesAsync();
+            }
 
             _context.ApplicationQuestions.Remove(existing);
             await _context.SaveChangesAsync();

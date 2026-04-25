@@ -1,5 +1,6 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Implementation;
+using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using FluentAssertions.Common;
@@ -15,12 +16,16 @@ namespace UNIC.ServiceTest.Services
     public class ClubServiceTest
     {
         private readonly Mock<IClubRepository> _mockClubRepository;
+        private readonly Mock<IClubRoleService> _mockClubRoleService;
+        private readonly Mock<IClubMemberService> _mockClubMemberService;
         private readonly ClubService _clubService;
 
         public ClubServiceTest()
         {
             _mockClubRepository = new Mock<IClubRepository>();
-            _clubService = new ClubService(_mockClubRepository.Object);
+            _mockClubRoleService = new Mock<IClubRoleService>();
+            _mockClubMemberService = new Mock<IClubMemberService>();
+            _clubService = new ClubService(_mockClubRepository.Object, _mockClubRoleService.Object, _mockClubMemberService.Object);
         }
         #region GetById
         [Fact]
@@ -119,12 +124,16 @@ namespace UNIC.ServiceTest.Services
         public async Task CreateAsync_ShouldThrowException_WhenClubNameExists()
         {
             // Arrange
+            var uid = Guid.NewGuid();
             var createDto = new CreateClubDto { ClubName = "Existing Club" };
-            _mockClubRepository.Setup(repo => repo.ClubNameExistsAsync(createDto.ClubName))
-                               .ReturnsAsync(true);
+
+            _mockClubRepository
+                .Setup(repo => repo.ClubNameExistsAsync(createDto.ClubName))
+                .ReturnsAsync(true);
 
             // Act & Assert
-            await Assert.ThrowsAsync<InvalidOperationException>(() => _clubService.CreateAsync(createDto));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                _clubService.CreateAsync(uid, createDto));
         }
 
 
@@ -132,22 +141,49 @@ namespace UNIC.ServiceTest.Services
         public async Task CreateAsync_ShouldReturnClubDto_WhenSuccessful()
         {
             // Arrange
-            var createDto = new CreateClubDto { ClubName = "New Club", Status = "Active" };
-            var createdClub = new Club { ClubId = 1, ClubName = "New Club", Status = "Active", CreatedAt = DateTime.UtcNow };
-            
-            _mockClubRepository.Setup(repo => repo.ClubNameExistsAsync(createDto.ClubName))
-                               .ReturnsAsync(false);
-            _mockClubRepository.Setup(repo => repo.CreateAsync(It.IsAny<Club>()))
-                               .ReturnsAsync(createdClub);
+            var uid = Guid.NewGuid();
+
+            var createDto = new CreateClubDto
+            {
+                ClubName = "New Club",
+                Status = "Active"
+            };
+
+            var createdClub = new Club
+            {
+                ClubId = 1,
+                ClubName = "New Club",
+                Status = "Active",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _mockClubRepository
+                .Setup(repo => repo.ClubNameExistsAsync(createDto.ClubName))
+                .ReturnsAsync(false);
+
+            _mockClubRepository
+                .Setup(repo => repo.CreateAsync(uid, It.IsAny<Club>()))
+                .ReturnsAsync(createdClub);
+
+            _mockClubRoleService
+                .Setup(s => s.CreateAsync(It.IsAny<CreateClubRoleDto>(), createdClub.ClubId))
+                .ReturnsAsync(new ClubRoleResponseDto { ClubRoleId = 1, RoleName = "Club Manager" });
+
+            _mockClubMemberService
+                .Setup(s => s.AddUserToClubAsync(createdClub.ClubId, It.IsAny<AddUserToClubDto>(), uid))
+                .ReturnsAsync(new ClubMemberResponseDto());
 
             // Act
-            var result = await _clubService.CreateAsync(createDto);
+            var result = await _clubService.CreateAsync(uid, createDto);
 
             // Assert
             Assert.NotNull(result);
             Assert.Equal(1, result.ClubId);
             Assert.Equal("New Club", result.ClubName);
-            _mockClubRepository.Verify(repo => repo.CreateAsync(It.IsAny<Club>()), Times.Once);
+
+            _mockClubRepository.Verify(repo =>
+                repo.CreateAsync(uid, It.IsAny<Club>()),
+                Times.Once);
         }
 
         #endregion

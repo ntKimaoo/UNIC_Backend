@@ -253,7 +253,7 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.Property<Guid>("CandidateUserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<DateTime?>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<Guid>("CreatedByUserId")
@@ -265,7 +265,19 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.Property<int>("DurationMinutes")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("ScheduledAt")
+                    b.Property<DateTime?>("FeedbackNudgeSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ReminderSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RescheduleReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("RoomOpenedEmailSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ScheduledAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Status")
@@ -336,12 +348,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateTime?>("ScheduledEndAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("ScheduledStartAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("datetime2");

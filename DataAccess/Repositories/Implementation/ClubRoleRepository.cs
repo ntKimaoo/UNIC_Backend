@@ -20,7 +20,7 @@ namespace DataAccess.Repositories.Implementation
         public async Task<ClubRole?> GetByIdAsync(int clubRoleId, int? clubId)
         {
             return await _context.ClubRoles
-                .Include(cr => cr.ClubMembers)
+                .Include(cr => cr.MemberAssignments).ThenInclude(ma => ma.ClubMember)
                 .Include(cr => cr.ClubRolePolicies!)
                     .ThenInclude(crp => crp.Policy).ThenInclude(p => p.PolicyGroup)
                 .FirstOrDefaultAsync(cr => cr.ClubRoleId == clubRoleId && cr.ClubId == clubId);
@@ -30,7 +30,7 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.ClubRoles
                 .Where(cr => cr.ClubId == clubId)
-                .Include(cr => cr.ClubMembers)
+                .Include(cr => cr.MemberAssignments).ThenInclude(ma => ma.ClubMember)
                 .Include(cr => cr.ClubRolePolicies!)
                     .ThenInclude(crp => crp.Policy).ThenInclude(p => p.PolicyGroup)
                 .OrderBy(cr => cr.Level)
@@ -68,10 +68,9 @@ namespace DataAccess.Repositories.Implementation
         {
             try
             {
-                await _context.UserClubRoles
-                     .Where(cm => cm.ClubRoleId == clubRoleId)
-                     .ExecuteUpdateAsync(setters =>
-                         setters.SetProperty(cm => cm.ClubRoleId, (int?)null));
+                await _context.UserClubRoleAssignments
+                     .Where(ura => ura.ClubRoleId == clubRoleId)
+                     .ExecuteDeleteAsync();
                 var clubRole = await _context.ClubRoles.FindAsync(clubRoleId);
                 if (clubRole == null)
                     return false;
@@ -111,7 +110,7 @@ namespace DataAccess.Repositories.Implementation
         }
         public async Task<UserClubRole?> GetUserClubRoleAsync(Guid userId, int clubId)
         {
-            return await _context.UserClubRoles.Include(p => p.ClubRole)
+            return await _context.UserClubRoles.Include(p => p.RoleAssignments).ThenInclude(ra => ra.ClubRole)
                 .FirstOrDefaultAsync(x => x.UserId == userId && x.ClubId == clubId);
         }
 
@@ -128,9 +127,10 @@ namespace DataAccess.Repositories.Implementation
         }
         public async Task<List<Club>> GetManagedClubsAsync(Guid userId)
         {
-            return await _context.UserClubRoles
-                .Where(u => u.UserId == userId && u.ClubRole.Level == 0)
-                .Select(u => u.Club)
+            return await _context.UserClubRoleAssignments
+                .Where(ura => ura.ClubMember.UserId == userId && ura.ClubRole.Level == 0)
+                .Select(ura => ura.ClubMember.Club)
+                .Distinct()
                 .ToListAsync();
         }
 
@@ -153,12 +153,95 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<List<Guid>> GetManagerIdsForClubsAsync(List<int> clubIds)
         {
-            return await _context.UserClubRoles
-                .Where(ucr => clubIds.Contains(ucr.ClubId) && ucr.ClubRole.Level == 0)
-                .Select(ucr => ucr.UserId)
+            return await _context.UserClubRoleAssignments
+                .Where(ura => clubIds.Contains(ura.ClubMember.ClubId) && ura.ClubRole.Level == 0)
+                .Select(ura => ura.ClubMember.UserId)
                 .Distinct()
                 .ToListAsync();
         }
+        public async Task<bool> CheckDepartementRole(int roleId)
+        {
+            var role = await _context.ClubRoles.Include(r => r.Department).FirstOrDefaultAsync(cr => cr.ClubRoleId == roleId);
+            if (role == null) return false;
+            return role.DepartmentId != null;
+        }
+        public async Task<UserClubRole> GetUserClubRoleByIdAsync(int clubId)
+        {
+            return await _context.UserClubRoles.FirstOrDefaultAsync(ucr => ucr.RoleAssignments.Any(ra => ra.ClubRoleId == clubId));
+        }
 
+        public async Task<bool> AddMemberRoleAsync(int clubMemberId, int clubRoleId)
+        {
+            var exists = await _context.UserClubRoleAssignments
+                .AnyAsync(ura => ura.ClubMemberId == clubMemberId && ura.ClubRoleId == clubRoleId);
+            
+            if (exists) return true;
+
+            await _context.UserClubRoleAssignments.AddAsync(new UserClubRoleAssignment
+            {
+                ClubMemberId = clubMemberId,
+                ClubRoleId = clubRoleId,
+                AssignedAt = System.DateTime.UtcNow
+            });
+            return await _context.SaveChangesAsync() > 0;
+        }
+
+        public async Task<bool> RemoveMemberRoleAsync(int clubMemberId, int clubRoleId)
+        {
+            var assignment = await _context.UserClubRoleAssignments
+                .FirstOrDefaultAsync(ura => ura.ClubMemberId == clubMemberId && ura.ClubRoleId == clubRoleId);
+            
+            if (assignment == null) return false;
+
+            _context.UserClubRoleAssignments.Remove(assignment);
+            return await _context.SaveChangesAsync() > 0;
+        }
+
+        public async Task SetMemberRolesAsync(int clubMemberId, IEnumerable<int> clubRoleIds)
+        {
+            var newRoleIdSet = clubRoleIds.ToHashSet();
+
+            var existing = await _context.UserClubRoleAssignments
+                .Where(ura => ura.ClubMemberId == clubMemberId)
+                .ToListAsync();
+
+            var toRemove = existing.Where(e => !newRoleIdSet.Contains(e.ClubRoleId)).ToList();
+            var existingRoleIds = existing.Select(e => e.ClubRoleId).ToHashSet();
+            var toAdd = newRoleIdSet.Where(id => !existingRoleIds.Contains(id)).ToList();
+
+            _context.UserClubRoleAssignments.RemoveRange(toRemove);
+
+            foreach (var roleId in toAdd)
+            {
+                await _context.UserClubRoleAssignments.AddAsync(new UserClubRoleAssignment
+                {
+                    ClubMemberId = clubMemberId,
+                    ClubRoleId = roleId,
+                    AssignedAt = System.DateTime.UtcNow
+                });
+            }
+
+            if (toRemove.Count > 0 || toAdd.Count > 0)
+                await _context.SaveChangesAsync();
+        }
+
+        public async Task<IEnumerable<ClubRole>> GetRolesOfMemberAsync(int clubMemberId)
+        {
+            return await _context.UserClubRoleAssignments
+                .Where(ura => ura.ClubMemberId == clubMemberId)
+                .Select(ura => ura.ClubRole)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<UserClubRole>> GetMembersByRoleAsync(int clubId, int roleId)
+        {
+            return await _context.UserClubRoles
+                .Include(m => m.User)
+                .Include(m => m.RoleAssignments)
+                    .ThenInclude(ra => ra.ClubRole)
+                .Where(m => m.ClubId == clubId && m.RoleAssignments.Any(ra => ra.ClubRoleId == roleId))
+                .OrderBy(m => m.JoinDate)
+                .ToListAsync();
+        }
     }
 }

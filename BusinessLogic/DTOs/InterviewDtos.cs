@@ -84,6 +84,12 @@ namespace BusinessLogic.DTOs
         public DateTime? ScheduledAt { get; set; }
 
         public int? DurationMinutes { get; set; }
+
+        /// <summary>
+        /// ID của khung giờ đề xuất được chọn. Nếu truyền ID này, 
+        /// ScheduledAt của lịch sẽ được cập nhật theo khung giờ đó.
+        /// </summary>
+        public int? SelectedTimeSlotId { get; set; }
     }
 
     public class UpdateInterviewStatusDto
@@ -109,11 +115,11 @@ namespace BusinessLogic.DTOs
         public Guid CreatedByUserId { get; set; }
         public string Title { get; set; } = null!;
         public string? Description { get; set; }
-        public DateTime ScheduledAt { get; set; }
+        public DateTime? ScheduledAt { get; set; }
         public int DurationMinutes { get; set; }
         public string Status { get; set; } = null!;
         public string? CancelReason { get; set; }
-        public DateTime CreatedAt { get; set; }
+        public DateTime? CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public List<InterviewAssignmentResponseDto> Assignments { get; set; } = new();
         public MeetingRoomResponseDto? MeetingRoom { get; set; }
@@ -240,6 +246,12 @@ namespace BusinessLogic.DTOs
     public class JoinRoomResponseDto
     {
         public string RoomCode { get; set; } = null!;
+
+        /// <summary>
+        /// "Interview" | "General" | "Internal" | "Training"
+        /// </summary>
+        public string RoomType { get; set; } = "General";
+
         public string? PeerId { get; set; }
         public string? StunServerUri { get; set; }
         public string? TurnServerUri { get; set; }

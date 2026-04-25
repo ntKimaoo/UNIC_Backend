@@ -10,10 +10,11 @@ namespace BusinessLogic.Services.Interface
         Task<IEnumerable<ClubResponseDto>> GetAllAsync();
         Task<IEnumerable<ClubResponseDto>> GetActiveClubsAsync();
         Task<IEnumerable<ClubResponseDto>> GetPublicClubsAsync();
-        Task<ClubResponseDto> CreateAsync(CreateClubDto dto);
+        Task<ClubResponseDto> CreateAsync(Guid uid, CreateClubDto dto);
         Task<ClubResponseDto?> UpdateAsync(int clubId, UpdateClubDto dto);
         Task<bool> DeleteAsync(int clubId);
         Task<bool> SoftDeleteAsync(int clubId);
         Task ChangeStatusClub(int clubId);
+        Task<bool> isDeleted(int clubId);
     }
 }

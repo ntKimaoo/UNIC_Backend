@@ -14,6 +14,11 @@ namespace DataAccess.Models
         public string FundName { get; set; }
         [MaxLength(1000)]
         public string? Description { get; set; }
+        public int FundTypeId { get; set; }
+        [ForeignKey("FundTypeId")]
+        public virtual FundType? FundType { get; set; }
+        [Column(TypeName = "decimal(15,2)")]
+        public decimal? GoalAmount { get; set; }
         [Column(TypeName = "decimal(15,2)")]
         public decimal TotalAmount { get; set; } = 0;
         [Column(TypeName = "decimal(15,2)")]
@@ -28,6 +33,9 @@ namespace DataAccess.Models
         [MaxLength(2000)]
         public string? RejectReason { get; set; }
         public DateTime? RejectedAt { get; set; }
+        public bool IsDeleted { get; set; }
+        public DateTime? DeletedAtUtc { get; set; }
+        public Guid? DeletedBy { get; set; }
         [ForeignKey("ClubId")]
         public virtual Club Club { get; set; }
         public virtual ICollection<FundTransaction> FundTransactions { get; set; }

@@ -60,7 +60,7 @@ namespace UNIC.Presentation.Controllers
         /// Create a new department for a club
         /// </summary>
         [HttpPost]
-        [RequireClubPolicyOrRole("createdepartment")]
+        [RequireClubPolicyOrRole("createdepartment", "Admin")]
         public async Task<IActionResult> CreateDepartment(int clubId, [FromBody] CreateDepartmentDto request)
         {
             if (!ModelState.IsValid)
@@ -111,8 +111,8 @@ namespace UNIC.Presentation.Controllers
                 });
             }
 
-            try
-            {
+            //try
+            //{
                 var updatedDepartment = await _departmentService.UpdateDepartmentAsync(clubId, id, request);
                 if (updatedDepartment == null)
                 {
@@ -129,17 +129,17 @@ namespace UNIC.Presentation.Controllers
                     message = "Department updated successfully",
                     data = updatedDepartment 
                 });
-            }
+            //}
             
-            catch (Exception ex)
-            {
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = "An error occurred while updating the department",
-                    error = ex.Message
-                });
-            }
+            //catch (Exception ex)
+            //{
+            //    return StatusCode(500, new
+            //    {
+            //        success = false,
+            //        message = "An error occurred while updating the department",
+            //        error = ex.Message
+            //    });
+            //}
         }
 
         /// <summary>
@@ -191,19 +191,46 @@ namespace UNIC.Presentation.Controllers
         ///Add member to department
         /// </summary>
         [HttpPost("{departmentId}/members/{memberId}/add")]
-        public async Task<IActionResult> AddMemberToDepartment(int clubId, int departmentId, Guid memberId)
+        public async Task<IActionResult> AddMemberToDepartment(int clubId, int departmentId, int memberId)
         {
-            var member = await _departmentService.AddMemberTodepartment(clubId, memberId, departmentId);
-            return Ok(member);
+            try
+            {
+                var member = await _departmentService.AddMemberToDepartment(clubId, memberId, departmentId);
+                return Ok(new { success = true, data = member });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { success = false, message = ex.Message });
+            }
         }
+
         ///<summary>
         ///Remove member from department
         /// </summary>
         [HttpDelete("{departmentId}/members/{memberId}/remove")]
-        public async Task<IActionResult> RemoveMemberFromDepartment(int clubId, int departmentId, Guid memberId)
+        public async Task<IActionResult> RemoveMemberFromDepartment(int clubId, int departmentId, int memberId)
         {
-            var member = await _departmentService.RemoveMemberFromDepartment(clubId, memberId, departmentId);
-            return Ok(member);
+            try
+            {
+                var member = await _departmentService.RemoveMemberFromDepartment(clubId, memberId, departmentId);
+                return Ok(new { success = true, data = member });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Get club members NOT yet in a specific department (for add-member modal)
+        /// </summary>
+        [HttpGet("{departmentId}/non-members")]
+        public async Task<IActionResult> GetNonMembers(int clubId, int departmentId)
+        {
+            var members = await _departmentService.GetClubMembersNotInDepartmentAsync(clubId, departmentId);
+            if (members == null)
+                return NotFound(new { success = false, message = "Department not found in this club" });
+            return Ok(new { success = true, data = members });
         }
     }
 }

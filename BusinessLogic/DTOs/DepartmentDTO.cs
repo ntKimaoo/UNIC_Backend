@@ -89,7 +89,7 @@ namespace UNIC.BusinessLogic.DTOs
         public string? StudentId { get; set; }
         public string Status { get; set; } = string.Empty;
         public DateTime JoinDate { get; set; }
-        /// <summary>The member's club-wide role (ClubRole assigned via UserClubRole).</summary>
-        public DepartmentMemberRoleDto? DepartmentRole { get; set; }
+        /// <summary>The member's club-wide roles (ClubRoles assigned via UserClubRole) in this department.</summary>
+        public List<DepartmentMemberRoleDto> DepartmentRoles { get; set; } = new();
     }
 }

@@ -224,30 +224,45 @@ namespace UNIC.ControllerTest.Controllers
 
             Assert.IsType<OkObjectResult>(result);
         }
-
         [Fact]
-        public async Task GetAllClub_ReturnsNotFound_WhenUserMissing()
+        public async Task GetAllClub_ReturnsOk_WhenUserMissing()
         {
             _mockUserService.Setup(s => s.GetUserByIdAsync(It.IsAny<Guid>()))
                             .ReturnsAsync((UserResponseDto?)null);
 
             var result = await _controller.GetAllClub(Guid.NewGuid());
 
-            Assert.IsType<NotFoundObjectResult>(result);
-        }
+            var ok = Assert.IsType<OkObjectResult>(result);
 
+            var value = ok.Value!;
+            var type = value.GetType();
+
+            Assert.False((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("User not found",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
+        }
         [Fact]
-        public async Task GetAllClub_ReturnsNotFound_WhenNoClubs()
+        public async Task GetAllClub_ReturnsOk_WhenNoClubs()
         {
             var userId = Guid.NewGuid();
             var user = new UserResponseDto { UserId = userId };
 
-            _mockUserService.Setup(s => s.GetUserByIdAsync(userId)).ReturnsAsync(user);
-            _mockUserService.Setup(s => s.GetAllClubsById(userId)).ReturnsAsync(new List<Club>());
+            _mockUserService.Setup(s => s.GetUserByIdAsync(userId))
+                            .ReturnsAsync(user);
+
+            _mockUserService.Setup(s => s.GetAllClubsById(userId))
+                            .ReturnsAsync(new List<Club>());
 
             var result = await _controller.GetAllClub(userId);
 
-            Assert.IsType<NotFoundObjectResult>(result);
+            var ok = Assert.IsType<OkObjectResult>(result);
+
+            var value = ok.Value!;
+            var type = value.GetType();
+
+            Assert.True((bool)type.GetProperty("success")!.GetValue(value)!);
+            Assert.Equal("You have not join any club!",
+                type.GetProperty("message")!.GetValue(value)?.ToString());
         }
 
         #endregion

@@ -10,7 +10,8 @@ namespace UNIC.DataAccess.Repositories.Interface
     public interface IFundRepository
     {
         Task<FundTransaction?> GetTransactionByIdAsync(int id);
-        Task<ClubFund?> GetFundByIdAsync(int id);
+        Task<ClubFund?> GetFundByIdAsync(int id, bool includeDeleted = false);
+        Task<bool> SoftDeleteFundAsync(int fundId, int clubId, Guid deletedByUserId);
         Task<bool> ExistsNonRejectedFundNameInClubAsync(int clubId, string fundNameNormalized);
         Task<ClubFund> AddFundAsync(ClubFund fund);
         Task AddTransactionAsync(FundTransaction transaction);
@@ -51,7 +52,8 @@ namespace UNIC.DataAccess.Repositories.Interface
             string? search,
             string sort,
             int pageNumber,
-            int pageSize);
+            int pageSize,
+            bool includeSoftDeletedFunds = false);
         Task<(IEnumerable<ClubFund> Items, int TotalCount)> GetMyFundsByClubIdPagedAsync(
             int clubId,
             Guid currentUserId,
@@ -60,10 +62,45 @@ namespace UNIC.DataAccess.Repositories.Interface
             string? search,
             string sort,
             int pageNumber,
-            int pageSize);
+            int pageSize,
+            bool includeSoftDeletedFunds = false);
         Task<(int PendingFundCount, int ApprovedFundCount, int RejectedFundCount, decimal TotalBalanceApprovedFunds, decimal TotalApprovedIncome, decimal TotalApprovedExpense)> GetClubFundReportAggregatesAsync(
             int clubId,
             DateTime? fromUtc,
             DateTime? toUtc);
+
+        Task AddRefundRequestAsync(FundRefundRequest request);
+        Task<bool> ExistsPendingRefundForOriginalTransactionAsync(int originalTransactionId);
+        Task<decimal> GetTotalRefundedAmountForOriginalTransactionAsync(int originalTransactionId);
+        Task<FundRefundRequest?> GetRefundRequestByIdAsync(int refundRequestId);
+        Task<(IEnumerable<FundRefundRequest> Items, int TotalCount)> GetRefundRequestsForMemberPagedAsync(
+            int clubId, Guid requestedBy, int pageNumber, int pageSize);
+        Task<(IEnumerable<FundRefundRequest> Items, int TotalCount)> GetRefundRequestsForClubPagedAsync(
+            int clubId, string? status, int pageNumber, int pageSize);
+        Task<bool> TryCompleteRefundRequestAsync(
+            int refundRequestId, Guid managerId, string? transferReference, string? managerNote);
+        Task<bool> TryRejectRefundRequestAsync(int refundRequestId, Guid managerId, string rejectionReason);
+        Task<bool> TryCancelRefundRequestAsync(int refundRequestId, Guid memberUserId);
+
+        Task<(int TransactionId, decimal NewCurrentBalance)?> TryRecordApprovedManagerRefundExpenseAsync(
+            int clubId,
+            int fundId,
+            int originalTransactionId,
+            Guid managerId,
+            decimal amount,
+            string? reason,
+            string? transferReference,
+            string? managerNote);
+
+        Task<(int TransactionId, decimal NewCurrentBalance)?> TryRecordApprovedCashIncomeAsync(
+            int clubId,
+            int fundId,
+            Guid contributorUserId,
+            Guid recordedByUserId,
+            decimal amount,
+            string description,
+            DateTime transactionDateUtc,
+            int? categoryId,
+            string contributionSource);
     }
 }

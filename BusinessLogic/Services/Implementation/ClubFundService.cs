@@ -1,12 +1,14 @@
 using System;
 using BusinessLogic.DTOs;
 using BusinessLogic.Options;
+using BusinessLogic.PaymentGateways;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using Microsoft.Extensions.Options;
 using UNIC.DataAccess.Repositories.Interface;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace BusinessLogic.Services.Implementation
 {
@@ -14,27 +16,36 @@ namespace BusinessLogic.Services.Implementation
     {
         private readonly IFundRepository _fundRepository;
         private readonly IClubMemberRepository _clubMemberRepository;
-        private readonly IPayOSService _payOSService;
+        private readonly IFundPaymentGatewayRegistry _paymentGatewayRegistry;
         private readonly IPolicyService _policyService;
+        private readonly IClubPayOSSettingsRepository _clubPayOSSettingsRepository;
+        private readonly IFundTypeRepository _fundTypeRepository;
         private readonly PayOSOptions _payOSOptions;
         private const string STATUS_PENDING = "PENDING";
         private const string STATUS_APPROVED = "APPROVED";
         private const string STATUS_REJECTED = "REJECTED";
+        private const string CLOSED_REASON_EXPIRED = "EXPIRED";
+        private const string CLOSED_REASON_MANAGER_CLOSED = "MANAGER_CLOSED";
         private const string TYPE_INCOME = "INCOME";
         private const string MEMBER_STATUS_ACTIVE = "ACTIVE";
-        private const decimal MinTransactionAmountVnd = 1000m;
+        private const decimal MinTransactionAmountVnd = 10000m;
+        private const string CONTRIBUTION_SOURCE_CASH = "CASH";
 
         public ClubFundService(
             IFundRepository fundRepository,
             IClubMemberRepository clubMemberRepository,
-            IPayOSService payOSService,
+            IFundPaymentGatewayRegistry paymentGatewayRegistry,
             IPolicyService policyService,
+            IClubPayOSSettingsRepository clubPayOSSettingsRepository,
+            IFundTypeRepository fundTypeRepository,
             IOptions<PayOSOptions> payOSOptions)
         {
             _fundRepository = fundRepository;
             _clubMemberRepository = clubMemberRepository;
-            _payOSService = payOSService;
+            _paymentGatewayRegistry = paymentGatewayRegistry;
             _policyService = policyService;
+            _clubPayOSSettingsRepository = clubPayOSSettingsRepository;
+            _fundTypeRepository = fundTypeRepository;
             _payOSOptions = payOSOptions.Value;
         }
 
@@ -57,19 +68,30 @@ namespace BusinessLogic.Services.Implementation
 
             var member = await _clubMemberRepository.GetMemberAsync(userId, dto.ClubId);
             if (member == null)
-                throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
+                throw new UnauthorizedAccessException("Bạn không phải thành viên của câu lạc bộ này.");
             if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
                 throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được tạo quỹ.");
-            if (!HasManagerOrViceLevel(member.ClubRole))
+            if (!HasManagerOrViceLevel(member))
                 throw new UnauthorizedAccessException("Chỉ Club Manager hoặc Vice Manager mới được tạo quỹ.");
 
-            var fundStatus = HasHighestClubLevel(member.ClubRole) ? STATUS_APPROVED : STATUS_PENDING;
+            var fundStatus = HasHighestClubLevel(member) ? STATUS_APPROVED : STATUS_PENDING;
+
+            if (dto.FundTypeId <= 0)
+                throw new ArgumentException("Bắt buộc chọn loại quỹ.", nameof(dto.FundTypeId));
+            var fundType = await _fundTypeRepository.GetByIdAsync(dto.FundTypeId);
+            if (fundType == null || !fundType.IsActive)
+                throw new ArgumentException("Loại quỹ không hợp lệ hoặc đã bị tắt.", nameof(dto.FundTypeId));
+
+            if (dto.GoalAmount.HasValue && dto.GoalAmount.Value < 0)
+                throw new ArgumentException("Mục tiêu quỹ phải >= 0.", nameof(dto.GoalAmount));
 
             var fund = new ClubFund
             {
                 ClubId = dto.ClubId,
                 FundName = fundName,
                 Description = dto.ResolveDescription(),
+                FundTypeId = fundType.FundTypeId,
+                GoalAmount = dto.GoalAmount,
                 TotalAmount = 0m,
                 CurrentBalance = 0m,
                 CreatedAt = DateTime.UtcNow,
@@ -133,13 +155,40 @@ namespace BusinessLogic.Services.Implementation
 
             try
             {
-                var payOsResult = await _payOSService.CreatePaymentLinkAsync(
+                ClubPayOSSettings settingsForGateway;
+                if (_payOSOptions.UseMock)
+                {
+                    settingsForGateway = new ClubPayOSSettings
+                    {
+                        ClubId = fund.ClubId,
+                        PaymentProvider = PaymentGatewayProviderCodes.PayOS,
+                        ClientId = "mock",
+                        ApiKey = "mock",
+                        ChecksumKey = "mock",
+                        IsEnabled = true
+                    };
+                }
+                else
+                {
+                    var s = await _clubPayOSSettingsRepository.GetByClubIdAsync(fund.ClubId);
+                    if (s == null || !s.IsEnabled)
+                        throw new InvalidOperationException("Câu lạc bộ chưa liên kết cổng thanh toán trực tuyến hoặc đã tắt liên kết.");
+                    settingsForGateway = s;
+                }
+
+                var providerCode = PaymentGatewayProviderCodes.Normalize(settingsForGateway.PaymentProvider);
+                var gateway = _paymentGatewayRegistry.Get(providerCode);
+                gateway.ValidateForCreatingPaymentLink(settingsForGateway);
+
+                var payResult = await gateway.CreatePaymentLinkAsync(
+                    settingsForGateway,
                     transaction.TransactionId,
                     transaction.Amount,
-                    transaction.Description ?? "Nop quy",
+                    transaction.Description ?? "Nộp quỹ",
                     cancellationToken);
 
-                transaction.PaymentLinkId = payOsResult.PaymentLinkId;
+                transaction.PaymentProvider = providerCode;
+                transaction.PaymentLinkId = payResult.ExternalPaymentId;
                 transaction.UpdatedAt = DateTime.UtcNow;
                 await _fundRepository.UpdateTransactionAsync(transaction);
 
@@ -147,9 +196,9 @@ namespace BusinessLogic.Services.Implementation
                 return new ContributeResponseDto
                 {
                     TransactionId = transaction.TransactionId,
-                    CheckoutUrl = payOsResult.CheckoutUrl,
-                    QrCode = payOsResult.QrCode,
-                    PaymentLinkId = payOsResult.PaymentLinkId,
+                    CheckoutUrl = payResult.CheckoutUrl,
+                    QrCode = payResult.QrCode,
+                    PaymentLinkId = payResult.ExternalPaymentId,
                     Amount = transaction.Amount,
                     PaymentLinkExpiresAtUtc = expiresAtUtc,
                     Message = "Quét QR hoặc mở link để thanh toán. Sau khi thanh toán thành công, quỹ sẽ được cập nhật tự động."
@@ -220,10 +269,24 @@ namespace BusinessLogic.Services.Implementation
             };
         }
 
-        public async Task<FundResponseDto?> GetFundByIdAsync(int fundId)
+        public async Task<FundResponseDto?> GetFundByIdAsync(
+            int fundId,
+            Guid currentUserId,
+            bool isSystemAdmin,
+            bool includeSoftDeletedIfPrivileged = true)
         {
-            var fund = await _fundRepository.GetFundByIdAsync(fundId);
-            return fund == null ? null : MapToFundDto(fund);
+            if (!includeSoftDeletedIfPrivileged)
+            {
+                var active = await _fundRepository.GetFundByIdAsync(fundId, includeDeleted: false);
+                return active == null ? null : MapToFundDto(active);
+            }
+
+            var fund = await _fundRepository.GetFundByIdAsync(fundId, includeDeleted: true);
+            if (fund == null)
+                return null;
+            if (fund.IsDeleted && !await CanViewSoftDeletedFundsInClubAsync(currentUserId, fund.ClubId, isSystemAdmin))
+                return null;
+            return MapToFundDto(fund);
         }
 
         public async Task<PagedResultDto<FundResponseDto>> GetFundsByClubIdPagedAsync(
@@ -236,17 +299,7 @@ namespace BusinessLogic.Services.Implementation
             int pageNumber,
             int pageSize)
         {
-            bool canFilterByWorkflowStatus;
-            if (isSystemAdmin)
-            {
-                canFilterByWorkflowStatus = true;
-            }
-            else
-            {
-                var member = await _clubMemberRepository.GetMemberAsync(currentUserId, clubId);
-                var hasEditFinance = await _policyService.HasMemberPolicyInClubAsync(currentUserId, clubId, "editfinance");
-                canFilterByWorkflowStatus = hasEditFinance && member != null && HasHighestClubLevel(member.ClubRole);
-            }
+            var canFilterByWorkflowStatus = await CanViewSoftDeletedFundsInClubAsync(currentUserId, clubId, isSystemAdmin);
 
             var statusForNormalization = (!canFilterByWorkflowStatus) ? STATUS_APPROVED : status;
 
@@ -274,13 +327,15 @@ namespace BusinessLogic.Services.Implementation
                 normalizedSearch,
                 normalizedSort,
                 pageNumber,
-                pageSize);
+                pageSize,
+                canFilterByWorkflowStatus);
             return ToPagedResult(items.Select(MapToFundDto), pageNumber, pageSize, totalCount);
         }
 
         public async Task<PagedResultDto<FundResponseDto>> GetMyFundsByClubIdPagedAsync(
             int clubId,
             Guid currentUserId,
+            bool isSystemAdmin,
             string? mineType,
             string? status,
             string? search,
@@ -315,6 +370,7 @@ namespace BusinessLogic.Services.Implementation
             if (normalizedSort is not ("NEWEST" or "OLDEST" or "NAME_ASC" or "NAME_DESC"))
                 throw new ArgumentException("Sắp xếp hợp lệ: NEWEST, OLDEST, NAME_ASC, NAME_DESC.", nameof(sort));
 
+            var includeSoftDeleted = await CanViewSoftDeletedFundsInClubAsync(currentUserId, clubId, isSystemAdmin);
             var (items, totalCount) = await _fundRepository.GetMyFundsByClubIdPagedAsync(
                 clubId,
                 currentUserId,
@@ -323,7 +379,8 @@ namespace BusinessLogic.Services.Implementation
                 normalizedSearch,
                 normalizedSort,
                 pageNumber,
-                pageSize);
+                pageSize,
+                includeSoftDeleted);
 
             return ToPagedResult(items.Select(MapToFundDto), pageNumber, pageSize, totalCount);
         }
@@ -406,6 +463,17 @@ namespace BusinessLogic.Services.Implementation
             };
         }
 
+        private async Task<bool> CanViewSoftDeletedFundsInClubAsync(Guid userId, int clubId, bool isSystemAdmin)
+        {
+            if (isSystemAdmin)
+                return true;
+            var member = await _clubMemberRepository.GetMemberAsync(userId, clubId);
+            if (member == null)
+                return false;
+            var hasEditFinance = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "editfinance");
+            return hasEditFinance && HasHighestClubLevel(member);
+        }
+
         private static FundResponseDto MapToFundDto(ClubFund fund)
         {
             var status = string.IsNullOrWhiteSpace(fund.Status) ? STATUS_PENDING : fund.Status.Trim();
@@ -413,28 +481,42 @@ namespace BusinessLogic.Services.Implementation
             var rejected = string.Equals(status, STATUS_REJECTED, StringComparison.OrdinalIgnoreCase);
             var pending = string.Equals(status, STATUS_PENDING, StringComparison.OrdinalIgnoreCase);
             var notExpired = !fund.ExpiresAt.HasValue || DateTime.UtcNow.Date <= fund.ExpiresAt.Value.Date;
-            var canContribute = approved && notExpired;
+            var expiredClosed = approved && !notExpired;
+            var isClosed = fund.IsDeleted || expiredClosed;
+            string? closedReason = null;
+            if (fund.IsDeleted)
+                closedReason = CLOSED_REASON_MANAGER_CLOSED;
+            else if (expiredClosed)
+                closedReason = CLOSED_REASON_EXPIRED;
+
+            var canContribute = approved && notExpired && !fund.IsDeleted;
 
             string? cannotContributeReason = null;
             if (!canContribute)
             {
-                if (rejected)
+                if (fund.IsDeleted)
+                    cannotContributeReason = "Quỹ đã đóng (quản lý đã đóng quỹ).";
+                else if (rejected)
                     cannotContributeReason = "Quỹ đã bị từ chối.";
                 else if (pending)
                     cannotContributeReason = "Quỹ đang chờ duyệt.";
                 else if (approved && !notExpired)
-                    cannotContributeReason = "Đã quá hạn nhận nộp tiền.";
+                    cannotContributeReason = "Quỹ đã đóng — hết hạn nhận nộp tiền.";
                 else
                     cannotContributeReason = "Quỹ chưa được duyệt hoặc không thể nhận nộp ở trạng thái hiện tại.";
             }
 
             string? balanceContext = null;
-            if (rejected)
+            if (fund.IsDeleted)
+                balanceContext = "Quỹ đã đóng (quản lý đã đóng quỹ).";
+            else if (rejected)
                 balanceContext = "Quỹ không hoạt động.";
             else if (pending)
                 balanceContext = "Quỹ đang chờ duyệt — số dư sẽ cập nhật sau khi được duyệt.";
+            else if (approved && !notExpired)
+                balanceContext = "Quỹ đã đóng — hết hạn nhận nộp tiền.";
             else if (approved && fund.CurrentBalance == 0m && fund.TotalAmount == 0m)
-                balanceContext = "Chưa có giao dịch thu/chi được duyệt (số 0 là bình thường nếu chưa phát sinh).";
+                balanceContext = "Chưa có giao dịch thu/chi được duyệt.";
 
             return new FundResponseDto
             {
@@ -442,6 +524,9 @@ namespace BusinessLogic.Services.Implementation
                 ClubId = fund.ClubId,
                 FundName = fund.FundName,
                 Description = fund.Description,
+                FundTypeId = fund.FundTypeId,
+                FundTypeName = fund.FundType?.Name,
+                GoalAmount = fund.GoalAmount,
                 TotalAmount = fund.TotalAmount,
                 CurrentBalance = fund.CurrentBalance,
                 CreatedAt = fund.CreatedAt,
@@ -450,11 +535,15 @@ namespace BusinessLogic.Services.Implementation
                 RejectReason = fund.RejectReason,
                 RejectedAt = fund.RejectedAt,
                 RejectionReasonVi = rejected ? fund.RejectReason : null,
+                IsDeleted = fund.IsDeleted,
+                IsClosed = isClosed,
+                ClosedReasonCode = closedReason,
+                LifecycleStatusVi = isClosed ? "Đã đóng" : null,
                 CanAcceptContributions = canContribute,
                 CannotContributeReasonVi = cannotContributeReason,
                 BalanceContextVi = balanceContext,
                 ExpiresAtUtcNoteVi = fund.ExpiresAt.HasValue
-                    ? "Hạn nhận nộp theo ngày lưu trong DB (UTC, so với ngày hiện tại của máy chủ)."
+                    ? "Hạn nhận nộp theo ngày lưu trong DB."
                     : null
             };
         }
@@ -485,6 +574,9 @@ namespace BusinessLogic.Services.Implementation
                 CreatedBy = t.CreatedBy,
                 ApprovedBy = t.ApprovedBy,
                 PaymentLinkId = t.PaymentLinkId,
+                PaymentProvider = t.PaymentProvider,
+                ContributionSource = t.ContributionSource,
+                RefundForTransactionId = t.RefundForTransactionId,
                 IsMemberContribution = t.IsMemberContribution,
                 CreatedAt = createdAt,
                 UpdatedAt = updatedAt,
@@ -497,16 +589,102 @@ namespace BusinessLogic.Services.Implementation
             };
         }
 
-        private static bool HasManagerOrViceLevel(ClubRole? clubRole)
+        public async Task<FundMemberContributionOverviewDto> GetFundMemberContributionOverviewAsync(
+            Guid currentUserId, int clubId, int fundId)
         {
-            if (clubRole == null) return false;
-            return clubRole.Level == 1 || clubRole.Level == 2;
+            var fund = await _fundRepository.GetFundByIdAsync(fundId);
+            if (fund == null)
+                throw new InvalidOperationException("Quỹ không tồn tại.");
+            if (fund.ClubId != clubId)
+                throw new UnauthorizedAccessException("Quỹ không thuộc câu lạc bộ này.");
+
+            var member = await _clubMemberRepository.GetMemberAsync(currentUserId, clubId);
+            if (member == null)
+                throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
+            if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được xem danh sách đóng góp.");
+
+            var members = (await _clubMemberRepository.GetMembersByClubIdAsync(clubId))
+                .Where(m => string.Equals(m.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var activeCount = members.Count;
+            var goal = fund.GoalAmount;
+
+            decimal? requiredPerMember = null;
+            if (goal.HasValue && goal.Value > 0 && activeCount > 0)
+                requiredPerMember = RoundUpVnd(goal.Value / activeCount);
+
+            var approvedMemberTx = await _fundRepository.GetTransactionsByFundIdAsync(
+                fundId,
+                status: STATUS_APPROVED,
+                memberContributionsOnly: true,
+                createdByUserId: null);
+
+            var paidByUser = approvedMemberTx
+                .Where(t => t.CreatedBy.HasValue)
+                .GroupBy(t => t.CreatedBy!.Value)
+                .ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
+
+            var memberDtos = members
+                .Select(m =>
+                {
+                    var uid = m.UserId;
+                    paidByUser.TryGetValue(uid, out var paid);
+
+                    decimal? remaining = null;
+                    var isPaidEnough = false;
+                    if (requiredPerMember.HasValue)
+                    {
+                        remaining = Math.Max(0, requiredPerMember.Value - paid);
+                        isPaidEnough = paid >= requiredPerMember.Value;
+                    }
+
+                    return new FundMemberContributionStatusDto
+                    {
+                        UserId = uid,
+                        FullName = m.User?.FullName,
+                        Email = m.User?.Email,
+                        Status = m.Status ?? MEMBER_STATUS_ACTIVE,
+                        PaidAmount = paid,
+                        RequiredAmount = requiredPerMember,
+                        RemainingAmount = remaining,
+                        IsPaidEnough = isPaidEnough
+                    };
+                })
+                .OrderBy(x => x.IsPaidEnough)
+                .ThenBy(x => x.FullName)
+                .ToList();
+
+            return new FundMemberContributionOverviewDto
+            {
+                ClubId = clubId,
+                FundId = fund.FundId,
+                FundName = fund.FundName ?? string.Empty,
+                FundTypeId = fund.FundTypeId,
+                FundTypeName = fund.FundType?.Name,
+                GoalAmount = goal,
+                ActiveMemberCount = activeCount,
+                RequiredPerMember = requiredPerMember,
+                TotalApprovedMemberContributions = approvedMemberTx.Sum(x => x.Amount),
+                Members = memberDtos
+            };
         }
 
-        private static bool HasHighestClubLevel(ClubRole? clubRole)
+        private static decimal RoundUpVnd(decimal value)
         {
-            if (clubRole == null) return false;
-            return clubRole.Level == 1;
+            if (value <= 0) return 0;
+            return Math.Ceiling(value);
+        }
+
+        private static bool HasManagerOrViceLevel(UserClubRole? member)
+        {
+            return member?.RoleAssignments?.Any(ra => ra.ClubRole?.Level == 0 || ra.ClubRole?.Level == 1) ?? false;
+        }
+
+        private static bool HasHighestClubLevel(UserClubRole? member)
+        {
+            return member?.RoleAssignments?.Any(ra => ra.ClubRole?.Level == 0) ?? false;
         }
 
         public async Task<bool> ProcessPayOSPaymentSuccessAsync(int orderCode)
@@ -551,7 +729,7 @@ namespace BusinessLogic.Services.Implementation
                 throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
             if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
                 throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được duyệt quỹ.");
-            if (!HasHighestClubLevel(member.ClubRole))
+            if (!HasHighestClubLevel(member))
                 throw new UnauthorizedAccessException("Chỉ Club Manager (role có Level cao nhất trong club) mới được duyệt hoặc từ chối quỹ.");
 
             var action = dto.Action?.Trim().ToUpperInvariant();
@@ -586,7 +764,30 @@ namespace BusinessLogic.Services.Implementation
             return true;
         }
 
-        public async Task<FundCapabilitiesDto> GetFundCapabilitiesAsync(Guid userId, int clubId)
+        public async Task SoftDeleteFundAsync(Guid userId, int clubId, int fundId, bool isSystemAdmin)
+        {
+            await EnsureClubHeadManagerOrAdminAsync(userId, clubId, isSystemAdmin);
+
+            if (!isSystemAdmin)
+            {
+                if (!await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "deletefinance"))
+                    throw new UnauthorizedAccessException("Bạn chưa có quyền xóa/ẩn quỹ (policy deletefinance).");
+            }
+
+            var fund = await _fundRepository.GetFundByIdAsync(fundId, includeDeleted: false);
+            if (fund == null)
+                throw new KeyNotFoundException("Quỹ không tồn tại hoặc đã được đóng (ẩn).");
+            if (fund.ClubId != clubId)
+                throw new UnauthorizedAccessException("Quỹ không thuộc câu lạc bộ này.");
+            if (fund.CurrentBalance != 0m)
+                throw new InvalidOperationException("Chỉ có thể ẩn quỹ khi số dư hiện tại bằng 0.");
+
+            var ok = await _fundRepository.SoftDeleteFundAsync(fundId, clubId, userId);
+            if (!ok)
+                throw new InvalidOperationException("Không thể ẩn quỹ (đã ẩn trước đó hoặc dữ liệu không hợp lệ).");
+        }
+
+        public async Task<FundCapabilitiesDto> GetFundCapabilitiesAsync(Guid userId, int clubId, bool isSystemAdmin = false)
         {
             var dto = new FundCapabilitiesDto { ClubId = clubId };
             var member = await _clubMemberRepository.GetMemberAsync(userId, clubId);
@@ -594,8 +795,8 @@ namespace BusinessLogic.Services.Implementation
                 return dto;
 
             dto.IsActiveClubMember = string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase);
-            dto.ClubRoleLevel = member.ClubRole?.Level;
-            dto.ClubRoleName = member.ClubRole?.RoleName;
+            dto.ClubRoleLevel = member.RoleAssignments?.Where(ra => ra.ClubRole != null).Min(ra => (int?)ra.ClubRole!.Level);
+            dto.ClubRoleName = string.Join(", ", member.RoleAssignments?.Select(ra => ra.ClubRole?.RoleName).Where(x => x != null) ?? Array.Empty<string>());
 
             if (!dto.IsActiveClubMember)
             {
@@ -607,18 +808,27 @@ namespace BusinessLogic.Services.Implementation
             var hasView = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "viewfinance");
             var hasCreate = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "createfinance");
             var hasEdit = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "editfinance");
+            var hasDelete = await _policyService.HasMemberPolicyInClubAsync(userId, clubId, "deletefinance");
 
             dto.HasViewFinancePolicy = hasView;
             dto.HasCreateFinancePolicy = hasCreate;
             dto.HasEditFinancePolicy = hasEdit;
+            dto.HasDeleteFinancePolicy = hasDelete;
 
-            var isMgrOrVice = HasManagerOrViceLevel(member.ClubRole);
-            var isMgr = HasHighestClubLevel(member.ClubRole);
+            var isMgrOrVice = HasManagerOrViceLevel(member);
+            var isMgr = HasHighestClubLevel(member);
 
             dto.CanViewFunds = hasView;
             dto.CanContribute = true;
             dto.CanCreateFund = hasCreate && isMgrOrVice;
             dto.CanApproveOrRejectFundEntity = hasEdit && isMgr;
+
+            var canMgrSensitiveOps = isSystemAdmin || (hasEdit && isMgr);
+            dto.CanManageOnlinePaymentSettings = canMgrSensitiveOps;
+            dto.CanRecordCashContributions = canMgrSensitiveOps;
+            dto.CanProcessClubRefunds = canMgrSensitiveOps;
+            dto.CanSoftDeleteFund = hasDelete && isMgr;
+            dto.CanViewSoftDeletedFunds = canMgrSensitiveOps;
 
             if (!hasView)
                 dto.FinanceAccessHintVi =
@@ -629,6 +839,9 @@ namespace BusinessLogic.Services.Implementation
             else if (!hasCreate && isMgrOrVice)
                 dto.FinanceAccessHintVi =
                     "Bạn chưa có quyền tạo quỹ (policy createfinance). Liên hệ quản lý CLB nếu cần cấp quyền.";
+            else if (!hasDelete && isMgr)
+                dto.FinanceAccessHintVi =
+                    "Bạn chưa có quyền xóa/ẩn quỹ (policy deletefinance). Liên hệ quản lý CLB nếu cần cấp quyền.";
 
             dto.MenuItems = BuildFundMenuItems(dto);
             return dto;
@@ -707,6 +920,343 @@ namespace BusinessLogic.Services.Implementation
                 Description = c.Description,
                 ClubId = c.ClubId
             }).ToList();
+        }
+
+        public async Task<RecordCashContributionResponseDto> RecordCashContributionAsync(
+            Guid managerUserId,
+            int clubId,
+            bool isSystemAdmin,
+            RecordCashContributionRequestDto dto)
+        {
+            await EnsureClubHeadManagerOrAdminAsync(managerUserId, clubId, isSystemAdmin);
+
+            if (dto.Amount < MinTransactionAmountVnd)
+                throw new ArgumentException($"Số tiền tối thiểu là {MinTransactionAmountVnd:N0} ₫.", nameof(dto.Amount));
+
+            var note = (dto.Note ?? string.Empty).Trim();
+            if (note.Length < 3)
+                throw new ArgumentException("Ghi chú phải có ít nhất 3 ký tự.", nameof(dto.Note));
+
+            var fund = await _fundRepository.GetFundByIdAsync(dto.FundId);
+            if (fund == null)
+                throw new KeyNotFoundException("Quỹ không tồn tại.");
+            if (fund.ClubId != clubId)
+                throw new ArgumentException("Quỹ không thuộc câu lạc bộ này.", nameof(dto.FundId));
+            if (!string.Equals(fund.Status, STATUS_APPROVED, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Chỉ có thể ghi nhận đóng góp vào quỹ đã được duyệt.");
+            if (fund.ExpiresAt.HasValue && DateTime.UtcNow.Date > fund.ExpiresAt.Value.Date)
+                throw new InvalidOperationException("Quỹ đã hết hạn nhận nộp tiền.");
+
+            var contributor = await _clubMemberRepository.GetMemberAsync(dto.ContributorUserId, clubId);
+            if (contributor == null)
+                throw new ArgumentException("Thành viên không thuộc câu lạc bộ này.", nameof(dto.ContributorUserId));
+            if (!string.Equals(contributor.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Chỉ có thể ghi nhận đóng góp cho thành viên đang hoạt động.", nameof(dto.ContributorUserId));
+
+            if (dto.CategoryId.HasValue)
+            {
+                var category = await _fundRepository.GetFundCategoryByIdAsync(dto.CategoryId.Value);
+                if (category == null)
+                    throw new ArgumentException("Danh mục không tồn tại.", nameof(dto.CategoryId));
+                if (category.ClubId.HasValue && category.ClubId.Value != clubId)
+                    throw new ArgumentException("Danh mục không thuộc câu lạc bộ của quỹ này.", nameof(dto.CategoryId));
+            }
+
+            DateTime transactionDateUtc;
+            if (dto.ContributedAtUtc.HasValue)
+            {
+                var d = dto.ContributedAtUtc.Value;
+                transactionDateUtc = d.Kind == DateTimeKind.Unspecified
+                    ? DateTime.SpecifyKind(d, DateTimeKind.Utc)
+                    : d.ToUniversalTime();
+            }
+            else
+            {
+                transactionDateUtc = DateTime.UtcNow;
+            }
+
+            var description = $"[Tiền mặt] {note}";
+
+            var result = await _fundRepository.TryRecordApprovedCashIncomeAsync(
+                clubId,
+                dto.FundId,
+                dto.ContributorUserId,
+                managerUserId,
+                dto.Amount,
+                description,
+                transactionDateUtc,
+                dto.CategoryId,
+                CONTRIBUTION_SOURCE_CASH);
+
+            if (result == null)
+                throw new InvalidOperationException("Không thể ghi nhận giao dịch (quỹ không hợp lệ hoặc không thuộc CLB).");
+
+            var (transactionId, newBalance) = result.Value;
+            return new RecordCashContributionResponseDto
+            {
+                TransactionId = transactionId,
+                FundId = dto.FundId,
+                Amount = dto.Amount,
+                Status = STATUS_APPROVED,
+                ContributionSource = CONTRIBUTION_SOURCE_CASH,
+                NewCurrentBalance = newBalance,
+                ContributorUserId = dto.ContributorUserId,
+                RecordedByUserId = managerUserId
+            };
+        }
+
+        public async Task<FundTransactionResponseDto> ManagerRefundContributionAsync(
+            Guid managerUserId, int clubId, int fundId, bool isSystemAdmin, ManagerRefundContributionDto dto)
+        {
+            await EnsureClubHeadManagerOrAdminAsync(managerUserId, clubId, isSystemAdmin);
+
+            if (dto.OriginalTransactionId <= 0)
+                throw new ArgumentException("OriginalTransactionId không hợp lệ.", nameof(dto.OriginalTransactionId));
+            if (dto.Amount <= 0m)
+                throw new ArgumentException("Số tiền hoàn phải > 0.", nameof(dto.Amount));
+
+            var transferRef = (dto.TransferReference ?? string.Empty).Trim();
+            if (transferRef.Length > 100)
+                throw new ArgumentException("TransferReference không được vượt quá 100 ký tự.", nameof(dto.TransferReference));
+            var note = (dto.ManagerNote ?? string.Empty).Trim();
+            if (note.Length > 500)
+                throw new ArgumentException("ManagerNote không được vượt quá 500 ký tự.", nameof(dto.ManagerNote));
+            var reason = (dto.Reason ?? string.Empty).Trim();
+            if (reason.Length > 2000)
+                throw new ArgumentException("Reason không được vượt quá 2000 ký tự.", nameof(dto.Reason));
+
+            var fund = await _fundRepository.GetFundByIdAsync(fundId);
+            if (fund == null)
+                throw new KeyNotFoundException("Quỹ không tồn tại.");
+            if (fund.ClubId != clubId)
+                throw new ArgumentException("Quỹ không thuộc câu lạc bộ này.", nameof(fundId));
+
+            var result = await _fundRepository.TryRecordApprovedManagerRefundExpenseAsync(
+                clubId,
+                fundId,
+                dto.OriginalTransactionId,
+                managerUserId,
+                dto.Amount,
+                reason,
+                transferRef,
+                note);
+
+            if (result == null)
+                throw new InvalidOperationException("Không thể hoàn tiền (giao dịch gốc không hợp lệ, số tiền vượt quá, hoặc quỹ không đủ số dư).");
+
+            var tx = await _fundRepository.GetTransactionByIdAsync(result.Value.TransactionId);
+            if (tx == null)
+                throw new InvalidOperationException("Không thể tải giao dịch hoàn vừa tạo.");
+
+            return MapToTransactionDto(tx);
+        }
+
+        private const string REFUND_PENDING = "PENDING";
+
+        private async Task EnsureClubHeadManagerOrAdminAsync(Guid userId, int clubId, bool isSystemAdmin)
+        {
+            if (isSystemAdmin)
+                return;
+
+            var member = await _clubMemberRepository.GetMemberAsync(userId, clubId);
+            if (member == null)
+                throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
+            if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được thực hiện thao tác này.");
+            if (!HasHighestClubLevel(member))
+                throw new UnauthorizedAccessException("Chỉ Club Manager (Level 0) mới được thực hiện thao tác này.");
+        }
+
+        public async Task<FundRefundRequestResponseDto> CreateFundRefundRequestAsync(
+            Guid userId, int clubId, CreateFundRefundRequestDto dto)
+        {
+            var orig = await _fundRepository.GetTransactionByIdAsync(dto.OriginalTransactionId);
+            if (orig == null || orig.ClubFund == null)
+                throw new ArgumentException("Giao dịch gốc không tồn tại.", nameof(dto.OriginalTransactionId));
+            if (orig.ClubFund.ClubId != clubId)
+                throw new ArgumentException("Giao dịch không thuộc câu lạc bộ này.", nameof(dto.OriginalTransactionId));
+            if (!orig.IsMemberContribution
+                || orig.TransactionType == null
+                || !string.Equals(orig.TransactionType, TYPE_INCOME, StringComparison.OrdinalIgnoreCase)
+                || orig.Status == null
+                || !string.Equals(orig.Status, STATUS_APPROVED, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException(
+                    "Chỉ có thể yêu cầu hoàn cho giao dịch nộp quỹ đã thanh toán thành công.",
+                    nameof(dto.OriginalTransactionId));
+            }
+
+            if (orig.CreatedBy != userId)
+                throw new UnauthorizedAccessException("Bạn chỉ có thể yêu cầu hoàn cho giao dịch do chính bạn nộp.");
+
+            var member = await _clubMemberRepository.GetMemberAsync(userId, clubId);
+            if (member == null)
+                throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
+            if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được gửi yêu cầu hoàn tiền.");
+
+            if (dto.Amount <= 0m)
+                throw new ArgumentException("Số tiền hoàn phải lớn hơn 0.", nameof(dto.Amount));
+
+            var alreadyRefunded = await _fundRepository.GetTotalRefundedAmountForOriginalTransactionAsync(orig.TransactionId);
+            if (dto.Amount + alreadyRefunded > orig.Amount)
+                throw new ArgumentException("Số tiền hoàn vượt quá phần còn có thể hoàn của giao dịch này.", nameof(dto.Amount));
+
+            if (await _fundRepository.ExistsPendingRefundForOriginalTransactionAsync(dto.OriginalTransactionId))
+                throw new InvalidOperationException("Đã có yêu cầu hoàn đang chờ xử lý cho giao dịch này.");
+
+            var bankName = (dto.BankName ?? string.Empty).Trim();
+            var bankAccount = (dto.BankAccountNumber ?? string.Empty).Trim();
+            var holder = (dto.AccountHolderName ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(bankName))
+                throw new ArgumentException("Tên ngân hàng không được để trống.", nameof(dto.BankName));
+            if (string.IsNullOrEmpty(bankAccount))
+                throw new ArgumentException("Số tài khoản không được để trống.", nameof(dto.BankAccountNumber));
+            if (string.IsNullOrEmpty(holder))
+                throw new ArgumentException("Tên chủ tài khoản không được để trống.", nameof(dto.AccountHolderName));
+
+            var utc = DateTime.UtcNow;
+            var entity = new FundRefundRequest
+            {
+                ClubId = clubId,
+                FundId = orig.FundId,
+                OriginalTransactionId = orig.TransactionId,
+                RequestedBy = userId,
+                Amount = dto.Amount,
+                Reason = string.IsNullOrWhiteSpace(dto.Reason) ? null : dto.Reason.Trim(),
+                BankName = bankName,
+                BankAccountNumber = bankAccount.Length > 32 ? bankAccount[..32] : bankAccount,
+                AccountHolderName = holder.Length > 200 ? holder[..200] : holder,
+                Status = REFUND_PENDING,
+                CreatedAtUtc = utc,
+                UpdatedAtUtc = utc
+            };
+
+            await _fundRepository.AddRefundRequestAsync(entity);
+
+            var loaded = await _fundRepository.GetRefundRequestByIdAsync(entity.RefundRequestId);
+            if (loaded == null)
+                throw new InvalidOperationException("Không thể tải yêu cầu hoàn vừa tạo.");
+            return MapRefundRequestDto(loaded);
+        }
+
+        public async Task<PagedResultDto<FundRefundRequestResponseDto>> GetMyFundRefundRequestsPagedAsync(
+            Guid userId, int clubId, int pageNumber, int pageSize)
+        {
+            var member = await _clubMemberRepository.GetMemberAsync(userId, clubId);
+            if (member == null)
+                throw new UnauthorizedAccessException("Bạn không phải thành viên của club này.");
+            if (!string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
+                throw new UnauthorizedAccessException("Chỉ thành viên đang hoạt động mới được xem yêu cầu hoàn tiền.");
+
+            var (items, total) = await _fundRepository.GetRefundRequestsForMemberPagedAsync(clubId, userId, pageNumber, pageSize);
+            return ToPagedResult(items.Select(MapRefundRequestDto), pageNumber, pageSize, total);
+        }
+
+        public async Task<PagedResultDto<FundRefundRequestResponseDto>> GetClubFundRefundRequestsPagedAsync(
+            Guid managerUserId, int clubId, bool isSystemAdmin, string? status, int pageNumber, int pageSize)
+        {
+            await EnsureClubHeadManagerOrAdminAsync(managerUserId, clubId, isSystemAdmin);
+
+            string? normalizedStatus = null;
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                var u = status.Trim().ToUpperInvariant();
+                if (u is not ("PENDING" or "COMPLETED" or "REJECTED" or "CANCELLED" or "ALL"))
+                    throw new ArgumentException("Trạng thái hợp lệ: PENDING, COMPLETED, REJECTED, CANCELLED hoặc ALL.", nameof(status));
+                if (u != "ALL")
+                    normalizedStatus = u;
+            }
+
+            var (items, total) = await _fundRepository.GetRefundRequestsForClubPagedAsync(
+                clubId, normalizedStatus, pageNumber, pageSize);
+            return ToPagedResult(items.Select(MapRefundRequestDto), pageNumber, pageSize, total);
+        }
+
+        public async Task<bool> CancelFundRefundRequestAsync(Guid userId, int clubId, int refundRequestId)
+        {
+            var r = await _fundRepository.GetRefundRequestByIdAsync(refundRequestId);
+            if (r == null || r.ClubId != clubId)
+                return false;
+
+            var member = await _clubMemberRepository.GetMemberAsync(userId, clubId);
+            if (member == null
+                || !string.Equals(member.Status, MEMBER_STATUS_ACTIVE, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return await _fundRepository.TryCancelRefundRequestAsync(refundRequestId, userId);
+        }
+
+        public async Task<bool> CompleteFundRefundRequestAsync(
+            Guid managerUserId, int clubId, bool isSystemAdmin, int refundRequestId, CompleteFundRefundRequestDto dto)
+        {
+            await EnsureClubHeadManagerOrAdminAsync(managerUserId, clubId, isSystemAdmin);
+
+            var r = await _fundRepository.GetRefundRequestByIdAsync(refundRequestId);
+            if (r == null || r.ClubId != clubId)
+                return false;
+
+            var transferRef = (dto?.TransferReference ?? string.Empty).Trim();
+            if (transferRef.Length > 100)
+                throw new ArgumentException("TransferReference không được vượt quá 100 ký tự.", nameof(dto.TransferReference));
+            var note = (dto?.ManagerNote ?? string.Empty).Trim();
+            if (note.Length > 500)
+                throw new ArgumentException("ManagerNote không được vượt quá 500 ký tự.", nameof(dto.ManagerNote));
+
+            return await _fundRepository.TryCompleteRefundRequestAsync(
+                refundRequestId,
+                managerUserId,
+                dto?.TransferReference,
+                dto?.ManagerNote);
+        }   
+
+        public async Task<bool> RejectFundRefundRequestAsync(
+            Guid managerUserId, int clubId, bool isSystemAdmin, int refundRequestId, RejectFundRefundRequestDto dto)
+        {
+            await EnsureClubHeadManagerOrAdminAsync(managerUserId, clubId, isSystemAdmin);
+
+            var r = await _fundRepository.GetRefundRequestByIdAsync(refundRequestId);
+            if (r == null || r.ClubId != clubId)
+                return false;
+
+            var reason = (dto?.RejectionReason ?? string.Empty).Trim();
+            if (reason.Length < 5)
+                throw new ArgumentException(
+                    "Lý do từ chối phải có ít nhất 5 ký tự sau khi bỏ khoảng trắng đầu cuối.",
+                    nameof(dto.RejectionReason));
+            if (reason.Length > 2000)
+                throw new ArgumentException("Lý do từ chối không được vượt quá 2000 ký tự.", nameof(dto.RejectionReason));
+
+            return await _fundRepository.TryRejectRefundRequestAsync(refundRequestId, managerUserId, reason);
+        }
+
+        private static FundRefundRequestResponseDto MapRefundRequestDto(FundRefundRequest r)
+        {
+            var fn = r.OriginalTransaction?.ClubFund?.FundName ?? r.ClubFund?.FundName;
+            return new FundRefundRequestResponseDto
+            {
+                RefundRequestId = r.RefundRequestId,
+                ClubId = r.ClubId,
+                FundId = r.FundId,
+                OriginalTransactionId = r.OriginalTransactionId,
+                RequestedBy = r.RequestedBy,
+                Amount = r.Amount,
+                Reason = r.Reason,
+                BankName = r.BankName,
+                BankAccountNumber = r.BankAccountNumber,
+                AccountHolderName = r.AccountHolderName,
+                Status = r.Status ?? REFUND_PENDING,
+                CreatedAtUtc = r.CreatedAtUtc,
+                UpdatedAtUtc = r.UpdatedAtUtc,
+                CompletedAtUtc = r.CompletedAtUtc,
+                CompletedBy = r.CompletedBy,
+                RejectedAtUtc = r.RejectedAtUtc,
+                RejectedBy = r.RejectedBy,
+                RejectionReason = r.RejectionReason,
+                TransferReference = r.TransferReference,
+                ManagerNote = r.ManagerNote,
+                FundName = string.IsNullOrWhiteSpace(fn) ? null : fn.Trim()
+            };
         }
     }
 }

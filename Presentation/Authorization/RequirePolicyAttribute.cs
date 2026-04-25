@@ -54,9 +54,10 @@ namespace Presentation.Authorization
     }
 
     /// <summary>
-    /// Requires the authenticated user to have a specific event-level policy
-    /// for the event identified by route parameters {clubId} and {id}.
-    /// Checks: System Admin > Club Manager > Event Member with matching policy.
+    /// Requires the authenticated user to have a specific policy
+    /// inside the event identified by the {eventId} or {id} route parameter.
+    /// Falls back to Club Manager check (auto-pass for managers).
+    ///
     /// Usage: [RequireEventPolicy("editevent")]
     /// </summary>
     [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = false)]
@@ -64,7 +65,7 @@ namespace Presentation.Authorization
     {
         public RequireEventPolicyAttribute(string policyTitle)
         {
-            // EventPolicy_ prefix signals DynamicPolicyProvider to use EventPermissionRequirement
+            // DynamicPolicyProvider resolves EventPolicy_<policyTitle>
             Policy = $"EventPolicy_{policyTitle}";
         }
     }

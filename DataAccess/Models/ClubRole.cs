@@ -32,7 +32,7 @@ namespace DataAccess.Models
         [ForeignKey("DepartmentId")]
         public virtual Department? Department { get; set; }
 
-        public virtual ICollection<UserClubRole> ClubMembers { get; set; }
+        public virtual ICollection<UserClubRoleAssignment> MemberAssignments { get; set; }
         
         public virtual ICollection<Department> ManagedDepartments { get; set; }
         

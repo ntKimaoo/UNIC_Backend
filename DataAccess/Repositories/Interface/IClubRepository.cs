@@ -10,7 +10,7 @@ namespace DataAccess.Repositories.Interface
         Task<IEnumerable<Club>> GetAllAsync();
         Task<IEnumerable<Club>> GetActiveClubsAsync();
         Task<IEnumerable<Club>> GetPublicClubsAsync();
-        Task<Club> CreateAsync(Club club);
+        Task<Club> CreateAsync(Guid uid, Club club);
         Task<bool> UpdateAsync(Club club);
         Task<bool> DeleteAsync(int clubId);
         Task<bool> SoftDeleteAsync(int clubId);
@@ -18,5 +18,6 @@ namespace DataAccess.Repositories.Interface
         Task<bool> ClubNameExistsAsync(string clubName);
         Task<int> CountMemberAsync(int clubId);
         Task ChangeStatusClub(int clubId);
+        Task<bool> isDeleted(int clubId);
     }
 }
