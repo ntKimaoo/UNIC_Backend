@@ -1,5 +1,6 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Implementation;
+using BusinessLogic.Services.Interface;
 using DataAccess.Models.Meeting;
 using DataAccess.Models.Meeting.Enums;
 using DataAccess.Repositories.Interface;

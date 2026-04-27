@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using UNIC.DataAccess.Repositories.Interface;
 using Xunit;
 
 namespace UNIC.ServiceTest.Services
