@@ -97,4 +97,6 @@ networks:
 volumes:
   sql_data:
   certbot-www:
+    external: true
   certbot-certs:
+    external: true
