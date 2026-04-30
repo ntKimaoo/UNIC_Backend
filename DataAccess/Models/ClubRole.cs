@@ -35,7 +35,9 @@ namespace DataAccess.Models
         public virtual ICollection<UserClubRoleAssignment> MemberAssignments { get; set; }
         
         public virtual ICollection<Department> ManagedDepartments { get; set; }
-        
+
         public virtual IList<ClubRolePolicy>? ClubRolePolicies { get; set; }
+
+        public bool IsDeleted { get; set; } = false;
     }
 }

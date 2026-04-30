@@ -28,11 +28,11 @@ namespace UNIC.DataAccess.Repositories.Implementation
         {
             try
             {
-                var department = await GetByIdAsync(departmentId);
-                if (department == null)
+                var department = await _context.Departments.FindAsync(departmentId);
+                if (department == null || department.IsDeleted)
                     return false;
 
-                _context.Departments.Remove(department);
+                department.IsDeleted = true;
                 await _context.SaveChangesAsync();
                 return true;
             }
@@ -45,6 +45,7 @@ namespace UNIC.DataAccess.Repositories.Implementation
         public async Task<IEnumerable<Department>> GetAllAsync()
         {
             return await _context.Departments
+                .Where(d => !d.IsDeleted)
                 .Include(d => d.Club)
                 .Include(d => d.ManagerRole)
                 .OrderByDescending(d => d.CreatedAt)
@@ -54,9 +55,9 @@ namespace UNIC.DataAccess.Repositories.Implementation
         public async Task<IEnumerable<Department>> GetByClubIdAsync(int clubId)
         {
             return await _context.Departments
+                .Where(d => d.ClubId == clubId && !d.IsDeleted)
                 .Include(d => d.Club)
                 .Include(d => d.ManagerRole)
-                .Where(d => d.ClubId == clubId)
                 .OrderByDescending(d => d.CreatedAt)
                 .ToListAsync();
         }
@@ -66,7 +67,7 @@ namespace UNIC.DataAccess.Repositories.Implementation
             return await _context.Departments
                 .Include(d => d.Club)
                 .Include(d => d.ManagerRole)
-                .FirstOrDefaultAsync(m => m.DepartmentId == departmentId);
+                .FirstOrDefaultAsync(m => m.DepartmentId == departmentId && !m.IsDeleted);
         }
 
         public async Task<bool> UpdateAsync(Department department)
@@ -87,18 +88,16 @@ namespace UNIC.DataAccess.Repositories.Implementation
         public async Task<bool> ExistsAsync(int departmentId)
         {
             return await _context.Departments
-                .AnyAsync(d => d.DepartmentId == departmentId);
+                .AnyAsync(d => d.DepartmentId == departmentId && !d.IsDeleted);
         }
 
         public async Task<bool> DepartmentNameExistsInClubAsync(string departmentName, int clubId, int? excludeDepartmentId = null)
         {
             var query = _context.Departments
-                .Where(d => d.DepartmentName == departmentName && d.ClubId == clubId);
+                .Where(d => d.DepartmentName == departmentName && d.ClubId == clubId && !d.IsDeleted);
 
             if (excludeDepartmentId.HasValue)
-            {
                 query = query.Where(d => d.DepartmentId != excludeDepartmentId.Value);
-            }
 
             return await query.AnyAsync();
         }
@@ -107,7 +106,7 @@ namespace UNIC.DataAccess.Repositories.Implementation
         {
             return await _context.Departments
                 .Include(d => d.ClubRoles)
-                .FirstOrDefaultAsync(d => d.ManagerRoleId == managerRoleId);
+                .FirstOrDefaultAsync(d => d.ManagerRoleId == managerRoleId && !d.IsDeleted);
         }
 
         public async Task<IEnumerable<UserClubRole>> GetMembersWithRolesByDepartmentAsync(
@@ -163,7 +162,7 @@ namespace UNIC.DataAccess.Repositories.Implementation
         public async Task<IEnumerable<Department>> GetDepartmentsJoinedByMemberAsync(int clubId, int clubMemberId)
         {
             return await _context.UserClubRoleDepartments
-                .Where(ud => ud.ClubMemberId == clubMemberId && ud.Department.ClubId == clubId)
+                .Where(ud => ud.ClubMemberId == clubMemberId && ud.Department.ClubId == clubId && !ud.Department.IsDeleted)
                 .Include(ud => ud.Department)
                     .ThenInclude(d => d.ManagerRole)
                 .Select(ud => ud.Department)
@@ -178,7 +177,7 @@ namespace UNIC.DataAccess.Repositories.Implementation
                 .ToListAsync();
 
             return await _context.Departments
-                .Where(d => d.ClubId == clubId && !joinedDepartmentIds.Contains(d.DepartmentId))
+                .Where(d => d.ClubId == clubId && !d.IsDeleted && !joinedDepartmentIds.Contains(d.DepartmentId))
                 .Include(d => d.ManagerRole)
                 .ToListAsync();
         }
