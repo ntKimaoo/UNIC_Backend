@@ -52,10 +52,10 @@ namespace Presentation.Authorization
                     return;
                 }
 
-                var userRole = await _policyService.GetUserRole(userId);
+                var userRoles = await _policyService.GetUserRole(userId);
+                var roleSet = userRoles.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-                if (requirement.Roles.Any(r =>
-                    string.Equals(r, userRole, StringComparison.OrdinalIgnoreCase)))
+                if (requirement.Roles.Any(r => roleSet.Contains(r)))
                 {
                     context.Succeed(requirement);
                     return;
@@ -92,8 +92,8 @@ namespace Presentation.Authorization
                     context.Fail();
                     return;
                 }
-                var userRole = await _policyService.GetUserRole(userId);
-                var isAdmin = string.Equals(userRole, "admin", StringComparison.OrdinalIgnoreCase);
+                var userRoles = await _policyService.GetUserRole(userId);
+                var isAdmin = userRoles.Any(r => string.Equals(r, "admin", StringComparison.OrdinalIgnoreCase));
 
                 if (!isAdmin)
                 {

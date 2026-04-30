@@ -23,13 +23,13 @@ namespace DataAccess.Repositories.Implementation
                 .Include(cr => cr.MemberAssignments).ThenInclude(ma => ma.ClubMember)
                 .Include(cr => cr.ClubRolePolicies!)
                     .ThenInclude(crp => crp.Policy).ThenInclude(p => p.PolicyGroup)
-                .FirstOrDefaultAsync(cr => cr.ClubRoleId == clubRoleId && cr.ClubId == clubId);
+                .FirstOrDefaultAsync(cr => cr.ClubRoleId == clubRoleId && cr.ClubId == clubId && !cr.IsDeleted);
         }
 
         public async Task<IEnumerable<ClubRole>> GetAllAsync(int clubId)
         {
             return await _context.ClubRoles
-                .Where(cr => cr.ClubId == clubId)
+                .Where(cr => cr.ClubId == clubId && !cr.IsDeleted)
                 .Include(cr => cr.MemberAssignments).ThenInclude(ma => ma.ClubMember)
                 .Include(cr => cr.ClubRolePolicies!)
                     .ThenInclude(crp => crp.Policy).ThenInclude(p => p.PolicyGroup)
@@ -37,9 +37,10 @@ namespace DataAccess.Repositories.Implementation
                 .ToListAsync();
         }
 
-        public async Task<bool> RoleNameExistsAsync(string roleName,int? clubId)
+        public async Task<bool> RoleNameExistsAsync(string roleName, int? clubId)
         {
-            return await _context.ClubRoles.Where(cr=>cr.ClubId==clubId)
+            return await _context.ClubRoles
+                .Where(cr => cr.ClubId == clubId && !cr.IsDeleted)
                 .AnyAsync(cr => cr.RoleName == roleName);
         }
 
@@ -68,16 +69,11 @@ namespace DataAccess.Repositories.Implementation
         {
             try
             {
-                await _context.UserClubRoleAssignments
-                     .Where(ura => ura.ClubRoleId == clubRoleId)
-                     .ExecuteDeleteAsync();
                 var clubRole = await _context.ClubRoles.FindAsync(clubRoleId);
-                if (clubRole == null)
+                if (clubRole == null || clubRole.IsDeleted)
                     return false;
-                await _context.ClubRolePolicies
-                    .Where(rp => rp.ClubRoleId == clubRoleId)
-                    .ExecuteDeleteAsync();
-                _context.ClubRoles.Remove(clubRole);
+
+                clubRole.IsDeleted = true;
                 await _context.SaveChangesAsync();
                 return true;
             }
@@ -137,7 +133,7 @@ namespace DataAccess.Repositories.Implementation
         public async Task<IEnumerable<ClubRole>> GetByDepartmentIdAsync(int departmentId)
         {
             return await _context.ClubRoles
-                .Where(cr => cr.DepartmentId == departmentId)
+                .Where(cr => cr.DepartmentId == departmentId && !cr.IsDeleted)
                 .ToListAsync();
         }
 
@@ -161,7 +157,9 @@ namespace DataAccess.Repositories.Implementation
         }
         public async Task<bool> CheckDepartementRole(int roleId)
         {
-            var role = await _context.ClubRoles.Include(r => r.Department).FirstOrDefaultAsync(cr => cr.ClubRoleId == roleId);
+            var role = await _context.ClubRoles
+                .Include(r => r.Department)
+                .FirstOrDefaultAsync(cr => cr.ClubRoleId == roleId && !cr.IsDeleted);
             if (role == null) return false;
             return role.DepartmentId != null;
         }

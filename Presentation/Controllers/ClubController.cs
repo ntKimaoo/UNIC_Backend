@@ -1,4 +1,4 @@
-using BusinessLogic.DTOs;
+﻿using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using DocumentFormat.OpenXml.Spreadsheet;
 using DocumentFormat.OpenXml.Wordprocessing;
@@ -30,7 +30,7 @@ namespace Presentation.Controllers
         /// </summary>
         [HttpGet]
         [RequireRole("Admin")]
-        public async Task<IActionResult> GetAll(int pageSize, string? searchQuery, string pageIndex)
+        public async Task<IActionResult> GetAll(int pageSize, string? searchQuery, string? status, string pageIndex)
         {
             try
             {
@@ -42,6 +42,14 @@ namespace Presentation.Controllers
                     clubs = clubs.Where(c =>
                         c.ClubName.ToLower().Contains(searchLower) ||
                         c.ShortName.ToLower().Contains(searchLower)
+                    );
+                }
+
+                if (!string.IsNullOrEmpty(status))
+                {
+                    var searchLower = status.ToLower();
+                    clubs = clubs.Where(c =>
+                        c.Status.ToLower().Contains(searchLower)
                     );
                 }
 
@@ -219,7 +227,11 @@ namespace Presentation.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = ex.Message });
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = ex.Message
+                });
             }
         }
 
@@ -342,14 +354,6 @@ namespace Presentation.Controllers
                 {
                     success = true,
                     message = "Club status updated successfully",
-                });
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = ex.Message
                 });
             }
             catch (Exception ex)

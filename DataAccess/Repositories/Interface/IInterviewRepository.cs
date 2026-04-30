@@ -13,6 +13,10 @@ namespace DataAccess.Repositories.Interface
         Task<InterviewSchedule> CreateScheduleAsync(InterviewSchedule schedule);
         Task<bool> UpdateScheduleAsync(InterviewSchedule schedule);
         Task<bool> DeleteScheduleAsync(int id);
+        Task<int> AutoCompleteExpiredInterviewsAsync(int gracePeriodMinutes);
+        Task<IEnumerable<InterviewSchedule>> GetSchedulesNeedingReminderAsync(TimeSpan reminderBefore);
+        Task<IEnumerable<InterviewSchedule>> GetCompletedSchedulesWithPendingFeedbackAsync();
+
 
         // ── InterviewAssignment ───────────────────────────────────
         Task<InterviewAssignment?> GetAssignmentByIdAsync(int id);
@@ -29,6 +33,8 @@ namespace DataAccess.Repositories.Interface
         Task<bool> UpdateRoomAsync(MeetingRoom room);
 
         // ── RoomParticipant ───────────────────────────────────────
+        Task<int> SyncRoomStatusesAsync(TimeSpan preOpenDuration);
+
         Task<RoomParticipant?> GetActiveParticipantAsync(int roomId, Guid userId);
         Task<IEnumerable<RoomParticipant>> GetParticipantsByRoomIdAsync(int roomId);
         Task<RoomParticipant> CreateParticipantAsync(RoomParticipant participant);
@@ -64,7 +70,10 @@ namespace DataAccess.Repositories.Interface
         Task<ProposedTimeSlot?> GetTimeSlotByIdAsync(int id);
         Task<ProposedTimeSlot> CreateTimeSlotAsync(ProposedTimeSlot slot);
         Task<bool> UpdateTimeSlotAsync(ProposedTimeSlot slot);
-        Task DeleteTimeSlotsByScheduleIdAsync(int scheduleId);
+        // ── AiAnalysisResult ────────────────────────────────────
+        Task<IEnumerable<AiCandidateAnalysisResult>> GetAiAnalysisResultsByCampaignIdAsync(int campaignId);
+        Task<AiCandidateAnalysisResult> CreateAiAnalysisResultAsync(AiCandidateAnalysisResult result);
+        Task<IEnumerable<AiCandidateAnalysisResult>> CreateAiAnalysisResultsAsync(IEnumerable<AiCandidateAnalysisResult> results);
     }
 }
 

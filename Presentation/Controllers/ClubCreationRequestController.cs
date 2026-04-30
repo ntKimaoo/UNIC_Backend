@@ -1,5 +1,4 @@
-﻿using BusinessLogic.DTOs;
-using BusinessLogic.Services.Interface;
+﻿using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Mvc;
 using UNIC.BusinessLogic.DTOs;
 
@@ -17,10 +16,63 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(int pageSize, string? searchQuery, string? status, string pageIndex)
         {
-            var requests = await _service.GetAllAsync();
-            return Ok(new { success = true, data = requests });
+            try
+            {
+                var requests = await _service.GetAllAsync();
+
+                if (!string.IsNullOrEmpty(searchQuery))
+                {
+                    var searchLower = searchQuery.ToLower();
+
+                    requests = requests.Where(r =>
+                        r.ClubName.ToLower().Contains(searchLower) 
+                    );
+                }
+
+                if (!string.IsNullOrEmpty(status))
+                {
+                    var searchLower = status.ToLower();
+
+                    requests = requests.Where(r =>
+                        r.Status.ToLower().Contains(searchLower)
+                    );
+                }
+
+                if (pageIndex.ToLower() != "all")
+                {
+                    var totalCount = requests.Count();
+                    var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+                    if (int.TryParse(pageIndex, out int pageInt))
+                    {
+                        requests = requests
+                            .Skip((pageInt - 1) * pageSize)
+                            .Take(pageSize);
+
+                        return Ok(new
+                        {
+                            success = true,
+                            data = requests,
+                            totalPages,
+                            totalCount
+                        });
+                    }
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    data = requests,
+                    totalPages = 1,
+                    totalCount = requests.Count()
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
         }
 
         [HttpGet("{id}")]
@@ -69,9 +121,9 @@ namespace UNIC.Presentation.Controllers
         [HttpPut("{id}/status")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateClubRequestStatusDto dto)
         {
-            var result = await _service.UpdateStatusAsync(id, dto);
+            var request = await _service.UpdateStatusAsync(id, dto);
 
-            if (!result)
+            if (request == null)
             {
                 return NotFound(new
                 {

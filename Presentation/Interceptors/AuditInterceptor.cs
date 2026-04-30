@@ -22,8 +22,7 @@ namespace Presentation.Interceptors
         // Entity types (by EF short name) that should be audited.
         private static readonly HashSet<string> AuditedNames = new(StringComparer.Ordinal)
         {
-            "Event", "Club", "Department",
-            "ClubFund", "FundTransaction",
+             "Club", "Department",
             "UserClubRole", "ClubRole",
             "RecruitmentCampaign",
             "UserClubRoleAssignment"
@@ -97,6 +96,16 @@ namespace Presentation.Interceptors
 
                     if (changedProps.Count == 0) continue;
 
+                    // Detect soft-delete: IsDeleted flipped false → true
+                    var isDeletedProp = entry.Properties
+                        .FirstOrDefault(p => p.Metadata.Name == "IsDeleted");
+                    if (isDeletedProp != null
+                        && isDeletedProp.OriginalValue is false
+                        && isDeletedProp.CurrentValue is true)
+                    {
+                        snap.IsSoftDelete = true;
+                    }
+
                     snap.ChangedPropertyNames = changedProps;
                     snap.EntityId = GetEntityId(entry);
                     snap.ClubId = TryGetClubId(entry);
@@ -168,10 +177,10 @@ namespace Presentation.Interceptors
                             snap.EntityId,
                             snap.ClubId,
                             OldValue: snap.OldValueJson,
-                            NewValue: SerializePropertyValues(snap.EntryRef!, snap.ChangedPropertyNames!, useOriginal: false),
+                            NewValue: snap.IsSoftDelete ? null : SerializePropertyValues(snap.EntryRef!, snap.ChangedPropertyNames!, useOriginal: false),
                             snap.ChangedAt,
                             snap.ChangedBy,
-                            ChangeType: "UPDATE");
+                            ChangeType: snap.IsSoftDelete ? "SOFT DELETE" : "UPDATE");
                         break;
 
                     case EntityState.Deleted:
@@ -255,6 +264,7 @@ namespace Presentation.Interceptors
             public Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry? EntryRef { get; set; }
             public Guid ChangedBy { get; set; }
             public DateTime ChangedAt { get; set; }
+            public bool IsSoftDelete { get; set; }
         }
     }
 }

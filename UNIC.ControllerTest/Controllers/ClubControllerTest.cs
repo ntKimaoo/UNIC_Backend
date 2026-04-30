@@ -64,7 +64,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubService.Setup(s => s.GetAllAsync())
                             .ReturnsAsync(clubs);
 
-            var result = await _controller.GetAll(1, null, "all");
+            var result = await _controller.GetAll();
 
             var okResult = Assert.IsType<OkObjectResult>(result);
             Assert.Equal(200, okResult.StatusCode);
@@ -76,7 +76,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubService.Setup(s => s.GetAllAsync())
                             .ReturnsAsync(new List<ClubResponseDto>());
 
-            var result = await _controller.GetAll(10, null, "all");
+            var result = await _controller.GetAll();
 
             Assert.IsType<OkObjectResult>(result);
         }
@@ -86,7 +86,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubService.Setup(s => s.GetAllAsync())
                             .ThrowsAsync(new Exception("Error"));
 
-            var result = await _controller.GetAll(10, null, "all");
+            var result = await _controller.GetAll();
 
             var obj = Assert.IsType<ObjectResult>(result);
             Assert.Equal(500, obj.StatusCode);
@@ -106,7 +106,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubService.Setup(s => s.GetActiveClubsAsync())
                             .ReturnsAsync(clubs);
 
-            var result = await _controller.GetActiveClubs(10, null, "all");
+            var result = await _controller.GetActiveClubs();
 
             var okResult = Assert.IsType<OkObjectResult>(result);
             Assert.Equal(200, okResult.StatusCode);
@@ -119,7 +119,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubService.Setup(s => s.GetActiveClubsAsync())
                             .ReturnsAsync(clubs);
 
-            var result = await _controller.GetActiveClubs(10, null, "all");
+            var result = await _controller.GetActiveClubs();
 
             Assert.IsType<OkObjectResult>(result);
         }
@@ -129,7 +129,7 @@ namespace UNIC.ControllerTest.Controllers
             _mockClubService.Setup(s => s.GetActiveClubsAsync())
                             .ThrowsAsync(new Exception("DB error"));
 
-            var result = await _controller.GetActiveClubs(10, null, "all");
+            var result = await _controller.GetActiveClubs();
 
             var obj = Assert.IsType<ObjectResult>(result);
             Assert.Equal(500, obj.StatusCode);

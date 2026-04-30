@@ -62,6 +62,7 @@ namespace DataAccess.Repositories.Implementation
             }
             club.CreatedAt = DateTime.UtcNow;
             club.IsDeleted = false;
+            club.IsActive = true;
             await _context.Clubs.AddAsync(club);
             await _context.SaveChangesAsync();
             return club;

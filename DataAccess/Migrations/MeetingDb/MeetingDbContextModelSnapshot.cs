@@ -22,6 +22,53 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("DataAccess.Models.Meeting.AiCandidateAnalysisResult", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AnalyzedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CampaignId")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("CandidateUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CriteriaEvaluationsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("InterviewScheduleId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("StrengthsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("WeaknessesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CampaignId");
+
+                    b.HasIndex("InterviewScheduleId")
+                        .IsUnique();
+
+                    b.ToTable("AiCandidateAnalysisResults", (string)null);
+                });
+
             modelBuilder.Entity("DataAccess.Models.Meeting.CampaignDecision", b =>
                 {
                     b.Property<int>("Id")
@@ -134,9 +181,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
-                    b.Property<int>("Weight")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
                     b.HasIndex("CampaignId");
@@ -209,7 +253,7 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.Property<Guid>("CandidateUserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<DateTime?>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<Guid>("CreatedByUserId")
@@ -221,7 +265,19 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.Property<int>("DurationMinutes")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("ScheduledAt")
+                    b.Property<DateTime?>("FeedbackNudgeSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ReminderSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("RescheduleReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("RoomOpenedEmailSentAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ScheduledAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Status")
@@ -292,12 +348,6 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
-
-                    b.Property<DateTime?>("ScheduledEndAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("ScheduledStartAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("StartedAt")
                         .HasColumnType("datetime2");
@@ -454,6 +504,17 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.HasIndex("UserId");
 
                     b.ToTable("RoomParticipants", (string)null);
+                });
+
+            modelBuilder.Entity("DataAccess.Models.Meeting.AiCandidateAnalysisResult", b =>
+                {
+                    b.HasOne("DataAccess.Models.Meeting.InterviewSchedule", "InterviewSchedule")
+                        .WithMany()
+                        .HasForeignKey("InterviewScheduleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("InterviewSchedule");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Meeting.CampaignDecision", b =>

@@ -114,12 +114,55 @@ namespace BusinessLogic.DTOs
         public int EventId { get; set; }
         public Guid UserId { get; set; }
         public string MemberName { get; set; } = null!;
+        public string? Email { get; set; }
         public string? StudentId { get; set; }
         public DateTime RegistrationDate { get; set; }
         public string AttendanceStatus { get; set; } = null!;
         public DateTime? CheckInTime { get; set; }
         public int? Score { get; set; }
         public string? Comment { get; set; }
+    }
+
+    /// <summary>
+    /// Result of bulk approve operation with detailed slot info
+    /// </summary>
+    public class BulkApproveResult
+    {
+        public int Approved { get; set; }
+        public int Total { get; set; }
+        public int SkippedDueToSlot { get; set; }
+        public int RemainingSlots { get; set; }
+        public string Message { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// Request to update attendee status (PATCH endpoint)
+    /// </summary>
+    public class UpdateAttendeeStatusRequest
+    {
+        [Required(ErrorMessage = "Status is required")]
+        public string Status { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// Paged result for attendee list
+    /// </summary>
+    public class AttendeePagedResult
+    {
+        public IEnumerable<AttendanceDetailDto> Items { get; set; } = Array.Empty<AttendanceDetailDto>();
+        public int TotalCount { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+    }
+
+    /// <summary>
+    /// Result of a code-based check-in attempt.
+    /// </summary>
+    public class CheckInResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = null!;
+        public bool AlreadyCheckedIn { get; set; }
     }
 
     

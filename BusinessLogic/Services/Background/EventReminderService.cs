@@ -20,6 +20,8 @@ namespace BusinessLogic.Services.Background
         
         // In-memory track of events we've already sent reminders for, to avoid duplicates without DB changes
         private static readonly HashSet<int> _remindedEventIds = new HashSet<int>();
+        // Track 30-min online reminders separately
+        private static readonly HashSet<int> _reminded30MinEventIds = new HashSet<int>();
 
         public EventReminderService(
             ILogger<EventReminderService> logger,
@@ -61,16 +63,15 @@ namespace BusinessLogic.Services.Background
             var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
             var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
 
-            DateTime now = DateTime.Now;
+            DateTime now = DateTime.UtcNow;
             // Look for events starting within the next 12.5 hours
             DateTime windowEnd = now.AddHours(12.5);
 
             try
             {
-                // Query events 
-                // Note: Getting all UPCOMING events that are within the time window
                 var upcomingEvents = await unitOfWork.Events.GetUpcomingEventsAsync();
                 
+                // ===== 12h general reminder =====
                 var eventsToRemind = upcomingEvents.Where(e => 
                     e.StartDate.HasValue && 
                     e.StartDate.Value <= windowEnd && 
@@ -90,11 +91,6 @@ namespace BusinessLogic.Services.Background
                     {
                         if (att.User != null && !string.IsNullOrEmpty(att.User.Email))
                         {
-                            // Enqueue email 
-                            // Since there is no specific SendReminder method in IEmailService, we can adapt an existing one
-                            // or ideally add it. But to minimize interface changes, we could just send a generic notification 
-                            // or event registration success if we can't change IEmailService. Wait, we CAN change IEmailService since it's an interface and we implement it.
-                            // But usually, modifying interfaces takes time. Let's assume we can add SendEventReminderEmailAsync.
                             _ = Task.Run(() => emailService.SendEventRegistrationSuccessAsync(
                                 att.User.Email, 
                                 att.User.FullName, 
@@ -105,6 +101,44 @@ namespace BusinessLogic.Services.Background
                     }
 
                     _remindedEventIds.Add(ev.EventId);
+                }
+
+                // ===== 30-min reminder for ONLINE events =====
+                DateTime window30Min = now.AddMinutes(35); // 35 phút để có buffer
+                var onlineEventsToRemind = upcomingEvents.Where(e =>
+                    e.StartDate.HasValue &&
+                    e.IsOnline &&
+                    e.StartDate.Value <= window30Min &&
+                    e.StartDate.Value > now &&
+                    e.Status != "CANCELED" &&
+                    !_reminded30MinEventIds.Contains(e.EventId)
+                ).ToList();
+
+                foreach (var ev in onlineEventsToRemind)
+                {
+                    _logger.LogInformation($"Sending 30-min online reminder for event: {ev.EventName}");
+
+                    var attendances = await unitOfWork.Attendances.GetAttendeesByEventAsync(ev.EventId);
+                    var registeredUsers = attendances.Where(a => a.AttendanceStatus == nameof(AttendanceStatus.REGISTERED)).ToList();
+
+                    var meetInfo = !string.IsNullOrEmpty(ev.MeetLink)
+                        ? $"Link tham gia: {ev.MeetLink}"
+                        : "Link sẽ được cung cấp khi sự kiện bắt đầu.";
+
+                    foreach (var att in registeredUsers)
+                    {
+                        if (att.User != null && !string.IsNullOrEmpty(att.User.Email))
+                        {
+                            _ = Task.Run(() => emailService.SendEventRegistrationSuccessAsync(
+                                att.User.Email,
+                                att.User.FullName,
+                                "⚡ " + ev.EventName + " sẽ bắt đầu sau 30 phút!",
+                                ev.StartDate,
+                                meetInfo));
+                        }
+                    }
+
+                    _reminded30MinEventIds.Add(ev.EventId);
                 }
             }
             catch (Exception ex)
