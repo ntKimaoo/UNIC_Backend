@@ -149,6 +149,7 @@ builder.Services.AddScoped<IPolicyService, PolicyService>();
 builder.Services.AddScoped<IRecordOfChangeRepository, RecordOfChangeRepository>();
 builder.Services.AddScoped<IRecordOfChangeService, RecordOfChangeService>();
 builder.Services.AddScoped<IRecordOfChangeHubContext, RecordOfChangeHubContext>();
+builder.Services.AddScoped<IUndoService, UndoService>();
 builder.Services.AddHostedService<RecordOfChangeProcessorService>();
 builder.Services.AddHostedService<TokenCleanupService>();
 builder.Services.AddHostedService<EmailQueueService>();

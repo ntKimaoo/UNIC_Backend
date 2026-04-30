@@ -41,7 +41,8 @@ namespace BusinessLogic.Services.Implementation
                 ChangeType = r.ChangeType,
                 Notification = r.Notification,
                 ClubId = r.ClubId,
-                ClubName = r.Club?.ClubName
+                ClubName = r.Club?.ClubName,
+                IsUndo = r.IsUndo
             });
 
             var totalPages = (int)Math.Ceiling(totalCount / (double)filter.PageSize);

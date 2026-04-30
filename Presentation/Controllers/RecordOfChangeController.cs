@@ -1,5 +1,4 @@
 using BusinessLogic.DTOs;
-using BusinessLogic.Hubs;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Mvc;
 using Presentation.Authorization;
@@ -11,12 +10,12 @@ namespace Presentation.Controllers
     public class RecordOfChangeController : ControllerBase
     {
         private readonly IRecordOfChangeService _service;
-        private readonly IRecordOfChangeHubContext _hubContext;
+        private readonly IUndoService _undoService;
 
-        public RecordOfChangeController(IRecordOfChangeService service, IRecordOfChangeHubContext hubContext)
+        public RecordOfChangeController(IRecordOfChangeService service, IUndoService undoService)
         {
             _service = service;
-            _hubContext = hubContext;
+            _undoService = undoService;
         }
 
         /// <summary>
@@ -78,6 +77,29 @@ namespace Presentation.Controllers
                     hasPreviousPage = filter.PageNumber > 1,
                     hasNextPage = filter.PageNumber < totalPages
                 });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Hoàn tác một thao tác UPDATE đã được ghi nhận.
+        /// Với soft-delete (ClubRole, Department): undo UPDATE {"IsDeleted":true} → khôi phục IsDeleted=false.
+        /// Không hỗ trợ undo CREATE hoặc hard DELETE.
+        /// </summary>
+        [HttpPost("{id}/undo")]
+        [RequireRole("Admin")]
+        public async Task<IActionResult> Undo(int id)
+        {
+            try
+            {
+                var (success, message) = await _undoService.UndoAsync(id);
+                if (!success)
+                    return BadRequest(new { success = false, message });
+
+                return Ok(new { success = true, message });
             }
             catch (Exception ex)
             {

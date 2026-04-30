@@ -14,6 +14,7 @@ namespace BusinessLogic.DTOs
         public string Notification { get; set; } = null!;
         public int? ClubId { get; set; }
         public string? ClubName { get; set; }
+        public bool IsUndo { get; set; }
     }
 
     public class RecordOfChangeFilterDto
