@@ -8,10 +8,12 @@ namespace DataAccess.Models
         [Key]
         public int FundId { get; set; }
         [Required]
+        public Guid PublicId { get; set; } = Guid.NewGuid();
+        [Required]
         public int ClubId { get; set; }
         [Required]
         [MaxLength(100)]
-        public string FundName { get; set; }
+        public string FundName { get; set; } = string.Empty;
         [MaxLength(1000)]
         public string? Description { get; set; }
         public int FundTypeId { get; set; }
@@ -37,7 +39,7 @@ namespace DataAccess.Models
         public DateTime? DeletedAtUtc { get; set; }
         public Guid? DeletedBy { get; set; }
         [ForeignKey("ClubId")]
-        public virtual Club Club { get; set; }
-        public virtual ICollection<FundTransaction> FundTransactions { get; set; }
+        public virtual Club Club { get; set; } = null!;
+        public virtual ICollection<FundTransaction> FundTransactions { get; set; } = new List<FundTransaction>();
     }
 }
