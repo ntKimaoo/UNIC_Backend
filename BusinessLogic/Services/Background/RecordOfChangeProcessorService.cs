@@ -1,6 +1,8 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using BusinessLogic.DTOs;
+using BusinessLogic.Hubs;
 using DataAccess.Interceptors;
 using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
@@ -79,6 +81,31 @@ namespace BusinessLogic.Services.Background
 
             context.RecordsOfChange.Add(record);
             await context.SaveChangesAsync(ct);
+
+            // Broadcast real-time sau khi lưu DB thành công
+            try
+            {
+                var hubContext = scope.ServiceProvider.GetRequiredService<IRecordOfChangeHubContext>();
+                var dto = new RecordOfChangeResponseDto
+                {
+                    Id = record.Id,
+                    EntityName = record.EntityName,
+                    EntityId = record.EntityId,
+                    OldValue = record.OldValue,
+                    NewValue = record.NewValue,
+                    ChangedAt = record.ChangedAt,
+                    ChangedBy = record.ChangedBy,
+                    ChangedByName = actorName,
+                    ChangeType = record.ChangeType,
+                    Notification = record.Notification,
+                    ClubId = record.ClubId
+                };
+                await hubContext.BroadcastAsync(dto, record.ClubId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "SignalR broadcast failed for RecordOfChange #{Id}", record.Id);
+            }
         }
 
         private static async Task<string> ResolveActorNameAsync(
