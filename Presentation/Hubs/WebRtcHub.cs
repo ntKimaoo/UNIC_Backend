@@ -326,7 +326,62 @@ namespace UNIC.Presentation.Hubs
             await Clients.Group(roomId)
                          .SendAsync("ReceiveMessage", chatMessage);
         }
+        /// <summary>
+        /// Thông báo user giơ tay cho các user khác trong room
+        /// </summary>
+        public async Task RaiseHand(string roomId)
+        {
+            RoomUser? user = null;
+            lock (_lock)
+            {
+                if (_rooms.ContainsKey(roomId) && _rooms[roomId].ContainsKey(Context.ConnectionId))
+                {
+                    user = _rooms[roomId][Context.ConnectionId];
+                }
+            }
 
+            if (user == null)
+            {
+                _logger.LogWarning("RaiseHand: User {ConnectionId} not found in room {RoomId}", Context.ConnectionId, roomId);
+                return;
+            }
+
+            _logger.LogInformation(
+                "User {UserId} ({FullName}) raised hand in room {RoomId}",
+                user.UserId, user.FullName, roomId);
+
+            // Gửi cho tất cả user trong room (bao gồm cả người giơ tay) để cập nhật UI
+            await Clients.Group(roomId)
+                         .SendAsync("UserRaisedHand", new { user.ConnectionId, user.UserId, user.FullName });
+        }
+
+        /// <summary>
+        /// Thông báo user hạ tay cho các user khác trong room
+        /// </summary>
+        public async Task LowerHand(string roomId)
+        {
+            RoomUser? user = null;
+            lock (_lock)
+            {
+                if (_rooms.ContainsKey(roomId) && _rooms[roomId].ContainsKey(Context.ConnectionId))
+                {
+                    user = _rooms[roomId][Context.ConnectionId];
+                }
+            }
+
+            if (user == null)
+            {
+                _logger.LogWarning("LowerHand: User {ConnectionId} not found in room {RoomId}", Context.ConnectionId, roomId);
+                return;
+            }
+
+            _logger.LogInformation(
+                "User {UserId} ({FullName}) lowered hand in room {RoomId}",
+                user.UserId, user.FullName, roomId);
+
+            await Clients.Group(roomId)
+                         .SendAsync("UserLoweredHand", new { user.ConnectionId, user.UserId, user.FullName });
+        }
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             _logger.LogWarning(
