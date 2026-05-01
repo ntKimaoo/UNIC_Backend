@@ -5,8 +5,9 @@ using DataAccess.Models.Meeting.Enums;
 namespace DataAccess.Models.Meeting;
 
 /// <summary>
-/// Phòng WebRTC – tạo tự động khi InterviewSchedule được Confirm.
-/// Quan hệ 1-1 với InterviewSchedule.
+/// Phòng WebRTC – dùng chung cho nhiều mục đích:
+/// phỏng vấn, họp nội bộ, đào tạo, v.v.
+/// Khi RoomType = Interview thì gắn với InterviewSchedule (optional 1-0..1).
 /// </summary>
 public class MeetingRoom
 {

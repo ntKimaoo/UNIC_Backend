@@ -1,5 +1,6 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Implementation;
+using BusinessLogic.Services.Interface;
 using DataAccess.Models.Meeting;
 using DataAccess.Models.Meeting.Enums;
 using DataAccess.Repositories.Interface;
@@ -16,13 +17,21 @@ namespace UNIC.ServiceTest.Services
     {
         private readonly Mock<IInterviewRepository> _mockRepo;
         private readonly Mock<IUserRepository> _mockUserRepo;
+        private readonly Mock<IEmailService> _mockEmailService;
+        private readonly Mock<IRecruitmentCampaignRepository> _mockCampaignRepo;
         private readonly InterviewService _interviewService;
 
         public InterviewServiceTest()
         {
             _mockRepo = new Mock<IInterviewRepository>();
             _mockUserRepo = new Mock<IUserRepository>();
-            _interviewService = new InterviewService(_mockRepo.Object, _mockUserRepo.Object);
+            _mockEmailService = new Mock<IEmailService>();
+            _mockCampaignRepo = new Mock<IRecruitmentCampaignRepository>();
+            _interviewService = new InterviewService(
+                _mockRepo.Object, 
+                _mockUserRepo.Object, 
+                _mockEmailService.Object, 
+                _mockCampaignRepo.Object);
         }
 
         #region CreateScheduleAsync

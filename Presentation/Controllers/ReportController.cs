@@ -1,6 +1,7 @@
 using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -35,7 +36,37 @@ namespace Presentation.Controllers
                 if (!isSystemAdmin && !await _clubMemberService.IsMemberAsync(userId, clubId))
                     return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
 
-                var data = await _reportService.GetClubSummaryAsync(clubId, userId, isSystemAdmin, year, month);
+                var data = await _reportService.GetSummaryAsync(clubId, userId, isSystemAdmin, year, month);
+                return Ok(new { success = true, data });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+            }
+        }
+
+        [HttpGet("analytics")]
+        public async Task<IActionResult> GetAnalytics(
+            int clubId,
+            [FromQuery] int? year)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var isSystemAdmin = User.IsInRole("Admin");
+
+                if (!isSystemAdmin && !await _clubMemberService.IsMemberAsync(userId, clubId))
+                    return StatusCode(403, new { success = false, message = "Bạn không thuộc câu lạc bộ này." });
+
+                var data = await _reportService.GetAnalyticsAsync(clubId, year);
                 return Ok(new { success = true, data });
             }
             catch (UnauthorizedAccessException ex)

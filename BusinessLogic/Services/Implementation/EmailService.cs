@@ -37,7 +37,7 @@ namespace BusinessLogic.Services.Implementation
             _smtpPassword = _configuration["Email:Password"] ?? "";
             _fromEmail = _configuration["Email:FromEmail"] ?? "";
             _fromName = _configuration["Email:FromName"] ?? "Member Management System";
-            _appBaseUrl = _configuration["AppSettings:BaseUrl"] ?? "http://localhost:5173";
+            _appBaseUrl = _configuration["AppSettings:BaseUrl"] ?? "https://uniclub.io.vn";
         }
 
         public async Task<bool> SendVerificationEmailAsync(string toEmail, string verificationToken, string fullName)

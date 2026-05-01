@@ -95,6 +95,13 @@ public class MeetingDbContext : DbContext
             e.ToTable("MeetingRooms");
             e.HasKey(r => r.Id);
 
+            // Phân loại & thông tin chung
+            e.Property(r => r.RoomType).HasConversion<string>().HasMaxLength(50);
+            e.Property(r => r.Title).IsRequired().HasMaxLength(300);
+            e.Property(r => r.Description).HasMaxLength(2000);
+            e.Property(r => r.CreatedByUserId).IsRequired();
+            e.HasIndex(r => r.CreatedByUserId);
+
             e.Property(r => r.RoomCode).IsRequired().HasMaxLength(20);
             e.HasIndex(r => r.RoomCode).IsUnique();          // Lookup /room/{code}
 
@@ -104,11 +111,12 @@ public class MeetingDbContext : DbContext
             e.Property(r => r.TurnUsername).HasMaxLength(200);
             e.Property(r => r.TurnCredential).HasMaxLength(200);
 
-            // 1-1 với InterviewSchedule
+            // 1-0..1 với InterviewSchedule (optional)
             e.HasOne(r => r.InterviewSchedule)
              .WithOne(s => s.MeetingRoom)
              .HasForeignKey<MeetingRoom>(r => r.InterviewScheduleId)
-             .OnDelete(DeleteBehavior.Cascade);
+             .IsRequired(false)
+             .OnDelete(DeleteBehavior.SetNull);
         });
 
         // ── RoomParticipant ───────────────────────────────────────
@@ -229,3 +237,4 @@ public class MeetingDbContext : DbContext
         });
     }
 }
+

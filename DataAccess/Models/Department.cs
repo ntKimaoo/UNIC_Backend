@@ -26,6 +26,7 @@ namespace DataAccess.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
+        public bool IsDeleted { get; set; } = false;
         
         [ForeignKey("ClubId")]
         public virtual Club Club { get; set; } = null!;

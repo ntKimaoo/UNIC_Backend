@@ -38,7 +38,7 @@ namespace UNIC.ControllerTest.Controllers
             _serviceMock.Setup(s => s.GetAllAsync())
                         .ReturnsAsync(new List<ClubCreationRequestDto> { BuildDto(1), BuildDto(2) });
 
-            var result = await _sut.GetAll();
+            var result = await _sut.GetAll(10, null, null, "all");
 
             var ok = Assert.IsType<OkObjectResult>(result);
             Assert.True(Prop<bool>(ok.Value, "success"));
@@ -132,11 +132,12 @@ namespace UNIC.ControllerTest.Controllers
             Assert.IsType<NotFoundResult>(result);
         }
 
+        // B4 FIX: service now returns ClubCreationRequestDto?, not bool
         [Fact]
         public async Task UpdateStatus_WhenFound_Returns200WithSuccessMessage()
         {
             _serviceMock.Setup(s => s.UpdateStatusAsync(1, It.IsAny<UpdateClubRequestStatusDto>()))
-                        .ReturnsAsync(true);
+                        .ReturnsAsync(BuildDto(1));
 
             var result = await _sut.UpdateStatus(1, new UpdateClubRequestStatusDto { Status = "Approved" });
 
@@ -144,11 +145,12 @@ namespace UNIC.ControllerTest.Controllers
             Assert.True(Prop<bool>(ok.Value, "success"));
         }
 
+        // B5 FIX: service now returns null (not false) when not found
         [Fact]
         public async Task UpdateStatus_WhenNotFound_Returns404WithMessage()
         {
             _serviceMock.Setup(s => s.UpdateStatusAsync(It.IsAny<int>(), It.IsAny<UpdateClubRequestStatusDto>()))
-                        .ReturnsAsync(false);
+                        .ReturnsAsync((ClubCreationRequestDto?)null);
 
             var result = await _sut.UpdateStatus(999, new UpdateClubRequestStatusDto { Status = "Approved" });
 

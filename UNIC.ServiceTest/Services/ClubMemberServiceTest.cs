@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using UNIC.DataAccess.Repositories.Interface;
 using Xunit;
 
 namespace UNIC.ServiceTest.Services
@@ -16,6 +17,9 @@ namespace UNIC.ServiceTest.Services
         private readonly Mock<IClubMemberRepository> _mockMemberRepo;
         private readonly Mock<IClubRepository> _mockClubRepo;
         private readonly Mock<IUserRepository> _mockUserRepo;
+        private readonly Mock<IClubRoleRepository> _mockClubRoleRepo;
+        private readonly Mock<IDepartmentRepository> _mockDeptRepo;
+        private readonly Mock<IPolicyRepository> _mockPolicyRepo;
         private readonly ClubMemberService _service;
 
         private static readonly Guid _userId = Guid.NewGuid();
@@ -26,10 +30,17 @@ namespace UNIC.ServiceTest.Services
             _mockMemberRepo = new Mock<IClubMemberRepository>();
             _mockClubRepo = new Mock<IClubRepository>();
             _mockUserRepo = new Mock<IUserRepository>();
+            _mockClubRoleRepo = new Mock<IClubRoleRepository>();
+            _mockDeptRepo = new Mock<IDepartmentRepository>();
+            _mockPolicyRepo = new Mock<IPolicyRepository>();
+
             _service = new ClubMemberService(
                 _mockMemberRepo.Object,
                 _mockClubRepo.Object,
-                _mockUserRepo.Object);
+                _mockUserRepo.Object,
+                _mockClubRoleRepo.Object,
+                _mockDeptRepo.Object,
+                _mockPolicyRepo.Object);
         }
 
         private static UserClubRole CreateMember(int id = 1, int clubId = 1) => new()
@@ -37,11 +48,13 @@ namespace UNIC.ServiceTest.Services
             ClubMemberId = id,
             UserId = _userId,
             ClubId = clubId,
-            ClubRoleId = 10,
             JoinDate = DateTime.UtcNow,
             Status = "ACTIVE",
             User = new User { UserId = _userId, FullName = "Test User", Email = "test@example.com" },
-            ClubRole = new ClubRole { ClubRoleId = 10, RoleName = "Member" }
+            RoleAssignments = new List<UserClubRoleAssignment>
+            {
+                new UserClubRoleAssignment { ClubRoleId = 10, ClubRole = new ClubRole { ClubRoleId = 10, RoleName = "Member" } }
+            }
         };
 
         #region GetMembersByClubAsync (simple)
@@ -169,7 +182,7 @@ namespace UNIC.ServiceTest.Services
             _mockMemberRepo.Setup(r => r.AddMemberAsync(It.IsAny<UserClubRole>())).ReturnsAsync(created);
             _mockMemberRepo.Setup(r => r.GetMemberByIdAsync(1)).ReturnsAsync(created);
 
-            var dto = new AddUserToClubDto { UserId = _userId, ClubRoleId = 10 };
+            var dto = new AddUserToClubDto { UserId = _userId, ClubRoleIds = new List<int> { 10 } };
             var result = await _service.AddUserToClubAsync(1, dto, _assignedBy);
 
             Assert.NotNull(result);
@@ -228,12 +241,11 @@ namespace UNIC.ServiceTest.Services
             _mockMemberRepo.Setup(r => r.GetMemberByIdAsync(1)).ReturnsAsync(member);
             _mockMemberRepo.Setup(r => r.UpdateMemberAsync(member)).ReturnsAsync(true);
 
-            var dto = new UpdateMemberRoleDto { ClubRoleId = 20 };
+            var dto = new UpdateMemberRoleDto { ClubRoleIds = new List<int> { 20 } };
             var result = await _service.UpdateMemberRoleAsync(1, dto);
 
             Assert.NotNull(result);
-            Assert.Equal(20, member.ClubRoleId);
-            _mockMemberRepo.Verify(r => r.UpdateMemberAsync(member), Times.Once);
+            _mockClubRoleRepo.Verify(r => r.SetMemberRolesAsync(1, It.IsAny<HashSet<int>>()), Times.Once);
         }
 
         [Fact]
@@ -241,7 +253,7 @@ namespace UNIC.ServiceTest.Services
         {
             _mockMemberRepo.Setup(r => r.GetMemberByIdAsync(99)).ReturnsAsync((UserClubRole?)null);
 
-            var result = await _service.UpdateMemberRoleAsync(99, new UpdateMemberRoleDto { ClubRoleId = 5 });
+            var result = await _service.UpdateMemberRoleAsync(99, new UpdateMemberRoleDto { ClubRoleIds = new List<int> { 5 } });
             Assert.Null(result);
         }
 

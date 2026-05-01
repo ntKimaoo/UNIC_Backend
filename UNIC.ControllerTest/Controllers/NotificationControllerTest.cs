@@ -68,5 +68,42 @@ namespace UNIC.ControllerTest.Controllers
             Assert.IsType<OkObjectResult>(result);
             _serviceMock.Verify(s => s.MarkAllAsReadAsync(userId), Times.Once);
         }
+
+        // M2 NEW: POST /send
+        [Fact]
+        public async Task SendNotification_WhenCalled_Returns200()
+        {
+            var userId = Guid.NewGuid();
+            _serviceMock.Setup(s => s.SendNotificationAsync(userId, "Hello", "Body", "INFO"))
+                        .Returns(Task.CompletedTask);
+
+            var result = await _sut.SendNotification(userId, "Hello", "Body", "INFO");
+
+            Assert.IsType<OkObjectResult>(result);
+        }
+
+        // M3 NEW: POST /send-bulk
+        [Fact]
+        public async Task SendBulkNotification_WhenCalled_Returns200AndSendsToAllUsers()
+        {
+            var uid1 = Guid.NewGuid();
+            var uid2 = Guid.NewGuid();
+            _serviceMock
+                .Setup(s => s.SendNotificationAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+                .Returns(Task.CompletedTask);
+
+            var result = await _sut.SendBulkNotification(new BulkNotificationDto
+            {
+                UserIds = new List<Guid> { uid1, uid2 },
+                Title = "Bulk Title",
+                Message = "Bulk Message",
+                Type = "INFO"
+            });
+
+            Assert.IsType<OkObjectResult>(result);
+            _serviceMock.Verify(
+                s => s.SendNotificationAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()),
+                Times.Exactly(2));
+        }
     }
 }

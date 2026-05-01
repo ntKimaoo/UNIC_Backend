@@ -317,10 +317,17 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<DateTime?>("EndedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("InterviewScheduleId")
+                    b.Property<int?>("InterviewScheduleId")
                         .HasColumnType("int");
 
                     b.Property<bool>("IsRecordingEnabled")
@@ -354,6 +361,11 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
                     b.Property<string>("TurnCredential")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -371,8 +383,11 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedByUserId");
+
                     b.HasIndex("InterviewScheduleId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[InterviewScheduleId] IS NOT NULL");
 
                     b.HasIndex("RoomCode")
                         .IsUnique();
@@ -548,8 +563,7 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                     b.HasOne("DataAccess.Models.Meeting.InterviewSchedule", "InterviewSchedule")
                         .WithOne("MeetingRoom")
                         .HasForeignKey("DataAccess.Models.Meeting.MeetingRoom", "InterviewScheduleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("InterviewSchedule");
                 });
@@ -585,6 +599,16 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                         .IsRequired();
 
                     b.Navigation("MeetingRoom");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.Meeting.EvaluationCriterion", b =>
+                {
+                    b.Navigation("CriteriaScores");
+                });
+
+            modelBuilder.Entity("DataAccess.Models.Meeting.InterviewAssignment", b =>
+                {
+                    b.Navigation("CriteriaScores");
                 });
 
             modelBuilder.Entity("DataAccess.Models.Meeting.InterviewSchedule", b =>

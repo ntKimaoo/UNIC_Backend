@@ -20,5 +20,6 @@ namespace DataAccess.Models
         public string Notification { get; set; } // Nguoi dung ... da thay doi ... cua ... tu ... thanh ...
         public int? ClubId { get; set; }
         public virtual Club Club { get; set; }
+        public bool IsUndo { get; set; } = false;
     }
 }
