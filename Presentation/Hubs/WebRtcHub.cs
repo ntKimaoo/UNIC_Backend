@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.SignalR;
 
 namespace UNIC.Presentation.Hubs
 {
@@ -7,6 +7,7 @@ namespace UNIC.Presentation.Hubs
         public string ConnectionId { get; set; } = null!;
         public Guid UserId { get; set; }
         public string FullName { get; set; } = null!;
+        public string? Avatar { get; set; }
     }
 
     public class WebRtcHub : Hub
@@ -22,7 +23,7 @@ namespace UNIC.Presentation.Hubs
             _serviceProvider = serviceProvider;
         }
 
-        public async Task JoinRoom(string roomId, Guid userId, string fullName)
+        public async Task JoinRoom(string roomId, Guid userId, string fullName, string? avatar)
         {
             _logger.LogInformation(
                 "User {UserId} ({FullName}) with ConnectionId {ConnectionId} is joining room {RoomId}",
@@ -34,7 +35,8 @@ namespace UNIC.Presentation.Hubs
             {
                 ConnectionId = Context.ConnectionId,
                 UserId = userId,
-                FullName = fullName
+                FullName = fullName,
+                Avatar = avatar
             };
 
             lock (_lock)
@@ -311,6 +313,7 @@ namespace UNIC.Presentation.Hubs
                 user.ConnectionId,
                 user.UserId,
                 user.FullName,
+                user.Avatar,
                 Message = message,
                 Timestamp = DateTime.UtcNow
             };
