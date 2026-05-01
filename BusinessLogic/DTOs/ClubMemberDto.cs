@@ -85,6 +85,7 @@ namespace BusinessLogic.DTOs
     public class UserClubDetailedInfoDto
     {
         public int ClubId { get; set; }
+        public string? ClubName { get; set; }
         public string GlobalRole { get; set; }
         public List<ClubRoleInfoDto> ClubRoles { get; set; } = new();
         public List<string> Policies { get; set; } = new();

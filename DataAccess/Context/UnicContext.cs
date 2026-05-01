@@ -578,7 +578,7 @@ public partial class UnicContext : DbContext
             .HasForeignKey(erp => erp.EventRoleId);
         modelBuilder.Entity<EventRolePolicy>()
             .HasOne(erp => erp.Policy)
-            .WithMany()
+            .WithMany(p => p.EventRolePolicies)
             .HasForeignKey(erp => erp.PolicyId);
 
         // EventMemberPolicy (composite PK, copy từ ClubMemberPolicy)
@@ -590,7 +590,7 @@ public partial class UnicContext : DbContext
             .HasForeignKey(emp => emp.EventMemberId);
         modelBuilder.Entity<EventMemberPolicy>()
             .HasOne(emp => emp.Policy)
-            .WithMany()
+            .WithMany(p => p.EventMemberPolicies)
             .HasForeignKey(emp => emp.PolicyId);
     }
 

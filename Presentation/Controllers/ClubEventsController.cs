@@ -63,7 +63,8 @@ namespace UNIC.Presentation.Controllers
             {
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
                 var roles = JsonSerializer.Deserialize<List<ClubRoleClaimDto>>(clubRolesClaim, options);
-                return roles != null && roles.Any(r => r.ClubId == clubId && (r.RoleName.Equals("Manager", StringComparison.OrdinalIgnoreCase) || r.RoleName.Equals("Admin", StringComparison.OrdinalIgnoreCase)));
+                var managerNames = new[] { "Manager", "Admin", "Club Manager", "Quản lý", "Chủ nhiệm" };
+                return roles != null && roles.Any(r => r.ClubId == clubId && managerNames.Any(m => r.RoleName.Equals(m, StringComparison.OrdinalIgnoreCase)));
             }
             catch { return false; }
         }
@@ -299,6 +300,25 @@ namespace UNIC.Presentation.Controllers
 
                 await _eventService.CompleteEventAsync(id);
                 return Ok(new { message = "Event completed." });
+            }
+            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+        }
+
+        /// <summary>
+        /// Cancel an event — sets status to CANCELED, marks all registrations as CANCELLED
+        /// </summary>
+        [HttpPut("{id}/cancel")]
+        //[RequireEventPolicy("editevent")]
+        public async Task<IActionResult> CancelEvent(int clubId, int id)
+        {
+            try
+            {
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                if (existingEvent.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                await _eventService.CancelEventAsync(id);
+                return Ok(new { message = "Sự kiện đã được hủy." });
             }
             catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
         }

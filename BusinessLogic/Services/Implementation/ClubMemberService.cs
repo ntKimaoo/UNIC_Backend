@@ -186,6 +186,7 @@ namespace BusinessLogic.Services.Implementation
                 result.Add(new UserClubDetailedInfoDto
                 {
                     ClubId = m.ClubId,
+                    ClubName = m.Club?.ClubName ?? "",
                     GlobalRole = systemRole,
                     ClubRoles = roles,
                     Policies = policies.ToList()

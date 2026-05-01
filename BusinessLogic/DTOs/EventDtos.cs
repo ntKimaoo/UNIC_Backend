@@ -95,6 +95,8 @@ namespace BusinessLogic.DTOs
         public bool RequiresApproval { get; set; }
         public DateTime? RegistrationStartDate { get; set; }
         public DateTime? RegistrationEndDate { get; set; }
+        public string? CheckInCode { get; set; }
+        public DateTime? CodeExpiresAt { get; set; }
         public List<SessionDto> Sessions { get; set; } = new List<SessionDto>();
     }
 

@@ -175,6 +175,24 @@ namespace DataAccess.Repositories.Implementation
             await _context.SaveChangesAsync();
         }
 
+        public async Task SetEventMemberPoliciesAsync(int eventMemberId, List<int> policyIds)
+        {
+            // Remove existing direct policies
+            var existing = await _context.EventMemberPolicies
+                .Where(emp => emp.EventMemberId == eventMemberId)
+                .ToListAsync();
+            _context.EventMemberPolicies.RemoveRange(existing);
+
+            // Add new policies
+            var newPolicies = policyIds.Select(pid => new EventMemberPolicy
+            {
+                EventMemberId = eventMemberId,
+                PolicyId = pid
+            });
+            await _context.EventMemberPolicies.AddRangeAsync(newPolicies);
+            await _context.SaveChangesAsync();
+        }
+
         // ── User permissions ──
 
         public async Task<IEnumerable<string>> GetUserEventPoliciesAsync(Guid userId, int eventId)
@@ -239,6 +257,7 @@ namespace DataAccess.Repositories.Implementation
                 .Include(e => e.Club)
                 .Where(e => eventIds.Contains(e.EventId))
                 .OrderByDescending(e => e.StartDate ?? e.CreatedAt)
+                .ThenByDescending(e => e.EventId)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();

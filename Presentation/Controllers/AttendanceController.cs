@@ -38,8 +38,14 @@ namespace UNIC.Presentation.Controllers
                 if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
                     return Unauthorized(new { error = "Invalid token" });
 
-                await _attendanceService.RegisterMemberAsync(new EventRegistrationRequest { EventId = id, UserId = userId });
-                return Ok(new { message = "Yêu cầu đăng ký đã được ghi nhận." });
+                var status = await _attendanceService.RegisterMemberAsync(new EventRegistrationRequest { EventId = id, UserId = userId });
+                var message = status switch
+                {
+                    "PENDING" => "Đăng ký đang chờ duyệt.",
+                    "WAITLIST" => "Đã vào danh sách chờ.",
+                    _ => "Đăng ký thành công!"
+                };
+                return Ok(new { message, attendanceStatus = status });
             }
             catch (NotFoundException ex) { return NotFound(new { error = ex.Message }); }
             catch (ConflictException ex) { return Conflict(new { error = ex.Message }); }
@@ -138,6 +144,24 @@ namespace UNIC.Presentation.Controllers
         {
             // TODO: implement _attendanceService.EvaluateMemberAsync when service method is available
             return StatusCode(501, new { error = "Not implemented yet." });
+        }
+        /// <summary>
+        /// Get current user's registration status for an event
+        /// Returns { attendanceStatus, registrationDate, checkInTime } or 404 if not registered
+        /// </summary>
+        [HttpGet("{id}/my-registration")]
+        [Authorize]
+        public async Task<IActionResult> GetMyRegistration(int id)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+                return Unauthorized(new { error = "Invalid token" });
+
+            var attendance = await _attendanceService.GetMyRegistrationAsync(id, userId);
+            if (attendance == null)
+                return NotFound(new { error = "Chưa đăng ký sự kiện này." });
+
+            return Ok(attendance);
         }
     }
 }
