@@ -49,10 +49,10 @@ namespace BusinessLogic.Services.Background
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error in ClubRole Notification Service. Retrying in 5 minutes.");
+                    _logger.LogError(ex, "Error in ClubRole Notification Service. Retrying in 24 hours.");
                     try
                     {
-                        await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                        await Task.Delay(TimeSpan.FromHours(24), stoppingToken);
                     }
                     catch (OperationCanceledException)
                     {
