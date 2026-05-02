@@ -1,9 +1,12 @@
 ﻿using BusinessLogic.Services.Interface;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Presentation.Authorization;
 using UNIC.BusinessLogic.DTOs;
 
 namespace UNIC.Presentation.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class ClubCreationRequestController : ControllerBase
@@ -16,6 +19,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpGet]
+        [RequireClubPolicyOrRole("Admin")]
         public async Task<IActionResult> GetAll(int pageSize, string? searchQuery, string? status, string pageIndex)
         {
             try
@@ -27,7 +31,7 @@ namespace UNIC.Presentation.Controllers
                     var searchLower = searchQuery.ToLower();
 
                     requests = requests.Where(r =>
-                        r.ClubName.ToLower().Contains(searchLower) 
+                        r.ClubName.ToLower().Contains(searchLower)
                     );
                 }
 
@@ -76,6 +80,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpGet("{id}")]
+        [RequireClubPolicyOrRole("Admin")]
         public async Task<IActionResult> GetById(int id)
         {
             var request = await _service.GetByIdAsync(id);
@@ -87,6 +92,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpGet("user/{userId}")]
+        [RequireClubPolicyOrRole("User")]
         public async Task<IActionResult> GetByUserId(Guid userId)
         {
             var requests = await _service.GetByUserIdAsync(userId);
@@ -101,6 +107,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPost]
+        [RequireClubPolicyOrRole("User")]
         public async Task<IActionResult> Create([FromBody] CreateClubCreationRequestDto dto)
         {
             await _service.CreateAsync(dto);
@@ -119,6 +126,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPut("{id}/status")]
+        [RequireClubPolicyOrRole("Admin")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateClubRequestStatusDto dto)
         {
             var request = await _service.UpdateStatusAsync(id, dto);
