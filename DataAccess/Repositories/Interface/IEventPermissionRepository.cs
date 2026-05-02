@@ -23,6 +23,7 @@ namespace DataAccess.Repositories.Interface
         Task AddEventMemberAsync(EventMember member);
         Task RemoveEventMemberAsync(int eventMemberId);
         Task UpdateEventMemberRoleAsync(int eventMemberId, int? eventRoleId);
+        Task SetEventMemberPoliciesAsync(int eventMemberId, List<int> policyIds);
 
         // EventRole CRUD
         Task<IEnumerable<EventRole>> GetEventRolesAsync(int eventId);

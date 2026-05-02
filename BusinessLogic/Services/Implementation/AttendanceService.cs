@@ -1,6 +1,7 @@
 using AutoMapper;
 using BusinessLogic.DTOs;
 using BusinessLogic.Exceptions;
+using BusinessLogic.Helpers;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
@@ -25,7 +26,7 @@ namespace BusinessLogic.Services.Implementation
             _emailService = emailService;
         }
 
-        public async Task RegisterMemberAsync(EventRegistrationRequest request)
+        public async Task<string> RegisterMemberAsync(EventRegistrationRequest request)
         {
             // Check if event exists
             var eventEntity = await _unitOfWork.Events.GetByIdAsync(request.EventId);
@@ -35,7 +36,7 @@ namespace BusinessLogic.Services.Implementation
             }
 
             // ── Auto-sync stale status from dates (same logic as EventService.AutoSyncStatusAsync) ──
-            var now = DateTime.UtcNow;
+            var now = VnTimeHelper.Now;
             bool statusChanged = false;
             var terminalStatuses = new[] { "ENDED", "CANCELED", "ONGOING" };
 
@@ -139,7 +140,7 @@ namespace BusinessLogic.Services.Implementation
                 {
                     // Reuse record cũ — update status + reset fields
                     existingAttendance.AttendanceStatus = status;
-                    existingAttendance.RegistrationDate = DateTime.UtcNow;
+                    existingAttendance.RegistrationDate = VnTimeHelper.Now;
                     existingAttendance.CheckInToken = Guid.NewGuid().ToString("N");
                     existingAttendance.CheckInTime = null;
                     existingAttendance.Score = null;
@@ -152,7 +153,7 @@ namespace BusinessLogic.Services.Implementation
                     {
                         EventId = request.EventId,
                         UserId = request.UserId,
-                        RegistrationDate = DateTime.UtcNow,
+                        RegistrationDate = VnTimeHelper.Now,
                         AttendanceStatus = status,
                         CheckInToken = Guid.NewGuid().ToString("N")
                     };
@@ -173,6 +174,7 @@ namespace BusinessLogic.Services.Implementation
                         catch (Exception ex) { Console.WriteLine($"[Email] SendRegistration failed: {ex.Message}"); }
                     });
                 }
+                return status;
             }
             catch
             {
@@ -194,7 +196,7 @@ namespace BusinessLogic.Services.Implementation
             var code = GenerateRandomCode(6);
 
             // Set expiration (e.g., 15 minutes from now)
-            var expiresAt = DateTime.UtcNow.AddMinutes(15);
+            var expiresAt = VnTimeHelper.Now.AddMinutes(15);
 
             // Update event
             eventEntity.CheckInCode = code;
@@ -223,7 +225,7 @@ namespace BusinessLogic.Services.Implementation
             }
 
             // Validate code expiration
-            if (!eventEntity.CodeExpiresAt.HasValue || eventEntity.CodeExpiresAt.Value < DateTime.UtcNow)
+            if (!eventEntity.CodeExpiresAt.HasValue || eventEntity.CodeExpiresAt.Value < VnTimeHelper.Now)
             {
                 throw new DomainException("Mã điểm danh đã hết hạn");
             }
@@ -249,7 +251,7 @@ namespace BusinessLogic.Services.Implementation
 
             // Update attendance status
             attendance.AttendanceStatus = nameof(AttendanceStatus.PRESENT);
-            attendance.CheckInTime = DateTime.UtcNow;
+            attendance.CheckInTime = VnTimeHelper.Now;
 
             _unitOfWork.Attendances.Update(attendance);
             await _unitOfWork.SaveChangesAsync();
@@ -300,7 +302,7 @@ namespace BusinessLogic.Services.Implementation
             if (!alreadyCheckedIn)
             {
                 attendance.AttendanceStatus = nameof(AttendanceStatus.PRESENT);
-                attendance.CheckInTime = DateTime.UtcNow;
+                attendance.CheckInTime = VnTimeHelper.Now;
                 _unitOfWork.Attendances.Update(attendance);
                 await _unitOfWork.SaveChangesAsync();
             }
@@ -335,7 +337,7 @@ namespace BusinessLogic.Services.Implementation
             if (!alreadyCheckedIn)
             {
                 attendance.AttendanceStatus = "PRESENT";
-                attendance.CheckInTime = DateTime.UtcNow;
+                attendance.CheckInTime = VnTimeHelper.Now;
                 _unitOfWork.Attendances.Update(attendance);
                 await _unitOfWork.SaveChangesAsync();
             }
@@ -400,7 +402,7 @@ namespace BusinessLogic.Services.Implementation
             }
 
             // Validate event has ended
-            if (!eventEntity.EndDate.HasValue || eventEntity.EndDate.Value > DateTime.UtcNow)
+            if (!eventEntity.EndDate.HasValue || eventEntity.EndDate.Value > VnTimeHelper.Now)
             {
                 throw new DomainException("Chỉ có thể đánh giá sau khi sự kiện kết thúc");
             }
@@ -727,7 +729,7 @@ namespace BusinessLogic.Services.Implementation
         /// <summary>
         /// Manager thêm thành viên CLB vào sự kiện — status REGISTERED ngay, gửi email thông báo.
         /// </summary>
-        public async Task<int> AddAttendeesAsync(int eventId, List<Guid> userIds)
+        public async Task<int> AddAttendeesAsync(int eventId, List<Guid> userIds, bool force = false)
         {
             var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
             if (eventEntity == null) throw new NotFoundException("Event", eventId);
@@ -753,17 +755,30 @@ namespace BusinessLogic.Services.Implementation
 
             if (toAdd.Count == 0) return 0;
 
-            // Manager bypass: nếu có giới hạn slot và không đủ chỗ → tự tăng MaxAttendees
+            // Kiểm tra slot — tính dynamic từ attendance thực tế, không dùng AvailableSlots (có thể stale)
             if (eventEntity.MaxAttendees.HasValue)
             {
-                var currentSlots = eventEntity.AvailableSlots ?? 0;
-                if (currentSlots < toAdd.Count)
+                var activeStatuses = new[] { "REGISTERED", "PRESENT", "CHECKED_IN", "ABSENT" };
+                var allAttendees = await _unitOfWork.Attendances.GetAttendeesByEventAsync(eventId);
+                var currentCount = allAttendees.Count(a => activeStatuses.Contains(a.AttendanceStatus));
+                var realAvailable = eventEntity.MaxAttendees.Value - currentCount;
+
+                if (realAvailable < toAdd.Count)
                 {
-                    var shortage = toAdd.Count - currentSlots;
-                    eventEntity.MaxAttendees += shortage;
-                    eventEntity.AvailableSlots = (eventEntity.AvailableSlots ?? 0) + shortage;
-                    _unitOfWork.Events.Update(eventEntity);
+                    if (!force)
+                    {
+                        var shortage = toAdd.Count - Math.Max(0, realAvailable);
+                        var newMax = eventEntity.MaxAttendees.Value + shortage;
+                        throw new DomainException(
+                            $"CAPACITY_EXCEEDED|Vượt quá {shortage} chỗ (hiện tại: {currentCount}/{eventEntity.MaxAttendees}, cần thêm: {toAdd.Count}).|{newMax}");
+                    }
+                    // force=true → manager đã xác nhận tăng capacity
+                    var shortageF = toAdd.Count - Math.Max(0, realAvailable);
+                    eventEntity.MaxAttendees += shortageF;
                 }
+
+                // Sync AvailableSlots DB column (sẽ tính lại = MaxAttendees - currentCount - toAdd sau save)
+                eventEntity.AvailableSlots = eventEntity.MaxAttendees.Value - currentCount;
             }
 
             foreach (var (userId, existing) in toAdd)
@@ -775,7 +790,7 @@ namespace BusinessLogic.Services.Implementation
                 if (existing != null)
                 {
                     existing.AttendanceStatus = nameof(AttendanceStatus.REGISTERED);
-                    existing.RegistrationDate = DateTime.UtcNow;
+                    existing.RegistrationDate = VnTimeHelper.Now;
                     existing.CheckInToken = Guid.NewGuid().ToString("N");
                     existing.CheckInTime = null;
                     checkInToken = existing.CheckInToken;
@@ -788,17 +803,17 @@ namespace BusinessLogic.Services.Implementation
                     {
                         EventId = eventId,
                         UserId = userId,
-                        RegistrationDate = DateTime.UtcNow,
+                        RegistrationDate = VnTimeHelper.Now,
                         AttendanceStatus = nameof(AttendanceStatus.REGISTERED),
                         CheckInToken = checkInToken
                     };
                     await _unitOfWork.Attendances.AddAsync(attendance);
                 }
 
-                // Trừ slot
-                if (eventEntity.MaxAttendees.HasValue)
+                // Trừ slot trực tiếp trên entity (tránh concurrency conflict với TryDecrementSlotAsync)
+                if (eventEntity.MaxAttendees.HasValue && eventEntity.AvailableSlots.HasValue)
                 {
-                    await _unitOfWork.Events.TryDecrementSlotAsync(eventId);
+                    eventEntity.AvailableSlots = Math.Max(0, eventEntity.AvailableSlots.Value - 1);
                 }
 
                 addedCount++;
@@ -818,8 +833,108 @@ namespace BusinessLogic.Services.Implementation
                 });
             }
 
+            _unitOfWork.Events.Update(eventEntity);
             await _unitOfWork.SaveChangesAsync();
             return addedCount;
+        }
+
+        // ─── Makeup Check-in ─────────────────────────────────────────────────
+
+        private async Task<DataAccess.Models.Event> ValidateMakeupCheckInEventAsync(int eventId)
+        {
+            var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
+            if (eventEntity == null)
+                throw new NotFoundException("Event", eventId);
+
+            var allowedStatuses = new[] { "COMPLETED", "ENDED" };
+            if (!allowedStatuses.Contains(eventEntity.Status))
+                throw new DomainException($"Chỉ có thể điểm danh bù khi sự kiện đã kết thúc. Trạng thái hiện tại: {eventEntity.Status}");
+
+            if (!eventEntity.EndDate.HasValue)
+                throw new DomainException("Sự kiện không có ngày kết thúc, không thể xác định thời hạn điểm danh bù.");
+
+            var deadline = eventEntity.EndDate.Value.AddDays(1);
+            if (VnTimeHelper.Now > deadline)
+                throw new DomainException($"Đã quá thời hạn điểm danh bù (trong vòng 1 ngày sau khi kết thúc). Hạn chót: {deadline:dd/MM/yyyy HH:mm}");
+
+            return eventEntity;
+        }
+
+        public async Task<MakeupCheckInResult> MakeupCheckInAsync(int eventId, Guid userId)
+        {
+            await ValidateMakeupCheckInEventAsync(eventId);
+
+            var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, userId);
+            if (attendance == null)
+                throw new NotFoundException("Không tìm thấy bản ghi điểm danh cho người dùng này.");
+
+            var eligibleStatuses = new[] { "REGISTERED", "ABSENT" };
+            if (!eligibleStatuses.Contains(attendance.AttendanceStatus))
+                throw new DomainException($"Không thể điểm danh bù cho trạng thái '{attendance.AttendanceStatus}'. Chỉ áp dụng cho REGISTERED hoặc ABSENT.");
+
+            var previousStatus = attendance.AttendanceStatus;
+            attendance.AttendanceStatus = "PRESENT";
+            attendance.CheckInTime = VnTimeHelper.Now;
+            _unitOfWork.Attendances.Update(attendance);
+            await _unitOfWork.SaveChangesAsync();
+
+            var memberName = attendance.User?.FullName ?? "—";
+            return new MakeupCheckInResult
+            {
+                Success = true,
+                Message = $"Đã điểm danh bù thành công cho {memberName}.",
+                MemberName = memberName,
+                PreviousStatus = previousStatus
+            };
+        }
+
+        public async Task<BulkMakeupCheckInResult> BulkMakeupCheckInAsync(int eventId, List<Guid> userIds)
+        {
+            await ValidateMakeupCheckInEventAsync(eventId);
+
+            int checkedIn = 0;
+            int skipped = 0;
+            var eligibleStatuses = new[] { "REGISTERED", "ABSENT" };
+
+            foreach (var userId in userIds)
+            {
+                var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, userId);
+                if (attendance == null || !eligibleStatuses.Contains(attendance.AttendanceStatus))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                attendance.AttendanceStatus = "PRESENT";
+                attendance.CheckInTime = VnTimeHelper.Now;
+                _unitOfWork.Attendances.Update(attendance);
+                checkedIn++;
+            }
+
+            if (checkedIn > 0)
+                await _unitOfWork.SaveChangesAsync();
+
+            return new BulkMakeupCheckInResult
+            {
+                CheckedIn = checkedIn,
+                Skipped = skipped,
+                Total = userIds.Count,
+                Message = $"Đã điểm danh bù {checkedIn}/{userIds.Count} người. {(skipped > 0 ? $"{skipped} bị bỏ qua." : "")}"
+            };
+        }
+
+        public async Task<object?> GetMyRegistrationAsync(int eventId, Guid userId)
+        {
+            var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, userId);
+            if (attendance == null)
+                return null;
+
+            return new
+            {
+                attendanceStatus = attendance.AttendanceStatus,
+                registrationDate = attendance.RegistrationDate,
+                checkInTime = attendance.CheckInTime
+            };
         }
     }
 }

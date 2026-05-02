@@ -165,5 +165,26 @@ namespace BusinessLogic.DTOs
         public bool AlreadyCheckedIn { get; set; }
     }
 
-    
+
+    /// <summary>
+    /// Result of a single makeup check-in attempt.
+    /// </summary>
+    public class MakeupCheckInResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = null!;
+        public string MemberName { get; set; } = null!;
+        public string PreviousStatus { get; set; } = null!;
+    }
+
+    /// <summary>
+    /// Result of bulk makeup check-in operation.
+    /// </summary>
+    public class BulkMakeupCheckInResult
+    {
+        public int CheckedIn { get; set; }
+        public int Skipped { get; set; }
+        public int Total { get; set; }
+        public string Message { get; set; } = null!;
+    }
 }

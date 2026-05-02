@@ -175,6 +175,20 @@ namespace UNIC.Presentation.Controllers
             catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
         }
 
+        /// <summary>Set direct policies cho thành viên ban tổ chức</summary>
+        [HttpPut("members/{memberId}/policies")]
+        [RequireEventPolicy("managecollaborator")]
+        public async Task<IActionResult> SetEventMemberPolicies(
+            int clubId, int eventId, int memberId, [FromBody] List<string> policies)
+        {
+            try
+            {
+                await _eventPermService.SetEventMemberPoliciesAsync(memberId, policies);
+                return Ok(new { message = "Cập nhật quyền thành viên thành công." });
+            }
+            catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+        }
+
         // ── Permissions Check ──
 
         /// <summary>Xem quyền của mình trên event</summary>

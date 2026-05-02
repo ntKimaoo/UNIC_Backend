@@ -202,6 +202,13 @@ namespace BusinessLogic.Services.Implementation
             await _eventPermRepo.SetEventRolePoliciesAsync(eventRoleId, policyIds);
         }
 
+        public async Task SetEventMemberPoliciesAsync(int eventMemberId, List<string> policyNames)
+        {
+            // Resolve policy names to IDs
+            var policyIds = await _eventPermRepo.GetPolicyIdsByNamesAsync(policyNames);
+            await _eventPermRepo.SetEventMemberPoliciesAsync(eventMemberId, policyIds);
+        }
+
         // ── Auto-create Creator ──
 
         public async Task CreateCreatorRoleAndAssignAsync(int eventId, Guid creatorUserId)
