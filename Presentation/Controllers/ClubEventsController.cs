@@ -104,7 +104,7 @@ namespace UNIC.Presentation.Controllers
             }
             catch (DomainException ex) { return BadRequest(new { error = ex.Message }); }
             catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
-            catch (Exception ex) { return StatusCode(500, new { error = "An error occurred", details = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { error = "An error occurred", details = ex.Message, inner = ex.InnerException?.Message }); }
         }
 
         /// <summary>
