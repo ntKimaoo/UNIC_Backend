@@ -11,13 +11,30 @@ namespace DataAccess.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            
+            migrationBuilder.AddColumn<bool>(
+                name: "IsOnline",
+                table: "Events",
+                type: "bit",
+                nullable: false,
+                defaultValue: false);
+
+            migrationBuilder.AddColumn<string>(
+                name: "MeetLink",
+                table: "Events",
+                type: "nvarchar(500)",
+                maxLength: 500,
+                nullable: true);
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "IsOnline",
+                table: "Events");
 
-            
+            migrationBuilder.DropColumn(
+                name: "MeetLink",
+                table: "Events");
         }
     }
 }
