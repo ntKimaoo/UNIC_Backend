@@ -261,5 +261,10 @@ namespace BusinessLogic.Services.Implementation
         {
             return await _memberRepository.isMemberActive(userId, clubId);
         }
+
+        public async Task<int> CountMembersAsync(int clubId)
+        {
+            return await _memberRepository.CountMembersAsync(clubId);
+        }
     }
 }

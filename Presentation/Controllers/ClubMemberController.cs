@@ -68,6 +68,16 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
+        /// Lấy số lượng thành viên ACTIVE của club
+        /// </summary>
+        [HttpGet("api/clubs/{clubId}/members/count")]
+        public async Task<IActionResult> GetMemberCount(int clubId)
+        {
+            var count = await _service.CountMembersAsync(clubId);
+            return Ok(new { success = true, data = count });
+        }
+
+        /// <summary>
         /// Lấy thông tin một member theo ID
         /// </summary>
         [HttpGet("api/clubs/{clubId}/members/{memberId}")]

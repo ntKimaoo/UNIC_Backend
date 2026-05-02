@@ -170,5 +170,11 @@ namespace DataAccess.Repositories.Implementation
                 .FirstOrDefaultAsync(uc => uc.ClubMember.ClubId == clubId && uc.ClubRole.Level == 0);
             return clubManager != null;
         }
+
+        public async Task<int> CountMembersAsync(int clubId)
+        {
+            return await _context.UserClubRoles
+                .CountAsync(m => m.ClubId == clubId && m.Status.ToUpper() == "ACTIVE");
+        }
     }
 }
