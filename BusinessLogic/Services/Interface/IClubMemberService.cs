@@ -19,5 +19,6 @@ namespace BusinessLogic.Services.Interface
         Task<IEnumerable<UserClubDetailedInfoDto>> GetMyClubsDetailedAsync(Guid userId);
         Task<bool> IsMemberAsync(Guid userId, int clubId);
         Task<bool> IsMemberActiveAsync(Guid userId, int clubId);
+        Task<bool> IsUserInClubAsync(Guid userId, int clubId);
     }
 }
