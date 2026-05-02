@@ -95,6 +95,7 @@ namespace BusinessLogic.Services.Implementation
                 TotalAmount = 0m,
                 CurrentBalance = 0m,
                 CreatedAt = DateTime.UtcNow,
+                PublicId = Guid.NewGuid(),
                 Status = fundStatus,
                 ExpiresAt = expiresAtDate,
                 CreatedBy = userId,
@@ -282,6 +283,26 @@ namespace BusinessLogic.Services.Implementation
             }
 
             var fund = await _fundRepository.GetFundByIdAsync(fundId, includeDeleted: true);
+            if (fund == null)
+                return null;
+            if (fund.IsDeleted && !await CanViewSoftDeletedFundsInClubAsync(currentUserId, fund.ClubId, isSystemAdmin))
+                return null;
+            return MapToFundDto(fund);
+        }
+
+        public async Task<FundResponseDto?> GetFundByPublicIdAsync(
+            Guid publicId,
+            Guid currentUserId,
+            bool isSystemAdmin,
+            bool includeSoftDeletedIfPrivileged = true)
+        {
+            if (!includeSoftDeletedIfPrivileged)
+            {
+                var active = await _fundRepository.GetFundByPublicIdAsync(publicId, includeDeleted: false);
+                return active == null ? null : MapToFundDto(active);
+            }
+
+            var fund = await _fundRepository.GetFundByPublicIdAsync(publicId, includeDeleted: true);
             if (fund == null)
                 return null;
             if (fund.IsDeleted && !await CanViewSoftDeletedFundsInClubAsync(currentUserId, fund.ClubId, isSystemAdmin))
@@ -521,6 +542,7 @@ namespace BusinessLogic.Services.Implementation
             return new FundResponseDto
             {
                 FundId = fund.FundId,
+                PublicId = fund.PublicId,
                 ClubId = fund.ClubId,
                 FundName = fund.FundName,
                 Description = fund.Description,

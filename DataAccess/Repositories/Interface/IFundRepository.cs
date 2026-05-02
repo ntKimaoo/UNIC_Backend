@@ -11,6 +11,7 @@ namespace UNIC.DataAccess.Repositories.Interface
     {
         Task<FundTransaction?> GetTransactionByIdAsync(int id);
         Task<ClubFund?> GetFundByIdAsync(int id, bool includeDeleted = false);
+        Task<ClubFund?> GetFundByPublicIdAsync(Guid publicId, bool includeDeleted = false);
         Task<bool> SoftDeleteFundAsync(int fundId, int clubId, Guid deletedByUserId);
         Task<bool> ExistsNonRejectedFundNameInClubAsync(int clubId, string fundNameNormalized);
         Task<ClubFund> AddFundAsync(ClubFund fund);

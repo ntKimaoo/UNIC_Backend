@@ -175,6 +175,7 @@ namespace BusinessLogic.DTOs
     public class FundResponseDto
     {
         public int FundId { get; set; }
+        public Guid PublicId { get; set; }
         public int ClubId { get; set; }
         public string FundName { get; set; } = string.Empty;
         public string? Description { get; set; }
