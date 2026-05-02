@@ -116,7 +116,8 @@ namespace BusinessLogic.Services.Implementation
 
             club.FoundedDate = dto.FoundedDate;
 
-            club.Status = dto.Status;
+            if (dto.Status != null)
+                club.Status = dto.Status;
             if (dto.IsPublic.HasValue)
                 club.IsPublic = dto.IsPublic.Value;
 
