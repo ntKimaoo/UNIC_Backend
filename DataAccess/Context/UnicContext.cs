@@ -349,6 +349,10 @@ public partial class UnicContext : DbContext
             .HasForeignKey(cf => cf.ClubId)
             .OnDelete(DeleteBehavior.NoAction);
 
+        modelBuilder.Entity<ClubFund>()
+            .HasIndex(cf => cf.PublicId)
+            .IsUnique();
+
         modelBuilder.Entity<FundType>()
             .HasIndex(x => x.Name)
             .IsUnique();

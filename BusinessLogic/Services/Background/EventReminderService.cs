@@ -1,4 +1,5 @@
 using BusinessLogic.Services.Interface;
+using BusinessLogic.Helpers;
 using DataAccess.Repositories.Interface;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -63,7 +64,7 @@ namespace BusinessLogic.Services.Background
             var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
             var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
 
-            DateTime now = DateTime.UtcNow;
+            DateTime now = VnTimeHelper.Now;
             // Look for events starting within the next 12.5 hours
             DateTime windowEnd = now.AddHours(12.5);
 

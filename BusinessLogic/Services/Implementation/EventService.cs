@@ -1,6 +1,7 @@
 using AutoMapper;
 using BusinessLogic.DTOs;
 using BusinessLogic.Exceptions;
+using BusinessLogic.Helpers;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
@@ -55,7 +56,7 @@ namespace BusinessLogic.Services.Implementation
 
             // Map to entity
             var eventEntity = _mapper.Map<Event>(request);
-            eventEntity.CreatedAt = DateTime.UtcNow;
+            eventEntity.CreatedAt = VnTimeHelper.Now;
             eventEntity.Status = "PLANNED";
             eventEntity.CheckInCode = Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper();
             // Set ImageUrl from Cloudinary upload (null if no image provided)
@@ -293,9 +294,9 @@ namespace BusinessLogic.Services.Implementation
             return _mapper.Map<EventDetailDto>(eventEntity);
         }
 
-        public async Task<IEnumerable<EventDetailDto>> GetAllEventsAsync(int pageNumber = 1, int pageSize = 10)
+        public async Task<IEnumerable<EventDetailDto>> GetAllEventsAsync(int pageNumber = 1, int pageSize = 10, string? status = null, int? clubId = null)
         {
-            var events = await _unitOfWork.Events.GetAllAsync(pageNumber, pageSize);
+            var events = await _unitOfWork.Events.GetAllAsync(pageNumber, pageSize, status, clubId);
 
             // Lazily correct stale statuses for all returned events
             bool anyChanged = false;
@@ -307,6 +308,11 @@ namespace BusinessLogic.Services.Implementation
             if (anyChanged) await _unitOfWork.SaveChangesAsync();
 
             return _mapper.Map<IEnumerable<EventDetailDto>>(events);
+        }
+
+        public async Task<int> GetTotalEventsCountAsync(string? status = null, int? clubId = null)
+        {
+            return await _unitOfWork.Events.GetTotalCountAsync(status, clubId);
         }
 
         public async Task RegisterForEventAsync(int eventId, string userId, string? apiBaseUrl = null)
@@ -334,7 +340,7 @@ namespace BusinessLogic.Services.Implementation
             eventEntity.Status = "ONGOING";
             string generatedCode = Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper();
             eventEntity.CheckInCode = generatedCode;
-            DateTime expiry = DateTime.UtcNow.AddHours(2);
+            DateTime expiry = VnTimeHelper.Now.AddMinutes(15);
             eventEntity.CodeExpiresAt = expiry;
 
             _unitOfWork.Events.Update(eventEntity);
@@ -370,7 +376,7 @@ namespace BusinessLogic.Services.Implementation
             if (string.IsNullOrEmpty(eventEntity.CheckInCode) || !eventEntity.CheckInCode.Equals(checkInCode, StringComparison.OrdinalIgnoreCase))
                 throw new DomainException("Mã điểm danh không hợp lệ hoặc đã hết hạn");
 
-            if (eventEntity.CodeExpiresAt.HasValue && DateTime.UtcNow > eventEntity.CodeExpiresAt.Value)
+            if (eventEntity.CodeExpiresAt.HasValue && VnTimeHelper.Now > eventEntity.CodeExpiresAt.Value)
                 throw new DomainException("Mã điểm danh đã hết hạn.");
 
             var attendance = await _unitOfWork.Attendances.GetByEventAndUserAsync(eventId, userGuid);
@@ -382,7 +388,7 @@ namespace BusinessLogic.Services.Implementation
                 throw new DomainException("Người dùng đã điểm danh rồi.");
 
             attendance.AttendanceStatus = nameof(AttendanceStatus.PRESENT);
-            attendance.CheckInTime = DateTime.UtcNow;
+            attendance.CheckInTime = VnTimeHelper.Now;
 
             _unitOfWork.Attendances.Update(attendance);
             await _unitOfWork.SaveChangesAsync();
@@ -413,6 +419,38 @@ namespace BusinessLogic.Services.Implementation
             await _unitOfWork.SaveChangesAsync();
         }
 
+        public async Task CancelEventAsync(int eventId)
+        {
+            var eventEntity = await _unitOfWork.Events.GetByIdAsync(eventId);
+            if (eventEntity == null)
+                throw new NotFoundException("Event", eventId);
+
+            var terminalStatuses = new[] { "CANCELED", "COMPLETED", "ENDED" };
+            if (terminalStatuses.Contains(eventEntity.Status))
+                throw new DomainException($"Không thể hủy sự kiện từ trạng thái '{eventEntity.Status}'.");
+
+            eventEntity.Status = "CANCELED";
+
+            // Mark all non-terminal attendees as CANCELLED
+            var allAttendances = await _unitOfWork.Attendances.GetAttendeesByEventAsync(eventId);
+            var cancelableStatuses = new[] {
+                nameof(AttendanceStatus.REGISTERED),
+                nameof(AttendanceStatus.PENDING),
+                nameof(AttendanceStatus.WAITLIST)
+            };
+            foreach (var attendance in allAttendances)
+            {
+                if (cancelableStatuses.Contains(attendance.AttendanceStatus))
+                {
+                    attendance.AttendanceStatus = nameof(AttendanceStatus.CANCELLED);
+                    _unitOfWork.Attendances.Update(attendance);
+                }
+            }
+
+            _unitOfWork.Events.Update(eventEntity);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
         /// <summary>
         /// Lazily corrects stale event status based on current time.
         /// Rules:
@@ -423,12 +461,28 @@ namespace BusinessLogic.Services.Implementation
         /// </summary>
         private async Task<bool> AutoSyncStatusAsync(Event eventEntity, bool saveImmediately = true)
         {
-            var now = DateTime.UtcNow;
+            var now = VnTimeHelper.Now;
             var originalStatus = eventEntity.Status;
 
             // Rule 2 first (higher priority): if event's own end time has passed, mark ENDED
-            var terminalStatuses = new[] { "ENDED", "CANCELED", "ONGOING" };
-            if (!terminalStatuses.Contains(eventEntity.Status)
+            var terminalStatuses = new[] { "ENDED", "CANCELED", "COMPLETED" };
+            if (eventEntity.Status == "ONGOING"
+                && eventEntity.EndDate.HasValue
+                && eventEntity.EndDate.Value <= now)
+            {
+                // ONGOING + quá endDate → COMPLETED (auto-mark ABSENT cho người chưa điểm danh)
+                eventEntity.Status = "COMPLETED";
+                var allAttendances = await _unitOfWork.Attendances.GetAttendeesByEventAsync(eventEntity.EventId);
+                foreach (var attendance in allAttendances)
+                {
+                    if (attendance.AttendanceStatus == "REGISTERED")
+                    {
+                        attendance.AttendanceStatus = "ABSENT";
+                        _unitOfWork.Attendances.Update(attendance);
+                    }
+                }
+            }
+            else if (!terminalStatuses.Contains(eventEntity.Status)
                 && eventEntity.EndDate.HasValue
                 && eventEntity.EndDate.Value <= now)
             {

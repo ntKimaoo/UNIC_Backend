@@ -440,3 +440,4 @@ EmailTemplates/cache/
 *.migration.sql
 /sql-query
 /report
+/DataAccess/Migrations/20260502035341_AddEventOnlineFields.cs

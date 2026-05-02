@@ -18,6 +18,7 @@ namespace BusinessLogic.Services.Interface
         Task<EventMemberDto> AddEventMemberAsync(int eventId, AddEventMemberRequest request, Guid assignedBy);
         Task RemoveEventMemberAsync(int eventMemberId);
         Task UpdateEventMemberRoleAsync(int eventMemberId, int? eventRoleId);
+        Task SetEventMemberPoliciesAsync(int eventMemberId, List<string> policyNames);
 
         // EventRole management
         Task<IEnumerable<EventRoleDto>> GetEventRolesAsync(int eventId);

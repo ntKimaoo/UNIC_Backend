@@ -42,20 +42,39 @@ namespace DataAccess.Repositories.Implementation
                 .FirstOrDefaultAsync(e => e.EventId == eventId);
         }
 
-        public async Task<IEnumerable<Event>> GetAllAsync(int pageNumber = 1, int pageSize = 10)
+        public async Task<IEnumerable<Event>> GetAllAsync(int pageNumber = 1, int pageSize = 10, string? status = null, int? clubId = null)
         {
-            return await _context.Events
+            var query = _context.Events
                 .Include(e => e.Attendances)
                 .Include(e => e.EventSchedules)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(status))
+                query = query.Where(e => e.Status == status);
+
+            if (clubId.HasValue)
+                query = query.Where(e => e.ClubId == clubId.Value);
+
+            return await query
                 .OrderByDescending(e => e.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
         }
 
+        public async Task<int> GetTotalCountAsync(string? status = null, int? clubId = null)
+        {
+            var query = _context.Events.AsQueryable();
+            if (!string.IsNullOrEmpty(status))
+                query = query.Where(e => e.Status == status);
+            if (clubId.HasValue)
+                query = query.Where(e => e.ClubId == clubId.Value);
+            return await query.CountAsync();
+        }
+
         public async Task<IEnumerable<Event>> GetUpcomingEventsAsync()
         {
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
             return await _context.Events
                 .Where(e => e.StartDate > now && e.Status != "CANCELED")
                 .ToListAsync();
@@ -141,8 +160,8 @@ namespace DataAccess.Repositories.Implementation
         // Proactive batch status sync — called by Background Service
         public async Task<int> BulkSyncStatusAsync()
         {
-            var now = DateTime.Now;
-            var terminalStatuses = new[] { "ENDED", "CANCELED", "ONGOING", "COMPLETED" };
+            var now = DateTime.UtcNow;
+            var terminalStatuses = new[] { "ENDED", "CANCELED", "COMPLETED" };
             int total = 0;
 
             // Rule 1: REGISTRATION_OPEN + RegEndDate passed → REGISTRATION_CLOSED
@@ -153,7 +172,15 @@ namespace DataAccess.Repositories.Implementation
                 .ExecuteUpdateAsync(s =>
                     s.SetProperty(e => e.Status, "REGISTRATION_CLOSED"));
 
-            // Rule 2: Non-terminal + EndDate passed → ENDED
+            // Rule 2a: ONGOING + EndDate passed → COMPLETED
+            total += await _context.Events
+                .Where(e => e.Status == "ONGOING"
+                         && e.EndDate.HasValue
+                         && e.EndDate.Value <= now)
+                .ExecuteUpdateAsync(s =>
+                    s.SetProperty(e => e.Status, "COMPLETED"));
+
+            // Rule 2b: Non-terminal + EndDate passed → ENDED
             total += await _context.Events
                 .Where(e => !terminalStatuses.Contains(e.Status)
                          && e.EndDate.HasValue

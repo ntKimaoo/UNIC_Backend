@@ -220,7 +220,7 @@ namespace UNIC.Presentation.Controllers
         /// </summary>
         [HttpPost("{id}/add-attendees")]
         [RequireEventPolicy("approveattendance")]
-        public async Task<IActionResult> AddAttendees(int clubId, int id, [FromBody] List<Guid> userIds)
+        public async Task<IActionResult> AddAttendees(int clubId, int id, [FromBody] List<Guid> userIds, [FromQuery] bool force = false)
         {
             try
             {
@@ -228,11 +228,63 @@ namespace UNIC.Presentation.Controllers
                 if (existingEvent.ClubId != clubId)
                     return BadRequest(new { error = "Event does not belong to this club." });
 
-                var addedCount = await _attendanceService.AddAttendeesAsync(id, userIds);
+                var addedCount = await _attendanceService.AddAttendeesAsync(id, userIds, force);
                 return Ok(new { message = $"Đã thêm {addedCount} thành viên vào sự kiện.", addedCount });
+            }
+            catch (DomainException ex) when (ex.Message.StartsWith("CAPACITY_EXCEEDED|"))
+            {
+                var parts = ex.Message.Split('|');
+                return Conflict(new { 
+                    error = parts.Length > 1 ? parts[1] : ex.Message,
+                    code = "CAPACITY_EXCEEDED",
+                    suggestedMax = parts.Length > 2 ? int.Parse(parts[2]) : 0
+                });
             }
             catch (NotFoundException ex) { return NotFound(new { error = ex.Message }); }
             catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+        }
+        /// <summary>
+        /// Makeup check-in: manager điểm danh bù cho 1 user (event đã COMPLETED/ENDED, trong vòng 1 ngày)
+        /// </summary>
+        [HttpPost("{id}/makeup-checkin/{userId}")]
+        [RequireEventPolicy("checkin,approveattendance")]
+        public async Task<IActionResult> MakeupCheckIn(int clubId, int id, Guid userId)
+        {
+            try
+            {
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                if (existingEvent.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                var result = await _attendanceService.MakeupCheckInAsync(id, userId);
+                return Ok(result);
+            }
+            catch (NotFoundException ex) { return NotFound(new { error = ex.Message }); }
+            catch (DomainException ex) { return BadRequest(new { error = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
+        }
+
+        /// <summary>
+        /// Bulk makeup check-in: manager điểm danh bù nhiều user cùng lúc
+        /// </summary>
+        [HttpPost("{id}/makeup-checkin-bulk")]
+        [RequireEventPolicy("checkin,approveattendance")]
+        public async Task<IActionResult> BulkMakeupCheckIn(int clubId, int id, [FromBody] List<Guid> userIds)
+        {
+            try
+            {
+                if (userIds == null || userIds.Count == 0)
+                    return BadRequest(new { error = "Danh sách userId không được rỗng." });
+
+                var existingEvent = await _eventService.GetEventByIdAsync(id);
+                if (existingEvent.ClubId != clubId)
+                    return BadRequest(new { error = "Event does not belong to this club." });
+
+                var result = await _attendanceService.BulkMakeupCheckInAsync(id, userIds);
+                return Ok(result);
+            }
+            catch (DomainException ex) { return BadRequest(new { error = ex.Message }); }
+            catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
         }
     }
 }
