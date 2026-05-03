@@ -161,6 +161,7 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventReminderService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventStatusSyncService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.InterviewRoomActivationService>();
+builder.Services.AddHostedService<BusinessLogic.Services.Background.RecruitmentCampaignStatusSyncService>();
 
 // Unit of Work and Repositories
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IUnitOfWork, DataAccess.Repositories.Implementation.UnitOfWork>();

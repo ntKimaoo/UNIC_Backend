@@ -11,7 +11,8 @@ namespace BusinessLogic.Services.Background
     {
         private readonly ILogger<ClubRoleNotificationService> _logger;
         private readonly IServiceProvider _serviceProvider;
-        private readonly TimeSpan _checkInterval = TimeSpan.FromMinutes(5);
+        private readonly TimeSpan _checkInterval = TimeSpan.FromHours(24);
+        private readonly TimeSpan _cooldown = TimeSpan.FromDays(1);
 
         private const int MinRoleThreshold = 2;
 
@@ -78,6 +79,9 @@ namespace BusinessLogic.Services.Background
 
             foreach (var managerId in managerIds)
             {
+                var alreadySent = await notificationRepo.HasRecentNotificationAsync(managerId, RoleNotificationType, _cooldown);
+                if (alreadySent) continue;
+
                 await notificationService.SendNotificationAsync(
                     managerId, RoleNotificationTitle, RoleNotificationMessage, RoleNotificationType);
 
@@ -106,6 +110,9 @@ namespace BusinessLogic.Services.Background
 
             foreach (var managerId in managerIds)
             {
+                var alreadySent = await notificationRepo.HasRecentNotificationAsync(managerId, InfoNotificationType, _cooldown);
+                if (alreadySent) continue;
+
                 await notificationService.SendNotificationAsync(
                     managerId, InfoNotificationTitle, InfoNotificationMessage, InfoNotificationType);
 
