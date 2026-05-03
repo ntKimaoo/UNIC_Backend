@@ -57,5 +57,6 @@ namespace DataAccess.Models
         public virtual ICollection<Attendance> Attendances { get; set; }
         public virtual ICollection<UserEventRole> EventMembers { get; set; }
         public virtual ICollection<EventRole> EventRoles { get; set; }
+        public virtual ICollection<ClubPost> ClubPosts { get; set; }
     }
 }

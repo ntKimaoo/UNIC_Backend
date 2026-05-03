@@ -15,13 +15,14 @@ namespace BusinessLogic.DTOs
         public string Title { get; set; }
 
         public string? ImageUrl { get; set; }
-
         public string? Caption { get; set; }
-
         public string? Content { get; set; }
 
         [MaxLength(20)]
         public string? Status { get; set; }
+
+        public int? EventId { get; set; }
+        public int? CampaignId { get; set; }
     }
 
     public class UpdateClubPostDto
@@ -30,13 +31,14 @@ namespace BusinessLogic.DTOs
         public string? Title { get; set; }
 
         public string? ImageUrl { get; set; }
-
         public string? Caption { get; set; }
-
         public string? Content { get; set; }
 
         [MaxLength(20)]
         public string? Status { get; set; }
+
+        public int? EventId { get; set; }
+        public int? CampaignId { get; set; }
     }
 
     public class ClubPostResponseDto
@@ -53,5 +55,10 @@ namespace BusinessLogic.DTOs
         public DateTime PostDate { get; set; }
         public DateTime UpdatedAt { get; set; }
         public string Status { get; set; }
+        public bool IsDeleted { get; set; }
+        public int? EventId { get; set; }
+        public string? EventName { get; set; }
+        public int? CampaignId { get; set; }
+        public string? CampaignName { get; set; }
     }
 }

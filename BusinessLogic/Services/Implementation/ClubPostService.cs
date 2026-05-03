@@ -24,10 +24,7 @@ namespace BusinessLogic.Services.Implementation
         public async Task<ClubPostResponseDto?> GetByIdAsync(int postId)
         {
             var post = await _repository.GetByIdAsync(postId);
-            if (post == null)
-                return null;
-
-            return MapToResponseDto(post);
+            return post == null ? null : MapToResponseDto(post);
         }
 
         public async Task<IEnumerable<ClubPostResponseDto>> GetAllAsync()
@@ -48,124 +45,113 @@ namespace BusinessLogic.Services.Implementation
             return posts.Select(MapToResponseDto);
         }
 
+        public async Task<IEnumerable<ClubPostResponseDto>> GetByEventIdAsync(int eventId)
+        {
+            var posts = await _repository.GetByEventIdAsync(eventId);
+            return posts.Select(MapToResponseDto);
+        }
+
+        public async Task<IEnumerable<ClubPostResponseDto>> GetByCampaignIdAsync(int campaignId)
+        {
+            var posts = await _repository.GetByCampaignIdAsync(campaignId);
+            return posts.Select(MapToResponseDto);
+        }
+
         public async Task<ClubPostResponseDto> CreateAsync(CreateClubPostDto dto, IFormFile? imageFile)
         {
-            // Verify club exists
-            var clubs = await _repository.GetByClubIdAsync(dto.ClubId);
-            // This is a bit inefficient, but confirms existence if we don't have a direct Club existence check in repo
-            // Actually, I'll just rely on the DB. But to fix the null issue:
-
-            var status = "PUBLISHED";
-            if (imageFile != null)
-            {
-                status = "PENDING";
-            }
+            var status = imageFile != null ? "PENDING" : "PUBLISHED";
 
             var post = new ClubPost
             {
                 ClubId = dto.ClubId,
                 UserId = dto.UserId,
                 Title = dto.Title,
-                ImageUrl = dto.ImageUrl ?? "", 
+                ImageUrl = dto.ImageUrl ?? "",
                 Caption = dto.Caption ?? "",
                 Content = dto.Content ?? "",
                 Status = !string.IsNullOrEmpty(dto.Status) ? dto.Status : status,
+                EventId = dto.EventId,
+                CampaignId = dto.CampaignId,
                 PostDate = DateTime.Now,
                 UpdatedAt = DateTime.Now
             };
 
-            var createdPost = await _repository.CreateAsync(post);
-            
+            var created = await _repository.CreateAsync(post);
+
             if (imageFile != null)
             {
-                using (var ms = new MemoryStream())
+                using var ms = new MemoryStream();
+                await imageFile.CopyToAsync(ms);
+                ImageUploadQueueService.EnqueueTask(new ImageUploadTask
                 {
-                    await imageFile.CopyToAsync(ms);
-                    ImageUploadQueueService.EnqueueTask(new ImageUploadTask
-                    {
-                        PostId = createdPost.PostId,
-                        FileData = ms.ToArray(),
-                        FileName = imageFile.FileName,
-                        Folder = "clubposts"
-                    });
-                }
+                    PostId = created.PostId,
+                    FileData = ms.ToArray(),
+                    FileName = imageFile.FileName,
+                    Folder = "clubposts"
+                });
             }
 
-            // Reload to get navigation properties
-            var postWithNav = await _repository.GetByIdAsync(createdPost.PostId);
+            var postWithNav = await _repository.GetByIdAsync(created.PostId);
             return MapToResponseDto(postWithNav!);
         }
 
         public async Task<ClubPostResponseDto?> UpdateAsync(int postId, UpdateClubPostDto dto, IFormFile? imageFile)
         {
             var post = await _repository.GetByIdAsync(postId);
-            if (post == null)
-                return null;
+            if (post == null) return null;
 
-            // Update only provided fields
-            if (!string.IsNullOrEmpty(dto.Title))
-                post.Title = dto.Title;
-
-            if (dto.ImageUrl != null)
-                post.ImageUrl = dto.ImageUrl;
-
-            if (dto.Caption != null)
-                post.Caption = dto.Caption;
-
-            if (dto.Content != null)
-                post.Content = dto.Content;
-
-            if (!string.IsNullOrEmpty(dto.Status))
-                post.Status = dto.Status;
+            if (!string.IsNullOrEmpty(dto.Title))     post.Title = dto.Title;
+            if (dto.ImageUrl != null)                  post.ImageUrl = dto.ImageUrl;
+            if (dto.Caption != null)                   post.Caption = dto.Caption;
+            if (dto.Content != null)                   post.Content = dto.Content;
+            if (!string.IsNullOrEmpty(dto.Status))     post.Status = dto.Status;
+            if (dto.EventId.HasValue)                  post.EventId = dto.EventId;
+            if (dto.CampaignId.HasValue)               post.CampaignId = dto.CampaignId;
 
             post.UpdatedAt = DateTime.Now;
 
             if (imageFile != null)
             {
                 post.Status = "PENDING";
-                using (var ms = new MemoryStream())
+                using var ms = new MemoryStream();
+                await imageFile.CopyToAsync(ms);
+                ImageUploadQueueService.EnqueueTask(new ImageUploadTask
                 {
-                    await imageFile.CopyToAsync(ms);
-                    ImageUploadQueueService.EnqueueTask(new ImageUploadTask
-                    {
-                        PostId = post.PostId,
-                        FileData = ms.ToArray(),
-                        FileName = imageFile.FileName,
-                        Folder = "clubposts"
-                    });
-                }
+                    PostId = post.PostId,
+                    FileData = ms.ToArray(),
+                    FileName = imageFile.FileName,
+                    Folder = "clubposts"
+                });
             }
 
             var updated = await _repository.UpdateAsync(post);
-            if (!updated)
-                return null;
-
-            return MapToResponseDto(post);
+            return updated ? MapToResponseDto(post) : null;
         }
-
 
         public async Task<bool> DeleteAsync(int postId)
         {
             return await _repository.DeleteAsync(postId);
         }
 
-        private ClubPostResponseDto MapToResponseDto(ClubPost post)
+        private static ClubPostResponseDto MapToResponseDto(ClubPost post) => new()
         {
-            return new ClubPostResponseDto
-            {
-                PostId = post.PostId,
-                ClubId = post.ClubId,
-                ClubName = post.Club?.ClubName ?? "",
-                UserId = post.UserId,
-                UserName = post.User?.FullName,
-                Title = post.Title,
-                ImageUrl = post.ImageUrl,
-                Caption = post.Caption,
-                Content = post.Content,
-                PostDate = post.PostDate,
-                UpdatedAt = post.UpdatedAt,
-                Status = post.Status
-            };
-        }
+            PostId = post.PostId,
+            ClubId = post.ClubId,
+            ClubName = post.Club?.ClubName ?? "",
+            UserId = post.UserId,
+            UserName = post.User?.FullName,
+            Title = post.Title,
+            ImageUrl = post.ImageUrl,
+            Caption = post.Caption,
+            Content = post.Content,
+            PostDate = post.PostDate,
+            UpdatedAt = post.UpdatedAt,
+            Status = post.Status,
+            IsDeleted = post.IsDeleted,
+            EventId = post.EventId,
+            EventName = post.Event?.EventName,
+            CampaignId = post.CampaignId,
+            CampaignName = post.RecruitmentCampaign?.CampaignName
+        };
     }
 }

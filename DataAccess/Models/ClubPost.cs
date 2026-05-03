@@ -31,11 +31,21 @@ namespace DataAccess.Models
         [MaxLength(20)]
         public string Status { get; set; } = "PUBLISHED";
 
+        public int? EventId { get; set; }
+        public int? CampaignId { get; set; }
+        public bool IsDeleted { get; set; } = false;
+
         // Navigation Properties
         [ForeignKey("ClubId")]
         public virtual Club Club { get; set; }
 
         [ForeignKey("UserId")]
         public virtual User User { get; set; }
+
+        [ForeignKey("EventId")]
+        public virtual Event? Event { get; set; }
+
+        [ForeignKey("CampaignId")]
+        public virtual RecruitmentCampaign? RecruitmentCampaign { get; set; }
     }
 }

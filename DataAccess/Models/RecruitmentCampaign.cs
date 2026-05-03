@@ -36,5 +36,6 @@ namespace DataAccess.Models
         public virtual Club Club { get; set; }
 
         public virtual ICollection<ApplicationForm> ApplicationForms { get; set; }
+        public virtual ICollection<ClubPost> ClubPosts { get; set; }
     }
 }
