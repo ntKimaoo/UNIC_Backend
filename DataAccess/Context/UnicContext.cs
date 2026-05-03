@@ -234,6 +234,18 @@ public partial class UnicContext : DbContext
             .HasForeignKey(cp => cp.UserId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        modelBuilder.Entity<ClubPost>()
+            .HasOne(cp => cp.Event)
+            .WithMany(e => e.ClubPosts)
+            .HasForeignKey(cp => cp.EventId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ClubPost>()
+            .HasOne(cp => cp.RecruitmentCampaign)
+            .WithMany(rc => rc.ClubPosts)
+            .HasForeignKey(cp => cp.CampaignId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Notification - User
         modelBuilder.Entity<Notification>()
             .HasOne(n => n.User)

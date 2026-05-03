@@ -62,5 +62,7 @@ namespace DataAccess.Models
         public virtual ICollection<Attendance> Attendances { get; set; }
         public virtual ICollection<EventRole> EventRoles { get; set; } = new List<EventRole>();
         public virtual ICollection<EventMember> EventMembers { get; set; } = new List<EventMember>();
+        public virtual ICollection<ClubPost> ClubPosts { get; set; }
+
     }
 }

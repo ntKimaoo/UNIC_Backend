@@ -17,42 +17,43 @@ namespace DataAccess.Repositories.Implementation
             _context = context;
         }
 
-        public async Task<ClubPost?> GetByIdAsync(int postId)
-        {
-            return await _context.ClubPosts
+        private IQueryable<ClubPost> ActivePosts() =>
+            _context.ClubPosts
+                .Where(cp => !cp.IsDeleted)
                 .Include(cp => cp.Club)
                 .Include(cp => cp.User)
-                .FirstOrDefaultAsync(cp => cp.PostId == postId);
-        }
+                .Include(cp => cp.Event)
+                .Include(cp => cp.RecruitmentCampaign);
 
-        public async Task<IEnumerable<ClubPost>> GetAllAsync()
-        {
-            return await _context.ClubPosts
-                .Include(cp => cp.Club)
-                .Include(cp => cp.User)
-                .OrderByDescending(cp => cp.PostDate)
-                .ToListAsync();
-        }
+        public async Task<ClubPost?> GetByIdAsync(int postId) =>
+            await ActivePosts().FirstOrDefaultAsync(cp => cp.PostId == postId);
 
-        public async Task<IEnumerable<ClubPost>> GetByClubIdAsync(int clubId)
-        {
-            return await _context.ClubPosts
-                .Include(cp => cp.Club)
-                .Include(cp => cp.User)
+        public async Task<IEnumerable<ClubPost>> GetAllAsync() =>
+            await ActivePosts().OrderByDescending(cp => cp.PostDate).ToListAsync();
+
+        public async Task<IEnumerable<ClubPost>> GetByClubIdAsync(int clubId) =>
+            await ActivePosts()
                 .Where(cp => cp.ClubId == clubId)
                 .OrderByDescending(cp => cp.PostDate)
                 .ToListAsync();
-        }
 
-        public async Task<IEnumerable<ClubPost>> GetByUserIdAsync(Guid userId)
-        {
-            return await _context.ClubPosts
-                .Include(cp => cp.Club)
-                .Include(cp => cp.User)
+        public async Task<IEnumerable<ClubPost>> GetByUserIdAsync(Guid userId) =>
+            await ActivePosts()
                 .Where(cp => cp.UserId == userId)
                 .OrderByDescending(cp => cp.PostDate)
                 .ToListAsync();
-        }
+
+        public async Task<IEnumerable<ClubPost>> GetByEventIdAsync(int eventId) =>
+            await ActivePosts()
+                .Where(cp => cp.EventId == eventId)
+                .OrderByDescending(cp => cp.PostDate)
+                .ToListAsync();
+
+        public async Task<IEnumerable<ClubPost>> GetByCampaignIdAsync(int campaignId) =>
+            await ActivePosts()
+                .Where(cp => cp.CampaignId == campaignId)
+                .OrderByDescending(cp => cp.PostDate)
+                .ToListAsync();
 
         public async Task<ClubPost> CreateAsync(ClubPost post)
         {
@@ -79,11 +80,12 @@ namespace DataAccess.Repositories.Implementation
         {
             try
             {
-                var post = await GetByIdAsync(postId);
-                if (post == null)
+                var post = await _context.ClubPosts.FindAsync(postId);
+                if (post == null || post.IsDeleted)
                     return false;
 
-                _context.ClubPosts.Remove(post);
+                post.IsDeleted = true;
+                post.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
                 return true;
             }
@@ -93,10 +95,7 @@ namespace DataAccess.Repositories.Implementation
             }
         }
 
-        public async Task<bool> ExistsAsync(int postId)
-        {
-            return await _context.ClubPosts
-                .AnyAsync(cp => cp.PostId == postId);
-        }
+        public async Task<bool> ExistsAsync(int postId) =>
+            await _context.ClubPosts.AnyAsync(cp => cp.PostId == postId && !cp.IsDeleted);
     }
 }

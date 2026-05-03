@@ -22,7 +22,7 @@ namespace UNIC.Presentation.Controllers
     /// </summary>
     [ApiController]
     [Route("api/club/{clubId}/events")]
-    [Authorize]
+    //[Authorize]
     public class ClubEventsController : ControllerBase
     {
         private readonly IEventService _eventService;
@@ -80,6 +80,8 @@ namespace UNIC.Presentation.Controllers
         {
             try
             {
+                if (!IsClubManager(clubId))
+                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions for this club." });
 
                 // Override ClubId from route
                 request.ClubId = clubId;
