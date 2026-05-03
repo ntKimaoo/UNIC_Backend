@@ -68,6 +68,16 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
+        /// Lấy số lượng thành viên ACTIVE của club
+        /// </summary>
+        [HttpGet("api/clubs/{clubId}/members/count")]
+        public async Task<IActionResult> GetMemberCount(int clubId)
+        {
+            var count = await _service.CountMembersAsync(clubId);
+            return Ok(new { success = true, data = count });
+        }
+
+        /// <summary>
         /// Lấy thông tin một member theo ID
         /// </summary>
         [HttpGet("api/clubs/{clubId}/members/{memberId}")]
@@ -366,6 +376,37 @@ namespace Presentation.Controllers
             if (departments == null)
                 return NotFound(new { success = false, message = "Member not found in this club" });
             return Ok(new { success = true, data = departments });
+        }
+
+        /// <summary>
+        /// Chuyển giao quyền Club Manager sang thành viên khác (atomic)
+        /// PUT /api/clubs/{clubId}/transfer
+        /// Body: { "newManagerMemberId": 123 }
+        /// </summary>
+        [HttpPut("api/clubs/{clubId}/transfer")]
+        public async Task<IActionResult> TransferClub(int clubId, [FromBody] TransferClubDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
+
+            try
+            {
+                var transferredBy = GetCurrentUserId();
+                await _service.TransferClubAsync(clubId, dto.NewManagerMemberId, transferredBy);
+                return Ok(new { success = true, message = "Chuyển giao câu lạc bộ thành công." });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { success = false, message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+            }
         }
 
         /// <summary>

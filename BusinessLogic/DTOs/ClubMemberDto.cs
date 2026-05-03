@@ -98,4 +98,10 @@ namespace BusinessLogic.DTOs
         public int Level { get; set; }
         public DateTime AssignedAt { get; set; }
     }
+
+    public class TransferClubDto
+    {
+        [Required]
+        public int NewManagerMemberId { get; set; }
+    }
 }

@@ -13,5 +13,7 @@ namespace DataAccess.Repositories.Interface
         Task<bool> UpdateAsync(RecruitmentCampaign campaign);
         Task<bool> DeleteAsync(int campaignId);
         Task<bool> ExistsAsync(int campaignId);
+        Task<int> BulkCloseExpiredAsync();
+        Task<bool> HasOverlappingCampaignAsync(int clubId, DateTime startDate, DateTime endDate, int? excludeCampaignId = null);
     }
 }

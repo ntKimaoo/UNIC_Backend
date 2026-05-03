@@ -34,7 +34,7 @@ namespace UNIC.Presentation.Controllers
         /// Approve a pending registration
         /// </summary>
         [HttpPost("{id}/approve/{userId}")]
-        //[RequireEventPolicy("approveattendance")]
+        [RequireEventPolicy("approveattendance")]
         public async Task<IActionResult> ApproveRegistration(int clubId, int id, Guid userId)
         {
             try
@@ -53,7 +53,7 @@ namespace UNIC.Presentation.Controllers
         /// Reject a pending registration
         /// </summary>
         [HttpPost("{id}/reject/{userId}")]
-        //[RequireEventPolicy("approveattendance")]
+        [RequireEventPolicy("approveattendance")]
         public async Task<IActionResult> RejectRegistration(int clubId, int id, Guid userId)
         {
             try
@@ -72,7 +72,7 @@ namespace UNIC.Presentation.Controllers
         /// Bulk approve multiple pending registrations
         /// </summary>
         [HttpPost("{id}/approve-bulk")]
-        //[RequireEventPolicy("approveattendance")]
+        [RequireEventPolicy("approveattendance")]
         public async Task<IActionResult> BulkApproveRegistrations(int clubId, int id, [FromBody] List<Guid> userIds)
         {
             try
@@ -94,7 +94,7 @@ namespace UNIC.Presentation.Controllers
         /// Generate check-in code for an event
         /// </summary>
         [HttpPost("{id}/checkin-code")]
-        //[RequireEventPolicy("checkin")]
+        [RequireEventPolicy("checkin")]
         public async Task<ActionResult<CheckInCodeResponse>> GenerateCheckInCode(int clubId, int id)
         {
             try
@@ -114,7 +114,7 @@ namespace UNIC.Presentation.Controllers
         /// Check in a participant by scanning their QR code
         /// </summary>
         [HttpPost("{id}/checkin-qr")]
-        //[RequireEventPolicy("checkin")]
+        [RequireEventPolicy("checkin")]
         public async Task<ActionResult<CheckInByQrResponse>> CheckInByQr(int clubId, int id, [FromBody] CheckInByQrRequest request)
         {
             try

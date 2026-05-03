@@ -12,9 +12,10 @@ namespace BusinessLogic.Services.Interface
         Task<IEnumerable<ClubPostResponseDto>> GetAllAsync();
         Task<IEnumerable<ClubPostResponseDto>> GetByClubIdAsync(int clubId);
         Task<IEnumerable<ClubPostResponseDto>> GetByUserIdAsync(Guid userId);
+        Task<IEnumerable<ClubPostResponseDto>> GetByEventIdAsync(int eventId);
+        Task<IEnumerable<ClubPostResponseDto>> GetByCampaignIdAsync(int campaignId);
         Task<ClubPostResponseDto> CreateAsync(CreateClubPostDto dto, IFormFile? imageFile);
         Task<ClubPostResponseDto?> UpdateAsync(int postId, UpdateClubPostDto dto, IFormFile? imageFile);
         Task<bool> DeleteAsync(int postId);
     }
 }
-

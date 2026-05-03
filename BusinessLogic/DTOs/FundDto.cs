@@ -109,6 +109,10 @@ namespace BusinessLogic.DTOs
     public class ContributeResponseDto
     {
         public int TransactionId { get; set; }
+
+        /// <summary>Mã đơn gửi lên cổng thanh toán (dùng cho return URL / webhook), khác <see cref="TransactionId"/>.</summary>
+        public long ExternalOrderCode { get; set; }
+
         public string CheckoutUrl { get; set; } = string.Empty;
         public string QrCode { get; set; } = string.Empty;
         public string? PaymentLinkId { get; set; }
@@ -121,6 +125,10 @@ namespace BusinessLogic.DTOs
     {
         public int ClubId { get; set; }
         public int TransactionId { get; set; }
+
+        /// <summary>Có khi giao dịch tạo qua cổng online; null với dữ liệu cũ trước khi có cột.</summary>
+        public long? ExternalOrderCode { get; set; }
+
         public int FundId { get; set; }
         public string Status { get; set; } = string.Empty;
         public decimal Amount { get; set; }

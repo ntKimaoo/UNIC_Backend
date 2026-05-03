@@ -188,6 +188,21 @@ namespace BusinessLogic.Services.Implementation
             if (schedule.EventId != request.EventId)
                 throw new DomainException("Phiên không thuộc sự kiện này.");
 
+            // Validate session time is within event time (only for 'main' type)
+            var sessionType = (request.SessionType ?? schedule.SessionType ?? "main").ToLower();
+            if (sessionType == "main")
+            {
+                var eventEntity = await _unitOfWork.Events.GetByIdAsync(request.EventId);
+                if (eventEntity != null)
+                {
+                    if (eventEntity.StartDate.HasValue && request.StartTime < eventEntity.StartDate.Value)
+                        throw new DomainException("Session start time cannot be before event start date");
+
+                    if (eventEntity.EndDate.HasValue && request.EndTime > eventEntity.EndDate.Value)
+                        throw new DomainException("Session end time cannot be after event end date");
+                }
+            }
+
             schedule.ScheduleName = request.SessionName;
             schedule.StartTime    = request.StartTime;
             schedule.EndTime      = request.EndTime;

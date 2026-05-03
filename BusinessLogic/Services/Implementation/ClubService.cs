@@ -28,7 +28,8 @@ namespace BusinessLogic.Services.Implementation
             if (club == null)
                 return null;
 
-            return MapToResponseDto(club);
+            var memberCount = await _repository.CountMemberAsync(clubId);
+            return MapToResponseDto(club, memberCount);
         }
 
         public async Task<IEnumerable<ClubResponseDto>> GetAllAsync()
@@ -116,7 +117,8 @@ namespace BusinessLogic.Services.Implementation
 
             club.FoundedDate = dto.FoundedDate;
 
-            club.Status = dto.Status;
+            if (dto.Status != null)
+                club.Status = dto.Status;
             if (dto.IsPublic.HasValue)
                 club.IsPublic = dto.IsPublic.Value;
 
@@ -158,7 +160,7 @@ namespace BusinessLogic.Services.Implementation
         {
             await _repository.ChangeStatusClub(clubId);
         }
-        private ClubResponseDto MapToResponseDto(Club club)
+        private ClubResponseDto MapToResponseDto(Club club, int memberCount = 0)
         {
             return new ClubResponseDto
             {
@@ -179,7 +181,8 @@ namespace BusinessLogic.Services.Implementation
                 CreatedAt = club.CreatedAt,
                 UpdatedAt = club.UpdatedAt,
                 IsActive = club.IsActive,
-                IsDeleted = club.IsDeleted
+                IsDeleted = club.IsDeleted,
+                MemberCount = memberCount
             };
         }
         public async Task<bool> isDeleted(int clubId)

@@ -234,6 +234,18 @@ public partial class UnicContext : DbContext
             .HasForeignKey(cp => cp.UserId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        modelBuilder.Entity<ClubPost>()
+            .HasOne(cp => cp.Event)
+            .WithMany(e => e.ClubPosts)
+            .HasForeignKey(cp => cp.EventId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ClubPost>()
+            .HasOne(cp => cp.RecruitmentCampaign)
+            .WithMany(rc => rc.ClubPosts)
+            .HasForeignKey(cp => cp.CampaignId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Notification - User
         modelBuilder.Entity<Notification>()
             .HasOne(n => n.User)
@@ -399,6 +411,11 @@ public partial class UnicContext : DbContext
             .WithMany()
             .HasForeignKey(ft => ft.RefundForTransactionId)
             .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<FundTransaction>()
+            .HasIndex(e => e.ExternalOrderCode)
+            .IsUnique()
+            .HasFilter("[ExternalOrderCode] IS NOT NULL");
 
         modelBuilder.Entity<FundRefundRequest>()
             .HasOne(r => r.OriginalTransaction)

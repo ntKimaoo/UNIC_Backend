@@ -4,16 +4,19 @@ using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    partial class UnicContextModelSnapshot : ModelSnapshot
+    [Migration("20260503045332_update-post")]
+    partial class updatepost
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -981,9 +984,6 @@ namespace UNIC.DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<long?>("ExternalOrderCode")
-                        .HasColumnType("bigint");
-
                     b.Property<int>("FundId")
                         .HasColumnType("int");
 
@@ -1022,10 +1022,6 @@ namespace UNIC.DataAccess.Migrations
                     b.HasIndex("CategoryId");
 
                     b.HasIndex("CreatedBy");
-
-                    b.HasIndex("ExternalOrderCode")
-                        .IsUnique()
-                        .HasFilter("[ExternalOrderCode] IS NOT NULL");
 
                     b.HasIndex("FundId");
 

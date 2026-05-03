@@ -4,16 +4,19 @@ using DataAccess.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace UNIC.DataAccess.Migrations
+namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    partial class UnicContextModelSnapshot : ModelSnapshot
+    [Migration("20260503031956_AddFundTransactionExternalOrderCode")]
+    partial class AddFundTransactionExternalOrderCode
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -210,6 +213,7 @@ namespace UNIC.DataAccess.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubId"));
 
                     b.Property<string>("Address")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ClubName")
@@ -218,18 +222,22 @@ namespace UNIC.DataAccess.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("CoverImageUrl")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Description")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Email")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FacebookUrl")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("FoundedDate")
@@ -245,12 +253,15 @@ namespace UNIC.DataAccess.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("LogoUrl")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PhoneNumber")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ShortName")
+                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
@@ -263,6 +274,7 @@ namespace UNIC.DataAccess.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("WebsiteUrl")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("ClubId");
@@ -399,9 +411,6 @@ namespace UNIC.DataAccess.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PostId"));
 
-                    b.Property<int?>("CampaignId")
-                        .HasColumnType("int");
-
                     b.Property<string>("Caption")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -413,15 +422,9 @@ namespace UNIC.DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("EventId")
-                        .HasColumnType("int");
-
                     b.Property<string>("ImageUrl")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
 
                     b.Property<DateTime>("PostDate")
                         .HasColumnType("datetime2");
@@ -444,11 +447,7 @@ namespace UNIC.DataAccess.Migrations
 
                     b.HasKey("PostId");
 
-                    b.HasIndex("CampaignId");
-
                     b.HasIndex("ClubId");
-
-                    b.HasIndex("EventId");
 
                     b.HasIndex("PostDate");
 
@@ -1777,21 +1776,11 @@ namespace UNIC.DataAccess.Migrations
 
             modelBuilder.Entity("DataAccess.Models.ClubPost", b =>
                 {
-                    b.HasOne("DataAccess.Models.RecruitmentCampaign", "RecruitmentCampaign")
-                        .WithMany("ClubPosts")
-                        .HasForeignKey("CampaignId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("DataAccess.Models.Club", "Club")
                         .WithMany("ClubPosts")
                         .HasForeignKey("ClubId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
-
-                    b.HasOne("DataAccess.Models.Event", "Event")
-                        .WithMany("ClubPosts")
-                        .HasForeignKey("EventId")
-                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("DataAccess.Models.User", "User")
                         .WithMany("ClubPosts")
@@ -1799,10 +1788,6 @@ namespace UNIC.DataAccess.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Club");
-
-                    b.Navigation("Event");
-
-                    b.Navigation("RecruitmentCampaign");
 
                     b.Navigation("User");
                 });
@@ -2318,8 +2303,6 @@ namespace UNIC.DataAccess.Migrations
                 {
                     b.Navigation("Attendances");
 
-                    b.Navigation("ClubPosts");
-
                     b.Navigation("EventBudgets");
 
                     b.Navigation("EventImages");
@@ -2356,8 +2339,6 @@ namespace UNIC.DataAccess.Migrations
             modelBuilder.Entity("DataAccess.Models.RecruitmentCampaign", b =>
                 {
                     b.Navigation("ApplicationForms");
-
-                    b.Navigation("ClubPosts");
                 });
 
             modelBuilder.Entity("DataAccess.Models.User", b =>
