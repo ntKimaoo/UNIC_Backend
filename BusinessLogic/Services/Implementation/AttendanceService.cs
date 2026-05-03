@@ -249,6 +249,13 @@ namespace BusinessLogic.Services.Implementation
                 };
             }
 
+            // Only REGISTERED can check in
+            if (attendance.AttendanceStatus != nameof(AttendanceStatus.REGISTERED))
+            {
+                throw new DomainException(
+                    $"Không thể điểm danh. Trạng thái hiện tại: {attendance.AttendanceStatus}. Chỉ người đã REGISTERED mới được điểm danh.");
+            }
+
             // Update attendance status
             attendance.AttendanceStatus = nameof(AttendanceStatus.PRESENT);
             attendance.CheckInTime = VnTimeHelper.Now;
@@ -301,6 +308,12 @@ namespace BusinessLogic.Services.Implementation
                                 || attendance.AttendanceStatus == nameof(AttendanceStatus.CHECKED_IN);
             if (!alreadyCheckedIn)
             {
+                // Only REGISTERED can check in
+                if (attendance.AttendanceStatus != nameof(AttendanceStatus.REGISTERED))
+                {
+                    throw new DomainException(
+                        $"Không thể điểm danh. Trạng thái hiện tại: {attendance.AttendanceStatus}. Chỉ người đã REGISTERED mới được điểm danh.");
+                }
                 attendance.AttendanceStatus = nameof(AttendanceStatus.PRESENT);
                 attendance.CheckInTime = VnTimeHelper.Now;
                 _unitOfWork.Attendances.Update(attendance);
