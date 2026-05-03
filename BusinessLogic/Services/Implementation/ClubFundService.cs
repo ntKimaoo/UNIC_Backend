@@ -181,9 +181,14 @@ namespace BusinessLogic.Services.Implementation
                 var gateway = _paymentGatewayRegistry.Get(providerCode);
                 gateway.ValidateForCreatingPaymentLink(settingsForGateway);
 
+                var externalOrderCode = BuildExternalOrderCodeForContribution(transaction.TransactionId);
+                transaction.ExternalOrderCode = externalOrderCode;
+                transaction.UpdatedAt = DateTime.UtcNow;
+                await _fundRepository.UpdateTransactionAsync(transaction);
+
                 var payResult = await gateway.CreatePaymentLinkAsync(
                     settingsForGateway,
-                    transaction.TransactionId,
+                    externalOrderCode,
                     transaction.Amount,
                     transaction.Description ?? "Nộp quỹ",
                     cancellationToken);
@@ -197,6 +202,7 @@ namespace BusinessLogic.Services.Implementation
                 return new ContributeResponseDto
                 {
                     TransactionId = transaction.TransactionId,
+                    ExternalOrderCode = externalOrderCode,
                     CheckoutUrl = payResult.CheckoutUrl,
                     QrCode = payResult.QrCode,
                     PaymentLinkId = payResult.ExternalPaymentId,
@@ -225,9 +231,9 @@ namespace BusinessLogic.Services.Implementation
             return MapContributionPaymentStatus(t);
         }
 
-        public async Task<ContributionPaymentStatusDto?> GetContributionPaymentStatusByOrderCodeAsync(Guid userId, int orderCode)
+        public async Task<ContributionPaymentStatusDto?> GetContributionPaymentStatusByOrderCodeAsync(Guid userId, long externalOrLegacyOrderCode)
         {
-            var t = await _fundRepository.GetTransactionByIdAsync(orderCode);
+            var t = await _fundRepository.GetTransactionForExternalCheckoutCompletionAsync(externalOrLegacyOrderCode);
             if (t == null || !t.IsMemberContribution || !string.Equals(t.TransactionType, TYPE_INCOME, StringComparison.OrdinalIgnoreCase))
                 return null;
             if (t.CreatedBy != userId)
@@ -260,6 +266,7 @@ namespace BusinessLogic.Services.Implementation
             {
                 ClubId = t.ClubFund!.ClubId,
                 TransactionId = t.TransactionId,
+                ExternalOrderCode = t.ExternalOrderCode,
                 FundId = t.FundId,
                 Status = status,
                 Amount = t.Amount,
@@ -268,6 +275,18 @@ namespace BusinessLogic.Services.Implementation
                 PaymentLinkExpiresAtUtc = expiresAtUtc,
                 Message = message
             };
+        }
+
+        /// <summary>Mã đơn duy nhất cho cổng thanh toán (tránh trùng với đơn cũ trên PayOS khi TransactionId nhỏ / DB từng xóa giao dịch tạm).</summary>
+        private static long BuildExternalOrderCodeForContribution(int transactionId)
+        {
+            if (transactionId <= 0)
+                throw new InvalidOperationException("Giao dịch chưa có TransactionId hợp lệ.");
+            var ms = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            unchecked
+            {
+                return (ms * 8192L) + transactionId;
+            }
         }
 
         public async Task<FundResponseDto?> GetFundByIdAsync(
@@ -709,9 +728,12 @@ namespace BusinessLogic.Services.Implementation
             return member?.RoleAssignments?.Any(ra => ra.ClubRole?.Level == 0) ?? false;
         }
 
-        public async Task<bool> ProcessPayOSPaymentSuccessAsync(int orderCode)
+        public async Task<bool> ProcessPayOSPaymentSuccessAsync(long externalOrLegacyOrderCode)
         {
-            return await _fundRepository.TryApproveMemberContributionAsync(orderCode);
+            var tx = await _fundRepository.GetTransactionForExternalCheckoutCompletionAsync(externalOrLegacyOrderCode);
+            if (tx == null)
+                return false;
+            return await _fundRepository.TryApproveMemberContributionAsync(tx.TransactionId);
         }
 
         public async Task<bool> TryCompleteOwnPendingContributionForDevelopmentAsync(Guid userId, int clubId, int transactionId)
@@ -726,7 +748,7 @@ namespace BusinessLogic.Services.Implementation
             if (!transaction.IsMemberContribution || !string.Equals(transaction.TransactionType, TYPE_INCOME, StringComparison.OrdinalIgnoreCase) || transaction.Status != STATUS_PENDING)
                 return false;
 
-            return await ProcessPayOSPaymentSuccessAsync(transactionId);
+            return await _fundRepository.TryApproveMemberContributionAsync(transactionId);
         }
 
         public async Task<bool> ApproveFundAsync(Guid managerId, ApproveFundDto dto)

@@ -400,6 +400,11 @@ public partial class UnicContext : DbContext
             .HasForeignKey(ft => ft.RefundForTransactionId)
             .OnDelete(DeleteBehavior.NoAction);
 
+        modelBuilder.Entity<FundTransaction>()
+            .HasIndex(e => e.ExternalOrderCode)
+            .IsUnique()
+            .HasFilter("[ExternalOrderCode] IS NOT NULL");
+
         modelBuilder.Entity<FundRefundRequest>()
             .HasOne(r => r.OriginalTransaction)
             .WithMany()

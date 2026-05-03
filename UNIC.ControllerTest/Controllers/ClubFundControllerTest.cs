@@ -1013,7 +1013,7 @@ namespace UNIC.ControllerTest.Controllers
             var result = await _controller.PayOSWebhookClubScoped(CancellationToken.None);
 
             Assert.IsType<OkObjectResult>(result);
-            _fundService.Verify(s => s.ProcessPayOSPaymentSuccessAsync(It.IsAny<int>()), Times.Never);
+            _fundService.Verify(s => s.ProcessPayOSPaymentSuccessAsync(It.IsAny<long>()), Times.Never);
         }
 
         [Fact]
@@ -1030,7 +1030,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task PayOSWebhook_ReturnsBadRequest_WhenSignatureInvalid()
         {
             SetJsonBody("{\"code\":\"00\",\"success\":true,\"data\":{\"orderCode\":5},\"signature\":\"sig\"}");
-            _fundRepository.Setup(r => r.GetTransactionByIdAsync(5)).ReturnsAsync(new FundTransaction
+            _fundRepository.Setup(r => r.GetTransactionForExternalCheckoutCompletionAsync(5)).ReturnsAsync(new FundTransaction
             {
                 TransactionId = 5,
                 PaymentProvider = PaymentGatewayProviderCodes.PayOS,
@@ -1054,7 +1054,7 @@ namespace UNIC.ControllerTest.Controllers
         public async Task PayOSWebhook_ReturnsOk_WhenProcessed()
         {
             SetJsonBody("{\"code\":\"00\",\"success\":true,\"data\":{\"orderCode\":5},\"signature\":\"good\"}");
-            _fundRepository.Setup(r => r.GetTransactionByIdAsync(5)).ReturnsAsync(new FundTransaction
+            _fundRepository.Setup(r => r.GetTransactionForExternalCheckoutCompletionAsync(5)).ReturnsAsync(new FundTransaction
             {
                 TransactionId = 5,
                 PaymentProvider = PaymentGatewayProviderCodes.PayOS,
@@ -1068,12 +1068,12 @@ namespace UNIC.ControllerTest.Controllers
                 IsEnabled = true
             });
             _fundPaymentGateway.Setup(g => g.VerifyWebhookSignature(It.IsAny<ClubPayOSSettings>(), "good", It.IsAny<System.Text.Json.JsonElement>())).Returns(true);
-            _fundService.Setup(s => s.ProcessPayOSPaymentSuccessAsync(5)).ReturnsAsync(true);
+            _fundService.Setup(s => s.ProcessPayOSPaymentSuccessAsync(5L)).ReturnsAsync(true);
 
             var result = await _controller.PayOSWebhookClubScoped(CancellationToken.None);
 
             Assert.IsType<OkObjectResult>(result);
-            _fundService.Verify(s => s.ProcessPayOSPaymentSuccessAsync(5), Times.Once);
+            _fundService.Verify(s => s.ProcessPayOSPaymentSuccessAsync(5L), Times.Once);
         }
 
         [Fact]
@@ -1084,7 +1084,7 @@ namespace UNIC.ControllerTest.Controllers
             var result = await _controller.PayOSWebhook(CancellationToken.None);
 
             Assert.IsType<BadRequestObjectResult>(result);
-            _fundService.Verify(s => s.ProcessPayOSPaymentSuccessAsync(It.IsAny<int>()), Times.Never);
+            _fundService.Verify(s => s.ProcessPayOSPaymentSuccessAsync(It.IsAny<long>()), Times.Never);
         }
 
         [Fact]
@@ -1106,14 +1106,14 @@ namespace UNIC.ControllerTest.Controllers
             var result = await _controller.PayOSWebhookClubScoped(CancellationToken.None);
 
             Assert.IsType<OkObjectResult>(result);
-            _fundService.Verify(s => s.ProcessPayOSPaymentSuccessAsync(It.IsAny<int>()), Times.Never);
+            _fundService.Verify(s => s.ProcessPayOSPaymentSuccessAsync(It.IsAny<long>()), Times.Never);
         }
 
         [Fact]
         public async Task PayOSWebhook_ReturnsBadRequest_WhenSignatureJsonNull()
         {
             SetJsonBody("{\"code\":\"00\",\"success\":true,\"data\":{\"orderCode\":1},\"signature\":null}");
-            _fundRepository.Setup(r => r.GetTransactionByIdAsync(1)).ReturnsAsync(new FundTransaction
+            _fundRepository.Setup(r => r.GetTransactionForExternalCheckoutCompletionAsync(1)).ReturnsAsync(new FundTransaction
             {
                 TransactionId = 1,
                 PaymentProvider = PaymentGatewayProviderCodes.PayOS,
