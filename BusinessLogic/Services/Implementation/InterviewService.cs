@@ -157,26 +157,6 @@ namespace BusinessLogic.Services.Implementation
                 schedule.ScheduledAt = dto.ScheduledAt.Value;
             }
 
-            // Đồng bộ trạng thái phòng khi thông tin lịch thay đổi
-            var room = await _repo.GetRoomByScheduleIdAsync(id);
-            if (room != null)
-            {
-                if (schedule.Status == InterviewStatus.Completed || schedule.Status == InterviewStatus.Cancelled)
-                {
-                    await CloseRoomAsync(room.RoomCode);
-                }
-                else if (schedule.Status == InterviewStatus.InProgress)
-                {
-                    await OpenRoomAsync(room.RoomCode);
-                }
-                else if (schedule.Status == InterviewStatus.Confirmed && schedule.ScheduledAt.HasValue)
-                {
-                    room.StartedAt = schedule.ScheduledAt.Value;
-                    room.EndedAt = schedule.ScheduledAt.Value.AddMinutes(schedule.DurationMinutes);
-                    await _repo.UpdateRoomAsync(room);
-                }
-            }
-
             schedule.UpdatedAt = DateTime.UtcNow;
 
             var ok = await _repo.UpdateScheduleAsync(schedule);
@@ -229,12 +209,29 @@ namespace BusinessLogic.Services.Implementation
                 default:
                     throw new ArgumentException($"Không hỗ trợ chuyển trạng thái sang: {dto.Status}");
             }
-
             schedule.Status = newStatus;
             schedule.UpdatedAt = DateTime.UtcNow;
-
             var updated = await _repo.UpdateScheduleAsync(schedule);
-
+            // Đồng bộ trạng thái phòng khi thông tin lịch thay đổi
+            var room = await _repo.GetRoomByScheduleIdAsync(id);
+            if (room != null)
+            {
+                if (schedule.Status == InterviewStatus.Completed || schedule.Status == InterviewStatus.Cancelled)
+                {
+                    await CloseRoomAsync(room.RoomCode);
+                }
+                else if (schedule.Status == InterviewStatus.InProgress)
+                {
+                    await OpenRoomAsync(room.RoomCode);
+                }
+                else if (schedule.Status == InterviewStatus.Confirmed && schedule.ScheduledAt.HasValue)
+                {
+                    room.StartedAt = schedule.ScheduledAt.Value;
+                    room.EndedAt = schedule.ScheduledAt.Value.AddMinutes(schedule.DurationMinutes);
+                    await _repo.UpdateRoomAsync(room);
+                }
+            }
+            
             // Gửi email thông báo thay đổi trạng thái cho ứng viên
             if (updated)
             {
