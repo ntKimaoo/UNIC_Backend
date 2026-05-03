@@ -21,7 +21,7 @@ namespace Presentation.Controllers
         /// <summary>
         /// Get all recruitment campaigns (all clubs)
         /// </summary>
-        [HttpGet("[controller]")]
+        [HttpGet("api/[controller]")]
         public async Task<IActionResult> GetAll()
         {
             var campaigns = await _service.GetAllAsync();
