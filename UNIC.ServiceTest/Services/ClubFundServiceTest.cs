@@ -319,7 +319,7 @@ namespace UNIC.ServiceTest.Services
                 .Callback<FundTransaction>(t => t.TransactionId = 100)
                 .Returns(Task.CompletedTask);
 
-            _payOS.Setup(p => p.CreatePaymentLinkAsync(It.IsAny<PayOSMerchantCredential>(), 100, 10_000m, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            _payOS.Setup(p => p.CreatePaymentLinkAsync(It.IsAny<PayOSMerchantCredential>(), It.IsAny<long>(), 10_000m, It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new PayOSPaymentLinkResult
                 {
                     CheckoutUrl = "https://pay.test",
@@ -337,9 +337,10 @@ namespace UNIC.ServiceTest.Services
             }, CancellationToken.None);
 
             Assert.Equal(100, result.TransactionId);
+            Assert.True(result.ExternalOrderCode > 0);
             Assert.Equal("https://pay.test", result.CheckoutUrl);
             Assert.Equal("pl_1", result.PaymentLinkId);
-            _payOS.Verify(p => p.CreatePaymentLinkAsync(It.IsAny<PayOSMerchantCredential>(), 100, 10_000m, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+            _payOS.Verify(p => p.CreatePaymentLinkAsync(It.IsAny<PayOSMerchantCredential>(), It.IsAny<long>(), 10_000m, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
@@ -425,7 +426,7 @@ namespace UNIC.ServiceTest.Services
             _fundRepo.Setup(r => r.AddTransactionAsync(It.IsAny<FundTransaction>()))
                 .Callback<FundTransaction>(t => t.TransactionId = 200)
                 .Returns(Task.CompletedTask);
-            _payOS.Setup(p => p.CreatePaymentLinkAsync(It.IsAny<PayOSMerchantCredential>(), 200, 10_000m, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            _payOS.Setup(p => p.CreatePaymentLinkAsync(It.IsAny<PayOSMerchantCredential>(), It.IsAny<long>(), 10_000m, It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new PayOSPaymentLinkResult { CheckoutUrl = "u", QrCode = "q", PaymentLinkId = "p" });
             _fundRepo.Setup(r => r.UpdateTransactionAsync(It.IsAny<FundTransaction>())).Returns(Task.CompletedTask);
 
@@ -463,7 +464,8 @@ namespace UNIC.ServiceTest.Services
             _fundRepo.Setup(r => r.AddTransactionAsync(It.IsAny<FundTransaction>()))
                 .Callback<FundTransaction>(t => t.TransactionId = 300)
                 .Returns(Task.CompletedTask);
-            _payOS.Setup(p => p.CreatePaymentLinkAsync(It.IsAny<PayOSMerchantCredential>(), 300, It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            _fundRepo.Setup(r => r.UpdateTransactionAsync(It.IsAny<FundTransaction>())).Returns(Task.CompletedTask);
+            _payOS.Setup(p => p.CreatePaymentLinkAsync(It.IsAny<PayOSMerchantCredential>(), It.IsAny<long>(), It.IsAny<decimal>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new InvalidOperationException("payos down"));
 
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -536,7 +538,7 @@ namespace UNIC.ServiceTest.Services
                 TransactionDate = DateTime.UtcNow,
                 ClubFund = new ClubFund { ClubId = 3 }
             };
-            _fundRepo.Setup(r => r.GetTransactionByIdAsync(7)).ReturnsAsync(t);
+            _fundRepo.Setup(r => r.GetTransactionForExternalCheckoutCompletionAsync(7)).ReturnsAsync(t);
 
             var dto = await _service.GetContributionPaymentStatusByOrderCodeAsync(uid, 7);
             Assert.NotNull(dto);
@@ -547,7 +549,7 @@ namespace UNIC.ServiceTest.Services
         [Fact]
         public async Task GetContributionPaymentStatusByOrderCodeAsync_ShouldReturnNull_WhenTransactionMissing()
         {
-            _fundRepo.Setup(r => r.GetTransactionByIdAsync(404)).ReturnsAsync((FundTransaction?)null);
+            _fundRepo.Setup(r => r.GetTransactionForExternalCheckoutCompletionAsync(404)).ReturnsAsync((FundTransaction?)null);
             Assert.Null(await _service.GetContributionPaymentStatusByOrderCodeAsync(Guid.NewGuid(), 404));
         }
 
@@ -563,7 +565,7 @@ namespace UNIC.ServiceTest.Services
                 CreatedBy = Guid.NewGuid(),
                 ClubFund = new ClubFund { ClubId = 1 }
             };
-            _fundRepo.Setup(r => r.GetTransactionByIdAsync(8)).ReturnsAsync(t);
+            _fundRepo.Setup(r => r.GetTransactionForExternalCheckoutCompletionAsync(8)).ReturnsAsync(t);
             Assert.Null(await _service.GetContributionPaymentStatusByOrderCodeAsync(uid, 8));
         }
 
@@ -579,7 +581,7 @@ namespace UNIC.ServiceTest.Services
                 CreatedBy = uid,
                 ClubFund = new ClubFund { ClubId = 1 }
             };
-            _fundRepo.Setup(r => r.GetTransactionByIdAsync(9)).ReturnsAsync(t);
+            _fundRepo.Setup(r => r.GetTransactionForExternalCheckoutCompletionAsync(9)).ReturnsAsync(t);
             Assert.Null(await _service.GetContributionPaymentStatusByOrderCodeAsync(uid, 9));
         }
 
@@ -595,7 +597,7 @@ namespace UNIC.ServiceTest.Services
                 CreatedBy = uid,
                 ClubFund = new ClubFund { ClubId = 1 }
             };
-            _fundRepo.Setup(r => r.GetTransactionByIdAsync(10)).ReturnsAsync(t);
+            _fundRepo.Setup(r => r.GetTransactionForExternalCheckoutCompletionAsync(10)).ReturnsAsync(t);
             Assert.Null(await _service.GetContributionPaymentStatusByOrderCodeAsync(uid, 10));
         }
 
@@ -615,7 +617,7 @@ namespace UNIC.ServiceTest.Services
                 Amount = 50,
                 ClubFund = new ClubFund { ClubId = 1 }
             };
-            _fundRepo.Setup(r => r.GetTransactionByIdAsync(11)).ReturnsAsync(t);
+            _fundRepo.Setup(r => r.GetTransactionForExternalCheckoutCompletionAsync(11)).ReturnsAsync(t);
             var dto = await _service.GetContributionPaymentStatusByOrderCodeAsync(uid, 11);
             Assert.NotNull(dto);
             Assert.True(dto!.IsPaymentLinkExpired);
@@ -1008,13 +1010,21 @@ namespace UNIC.ServiceTest.Services
         [Fact]
         public async Task ProcessPayOSPaymentSuccessAsync_ShouldReturnFalse_WhenTransactionInvalid()
         {
-            _fundRepo.Setup(r => r.TryApproveMemberContributionAsync(1)).ReturnsAsync(false);
+            _fundRepo.Setup(r => r.GetTransactionForExternalCheckoutCompletionAsync(1)).ReturnsAsync((FundTransaction?)null);
             Assert.False(await _service.ProcessPayOSPaymentSuccessAsync(1));
+            _fundRepo.Verify(r => r.TryApproveMemberContributionAsync(It.IsAny<int>()), Times.Never);
         }
 
         [Fact]
         public async Task ProcessPayOSPaymentSuccessAsync_ShouldReturnTrue_WhenRepositoryApproves()
         {
+            _fundRepo.Setup(r => r.GetTransactionForExternalCheckoutCompletionAsync(9)).ReturnsAsync(new FundTransaction
+            {
+                TransactionId = 9,
+                IsMemberContribution = true,
+                TransactionType = "INCOME",
+                Status = "PENDING"
+            });
             _fundRepo.Setup(r => r.TryApproveMemberContributionAsync(9)).ReturnsAsync(true);
 
             var ok = await _service.ProcessPayOSPaymentSuccessAsync(9);
@@ -1336,7 +1346,7 @@ namespace UNIC.ServiceTest.Services
                 CreatedBy = uid,
                 ClubFund = null!
             };
-            _fundRepo.Setup(r => r.GetTransactionByIdAsync(5)).ReturnsAsync(t);
+            _fundRepo.Setup(r => r.GetTransactionForExternalCheckoutCompletionAsync(5)).ReturnsAsync(t);
 
             Assert.Null(await _service.GetContributionPaymentStatusByOrderCodeAsync(uid, 5));
         }

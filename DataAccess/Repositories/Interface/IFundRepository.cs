@@ -10,6 +10,7 @@ namespace UNIC.DataAccess.Repositories.Interface
     public interface IFundRepository
     {
         Task<FundTransaction?> GetTransactionByIdAsync(int id);
+        Task<FundTransaction?> GetTransactionForExternalCheckoutCompletionAsync(long externalOrLegacyOrderCode);
         Task<ClubFund?> GetFundByIdAsync(int id, bool includeDeleted = false);
         Task<ClubFund?> GetFundByPublicIdAsync(Guid publicId, bool includeDeleted = false);
         Task<bool> SoftDeleteFundAsync(int fundId, int clubId, Guid deletedByUserId);

@@ -41,6 +41,8 @@ namespace DataAccess.Models
         [MaxLength(32)]
         public string? PaymentProvider { get; set; }
 
+        public long? ExternalOrderCode { get; set; }
+
         [MaxLength(20)]
         public string? ContributionSource { get; set; }
 
