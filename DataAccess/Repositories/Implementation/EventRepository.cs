@@ -47,6 +47,7 @@ namespace DataAccess.Repositories.Implementation
             var query = _context.Events
                 .Include(e => e.Attendances)
                 .Include(e => e.EventSchedules)
+                .Include(e => e.Club)
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(status))
