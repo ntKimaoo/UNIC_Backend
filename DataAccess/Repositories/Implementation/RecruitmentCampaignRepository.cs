@@ -1,6 +1,7 @@
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
 using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -83,6 +84,35 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.RecruitmentCampaigns
                 .AnyAsync(rc => rc.CampaignId == campaignId);
+        }
+
+        public async Task<bool> HasOverlappingCampaignAsync(int clubId, DateTime startDate, DateTime endDate, int? excludeCampaignId = null)
+        {
+            return await _context.RecruitmentCampaigns
+                .Where(c =>
+                    c.ClubId == clubId &&
+                    c.Status != "CLOSED" &&
+                    (excludeCampaignId == null || c.CampaignId != excludeCampaignId) &&
+                    c.StartDate.HasValue && c.EndDate.HasValue &&
+                    c.StartDate.Value <= endDate &&
+                    c.EndDate.Value >= startDate)
+                .AnyAsync();
+        }
+
+        public async Task<int> BulkCloseExpiredAsync()
+        {
+            var today = DateTime.Now.Date;
+            var expired = await _context.RecruitmentCampaigns
+                .Where(c => c.Status == "OPEN" && c.EndDate.HasValue && c.EndDate.Value.Date < today)
+                .ToListAsync();
+
+            if (!expired.Any()) return 0;
+
+            foreach (var c in expired)
+                c.Status = "CLOSED";
+
+            await _context.SaveChangesAsync();
+            return expired.Count;
         }
     }
 }
