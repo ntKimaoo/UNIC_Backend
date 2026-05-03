@@ -302,5 +302,9 @@ namespace BusinessLogic.Services.Implementation
 
             return true;
         }
+        public async Task<bool> IsUserInClubAsync(Guid userId, int clubId)
+        {
+            return await _memberRepository.IsMemberAsync(userId, clubId);
+        }
     }
 }
