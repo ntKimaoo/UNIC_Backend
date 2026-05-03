@@ -549,8 +549,8 @@ namespace BusinessLogic.Services.Implementation
             if (room.Status == RoomStatus.Active) return true;
 
             room.Status = RoomStatus.Active;
-            room.EndedAt = DateTime.UtcNow;
-
+            room.StartedAt = DateTime.UtcNow;
+            
             await _repo.UpdateRoomAsync(room);
 
             await _repo.CreateEventAsync(new RoomEvent
