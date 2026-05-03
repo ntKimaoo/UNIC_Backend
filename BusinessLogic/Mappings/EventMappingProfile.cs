@@ -1,5 +1,6 @@
 using AutoMapper;
 using BusinessLogic.DTOs;
+using BusinessLogic.Helpers;
 using DataAccess.Models;
 using System.Linq;
 
@@ -15,11 +16,30 @@ namespace BusinessLogic.Mappings
             // Event -> EventDetailDto
             CreateMap<Event, EventDetailDto>()
                 .ForMember(dest => dest.Sessions, opt => opt.MapFrom(src => src.EventSchedules))
-                .ForMember(dest => dest.CurrentAttendees, opt => opt.MapFrom(src => src.Attendances != null ? src.Attendances.Count : 0))
+                .ForMember(dest => dest.CurrentAttendees, opt => opt.MapFrom(src =>
+                    src.Attendances != null
+                        ? src.Attendances.Count(a =>
+                            a.AttendanceStatus == "REGISTERED"
+                            || a.AttendanceStatus == "PRESENT"
+                            || a.AttendanceStatus == "CHECKED_IN"
+                            || a.AttendanceStatus == "ABSENT")
+                        : 0))
                 .ForMember(dest => dest.RequiresApproval, opt => opt.MapFrom(src => src.RequiresApproval))
-                .ForMember(dest => dest.AvailableSlots, opt => opt.MapFrom(src => src.AvailableSlots))
-                .ForMember(dest => dest.MeetLink, opt => opt.MapFrom(src => src.IsPublic ? null : src.Location))
-                .ForMember(dest => dest.Location, opt => opt.MapFrom(src => src.IsPublic ? src.Location : "Online (WebRTC)"));
+                .ForMember(dest => dest.AvailableSlots, opt => opt.MapFrom(src =>
+                    src.MaxAttendees.HasValue
+                        ? Math.Max(0, src.MaxAttendees.Value - (src.Attendances != null
+                            ? src.Attendances.Count(a =>
+                                a.AttendanceStatus == "REGISTERED"
+                                || a.AttendanceStatus == "PRESENT"
+                                || a.AttendanceStatus == "CHECKED_IN"
+                                || a.AttendanceStatus == "ABSENT")
+                            : 0))
+                        : (int?)null))
+                .ForMember(dest => dest.IsOnline, opt => opt.MapFrom(src => src.IsOnline))
+                .ForMember(dest => dest.MeetLink, opt => opt.MapFrom(src => src.MeetLink))
+                .ForMember(dest => dest.Location, opt => opt.MapFrom(src => src.Location))
+                .ForMember(dest => dest.CheckInCode, opt => opt.MapFrom(src => src.CheckInCode))
+                .ForMember(dest => dest.CodeExpiresAt, opt => opt.MapFrom(src => src.CodeExpiresAt));
 
             CreateMap<EventSchedule, SessionDto>()
                 .ForMember(dest => dest.ScheduleId,   opt => opt.MapFrom(src => src.ScheduleId))
@@ -34,7 +54,8 @@ namespace BusinessLogic.Mappings
                 .ForMember(dest => dest.EventId, opt => opt.Ignore())
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => "PLANNED"))
                 .ForMember(dest => dest.IsPublic, opt => opt.MapFrom(src => src.IsPublic))
-                .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.Now))
+                .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => VnTimeHelper.Now))
+                .ForMember(dest => dest.IsOnline, opt => opt.MapFrom(src => src.IsOnline))
                 // AvailableSlots = MaxAttendees khi tạo event mới
                 .ForMember(dest => dest.AvailableSlots, opt => opt.MapFrom(src => src.MaxAttendees))
                 .ForMember(dest => dest.Club, opt => opt.Ignore())

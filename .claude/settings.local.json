@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(dotnet build *)",
-      "Bash(dotnet test *)",
-      "Bash(python gen_app_test_sheets.py)"
-    ]
-  }
-}

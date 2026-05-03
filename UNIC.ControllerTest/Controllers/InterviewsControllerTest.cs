@@ -452,7 +452,7 @@ namespace UNIC.ControllerTest.Controllers
         [Fact]
         public async Task CreateCriterion_ReturnsOk_WhenSuccess()
         {
-            var dto = new CreateEvaluationCriterionDto { Name = "Teamwork", Weight = 30 };
+            var dto = new CreateEvaluationCriterionDto { Name = "Teamwork" };
             var response = new EvaluationCriterionDto { Id = 1, Name = "Teamwork" };
 
             _mockService.Setup(s => s.CreateCriterionAsync(1, dto))

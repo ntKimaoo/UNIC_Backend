@@ -32,8 +32,6 @@ namespace BusinessLogic.DTOs
         public bool IsPublic { get; set; } = true;
 
         public bool IsOnline { get; set; } = false;
-
-        [MaxLength(500)]
         public string? MeetLink { get; set; }
 
         [Range(1, int.MaxValue, ErrorMessage = "So luong nguoi phai lon hon 0")]
@@ -67,8 +65,6 @@ namespace BusinessLogic.DTOs
         public bool RequiresApproval { get; set; }
 
         public bool IsOnline { get; set; } = false;
-
-        [MaxLength(500)]
         public string? MeetLink { get; set; }
 
         [Range(1, int.MaxValue, ErrorMessage = "So luong nguoi phai lon hon 0")]
@@ -99,6 +95,8 @@ namespace BusinessLogic.DTOs
         public bool RequiresApproval { get; set; }
         public DateTime? RegistrationStartDate { get; set; }
         public DateTime? RegistrationEndDate { get; set; }
+        public string? CheckInCode { get; set; }
+        public DateTime? CodeExpiresAt { get; set; }
         public List<SessionDto> Sessions { get; set; } = new List<SessionDto>();
     }
 

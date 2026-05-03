@@ -38,8 +38,14 @@ namespace UNIC.Presentation.Controllers
                 if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
                     return Unauthorized(new { error = "Invalid token" });
 
-                await _attendanceService.RegisterMemberAsync(new EventRegistrationRequest { EventId = id, UserId = userId });
-                return Ok(new { message = "Yêu cầu đăng ký đã được ghi nhận." });
+                var status = await _attendanceService.RegisterMemberAsync(new EventRegistrationRequest { EventId = id, UserId = userId });
+                var message = status switch
+                {
+                    "PENDING" => "Đăng ký đang chờ duyệt.",
+                    "WAITLIST" => "Đã vào danh sách chờ.",
+                    _ => "Đăng ký thành công!"
+                };
+                return Ok(new { message, attendanceStatus = status });
             }
             catch (NotFoundException ex) { return NotFound(new { error = ex.Message }); }
             catch (ConflictException ex) { return Conflict(new { error = ex.Message }); }
@@ -67,7 +73,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         /// <summary>
-        /// Check in to an event using a code
+        /// Check in to an event using a 6-character code (member self check-in)
         /// </summary>
         [HttpPost("{id}/checkin")]
         [Authorize]
@@ -77,20 +83,28 @@ namespace UNIC.Presentation.Controllers
             {
                 if (id != request.EventId) return BadRequest(new { error = "Mã sự kiện không khớp." });
 
-                var token = request?.Code?.Trim();
-                if (string.IsNullOrEmpty(token))
-                    return BadRequest(new { error = "Mã QR không hợp lệ." });
+                var code = request?.Code?.Trim();
+                if (string.IsNullOrEmpty(code))
+                    return BadRequest(new { error = "Vui lòng nhập mã điểm danh." });
 
-                var response = await _attendanceService.CheckInByQrTokenAsync(id, token);
-                return Ok(response);
-            }
-            catch (NotFoundException)
-            {
-                return NotFound(new
+                // Lấy userId từ JWT nếu request không gửi
+                if (request.UserId == Guid.Empty)
                 {
-                    error = "Mã QR không hợp lệ hoặc đã hết hạn.",
-                    hint = "Nếu bạn vừa quét thành công (đã thấy PRESENT trên màn hình), có thể do quét liên tục. Hãy bỏ điện thoại ra khỏi mã QR sau khi quét một lần."
-                });
+                    var userIdClaim = User.FindFirst("UserId")
+                        ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+                    if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out var uid))
+                        request.UserId = uid;
+                    else
+                        return Unauthorized(new { error = "Không xác định được người dùng." });
+                }
+
+                request.Code = code;
+                var result = await _attendanceService.CheckInMemberAsync(request);
+                return Ok(result);
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { error = ex.Message });
             }
             catch (DomainException ex)
             {
@@ -98,7 +112,7 @@ namespace UNIC.Presentation.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { error = "Lỗi khi điểm danh bằng QR", details = ex.Message });
+                return StatusCode(500, new { error = "Lỗi khi điểm danh", details = ex.Message });
             }
         }
 
@@ -130,6 +144,24 @@ namespace UNIC.Presentation.Controllers
         {
             // TODO: implement _attendanceService.EvaluateMemberAsync when service method is available
             return StatusCode(501, new { error = "Not implemented yet." });
+        }
+        /// <summary>
+        /// Get current user's registration status for an event
+        /// Returns { attendanceStatus, registrationDate, checkInTime } or 404 if not registered
+        /// </summary>
+        [HttpGet("{id}/my-registration")]
+        [Authorize]
+        public async Task<IActionResult> GetMyRegistration(int id)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+                return Unauthorized(new { error = "Invalid token" });
+
+            var attendance = await _attendanceService.GetMyRegistrationAsync(id, userId);
+            if (attendance == null)
+                return NotFound(new { error = "Chưa đăng ký sự kiện này." });
+
+            return Ok(attendance);
         }
     }
 }

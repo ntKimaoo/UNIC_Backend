@@ -88,6 +88,64 @@ namespace DataAccess.Repositories.Implementation
             return true;
         }
 
+        public async Task<int> AutoCompleteExpiredInterviewsAsync(int gracePeriodMinutes)
+        {
+            var now = DateTime.UtcNow;
+            var maxPossibleStartDate = now.AddMinutes(-gracePeriodMinutes);
+
+            var candidates = await _context.InterviewSchedules
+                .Include(s => s.MeetingRoom)
+                .Where(s => (s.Status == InterviewStatus.InProgress || s.Status == InterviewStatus.Confirmed)
+                            && s.ScheduledAt <= maxPossibleStartDate)
+                .ToListAsync();
+
+            var expiredSchedules = candidates
+                .Where(s => s.ScheduledAt?.AddMinutes(s.DurationMinutes + gracePeriodMinutes) <= now)
+                .ToList();
+
+            if (!expiredSchedules.Any())
+                return 0;
+
+            foreach (var schedule in expiredSchedules)
+            {
+                schedule.Status = InterviewStatus.Completed;
+
+                if (schedule.MeetingRoom != null && schedule.MeetingRoom.Status != RoomStatus.Closed)
+                {
+                    schedule.MeetingRoom.Status = RoomStatus.Closed;
+                    schedule.MeetingRoom.EndedAt = now;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return expiredSchedules.Count;
+        }
+
+        public async Task<IEnumerable<InterviewSchedule>> GetSchedulesNeedingReminderAsync(TimeSpan reminderBefore)
+        {
+            var now = DateTime.UtcNow;
+            var reminderThreshold = now.Add(reminderBefore);
+
+            return await _context.InterviewSchedules
+                .Include(s => s.Assignments)
+                .Include(s => s.MeetingRoom)
+                .Where(s => (s.Status == InterviewStatus.Scheduled || s.Status == InterviewStatus.Confirmed)
+                            && s.ReminderSentAt == null
+                            && s.ScheduledAt <= reminderThreshold
+                            && s.ScheduledAt > now)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<InterviewSchedule>> GetCompletedSchedulesWithPendingFeedbackAsync()
+        {
+            return await _context.InterviewSchedules
+                .Include(s => s.Assignments)
+                .Where(s => s.Status == InterviewStatus.Completed
+                            && s.FeedbackNudgeSentAt == null
+                            && s.Assignments.Any(a => a.FeedbackSubmittedAt == null))
+                .ToListAsync();
+        }
+
         // ═══════════════════════════════════════════════════════════
         //  InterviewAssignment
         // ═══════════════════════════════════════════════════════════
@@ -185,6 +243,35 @@ namespace DataAccess.Repositories.Implementation
         // ═══════════════════════════════════════════════════════════
         //  RoomParticipant
         // ═══════════════════════════════════════════════════════════
+
+        public async Task<int> SyncRoomStatusesAsync(TimeSpan preOpenDuration)
+        {
+            var thresholdTime = DateTime.UtcNow.Add(preOpenDuration);
+            var roomsToActivate = await _context.MeetingRooms
+                .Include(r => r.InterviewSchedule)
+                .Where(r => r.Status == RoomStatus.Idle 
+                            && r.RoomType == RoomType.Interview
+                            && r.InterviewSchedule != null
+                            && r.InterviewSchedule.Status == InterviewStatus.Confirmed
+                            && r.InterviewSchedule.ScheduledAt <= thresholdTime)
+                .ToListAsync();
+
+            if (!roomsToActivate.Any())
+                return 0;
+
+            foreach (var room in roomsToActivate)
+            {
+                room.Status = RoomStatus.Active;
+                if (room.InterviewSchedule != null)
+                {
+                    room.InterviewSchedule.Status = InterviewStatus.InProgress;
+                    room.InterviewSchedule.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return roomsToActivate.Count;
+        }
 
         public async Task<RoomParticipant?> GetActiveParticipantAsync(int roomId, Guid userId)
         {
@@ -426,6 +513,32 @@ namespace DataAccess.Repositories.Implementation
                 _context.ProposedTimeSlots.RemoveRange(slots);
                 await _context.SaveChangesAsync();
             }
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  AiAnalysisResult
+        // ════════════════════════════════════════════════════════════
+
+        public async Task<IEnumerable<AiCandidateAnalysisResult>> GetAiAnalysisResultsByCampaignIdAsync(int campaignId)
+        {
+            return await _context.AiCandidateAnalysisResults
+                .Where(a => a.CampaignId == campaignId)
+                .OrderByDescending(a => a.AnalyzedAt)
+                .ToListAsync();
+        }
+
+        public async Task<AiCandidateAnalysisResult> CreateAiAnalysisResultAsync(AiCandidateAnalysisResult result)
+        {
+            await _context.AiCandidateAnalysisResults.AddAsync(result);
+            await _context.SaveChangesAsync();
+            return result;
+        }
+
+        public async Task<IEnumerable<AiCandidateAnalysisResult>> CreateAiAnalysisResultsAsync(IEnumerable<AiCandidateAnalysisResult> results)
+        {
+            await _context.AiCandidateAnalysisResults.AddRangeAsync(results);
+            await _context.SaveChangesAsync();
+            return results;
         }
     }
 }

@@ -57,7 +57,7 @@ namespace BusinessLogic.DTOs
     }
 
     /// <summary>
-    /// Response thông tin một member trong club
+    /// Response thông tin một member trong club (Dùng cho danh sách thành viên)
     /// </summary>
     public class ClubMemberResponseDto
     {
@@ -77,6 +77,18 @@ namespace BusinessLogic.DTOs
         /// Danh sách departments trong club mà user thuộc về
         /// </summary>
         public List<DepartmentInfoDto> Departments { get; set; } = new();
+    }
+
+    /// <summary>
+    /// DTO rút gọn phục vụ kiểm tra quyền (Roles & Policies)
+    /// </summary>
+    public class UserClubDetailedInfoDto
+    {
+        public int ClubId { get; set; }
+        public string? ClubName { get; set; }
+        public string GlobalRole { get; set; }
+        public List<ClubRoleInfoDto> ClubRoles { get; set; } = new();
+        public List<string> Policies { get; set; } = new();
     }
 
     public class ClubRoleInfoDto

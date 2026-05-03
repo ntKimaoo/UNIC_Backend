@@ -1,5 +1,6 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Implementation;
+using BusinessLogic.Services.Interface;
 using DataAccess.Models.Meeting;
 using DataAccess.Models.Meeting.Enums;
 using DataAccess.Repositories.Interface;
@@ -16,13 +17,21 @@ namespace UNIC.ServiceTest.Services
     {
         private readonly Mock<IInterviewRepository> _mockRepo;
         private readonly Mock<IUserRepository> _mockUserRepo;
+        private readonly Mock<IEmailService> _mockEmailService;
+        private readonly Mock<IRecruitmentCampaignRepository> _mockCampaignRepo;
         private readonly InterviewService _interviewService;
 
         public InterviewServiceTest()
         {
             _mockRepo = new Mock<IInterviewRepository>();
             _mockUserRepo = new Mock<IUserRepository>();
-            _interviewService = new InterviewService(_mockRepo.Object, _mockUserRepo.Object);
+            _mockEmailService = new Mock<IEmailService>();
+            _mockCampaignRepo = new Mock<IRecruitmentCampaignRepository>();
+            _interviewService = new InterviewService(
+                _mockRepo.Object, 
+                _mockUserRepo.Object, 
+                _mockEmailService.Object, 
+                _mockCampaignRepo.Object);
         }
 
         #region CreateScheduleAsync
@@ -709,7 +718,7 @@ namespace UNIC.ServiceTest.Services
 
             var result = await _interviewService.CreateCriterionAsync(1, new CreateEvaluationCriterionDto
             {
-                Name = "Test", Weight = 20
+                Name = "Test"
             });
 
             Assert.Equal("Test", result.Name);
@@ -725,13 +734,12 @@ namespace UNIC.ServiceTest.Services
         [Fact]
         public async Task UpdateCriterionAsync_UpdatesAndReturnsDto()
         {
-            var criterion = new EvaluationCriterion { Id = 1, Name = "Old", Weight = 10 };
+            var criterion = new EvaluationCriterion { Id = 1, Name = "Old" };
             _mockRepo.Setup(r => r.GetCriterionByIdAsync(1)).ReturnsAsync(criterion);
             _mockRepo.Setup(r => r.UpdateCriterionAsync(criterion)).ReturnsAsync(true);
 
-            var result = await _interviewService.UpdateCriterionAsync(1, new UpdateEvaluationCriterionDto { Name = "New", Weight = 30 });
+            var result = await _interviewService.UpdateCriterionAsync(1, new UpdateEvaluationCriterionDto { Name = "New" });
             Assert.Equal("New", result!.Name);
-            Assert.Equal(30, result.Weight);
         }
 
         [Fact]

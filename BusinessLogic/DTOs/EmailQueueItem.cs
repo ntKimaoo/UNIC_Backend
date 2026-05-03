@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -26,6 +26,9 @@ namespace BusinessLogic.DTOs
         public int InterviewDurationMinutes { get; set; }
         public string? CancelReason { get; set; }
         public string? ConfirmDeadline { get; set; }
+        public string? RoomCode { get; set; }
+        public string? CampaignName { get; set; }
+        public List<DateTime>? ProposedTimes { get; set; }
     }
 
     public enum EmailType
@@ -35,6 +38,11 @@ namespace BusinessLogic.DTOs
         Welcome,
         EventRegistration,
         EventCheckIn,
-        InterviewStatusChange
+        InterviewStatusChange,
+        InterviewReminder,
+        InterviewRoomOpened,
+        InterviewFeedbackNudge,
+        ApplicationSuccess,
+        ApplicationRejected
     }
 }

@@ -42,20 +42,39 @@ namespace DataAccess.Repositories.Implementation
                 .FirstOrDefaultAsync(e => e.EventId == eventId);
         }
 
-        public async Task<IEnumerable<Event>> GetAllAsync(int pageNumber = 1, int pageSize = 10)
+        public async Task<IEnumerable<Event>> GetAllAsync(int pageNumber = 1, int pageSize = 10, string? status = null, int? clubId = null)
         {
-            return await _context.Events
+            var query = _context.Events
                 .Include(e => e.Attendances)
                 .Include(e => e.EventSchedules)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(status))
+                query = query.Where(e => e.Status == status);
+
+            if (clubId.HasValue)
+                query = query.Where(e => e.ClubId == clubId.Value);
+
+            return await query
                 .OrderByDescending(e => e.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
         }
 
+        public async Task<int> GetTotalCountAsync(string? status = null, int? clubId = null)
+        {
+            var query = _context.Events.AsQueryable();
+            if (!string.IsNullOrEmpty(status))
+                query = query.Where(e => e.Status == status);
+            if (clubId.HasValue)
+                query = query.Where(e => e.ClubId == clubId.Value);
+            return await query.CountAsync();
+        }
+
         public async Task<IEnumerable<Event>> GetUpcomingEventsAsync()
         {
-            var now = DateTime.Now;
+            var now = DateTime.UtcNow;
             return await _context.Events
                 .Where(e => e.StartDate > now && e.Status != "CANCELED")
                 .ToListAsync();
@@ -89,31 +108,25 @@ namespace DataAccess.Repositories.Implementation
 
         // Atomic Direct-Promote: chuyển người WAITLIST lâu nhất thành targetStatus
         // KHÔNG nhả slot vào pool — chống Slot Stealing & Double Cancel
-        // Retry loop chống race condition khi 2+ cancel cùng lúc
         public async Task<bool> TryDirectPromoteOldestWaitlistAsync(int eventId, string targetStatus)
         {
-            for (int attempt = 0; attempt < 3; attempt++)
-            {
-                var oldestId = await _context.Attendances
-                    .Where(a => a.EventId == eventId
-                             && a.AttendanceStatus == nameof(AttendanceStatus.WAITLIST))
-                    .OrderBy(a => a.RegistrationDate)
-                    .Select(a => (int?)a.AttendId)
-                    .FirstOrDefaultAsync();
+            var oldestId = await _context.Attendances
+                .Where(a => a.EventId == eventId
+                         && a.AttendanceStatus == nameof(AttendanceStatus.WAITLIST))
+                .OrderBy(a => a.RegistrationDate)
+                .Select(a => (int?)a.AttendId)
+                .FirstOrDefaultAsync();
 
-                if (oldestId == null) return false; // Không còn ai WAITLIST
+            if (oldestId == null) return false;
 
-                // Guard condition: chỉ update nếu vẫn còn WAITLIST (chống double promote)
-                var rows = await _context.Attendances
-                    .Where(a => a.AttendId == oldestId.Value
-                             && a.AttendanceStatus == nameof(AttendanceStatus.WAITLIST))
-                    .ExecuteUpdateAsync(s =>
-                        s.SetProperty(a => a.AttendanceStatus, targetStatus));
+            // Guard condition chống Double Cancel: chỉ update nếu vẫn còn WAITLIST
+            var rows = await _context.Attendances
+                .Where(a => a.AttendId == oldestId.Value
+                         && a.AttendanceStatus == nameof(AttendanceStatus.WAITLIST))
+                .ExecuteUpdateAsync(s =>
+                    s.SetProperty(a => a.AttendanceStatus, targetStatus));
 
-                if (rows == 1) return true; // Promote thành công
-                // rows == 0: người này đã bị promote bởi thread khác → retry với người tiếp theo
-            }
-            return false; // Sau 3 lần vẫn race → fallback increment slot
+            return rows == 1;
         }
 
         // Cộng slot lại — chỉ gọi khi không có ai ở WAITLIST
@@ -123,6 +136,15 @@ namespace DataAccess.Repositories.Implementation
                 .Where(e => e.EventId == eventId && e.MaxAttendees.HasValue)
                 .ExecuteUpdateAsync(s =>
                     s.SetProperty(e => e.AvailableSlots, e => e.AvailableSlots + 1));
+        }
+
+        // Set AvailableSlots trực tiếp — dùng cho recalc
+        public async Task SetAvailableSlotsAsync(int eventId, int value)
+        {
+            await _context.Events
+                .Where(e => e.EventId == eventId)
+                .ExecuteUpdateAsync(s =>
+                    s.SetProperty(e => e.AvailableSlots, value));
         }
 
         public async Task AddAsync(Event @event)
@@ -135,11 +157,11 @@ namespace DataAccess.Repositories.Implementation
             _context.Events.Update(@event);
         }
 
-        // Proactive batch status sync — gọi bởi Background Service
+        // Proactive batch status sync — called by Background Service
         public async Task<int> BulkSyncStatusAsync()
         {
-            var now = DateTime.Now;
-            var terminalStatuses = new[] { "ENDED", "CANCELED", "ONGOING", "COMPLETED" };
+            var now = DateTime.UtcNow;
+            var terminalStatuses = new[] { "ENDED", "CANCELED", "COMPLETED" };
             int total = 0;
 
             // Rule 1: REGISTRATION_OPEN + RegEndDate passed → REGISTRATION_CLOSED
@@ -150,7 +172,15 @@ namespace DataAccess.Repositories.Implementation
                 .ExecuteUpdateAsync(s =>
                     s.SetProperty(e => e.Status, "REGISTRATION_CLOSED"));
 
-            // Rule 2: Non-terminal + EndDate passed → ENDED
+            // Rule 2a: ONGOING + EndDate passed → COMPLETED
+            total += await _context.Events
+                .Where(e => e.Status == "ONGOING"
+                         && e.EndDate.HasValue
+                         && e.EndDate.Value <= now)
+                .ExecuteUpdateAsync(s =>
+                    s.SetProperty(e => e.Status, "COMPLETED"));
+
+            // Rule 2b: Non-terminal + EndDate passed → ENDED
             total += await _context.Events
                 .Where(e => !terminalStatuses.Contains(e.Status)
                          && e.EndDate.HasValue

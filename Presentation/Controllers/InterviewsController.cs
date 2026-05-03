@@ -1,5 +1,6 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
+using DataAccess.Models.Meeting.Enums;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading.Tasks;
@@ -18,6 +19,10 @@ namespace Presentation.Controllers
             _service = service;
             _aiService = aiService;
         }
+
+        // ═══════════════════════════════════════════════════════════
+        //  Interview Schedule CRUD
+        // ═══════════════════════════════════════════════════════════
 
         /// <summary>
         /// POST /api/interviews – Tạo lịch phỏng vấn từ ApplicationId
@@ -85,8 +90,8 @@ namespace Presentation.Controllers
                 var result = await _service.UpdateScheduleAsync(id, dto);
                 if (result == null)
                     return NotFound(new { success = false, message = "Interview schedule not found" });
-
-                return Ok(new { success = true, message = "Updated successfully", data = result });
+                
+                    return Ok(new { success = true, message = "Updated successfully", data = result });
             }
             catch (Exception ex)
             {
@@ -493,6 +498,23 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
+        /// POST /api/interviews/campaign/{campaignId}/ai-analysis/generate – Scan ứng viên chưa được phân tích, gọi AI & lưu DB
+        /// </summary>
+        [HttpPost("campaign/{campaignId}/ai-analysis/generate")]
+        public async Task<IActionResult> GenerateAiAnalysis(int campaignId)
+        {
+            try
+            {
+                var result = await _aiService.GenerateAiAnalysisAsync(campaignId);
+                return Ok(new { success = true, data = result });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// POST /api/interviews/campaign/{campaignId}/ai-search – Tìm kiếm ứng viên bằng AI
         /// </summary>
         [HttpPost("campaign/{campaignId}/ai-search")]
@@ -513,4 +535,3 @@ namespace Presentation.Controllers
         }
     }
 }
-

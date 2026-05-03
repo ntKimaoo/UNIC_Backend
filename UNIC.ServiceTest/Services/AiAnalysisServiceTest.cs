@@ -1,6 +1,7 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Options;
 using BusinessLogic.Services.Implementation;
+using DataAccess.Models;
 using DataAccess.Models.Meeting;
 using DataAccess.Models.Meeting.Enums;
 using DataAccess.Repositories.Interface;
@@ -25,23 +26,24 @@ namespace UNIC.ServiceTest.Services
     {
         private readonly Mock<IInterviewRepository> _mockRepo;
         private readonly Mock<ILogger<AiAnalysisService>> _mockLogger;
-        private readonly IOptions<OpenRouterOptions> _options;
+        private readonly Mock<IUserRepository> _mockUserRepo;
+        private readonly IOptions<GeminiOptions> _options;
 
         public AiAnalysisServiceTest()
         {
             _mockRepo = new Mock<IInterviewRepository>();
             _mockLogger = new Mock<ILogger<AiAnalysisService>>();
-            _options = Options.Create(new OpenRouterOptions
+            _mockUserRepo = new Mock<IUserRepository>();
+            _options = Options.Create(new GeminiOptions
             {
                 ApiKey = "test-key",
-                Model = "test-model",
-                BaseUrl = "https://fake.openrouter.ai/api/v1"
+                Model = "gemini-2.0-flash"
             });
         }
 
         private AiAnalysisService CreateService(HttpClient httpClient)
         {
-            return new AiAnalysisService(httpClient, _mockRepo.Object, _options, _mockLogger.Object);
+            return new AiAnalysisService(httpClient, _mockRepo.Object, _options, _mockLogger.Object, _mockUserRepo.Object);
         }
 
         private HttpClient CreateMockHttpClient(HttpStatusCode statusCode, string responseBody)
@@ -81,11 +83,12 @@ namespace UNIC.ServiceTest.Services
         [Fact]
         public async Task AnalyzeCampaignCandidatesAsync_ReturnsFallback_WhenAiFails()
         {
+            var userId = Guid.NewGuid();
             var schedules = new List<InterviewSchedule>
             {
                 new InterviewSchedule
                 {
-                    Id = 1, CandidateUserId = Guid.NewGuid(), Title = "Applicant A",
+                    Id = 1, CandidateUserId = userId, Title = "Applicant A",
                     Assignments = new List<InterviewAssignment>
                     {
                         new InterviewAssignment { FeedbackNotes = "Good candidate", Result = InterviewResult.Pass }
@@ -94,12 +97,13 @@ namespace UNIC.ServiceTest.Services
             };
             var criteria = new List<EvaluationCriterion>
             {
-                new EvaluationCriterion { Id = 1, Name = "Communication", Weight = 50 }
+                new EvaluationCriterion { Id = 1, Name = "Communication" }
             };
 
             _mockRepo.Setup(r => r.GetSchedulesAsync(1, null, null, null)).ReturnsAsync(schedules);
             _mockRepo.Setup(r => r.GetCriteriaByCampaignIdAsync(1)).ReturnsAsync(criteria);
             _mockRepo.Setup(r => r.GetCriteriaScoresByScheduleIdAsync(1)).ReturnsAsync(new List<CriteriaScore>());
+            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { FullName = "Applicant A" });
 
             // AI returns error → fallback
             var httpClient = CreateMockHttpClient(HttpStatusCode.InternalServerError, "error");
@@ -109,7 +113,7 @@ namespace UNIC.ServiceTest.Services
 
             Assert.NotNull(result);
             Assert.Single(result.Candidates);
-            Assert.Contains("[Fallback]", result.Candidates[0].SummaryText);
+            Assert.Equal("Pass", result.Candidates[0].Result);
         }
 
         [Fact]
@@ -126,12 +130,13 @@ namespace UNIC.ServiceTest.Services
             };
             var criteria = new List<EvaluationCriterion>
             {
-                new EvaluationCriterion { Id = 1, Name = "Communication", Weight = 50 }
+                new EvaluationCriterion { Id = 1, Name = "Communication" }
             };
 
             _mockRepo.Setup(r => r.GetSchedulesAsync(1, null, null, null)).ReturnsAsync(schedules);
             _mockRepo.Setup(r => r.GetCriteriaByCampaignIdAsync(1)).ReturnsAsync(criteria);
             _mockRepo.Setup(r => r.GetCriteriaScoresByScheduleIdAsync(1)).ReturnsAsync(new List<CriteriaScore>());
+            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { FullName = "Applicant A" });
 
             var aiJson = JsonSerializer.Serialize(new[]
             {
@@ -140,32 +145,29 @@ namespace UNIC.ServiceTest.Services
                     interviewScheduleId = 1,
                     candidateUserId = userId.ToString(),
                     candidateName = "Applicant A",
-                    fitLevel = "StrongFit",
-                    suggestedResult = "Accept",
-                    summaryText = "Ứng viên tốt",
-                    criteriaSentiments = new[] { new { criterionId = 1, criterionName = "Communication", sentiment = "positive", confidence = 0.9, explanation = "Good" } },
+                    result = "Pass",
+                    criteriaEvaluations = new[] { new { criterionId = 1, criterionName = "Communication", result = "Pass" } },
                     strengths = new[] { "Giao tiếp tốt" },
                     weaknesses = new string[] { }
                 }
             });
 
-            var openRouterResponse = JsonSerializer.Serialize(new
+            var geminiResponse = JsonSerializer.Serialize(new
             {
-                choices = new[]
+                candidates = new[]
                 {
-                    new { message = new { content = aiJson } }
+                    new { content = new { parts = new[] { new { text = aiJson } } } }
                 }
             });
 
-            var httpClient = CreateMockHttpClient(HttpStatusCode.OK, openRouterResponse);
+            var httpClient = CreateMockHttpClient(HttpStatusCode.OK, geminiResponse);
             var service = CreateService(httpClient);
 
             var result = await service.AnalyzeCampaignCandidatesAsync(1);
 
             Assert.NotNull(result);
             Assert.Single(result.Candidates);
-            Assert.Equal("StrongFit", result.Candidates[0].FitLevel);
-            Assert.Equal("Accept", result.Candidates[0].SuggestedResult);
+            Assert.Equal("Pass", result.Candidates[0].Result);
         }
 
         #endregion
@@ -242,21 +244,20 @@ namespace UNIC.ServiceTest.Services
                         interviewScheduleId = 1,
                         candidateUserId = userId.ToString(),
                         candidateName = "Alice",
-                        relevanceScore = 0.95,
                         matchReason = "Phù hợp yêu cầu",
-                        suggestedResult = "Accept"
+                        result = "Pass"
                     }
                 },
                 totalFound = 1,
                 aiExplanation = "Tìm thấy 1 ứng viên phù hợp."
             });
 
-            var openRouterResponse = JsonSerializer.Serialize(new
+            var geminiResponse = JsonSerializer.Serialize(new
             {
-                choices = new[] { new { message = new { content = searchJson } } }
+                candidates = new[] { new { content = new { parts = new[] { new { text = searchJson } } } } }
             });
 
-            var httpClient = CreateMockHttpClient(HttpStatusCode.OK, openRouterResponse);
+            var httpClient = CreateMockHttpClient(HttpStatusCode.OK, geminiResponse);
             var service = CreateService(httpClient);
 
             var result = await service.SearchCandidatesAsync(1, new AiSearchRequestDto { Query = "alice" });
@@ -272,13 +273,14 @@ namespace UNIC.ServiceTest.Services
         #region AnalyzeCampaign_WithNotesAndFeedback
 
         [Fact]
-        public async Task AnalyzeCampaignCandidatesAsync_WithPassResults_ReturnsFallbackStrongFit()
+        public async Task AnalyzeCampaignCandidatesAsync_WithPassResults_ReturnsFallbackPass()
         {
+            var userId = Guid.NewGuid();
             var schedules = new List<InterviewSchedule>
             {
                 new InterviewSchedule
                 {
-                    Id = 1, CandidateUserId = Guid.NewGuid(), Title = "Winner",
+                    Id = 1, CandidateUserId = userId, Title = "Winner",
                     Assignments = new List<InterviewAssignment>
                     {
                         new InterviewAssignment { FeedbackNotes = "Excellent", Result = InterviewResult.Pass },
@@ -288,7 +290,7 @@ namespace UNIC.ServiceTest.Services
             };
             var criteria = new List<EvaluationCriterion>
             {
-                new EvaluationCriterion { Id = 1, Name = "Skills", Weight = 50 }
+                new EvaluationCriterion { Id = 1, Name = "Skills" }
             };
 
             _mockRepo.Setup(r => r.GetSchedulesAsync(1, null, null, null)).ReturnsAsync(schedules);
@@ -298,6 +300,7 @@ namespace UNIC.ServiceTest.Services
                      {
                          new CriteriaScore { EvaluationCriterionId = 1, Note = "Very strong skills" }
                      });
+            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { FullName = "Winner" });
 
             var httpClient = CreateMockHttpClient(HttpStatusCode.InternalServerError, "error");
             var service = CreateService(httpClient);
@@ -305,18 +308,18 @@ namespace UNIC.ServiceTest.Services
             var result = await service.AnalyzeCampaignCandidatesAsync(1);
 
             Assert.Single(result.Candidates);
-            Assert.Equal("StrongFit", result.Candidates[0].FitLevel);
-            Assert.Equal("Accept", result.Candidates[0].SuggestedResult);
+            Assert.Equal("Pass", result.Candidates[0].Result);
         }
 
         [Fact]
-        public async Task AnalyzeCampaignCandidatesAsync_WithFailResults_ReturnsFallbackWeakFit()
+        public async Task AnalyzeCampaignCandidatesAsync_WithFailResults_ReturnsFallbackFail()
         {
+            var userId = Guid.NewGuid();
             var schedules = new List<InterviewSchedule>
             {
                 new InterviewSchedule
                 {
-                    Id = 1, CandidateUserId = Guid.NewGuid(), Title = "Weak",
+                    Id = 1, CandidateUserId = userId, Title = "Weak",
                     Assignments = new List<InterviewAssignment>
                     {
                         new InterviewAssignment { FeedbackNotes = "Poor", Result = InterviewResult.Fail },
@@ -326,31 +329,32 @@ namespace UNIC.ServiceTest.Services
             };
             var criteria = new List<EvaluationCriterion>
             {
-                new EvaluationCriterion { Id = 1, Name = "Communication", Weight = 30 }
+                new EvaluationCriterion { Id = 1, Name = "Communication" }
             };
 
             _mockRepo.Setup(r => r.GetSchedulesAsync(1, null, null, null)).ReturnsAsync(schedules);
             _mockRepo.Setup(r => r.GetCriteriaByCampaignIdAsync(1)).ReturnsAsync(criteria);
             _mockRepo.Setup(r => r.GetCriteriaScoresByScheduleIdAsync(1))
                      .ReturnsAsync(new List<CriteriaScore>());
+            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { FullName = "Weak" });
 
             var httpClient = CreateMockHttpClient(HttpStatusCode.InternalServerError, "error");
             var service = CreateService(httpClient);
 
             var result = await service.AnalyzeCampaignCandidatesAsync(1);
 
-            Assert.Equal("WeakFit", result.Candidates[0].FitLevel);
-            Assert.Equal("Reject", result.Candidates[0].SuggestedResult);
+            Assert.Equal("Fail", result.Candidates[0].Result);
         }
 
         [Fact]
-        public async Task AnalyzeCampaignCandidatesAsync_WithEqualResults_ReturnsFallbackMediumFit()
+        public async Task AnalyzeCampaignCandidatesAsync_WithEqualResults_ReturnsFallbackConsider()
         {
+            var userId = Guid.NewGuid();
             var schedules = new List<InterviewSchedule>
             {
                 new InterviewSchedule
                 {
-                    Id = 1, CandidateUserId = Guid.NewGuid(), Title = "Middle",
+                    Id = 1, CandidateUserId = userId, Title = "Middle",
                     Assignments = new List<InterviewAssignment>
                     {
                         new InterviewAssignment { FeedbackNotes = "Mixed", Result = InterviewResult.Pass },
@@ -363,43 +367,44 @@ namespace UNIC.ServiceTest.Services
             _mockRepo.Setup(r => r.GetSchedulesAsync(1, null, null, null)).ReturnsAsync(schedules);
             _mockRepo.Setup(r => r.GetCriteriaByCampaignIdAsync(1)).ReturnsAsync(criteria);
             _mockRepo.Setup(r => r.GetCriteriaScoresByScheduleIdAsync(1)).ReturnsAsync(new List<CriteriaScore>());
+            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { FullName = "Middle" });
 
             var httpClient = CreateMockHttpClient(HttpStatusCode.InternalServerError, "error");
             var service = CreateService(httpClient);
 
             var result = await service.AnalyzeCampaignCandidatesAsync(1);
 
-            Assert.Equal("MediumFit", result.Candidates[0].FitLevel);
-            Assert.Equal("Waitlist", result.Candidates[0].SuggestedResult);
+            Assert.Equal("Consider", result.Candidates[0].Result);
         }
 
         [Fact]
-        public async Task AnalyzeCampaignCandidatesAsync_WithNoNotes_ReturnsFallbackNoData()
+        public async Task AnalyzeCampaignCandidatesAsync_WithNoNotes_ReturnsFallbackConsider()
         {
+            var userId = Guid.NewGuid();
             var schedules = new List<InterviewSchedule>
             {
                 new InterviewSchedule
                 {
-                    Id = 1, CandidateUserId = Guid.NewGuid(), Title = "Silent",
+                    Id = 1, CandidateUserId = userId, Title = "Silent",
                     Assignments = new List<InterviewAssignment>() // no feedback
                 }
             };
             var criteria = new List<EvaluationCriterion>
             {
-                new EvaluationCriterion { Id = 1, Name = "Technical", Weight = 40 }
+                new EvaluationCriterion { Id = 1, Name = "Technical" }
             };
 
             _mockRepo.Setup(r => r.GetSchedulesAsync(1, null, null, null)).ReturnsAsync(schedules);
             _mockRepo.Setup(r => r.GetCriteriaByCampaignIdAsync(1)).ReturnsAsync(criteria);
             _mockRepo.Setup(r => r.GetCriteriaScoresByScheduleIdAsync(1)).ReturnsAsync(new List<CriteriaScore>());
+            _mockUserRepo.Setup(r => r.GetByIdAsync(userId)).ReturnsAsync(new User { FullName = "Silent" });
 
             var httpClient = CreateMockHttpClient(HttpStatusCode.InternalServerError, "error");
             var service = CreateService(httpClient);
 
             var result = await service.AnalyzeCampaignCandidatesAsync(1);
 
-            Assert.Equal("NoData", result.Candidates[0].FitLevel);
-            Assert.Equal("Undecided", result.Candidates[0].SuggestedResult);
+            Assert.Equal("Consider", result.Candidates[0].Result);
         }
 
         #endregion
@@ -423,7 +428,7 @@ namespace UNIC.ServiceTest.Services
             };
             var criteria = new List<EvaluationCriterion>
             {
-                new EvaluationCriterion { Id = 1, Name = "Technical", Weight = 50 }
+                new EvaluationCriterion { Id = 1, Name = "Technical" }
             };
 
             _mockRepo.Setup(r => r.GetSchedulesAsync(1, null, null, null)).ReturnsAsync(schedules);

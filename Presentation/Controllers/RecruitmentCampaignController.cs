@@ -74,7 +74,7 @@ namespace Presentation.Controllers
         /// Create a new recruitment campaign
         /// </summary>
         [HttpPost]
-        [RequireClubPolicyOrRole("CreateCampaign")]
+        [RequireClubPolicyOrRole("CreateCampaign", "Admin", "Club Manager")]
         public async Task<IActionResult> Create([FromBody] CreateRecruitmentCampaignDto dto)
         {
             try

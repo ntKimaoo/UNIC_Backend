@@ -10,7 +10,8 @@ namespace BusinessLogic.Services.Interface
         Task<ContributeResponseDto> CreateContributionAsync(Guid userId, ContributeRequestDto request, CancellationToken cancellationToken = default);
         Task<ContributionPaymentStatusDto?> GetContributionPaymentStatusAsync(Guid userId, int clubId, int transactionId);
         Task<ContributionPaymentStatusDto?> GetContributionPaymentStatusByOrderCodeAsync(Guid userId, int orderCode);
-        Task<FundResponseDto?> GetFundByIdAsync(int fundId);
+        Task<FundResponseDto?> GetFundByIdAsync(int fundId, Guid currentUserId, bool isSystemAdmin, bool includeSoftDeletedIfPrivileged = true);
+        Task<FundResponseDto?> GetFundByPublicIdAsync(Guid publicId, Guid currentUserId, bool isSystemAdmin, bool includeSoftDeletedIfPrivileged = true);
         Task<PagedResultDto<FundResponseDto>> GetFundsByClubIdPagedAsync(
             int clubId,
             Guid currentUserId,
@@ -23,6 +24,7 @@ namespace BusinessLogic.Services.Interface
         Task<PagedResultDto<FundResponseDto>> GetMyFundsByClubIdPagedAsync(
             int clubId,
             Guid currentUserId,
+            bool isSystemAdmin,
             string? mineType,
             string? status,
             string? search,
@@ -43,9 +45,10 @@ namespace BusinessLogic.Services.Interface
             int pageNumber,
             int pageSize);
         Task<bool> ApproveFundAsync(Guid managerId, ApproveFundDto dto);
+        Task SoftDeleteFundAsync(Guid userId, int clubId, int fundId, bool isSystemAdmin);
         Task<bool> ProcessPayOSPaymentSuccessAsync(int orderCode);
         Task<bool> TryCompleteOwnPendingContributionForDevelopmentAsync(Guid userId, int clubId, int transactionId);
-        Task<FundCapabilitiesDto> GetFundCapabilitiesAsync(Guid userId, int clubId);
+        Task<FundCapabilitiesDto> GetFundCapabilitiesAsync(Guid userId, int clubId, bool isSystemAdmin = false);
         Task<ClubFundReportSummaryDto> GetClubFundReportSummaryAsync(int clubId, DateTime? fromUtc, DateTime? toUtc);
         Task<IReadOnlyList<FundCategoryResponseDto>> GetFundCategoriesForClubAsync(int clubId);
 

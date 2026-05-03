@@ -137,8 +137,8 @@ namespace BusinessLogic.Services.Implementation
             club.Address = dto.Address;
             if (dto.IsActive.HasValue)
                 club.IsActive = dto.IsActive.Value;
-
-            club.UpdatedAt = DateTime.UtcNow;
+            
+                club.UpdatedAt = DateTime.UtcNow;
 
             var updated = await _repository.UpdateAsync(club);
             if (!updated)
