@@ -33,6 +33,7 @@ namespace DataAccess.Repositories
         {
             return await _context.ClubCreationRequests
                 .Where(r => r.UserId == userId)
+                .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
         }
 

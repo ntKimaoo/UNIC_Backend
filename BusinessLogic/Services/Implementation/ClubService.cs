@@ -12,10 +12,14 @@ namespace BusinessLogic.Services.Implementation
     public class ClubService : IClubService
     {
         private readonly IClubRepository _repository;
+        private readonly IClubRoleService _clubRoleService;
+        private readonly IClubMemberService _memberService;
 
-        public ClubService(IClubRepository repository)
+        public ClubService(IClubRepository repository, IClubRoleService clubRoleService, IClubMemberService memberService)
         {
             _repository = repository;
+            _clubRoleService = clubRoleService;
+            _memberService = memberService;
         }
 
         public async Task<ClubResponseDto?> GetByIdAsync(int clubId)
@@ -24,7 +28,8 @@ namespace BusinessLogic.Services.Implementation
             if (club == null)
                 return null;
 
-            return MapToResponseDto(club);
+            var memberCount = await _repository.CountMemberAsync(clubId);
+            return MapToResponseDto(club, memberCount);
         }
 
         public async Task<IEnumerable<ClubResponseDto>> GetAllAsync()
@@ -56,24 +61,39 @@ namespace BusinessLogic.Services.Implementation
             var club = new Club
             {
                 ClubName = dto.ClubName,
-                ShortName = dto.ShortName,
-                Description = dto.Description,
+                ShortName = dto.ShortName ?? string.Empty,
+                Description = dto.Description ?? string.Empty,
                 FoundedDate = dto.FoundedDate,
                 Status = dto.Status ?? "Active",
                 IsPublic = dto.IsPublic,
-                LogoUrl = dto.LogoUrl,
-                CoverImageUrl = dto.CoverImageUrl,
-                Email = dto.Email,
-                PhoneNumber = dto.PhoneNumber,
-                FacebookUrl = dto.FacebookUrl,
-                WebsiteUrl = dto.WebsiteUrl,
-                Address = dto.Address,
+                LogoUrl = dto.LogoUrl ?? string.Empty,
+                CoverImageUrl = dto.CoverImageUrl ?? string.Empty,
+                Email = dto.Email ?? string.Empty,
+                PhoneNumber = dto.PhoneNumber ?? string.Empty,
+                FacebookUrl = dto.FacebookUrl ?? string.Empty,
+                WebsiteUrl = dto.WebsiteUrl ?? string.Empty,
+                Address = dto.Address ?? string.Empty,
                 IsActive = false,
                 IsDeleted = false,
                 CreatedAt = DateTime.UtcNow
             };
 
             var createdClub = await _repository.CreateAsync(uid, club);
+
+            var managerRole = await _clubRoleService.CreateAsync(new CreateClubRoleDto
+            {
+                RoleName = "Club Manager",
+                Description = "Vai trò chủ nhiệm câu lạc bộ, có toàn quyền quản lý và điều hành các hoạt động của câu lạc bộ.",
+                Level = 0,
+                policies = new List<int>()
+            }, createdClub.ClubId);
+
+            await _memberService.AddUserToClubAsync(createdClub.ClubId, new AddUserToClubDto
+            {
+                UserId = uid,
+                ClubRoleIds = new List<int> { managerRole.ClubRoleId }
+            }, uid);
+
             return MapToResponseDto(createdClub);
         }
 
@@ -97,7 +117,8 @@ namespace BusinessLogic.Services.Implementation
 
             club.FoundedDate = dto.FoundedDate;
 
-            club.Status = dto.Status;
+            if (dto.Status != null)
+                club.Status = dto.Status;
             if (dto.IsPublic.HasValue)
                 club.IsPublic = dto.IsPublic.Value;
 
@@ -116,8 +137,8 @@ namespace BusinessLogic.Services.Implementation
             club.Address = dto.Address;
             if (dto.IsActive.HasValue)
                 club.IsActive = dto.IsActive.Value;
-
-            club.UpdatedAt = DateTime.UtcNow;
+            
+                club.UpdatedAt = DateTime.UtcNow;
 
             var updated = await _repository.UpdateAsync(club);
             if (!updated)
@@ -139,7 +160,7 @@ namespace BusinessLogic.Services.Implementation
         {
             await _repository.ChangeStatusClub(clubId);
         }
-        private ClubResponseDto MapToResponseDto(Club club)
+        private ClubResponseDto MapToResponseDto(Club club, int memberCount = 0)
         {
             return new ClubResponseDto
             {
@@ -160,7 +181,8 @@ namespace BusinessLogic.Services.Implementation
                 CreatedAt = club.CreatedAt,
                 UpdatedAt = club.UpdatedAt,
                 IsActive = club.IsActive,
-                IsDeleted = club.IsDeleted
+                IsDeleted = club.IsDeleted,
+                MemberCount = memberCount
             };
         }
         public async Task<bool> isDeleted(int clubId)

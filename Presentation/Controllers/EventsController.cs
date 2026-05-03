@@ -20,11 +20,49 @@ namespace UNIC.Presentation.Controllers
     {
         private readonly IEventService _eventService;
         private readonly IQRCodeGeneratorService _qrCodeGeneratorService;
+        private readonly IEventPermissionService _eventPermService;
 
-        public EventsController(IEventService eventService, IQRCodeGeneratorService qrCodeGeneratorService)
+        public EventsController(
+            IEventService eventService,
+            IQRCodeGeneratorService qrCodeGeneratorService,
+            IEventPermissionService eventPermService)
         {
             _eventService = eventService;
             _qrCodeGeneratorService = qrCodeGeneratorService;
+            _eventPermService = eventPermService;
+        }
+
+        private Guid GetUserId()
+        {
+            var claim = User.FindFirst("UserId")
+                ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            return claim != null && Guid.TryParse(claim.Value, out var id) ? id : Guid.Empty;
+        }
+
+        /// <summary>
+        /// Get all events the current user participates in (as attendee or collaborator).
+        /// Returns policies per event for frontend action gating.
+        /// </summary>
+        [HttpGet("my-events")]
+        [Authorize]
+        public async Task<ActionResult<MyEventsPagedResult>> GetMyEvents(
+            [FromQuery] string? search = null,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
+        {
+            try
+            {
+                var userId = GetUserId();
+                if (userId == Guid.Empty)
+                    return Unauthorized(new { error = "User not authenticated." });
+
+                if (page < 1) page = 1;
+                if (pageSize < 1 || pageSize > 50) pageSize = 10;
+
+                var result = await _eventPermService.GetMyEventsAsync(userId, search, page, pageSize);
+                return Ok(result);
+            }
+            catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
         }
 
         /// <summary>
@@ -42,18 +80,20 @@ namespace UNIC.Presentation.Controllers
             catch (Exception ex) { return StatusCode(500, new { error = "An error occurred", details = ex.Message }); }
         }
 
-        /// <summary>
-        /// Get all events with pagination (public)
-        /// </summary>
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<EventDetailDto>>> GetAllEvents([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
+        public async Task<ActionResult> GetAllEvents(
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? status = null,
+            [FromQuery] int? clubId = null)
         {
             if (pageNumber < 1) return BadRequest(new { error = "Page number must be greater than 0." });
             if (pageSize < 1 || pageSize > 100) return BadRequest(new { error = "Page size must be between 1 and 100." });
             try
             {
-                var events = await _eventService.GetAllEventsAsync(pageNumber, pageSize);
-                return Ok(events);
+                var events = await _eventService.GetAllEventsAsync(pageNumber, pageSize, status, clubId);
+                var total = await _eventService.GetTotalEventsCountAsync(status, clubId);
+                return Ok(new { items = events, total, page = pageNumber, pageSize });
             }
             catch (Exception ex) { return StatusCode(500, new { error = "An error occurred", details = ex.Message }); }
         }

@@ -54,11 +54,11 @@ public partial class UnicContext : DbContext
     public DbSet<PolicyGroup> PolicyGroups { get; set; }
     public DbSet<ClubCreationRequest> ClubCreationRequests { get; set; }
     public DbSet<EventRole> EventRoles { get; set; }
-    public DbSet<UserEventRole> UserEventRoles { get; set; }
     public DbSet<EventRolePolicy> EventRolePolicies { get; set; }
     public DbSet<EventMemberPolicy> EventMemberPolicies { get; set; }
     public virtual DbSet<UserClubRoleDepartment> UserClubRoleDepartments { get; set; }
     public virtual DbSet<RecordOfChange> RecordsOfChange { get; set; }
+    public virtual DbSet<EventMember> EventMembers { get; set; }
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
 
@@ -275,28 +275,6 @@ public partial class UnicContext : DbContext
             .HasForeignKey(er => er.EventId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // UserEventRole
-        modelBuilder.Entity<UserEventRole>()
-            .HasOne(uer => uer.Event)
-            .WithMany(e => e.EventMembers)
-            .HasForeignKey(uer => uer.EventId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        modelBuilder.Entity<UserEventRole>()
-            .HasOne(uer => uer.User)
-            .WithMany(u => u.EventMembers)
-            .HasForeignKey(uer => uer.UserId)
-            .OnDelete(DeleteBehavior.NoAction);
-            
-        modelBuilder.Entity<UserEventRole>()
-            .HasOne(uer => uer.EventRole)
-            .WithMany(er => er.UserEventRoles)
-            .HasForeignKey(uer => uer.EventRoleId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<UserEventRole>()
-            .HasIndex(uer => new { uer.EventId, uer.UserId })
-            .IsUnique();
 
         // EventRolePolicy (Composite PK)
         modelBuilder.Entity<EventRolePolicy>()
@@ -319,8 +297,8 @@ public partial class UnicContext : DbContext
             .HasKey(emp => new { emp.EventMemberId, emp.PolicyId });
 
         modelBuilder.Entity<EventMemberPolicy>()
-            .HasOne(emp => emp.UserEventRole)
-            .WithMany(uer => uer.EventMemberPolicies)
+            .HasOne(emp => emp.EventMember)
+            .WithMany(em => em.EventMemberPolicies)
             .HasForeignKey(emp => emp.EventMemberId)
             .OnDelete(DeleteBehavior.Cascade);
 
@@ -382,6 +360,10 @@ public partial class UnicContext : DbContext
             .WithMany(c => c.ClubFunds)
             .HasForeignKey(cf => cf.ClubId)
             .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<ClubFund>()
+            .HasIndex(cf => cf.PublicId)
+            .IsUnique();
 
         modelBuilder.Entity<FundType>()
             .HasIndex(x => x.Name)

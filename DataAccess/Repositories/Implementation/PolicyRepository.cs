@@ -69,7 +69,15 @@ namespace DataAccess.Repositories.Implementation
         public async Task<bool> HasMemberPolicyInClubAsync(Guid userId, int clubId, string policyTitle)
         {
             var normalizedTitle = policyTitle.ToLower().Trim();
-            var isClubManager = await _context.UserClubRoleAssignments.AnyAsync(ura => ura.ClubMember.UserId == userId && ura.ClubRole.Level == 0);
+            
+            // Bypass cho Admin hệ thống
+            var userRoles = await GetUserRoleAsync(userId);
+            if (userRoles.Any(r => string.Equals(r, "Admin", StringComparison.OrdinalIgnoreCase))) return true;
+
+            // Check xem user có phải Club Manager của CLB này không (Level 0)
+            var isClubManager = await _context.UserClubRoleAssignments
+                .AnyAsync(ura => ura.ClubMember.UserId == userId && ura.ClubMember.ClubId == clubId && ura.ClubRole.Level == 0);
+
             if (isClubManager) return true;
             // Check policy from club role (within this specific club)
             var hasRolePolicy = await _context.UserClubRoleAssignments
@@ -182,13 +190,47 @@ namespace DataAccess.Repositories.Implementation
 
             await _context.SaveChangesAsync();
         }
-        public async Task<string> GetUserRoleAsync(Guid userId)
+        public async Task<List<string>> GetUserRoleAsync(Guid userId)
         {
             var userRoles = await _context.UserRoles
                 .Where(ur => ur.UserId == userId)
                 .Select(ur => ur.RoleName)
                 .ToListAsync();
-            return userRoles.FirstOrDefault() ?? "User";
+            // trả về nhiều role
+            return userRoles;
+            // return userRoles.FirstOrDefault() ?? "User";
+        }
+
+        public async Task<IEnumerable<string>> GetPoliciesInClubAsync(Guid userId, int clubId)
+        {
+            // Lấy role hệ thống của user
+            // var userRole = await GetUserRoleAsync(userId);
+            // var isSystemAdmin = string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase);
+            var userRoles = await GetUserRoleAsync(userId);
+            var isSystemAdmin = userRoles.Any(r => string.Equals(r, "Admin", StringComparison.OrdinalIgnoreCase));
+
+            // Check xem user có phải Club Manager của CLB này không (Level 0)
+            var isClubManager = await _context.UserClubRoleAssignments
+                .AnyAsync(ura => ura.ClubMember.UserId == userId && ura.ClubMember.ClubId == clubId && ura.ClubRole.Level == 0);
+
+            if (isSystemAdmin || isClubManager)
+            {
+                return await _context.Policies.Select(p => p.Name).ToListAsync();
+            }
+
+            var rolePolicies = await _context.UserClubRoleAssignments
+                .Where(ura => ura.ClubMember.UserId == userId && ura.ClubMember.ClubId == clubId)
+                .SelectMany(ura => ura.ClubRole!.ClubRolePolicies)
+                .Select(crp => crp.Policy.Name)
+                .ToListAsync();
+
+            var directPolicies = await _context.UserClubRoles
+                .Where(ucr => ucr.UserId == userId && ucr.ClubId == clubId)
+                .SelectMany(ucr => ucr.ClubMemberPolicies!)
+                .Select(cmp => cmp.Policy.Name)
+                .ToListAsync();
+
+            return rolePolicies.Concat(directPolicies).Distinct().ToList();
         }
     }
 }

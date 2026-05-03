@@ -1,6 +1,8 @@
 ﻿using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
+using DataAccess.Models;
 using DataAccess.Repositories.Interface;
+using Microsoft.EntityFrameworkCore;
 using UNIC.BusinessLogic.DTOs;
 using UNIC.DataAccess.Models;
 
@@ -9,10 +11,14 @@ namespace BusinessLogic.Services
     public class ClubCreationRequestService : IClubCreationRequestService
     {
         private readonly IClubCreationRequestRepository _repository;
+        private readonly IClubService _clubService;
+        private readonly UnicContext _context;
 
-        public ClubCreationRequestService(IClubCreationRequestRepository repository)
+        public ClubCreationRequestService(IClubCreationRequestRepository repository, IClubService clubService, UnicContext context)
         {
             _repository = repository;
+            _clubService = clubService;
+            _context = context;
         }
 
         public async Task<IEnumerable<ClubCreationRequestDto>> GetAllAsync()
@@ -101,20 +107,48 @@ namespace BusinessLogic.Services
 
             return true;
         }
-        public async Task<bool> UpdateStatusAsync(int id, UpdateClubRequestStatusDto dto)
+        public async Task<ClubCreationRequestDto?> UpdateStatusAsync(int id, UpdateClubRequestStatusDto dto)
         {
             var request = await _repository.GetByIdAsync(id);
 
             if (request == null)
-                return false;
+                return null;
 
-            request.Status = dto.Status;
-            request.AdminComment = dto.AdminComment;
-            request.ReviewedAt = DateTime.UtcNow;
+            var strategy = _context.Database.CreateExecutionStrategy();
 
-            await _repository.UpdateAsync(request);
+            await strategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await _context.Database.BeginTransactionAsync();
 
-            return true;
+                request.Status = dto.Status;
+                request.AdminComment = dto.AdminComment;
+                request.ReviewedAt = DateTime.UtcNow;
+
+                await _repository.UpdateAsync(request);
+
+                if (dto.Status.Equals("approved", StringComparison.OrdinalIgnoreCase))
+                {
+                    await _clubService.CreateAsync(request.UserId, new CreateClubDto
+                    {
+                        ClubName = request.ClubName,
+                        Description = request.Description,
+                        Status = "Active"
+                    });
+                }
+
+                await transaction.CommitAsync();
+            });
+
+            return new ClubCreationRequestDto
+            {
+                RequestId = request.RequestId,
+                UserId = request.UserId,
+                ClubName = request.ClubName,
+                Description = request.Description,
+                Reason = request.Reason,
+                Status = request.Status,
+                CreatedAt = request.CreatedAt
+            };
         }
         public async Task<bool> DeleteAsync(int id)
         {

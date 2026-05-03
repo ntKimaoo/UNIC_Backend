@@ -18,6 +18,7 @@ public class MeetingDbContext : DbContext
     public DbSet<CriteriaScore>       CriteriaScores       { get; set; }
     public DbSet<CampaignDecision>    CampaignDecisions    { get; set; }
     public DbSet<ProposedTimeSlot>   ProposedTimeSlots    { get; set; }
+    public DbSet<AiCandidateAnalysisResult> AiCandidateAnalysisResults { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -205,6 +206,27 @@ public class MeetingDbContext : DbContext
              .WithMany()
              .HasForeignKey(d => d.InterviewScheduleId)
              .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── AiCandidateAnalysisResult ──────────────────────────────
+        modelBuilder.Entity<AiCandidateAnalysisResult>(e =>
+        {
+            e.ToTable("AiCandidateAnalysisResults");
+            e.HasKey(a => a.Id);
+
+            // Unique per schedule
+            e.HasIndex(a => a.InterviewScheduleId).IsUnique();
+            e.HasIndex(a => a.CampaignId);
+
+            e.Property(a => a.Result).HasMaxLength(50);
+            e.Property(a => a.CriteriaEvaluationsJson).HasColumnType("nvarchar(max)");
+            e.Property(a => a.StrengthsJson).HasColumnType("nvarchar(max)");
+            e.Property(a => a.WeaknessesJson).HasColumnType("nvarchar(max)");
+
+            e.HasOne(a => a.InterviewSchedule)
+             .WithMany()
+             .HasForeignKey(a => a.InterviewScheduleId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

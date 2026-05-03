@@ -18,12 +18,14 @@ namespace Presentation.Controllers
         private readonly IClubMemberService _service;
         private readonly IPolicyService _policyService;
         private readonly IDepartmentService _departmentService;
+        private readonly IClubRoleService _clubRoleService;
 
-        public ClubMemberController(IClubMemberService service, IPolicyService policyService, IDepartmentService departmentService)
+        public ClubMemberController(IClubMemberService service, IPolicyService policyService, IDepartmentService departmentService, IClubRoleService clubRoleService)
         {
             _service = service;
             _policyService = policyService;
             _departmentService = departmentService;
+            _clubRoleService = clubRoleService;
         }
         private Guid? GetCurrentUserId()
         {
@@ -63,6 +65,16 @@ namespace Presentation.Controllers
             }
 
             return Ok(new { success = true, totalItems = pagedResult.TotalCount, data = pagedResult.Items });
+        }
+
+        /// <summary>
+        /// Lấy số lượng thành viên ACTIVE của club
+        /// </summary>
+        [HttpGet("api/clubs/{clubId}/members/count")]
+        public async Task<IActionResult> GetMemberCount(int clubId)
+        {
+            var count = await _service.CountMembersAsync(clubId);
+            return Ok(new { success = true, data = count });
         }
 
         /// <summary>
@@ -183,6 +195,9 @@ namespace Presentation.Controllers
             if (member == null || member.ClubId != clubId)
                 return NotFound(new { success = false, message = "Member not found" });
 
+            if (member.Roles.Any(r => r.Level == 0))
+                return Conflict(new { success = false, message = "Không thể xóa Club Manager ra khỏi câu lạc bộ." });
+
             var result = await _service.RemoveMemberAsync(memberId);
             if (!result)
                 return StatusCode(500, new { success = false, message = "Failed to remove member" });
@@ -241,6 +256,22 @@ namespace Presentation.Controllers
                 return BadRequest(new { success = false, message = "userId is required" });
 
             var clubs = await _service.GetMyClubsAsync(userId);
+            return Ok(new { success = true, data = clubs });
+        }
+
+        /// <summary>
+        /// Lấy danh sách club kèm Policies chi tiết (Dùng token)
+        /// GET /api/me/my-clubs
+        /// </summary>
+        [Authorize]
+        [HttpGet("api/me/my-clubs")]
+        public async Task<IActionResult> GetMyClubsDetailed()
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null)
+                return Unauthorized(new { success = false, message = "Unauthorized: User ID not found in token." });
+
+            var clubs = await _service.GetMyClubsDetailedAsync(userId.Value);
             return Ok(new { success = true, data = clubs });
         }
 
@@ -345,6 +376,41 @@ namespace Presentation.Controllers
             if (departments == null)
                 return NotFound(new { success = false, message = "Member not found in this club" });
             return Ok(new { success = true, data = departments });
+        }
+
+        /// <summary>
+        /// Gắn role Club Manager (Level 0) cho member
+        /// POST /api/clubs/{clubId}/members/{memberId}/assign-manager
+        /// </summary>
+        [HttpPost("api/clubs/{clubId}/members/{memberId}/assign-manager")]
+        public async Task<IActionResult> AssignClubManager(int clubId, int memberId)
+        {
+            try
+            {
+                var member = await _service.GetMemberByIdAsync(memberId);
+                if (member == null || member.ClubId != clubId)
+                    return NotFound(new { success = false, message = "Member not found" });
+
+                var allRoles = await _clubRoleService.GetAllAsync(clubId);
+                var managerRole = allRoles.FirstOrDefault(r => r.Level == 0);
+                if (managerRole == null)
+                    return NotFound(new { success = false, message = "Chưa có role Club Manager (Level 0) nào được tạo cho club này." });
+
+                var currentRoleIds = member.Roles.Select(r => r.ClubRoleId).ToList();
+                if (!currentRoleIds.Contains(managerRole.ClubRoleId))
+                    currentRoleIds.Add(managerRole.ClubRoleId);
+
+                var updated = await _service.UpdateMemberRoleAsync(memberId, new UpdateMemberRoleDto { ClubRoleIds = currentRoleIds });
+                return Ok(new { success = true, message = "Gắn Club Manager thành công.", data = updated });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+            }
         }
     }
 }

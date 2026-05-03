@@ -160,10 +160,12 @@ builder.Services.AddScoped<INotificationHubContext, NotificationHubContext>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventReminderService>();
 builder.Services.AddHostedService<BusinessLogic.Services.Background.EventStatusSyncService>();
+builder.Services.AddHostedService<BusinessLogic.Services.Background.InterviewRoomActivationService>();
 
 // Unit of Work and Repositories
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IUnitOfWork, DataAccess.Repositories.Implementation.UnitOfWork>();
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventRepository, DataAccess.Repositories.Implementation.EventRepository>();
+builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventPermissionRepository, DataAccess.Repositories.Implementation.EventPermissionRepository>();
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IAttendanceRepository, DataAccess.Repositories.Implementation.AttendanceRepository>();
 builder.Services.AddScoped<DataAccess.Repositories.Interface.IEventScheduleRepository, DataAccess.Repositories.Implementation.EventScheduleRepository>();
 
@@ -174,7 +176,7 @@ builder.Services.AddScoped<BusinessLogic.Services.Interface.IQRCodeGeneratorServ
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<BusinessLogic.Validators.CreateEventRequestValidator>();
-builder.Services.Configure<OpenRouterOptions>(builder.Configuration.GetSection("OpenRouter"));
+builder.Services.Configure<GeminiOptions>(builder.Configuration.GetSection("Gemini"));
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(BusinessLogic.Mappings.EventMappingProfile).Assembly);
 
@@ -188,12 +190,7 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new NullableDateTimeUtcJsonConverter());
 }); ;
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    c.IncludeXmlComments(xmlPath);
-});
+builder.Services.AddSwaggerGen();
 //signalR
 builder.Services.AddSignalR();
 //jwt
@@ -218,18 +215,17 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(key)
     };
 });
-// Register authorization handler
-builder.Services.AddScoped<IAuthorizationHandler, PolicyAuthorizationHandler>();
-
+// Single handler: club-scoped policy check OR UserRole claim check (OR logic)
 builder.Services.AddScoped<IAuthorizationHandler, ClubPolicyOrRoleHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, EventPolicyHandler>();
+
+// Event Permission Service
+builder.Services.AddScoped<IEventPermissionService, EventPermissionService>();
 
 // Register club-scoped authorization handler
 builder.Services.AddScoped<IAuthorizationHandler, ClubMemberAuthorizationHandler>();
 
-// Register event-scoped authorization handler
-builder.Services.AddScoped<IAuthorizationHandler, EventPermissionAuthorizationHandler>();
-
-// Register dynamic policy provider
+// Dynamic policy provider (ClubPolicy_ / Role_ / ClubPolicyOrRole_ / EventPolicy_ prefixes)
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPolicyProvider>();
 
 // Configure file upload size limits
@@ -250,7 +246,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     }
 });
 
-//builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.None);
 
 IEdmModel GetEdmModel()
 {
@@ -263,19 +259,35 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<UnicContext>();
     var meetingDb = scope.ServiceProvider.GetRequiredService<MeetingDbContext>();
 
-    var retry = 0;
-    while (!db.Database.CanConnect())
+    // Connect to 'master' to check SQL Server readiness (target DB may not exist yet)
+    var connString = builder.Configuration.GetConnectionString("DefaultConnection")!;
+    var masterConn = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(connString)
     {
-        retry++;
-        if (retry > 10)
-        {
-            throw new Exception("SQL Server is not ready after waiting.");
-        }
+        InitialCatalog = "master"
+    }.ConnectionString;
 
-        Console.WriteLine("Waiting for SQL Server...");
-        Thread.Sleep(3000);
+    var retry = 0;
+    while (true)
+    {
+        try
+        {
+            using var conn = new Microsoft.Data.SqlClient.SqlConnection(masterConn);
+            conn.Open();
+            break;
+        }
+        catch
+        {
+            retry++;
+            if (retry > 30)
+            {
+                throw new Exception("SQL Server is not ready after waiting 150s.");
+            }
+            Console.WriteLine($"Waiting for SQL Server... ({retry}/30)");
+            Thread.Sleep(5000);
+        }
     }
 
+    Console.WriteLine("SQL Server is ready. Running migrations...");
     db.Database.Migrate();
     meetingDb.Database.Migrate();
 
@@ -307,7 +319,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowFE");
-app.UseStaticFiles(); // Enable serving files from wwwroot
+app.UseStaticFiles(); 
 app.MapHub<WebRtcHub>("/webrtc");
 app.MapHub<NotificationHub>("/notifications");
 app.MapHub<RecordOfChangeHub>("/record-of-change");
@@ -316,11 +328,5 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
-if (app.Environment.IsDevelopment())
-{
-    // Tránh 404 khi mở base URL qua ngrok (GET / không có controller).
-    app.MapGet("/", () => Results.Redirect("/swagger"));
-}
 
 app.Run();

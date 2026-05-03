@@ -1,4 +1,5 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.Exceptions;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
@@ -12,10 +13,14 @@ namespace BusinessLogic.Services.Implementation
     public class RecruitmentCampaignService : IRecruitmentCampaignService
     {
         private readonly IRecruitmentCampaignRepository _repository;
+        private readonly IClubRepository _clubRepository;
 
-        public RecruitmentCampaignService(IRecruitmentCampaignRepository repository)
+        public RecruitmentCampaignService(
+            IRecruitmentCampaignRepository repository,
+            IClubRepository clubRepository)
         {
             _repository = repository;
+            _clubRepository = clubRepository;
         }
 
         public async Task<RecruitmentCampaignResponseDto?> GetByIdAsync(int campaignId)
@@ -41,6 +46,17 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<RecruitmentCampaignResponseDto> CreateAsync(CreateRecruitmentCampaignDto dto)
         {
+            var clubExists = await _clubRepository.ExistsAsync(dto.ClubId);
+            if (!clubExists)
+                throw new NotFoundException("Club", dto.ClubId);
+
+            if (dto.StartDate.HasValue && dto.EndDate.HasValue && dto.StartDate >= dto.EndDate)
+                throw new DomainException("StartDate must be earlier than EndDate.");
+
+            var validStatuses = new[] { "OPEN", "CLOSED", "DRAFT" };
+            if (!string.IsNullOrEmpty(dto.Status) && !validStatuses.Contains(dto.Status.ToUpper()))
+                throw new DomainException($"Invalid status. Allowed values: {string.Join(", ", validStatuses)}");
+
             var campaign = new RecruitmentCampaign
             {
                 ClubId = dto.ClubId,
@@ -65,6 +81,15 @@ namespace BusinessLogic.Services.Implementation
             if (campaign == null)
                 return null;
 
+            var validStatuses = new[] { "OPEN", "CLOSED", "DRAFT" };
+            if (!string.IsNullOrEmpty(dto.Status) && !validStatuses.Contains(dto.Status.ToUpper()))
+                throw new DomainException($"Invalid status. Allowed values: {string.Join(", ", validStatuses)}");
+
+            var effectiveStartDate = dto.StartDate ?? campaign.StartDate;
+            var effectiveEndDate = dto.EndDate ?? campaign.EndDate;
+            if (effectiveStartDate.HasValue && effectiveEndDate.HasValue && effectiveStartDate >= effectiveEndDate)
+                throw new DomainException("StartDate must be earlier than EndDate.");
+
             // Update only provided fields
             if (!string.IsNullOrEmpty(dto.CampaignName))
                 campaign.CampaignName = dto.CampaignName;
@@ -82,7 +107,7 @@ namespace BusinessLogic.Services.Implementation
                 campaign.EndDate = dto.EndDate;
 
             if (!string.IsNullOrEmpty(dto.Status))
-                campaign.Status = dto.Status;
+                campaign.Status = dto.Status.ToUpper();
 
             if (dto.ImageUrl != null)
                 campaign.ImageUrl = dto.ImageUrl;

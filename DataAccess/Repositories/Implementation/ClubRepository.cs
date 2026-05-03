@@ -62,6 +62,7 @@ namespace DataAccess.Repositories.Implementation
             }
             club.CreatedAt = DateTime.UtcNow;
             club.IsDeleted = false;
+            club.IsActive = true;
             await _context.Clubs.AddAsync(club);
             await _context.SaveChangesAsync();
             return club;
@@ -132,9 +133,8 @@ namespace DataAccess.Repositories.Implementation
         }
         public async Task<int> CountMemberAsync(int clubId)
         {
-            return 0;
-            //return await _context.Users.Include(u => u.UserClubRoles)
-            //    .CountAsync(cm => cm.ClubMembers. == clubId && !cm.IsDeleted);
+            return await _context.UserClubRoles
+                .CountAsync(m => m.ClubId == clubId && m.Status.ToUpper() == "ACTIVE");
         }
         public async Task ChangeStatusClub(int clubId)
         {

@@ -262,9 +262,9 @@ namespace UNIC.ControllerTest.Controllers
 
 
         [Fact]
-        public async Task UpdateDepartment_Returns500_WhenExceptionThrown()
+        public async Task UpdateDepartment_ThrowsException_WhenServiceThrows()
         {
-            // Arrange
+            // Arrange — controller no longer has a try-catch; exception propagates to middleware
             int clubId = 1;
             int id = 1;
             var request = new UpdateDepartmentDto { Name = "Updated" };
@@ -272,12 +272,8 @@ namespace UNIC.ControllerTest.Controllers
             _mockDepartmentService.Setup(s => s.UpdateDepartmentAsync(clubId, id, request))
                 .ThrowsAsync(new Exception("Error"));
 
-            // Act
-            var result = await _controller.UpdateDepartment(clubId, id, request);
-
-            // Assert
-            var objectResult = Assert.IsType<ObjectResult>(result);
-            Assert.Equal(500, objectResult.StatusCode);
+            // Act & Assert
+            await Assert.ThrowsAsync<Exception>(() => _controller.UpdateDepartment(clubId, id, request));
         }
 
         #endregion

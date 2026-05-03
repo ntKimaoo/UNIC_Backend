@@ -129,7 +129,7 @@ namespace DataAccess.Repositories.Implementation
             {
                 var member = await _context.UserClubRoles.FindAsync(clubMemberId);
                 if (member == null) return false;
-
+                
                 _context.UserClubRoles.Remove(member);
                 await _context.SaveChangesAsync();
                 return true;
@@ -169,6 +169,12 @@ namespace DataAccess.Repositories.Implementation
                 .Include(u => u.ClubRole)
                 .FirstOrDefaultAsync(uc => uc.ClubMember.ClubId == clubId && uc.ClubRole.Level == 0);
             return clubManager != null;
+        }
+
+        public async Task<int> CountMembersAsync(int clubId)
+        {
+            return await _context.UserClubRoles
+                .CountAsync(m => m.ClubId == clubId && m.Status.ToUpper() == "ACTIVE");
         }
     }
 }

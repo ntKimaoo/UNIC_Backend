@@ -17,11 +17,14 @@ namespace Presentation.Controllers
     {
         private readonly IClubService _service;
         private readonly IClubRoleService _clubRoleService;
-
-        public ClubController(IClubService service, IClubRoleService clubRoleService)
+        private readonly IUserService _userService;
+        private readonly IClubMemberService _clubMemberService;
+        public ClubController(IClubService service, IClubRoleService clubRoleService, IUserService userservice, IClubMemberService clubMemberService)
         {
             _service = service;
             _clubRoleService = clubRoleService;
+            _userService = userservice;
+            _clubMemberService = clubMemberService;
         }
 
         /// <summary>
@@ -30,7 +33,7 @@ namespace Presentation.Controllers
         /// </summary>
         [HttpGet]
         [RequireRole("Admin")]
-        public async Task<IActionResult> GetAll(int pageSize, string? searchQuery, string pageIndex)
+        public async Task<IActionResult> GetAll(int pageSize, string? searchQuery, string? status, string pageIndex)
         {
             try
             {
@@ -42,6 +45,14 @@ namespace Presentation.Controllers
                     clubs = clubs.Where(c =>
                         c.ClubName.ToLower().Contains(searchLower) ||
                         c.ShortName.ToLower().Contains(searchLower)
+                    );
+                }
+
+                if (!string.IsNullOrEmpty(status))
+                {
+                    var searchLower = status.ToLower();
+                    clubs = clubs.Where(c =>
+                        c.Status.ToLower().Contains(searchLower)
                     );
                 }
 
@@ -219,7 +230,11 @@ namespace Presentation.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { success = false, message = ex.Message });
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = ex.Message
+                });
             }
         }
 
@@ -344,14 +359,6 @@ namespace Presentation.Controllers
                     message = "Club status updated successfully",
                 });
             }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = ex.Message
-                });
-            }
             catch (Exception ex)
             {
                 return StatusCode(500, new
@@ -469,5 +476,81 @@ namespace Presentation.Controllers
                 });
             }
         }
+        [HttpPost("{clubId}/add-members")]
+        public async Task<IActionResult> AddMembers(int clubId, [FromBody] List<string> emails)
+        {
+            try
+            {
+                var club = await _service.GetByIdAsync(clubId);
+                if (club == null)
+                {
+                    return NotFound(new
+                    {
+                        success = false,
+                        message = "Club not found"
+                    });
+                }
+
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                                 ?? User.FindFirst("sub")?.Value;
+                Guid? assignedBy = userIdClaim != null ? Guid.Parse(userIdClaim) : null;
+
+                var results = new
+                {
+                    added = new List<string>(),
+                    alreadyIn = new List<string>(),
+                    notFound = new List<string>(),
+                    errors = new List<string>()
+                };
+
+                foreach (var email in emails)
+                {
+                    try
+                    {
+                        var user = await _userService.GetByEmail(email);
+                        if (user == null)
+                        {
+                            results.notFound.Add(email);
+                            continue;
+                        }
+
+                        if (await _clubMemberService.IsUserInClubAsync(user.UserId, clubId))
+                        {
+                            results.alreadyIn.Add(email);
+                            continue;
+                        }
+
+                        await _clubMemberService.AddUserToClubAsync(clubId, new AddUserToClubDto
+                        {
+                            UserId = user.UserId,
+                            ClubRoleIds = new List<int>()
+                        }, assignedBy);
+
+                        results.added.Add(email);
+                    }
+                    catch (Exception ex)
+                    {
+                        results.errors.Add($"{email}: {ex.Message}");
+                    }
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    message = $"Processed {emails.Count} emails",
+                    data = results
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "An error occurred while adding members to the club",
+                    error = ex.Message
+                });
+            }
+        }
+
     }
 }

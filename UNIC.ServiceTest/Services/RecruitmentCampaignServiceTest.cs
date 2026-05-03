@@ -1,4 +1,5 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.Exceptions;
 using BusinessLogic.Services.Implementation;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
@@ -14,12 +15,14 @@ namespace UNIC.ServiceTest.Services
     public class RecruitmentCampaignServiceTest
     {
         private readonly Mock<IRecruitmentCampaignRepository> _mockRepo;
+        private readonly Mock<IClubRepository> _mockClubRepo;
         private readonly RecruitmentCampaignService _service;
 
         public RecruitmentCampaignServiceTest()
         {
             _mockRepo = new Mock<IRecruitmentCampaignRepository>();
-            _service = new RecruitmentCampaignService(_mockRepo.Object);
+            _mockClubRepo = new Mock<IClubRepository>();
+            _service = new RecruitmentCampaignService(_mockRepo.Object, _mockClubRepo.Object);
         }
 
         private static RecruitmentCampaign CreateCampaign(int id = 1) => new RecruitmentCampaign
@@ -112,7 +115,7 @@ namespace UNIC.ServiceTest.Services
         #region CreateAsync
 
         [Fact]
-        public async Task CreateAsync_ReturnsMappedDto()
+        public async Task CreateAsync_ReturnsDto_WhenValidInput()
         {
             var dto = new CreateRecruitmentCampaignDto
             {
@@ -122,12 +125,9 @@ namespace UNIC.ServiceTest.Services
                 Status = "OPEN"
             };
 
+            _mockClubRepo.Setup(r => r.ExistsAsync(1)).ReturnsAsync(true);
             _mockRepo.Setup(r => r.CreateAsync(It.IsAny<RecruitmentCampaign>()))
-                     .ReturnsAsync((RecruitmentCampaign c) =>
-                     {
-                         c.CampaignId = 10;
-                         return c;
-                     });
+                     .ReturnsAsync((RecruitmentCampaign c) => { c.CampaignId = 10; return c; });
 
             var result = await _service.CreateAsync(dto);
 
@@ -138,7 +138,7 @@ namespace UNIC.ServiceTest.Services
         }
 
         [Fact]
-        public async Task CreateAsync_SetsDefaultStatus_WhenNull()
+        public async Task CreateAsync_SetsDefaultStatusToOpen_WhenStatusIsNull()
         {
             var dto = new CreateRecruitmentCampaignDto
             {
@@ -147,16 +147,117 @@ namespace UNIC.ServiceTest.Services
                 Status = null
             };
 
+            _mockClubRepo.Setup(r => r.ExistsAsync(1)).ReturnsAsync(true);
             _mockRepo.Setup(r => r.CreateAsync(It.IsAny<RecruitmentCampaign>()))
-                     .ReturnsAsync((RecruitmentCampaign c) =>
-                     {
-                         c.CampaignId = 11;
-                         return c;
-                     });
+                     .ReturnsAsync((RecruitmentCampaign c) => { c.CampaignId = 11; return c; });
 
             var result = await _service.CreateAsync(dto);
 
             Assert.Equal("OPEN", result.Status);
+        }
+
+        [Fact]
+        public async Task CreateAsync_ThrowsNotFoundException_WhenClubNotFound()
+        {
+            var dto = new CreateRecruitmentCampaignDto { ClubId = 99, CampaignName = "Test" };
+
+            _mockClubRepo.Setup(r => r.ExistsAsync(99)).ReturnsAsync(false);
+
+            await Assert.ThrowsAsync<NotFoundException>(() => _service.CreateAsync(dto));
+            _mockRepo.Verify(r => r.CreateAsync(It.IsAny<RecruitmentCampaign>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task CreateAsync_ThrowsDomainException_WhenStartDateEqualsEndDate()
+        {
+            var date = DateTime.UtcNow;
+            var dto = new CreateRecruitmentCampaignDto
+            {
+                ClubId = 1,
+                CampaignName = "Test",
+                StartDate = date,
+                EndDate = date
+            };
+
+            _mockClubRepo.Setup(r => r.ExistsAsync(1)).ReturnsAsync(true);
+
+            var ex = await Assert.ThrowsAsync<DomainException>(() => _service.CreateAsync(dto));
+            Assert.Equal("StartDate must be earlier than EndDate.", ex.Message);
+        }
+
+        [Fact]
+        public async Task CreateAsync_ThrowsDomainException_WhenStartDateAfterEndDate()
+        {
+            var dto = new CreateRecruitmentCampaignDto
+            {
+                ClubId = 1,
+                CampaignName = "Test",
+                StartDate = DateTime.UtcNow.AddDays(5),
+                EndDate = DateTime.UtcNow
+            };
+
+            _mockClubRepo.Setup(r => r.ExistsAsync(1)).ReturnsAsync(true);
+
+            await Assert.ThrowsAsync<DomainException>(() => _service.CreateAsync(dto));
+        }
+
+        [Fact]
+        public async Task CreateAsync_ThrowsDomainException_WhenStatusIsInvalid()
+        {
+            var dto = new CreateRecruitmentCampaignDto
+            {
+                ClubId = 1,
+                CampaignName = "Test",
+                Status = "INVALID"
+            };
+
+            _mockClubRepo.Setup(r => r.ExistsAsync(1)).ReturnsAsync(true);
+
+            var ex = await Assert.ThrowsAsync<DomainException>(() => _service.CreateAsync(dto));
+            Assert.Contains("Invalid status", ex.Message);
+            Assert.Contains("OPEN, CLOSED, DRAFT", ex.Message);
+        }
+
+        [Theory]
+        [InlineData("OPEN")]
+        [InlineData("CLOSED")]
+        [InlineData("DRAFT")]
+        public async Task CreateAsync_Succeeds_WithAllValidStatuses(string status)
+        {
+            var dto = new CreateRecruitmentCampaignDto
+            {
+                ClubId = 1,
+                CampaignName = "Test",
+                Status = status
+            };
+
+            _mockClubRepo.Setup(r => r.ExistsAsync(1)).ReturnsAsync(true);
+            _mockRepo.Setup(r => r.CreateAsync(It.IsAny<RecruitmentCampaign>()))
+                     .ReturnsAsync((RecruitmentCampaign c) => c);
+
+            var result = await _service.CreateAsync(dto);
+
+            Assert.Equal(status, result.Status);
+        }
+
+        [Fact]
+        public async Task CreateAsync_Succeeds_WhenOnlyStartDateProvided()
+        {
+            var dto = new CreateRecruitmentCampaignDto
+            {
+                ClubId = 1,
+                CampaignName = "Test",
+                StartDate = DateTime.UtcNow,
+                EndDate = null
+            };
+
+            _mockClubRepo.Setup(r => r.ExistsAsync(1)).ReturnsAsync(true);
+            _mockRepo.Setup(r => r.CreateAsync(It.IsAny<RecruitmentCampaign>()))
+                     .ReturnsAsync((RecruitmentCampaign c) => c);
+
+            var result = await _service.CreateAsync(dto);
+
+            Assert.NotNull(result);
         }
 
         #endregion
@@ -167,7 +268,7 @@ namespace UNIC.ServiceTest.Services
         public async Task UpdateAsync_ReturnsUpdatedDto_WhenFound()
         {
             var campaign = CreateCampaign();
-            var updateDto = new UpdateRecruitmentCampaignDto
+            var dto = new UpdateRecruitmentCampaignDto
             {
                 CampaignName = "Updated Name",
                 Status = "CLOSED"
@@ -176,7 +277,7 @@ namespace UNIC.ServiceTest.Services
             _mockRepo.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(campaign);
             _mockRepo.Setup(r => r.UpdateAsync(It.IsAny<RecruitmentCampaign>())).ReturnsAsync(true);
 
-            var result = await _service.UpdateAsync(1, updateDto);
+            var result = await _service.UpdateAsync(1, dto);
 
             Assert.NotNull(result);
             Assert.Equal("Updated Name", result!.CampaignName);
@@ -184,17 +285,18 @@ namespace UNIC.ServiceTest.Services
         }
 
         [Fact]
-        public async Task UpdateAsync_ReturnsNull_WhenNotFound()
+        public async Task UpdateAsync_ReturnsNull_WhenCampaignNotFound()
         {
             _mockRepo.Setup(r => r.GetByIdAsync(99)).ReturnsAsync((RecruitmentCampaign?)null);
 
             var result = await _service.UpdateAsync(99, new UpdateRecruitmentCampaignDto());
 
             Assert.Null(result);
+            _mockRepo.Verify(r => r.UpdateAsync(It.IsAny<RecruitmentCampaign>()), Times.Never);
         }
 
         [Fact]
-        public async Task UpdateAsync_ReturnsNull_WhenUpdateFails()
+        public async Task UpdateAsync_ReturnsNull_WhenRepositoryUpdateFails()
         {
             var campaign = CreateCampaign();
             _mockRepo.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(campaign);
@@ -209,35 +311,36 @@ namespace UNIC.ServiceTest.Services
         }
 
         [Fact]
-        public async Task UpdateAsync_OnlyUpdatesProvidedFields()
+        public async Task UpdateAsync_PreservesUnchangedFields_WhenPartialUpdate()
         {
             var campaign = CreateCampaign();
-            campaign.Description = "Original";
+            campaign.Description = "Original Description";
             campaign.Content = "Original Content";
+            campaign.LinkCampaign = "http://original.com";
 
-            var updateDto = new UpdateRecruitmentCampaignDto
+            var dto = new UpdateRecruitmentCampaignDto
             {
                 CampaignName = "New Name"
-                // Description, Content not provided → should keep originals
             };
 
             _mockRepo.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(campaign);
             _mockRepo.Setup(r => r.UpdateAsync(It.IsAny<RecruitmentCampaign>())).ReturnsAsync(true);
 
-            var result = await _service.UpdateAsync(1, updateDto);
+            var result = await _service.UpdateAsync(1, dto);
 
             Assert.NotNull(result);
             Assert.Equal("New Name", result!.CampaignName);
-            Assert.Equal("Original", result.Description);
+            Assert.Equal("Original Description", result.Description);
             Assert.Equal("Original Content", result.Content);
+            Assert.Equal("http://original.com", result.LinkCampaign);
         }
 
         [Fact]
-        public async Task UpdateAsync_UpdatesAllFields()
+        public async Task UpdateAsync_UpdatesAllFields_WhenFullUpdate()
         {
             var campaign = CreateCampaign();
             var now = DateTime.UtcNow;
-            var updateDto = new UpdateRecruitmentCampaignDto
+            var dto = new UpdateRecruitmentCampaignDto
             {
                 CampaignName = "Full Update",
                 LinkCampaign = "http://link.com",
@@ -252,13 +355,14 @@ namespace UNIC.ServiceTest.Services
             _mockRepo.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(campaign);
             _mockRepo.Setup(r => r.UpdateAsync(It.IsAny<RecruitmentCampaign>())).ReturnsAsync(true);
 
-            var result = await _service.UpdateAsync(1, updateDto);
+            var result = await _service.UpdateAsync(1, dto);
 
             Assert.NotNull(result);
             Assert.Equal("Full Update", result!.CampaignName);
             Assert.Equal("http://link.com", result.LinkCampaign);
             Assert.Equal("New Desc", result.Description);
             Assert.Equal(now, result.StartDate);
+            Assert.Equal(now.AddDays(30), result.EndDate);
             Assert.Equal("CLOSED", result.Status);
             Assert.Equal("http://img.com/pic.jpg", result.ImageUrl);
             Assert.Equal("New Content", result.Content);
@@ -276,6 +380,7 @@ namespace UNIC.ServiceTest.Services
             var result = await _service.DeleteAsync(1);
 
             Assert.True(result);
+            _mockRepo.Verify(r => r.DeleteAsync(1), Times.Once);
         }
 
         [Fact]
