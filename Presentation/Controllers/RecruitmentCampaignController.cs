@@ -53,7 +53,15 @@ namespace Presentation.Controllers
 
             return Ok(new { success = true, data = campaign });
         }
+        [HttpGet("api/RecruitmentCampaign/{id}")]
+        public async Task<IActionResult> GetByIdPublic(int id)
+        {
+            var campaign = await _service.GetByIdAsync(id);
+            if (campaign == null)
+                return NotFound(new { success = false, message = "Recruitment campaign not found" });
 
+            return Ok(new { success = true, data = campaign });
+        }
         /// <summary>
         /// Create a new recruitment campaign
         /// </summary>
