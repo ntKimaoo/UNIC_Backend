@@ -277,7 +277,6 @@ namespace BusinessLogic.Services.Implementation
             };
         }
 
-        /// <summary>Mã đơn duy nhất cho cổng thanh toán (tránh trùng với đơn cũ trên PayOS khi TransactionId nhỏ / DB từng xóa giao dịch tạm).</summary>
         private static long BuildExternalOrderCodeForContribution(int transactionId)
         {
             if (transactionId <= 0)
@@ -285,7 +284,7 @@ namespace BusinessLogic.Services.Implementation
             var ms = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             unchecked
             {
-                return (ms * 8192L) + transactionId;
+                return (ms * 1000L) + transactionId;
             }
         }
 
