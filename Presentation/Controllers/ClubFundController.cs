@@ -298,12 +298,25 @@ namespace Presentation.Controllers
             }
         }
 
-        [HttpGet("{fundId}")]
+        [HttpGet("{fundId:int}")]
         [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFund(int fundId)
         {
             var userId = GetCurrentUserId();
             var fund = await _clubFundService.GetFundByIdAsync(fundId, userId, User.IsInRole("Admin"));
+            if (fund == null)
+                return NotFound(new { success = false, message = "Quỹ không tồn tại." });
+            if (!await CanAccessClubAsync(userId, fund.ClubId))
+                return StatusCode(403, new { success = false, message = "Bạn không có quyền xem quỹ của câu lạc bộ này." });
+            return Ok(new { success = true, data = fund });
+        }
+
+        [HttpGet("{publicId:guid}")]
+        [RequireClubPolicy("viewfinance")]
+        public async Task<IActionResult> GetFundByPublicId(Guid publicId)
+        {
+            var userId = GetCurrentUserId();
+            var fund = await _clubFundService.GetFundByPublicIdAsync(publicId, userId, User.IsInRole("Admin"));
             if (fund == null)
                 return NotFound(new { success = false, message = "Quỹ không tồn tại." });
             if (!await CanAccessClubAsync(userId, fund.ClubId))

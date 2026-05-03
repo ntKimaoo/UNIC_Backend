@@ -9,13 +9,6 @@ public class MeetingDbContext : DbContext
     public MeetingDbContext(DbContextOptions<MeetingDbContext> options)
         : base(options) { }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        optionsBuilder.ConfigureWarnings(w =>
-            w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
-    }
-
-
     public DbSet<InterviewSchedule>   InterviewSchedules   { get; set; }
     public DbSet<InterviewAssignment> InterviewAssignments { get; set; }
     public DbSet<MeetingRoom>         MeetingRooms         { get; set; }

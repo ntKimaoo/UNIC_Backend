@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    [Migration("20260502035341_AddEventOnlineFields")]
-    partial class AddEventOnlineFields
+    [Migration("20260430141652_AddClubFundPublicId")]
+    partial class AddClubFundPublicId
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -334,6 +334,9 @@ namespace DataAccess.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("RejectReason")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
@@ -354,6 +357,9 @@ namespace DataAccess.Migrations
                     b.HasIndex("ClubId");
 
                     b.HasIndex("FundTypeId");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique();
 
                     b.ToTable("ClubFunds");
                 });
@@ -748,12 +754,11 @@ namespace DataAccess.Migrations
 
                     b.HasIndex("AssignedBy");
 
+                    b.HasIndex("EventId");
+
                     b.HasIndex("EventRoleId");
 
                     b.HasIndex("UserId");
-
-                    b.HasIndex("EventId", "UserId")
-                        .IsUnique();
 
                     b.ToTable("EventMembers");
                 });
@@ -1862,8 +1867,7 @@ namespace DataAccess.Migrations
                 {
                     b.HasOne("DataAccess.Models.User", "AssignedByUser")
                         .WithMany()
-                        .HasForeignKey("AssignedBy")
-                        .OnDelete(DeleteBehavior.NoAction);
+                        .HasForeignKey("AssignedBy");
 
                     b.HasOne("DataAccess.Models.Event", "Event")
                         .WithMany("EventMembers")
@@ -1873,13 +1877,12 @@ namespace DataAccess.Migrations
 
                     b.HasOne("DataAccess.Models.EventRole", "EventRole")
                         .WithMany("EventMembers")
-                        .HasForeignKey("EventRoleId")
-                        .OnDelete(DeleteBehavior.NoAction);
+                        .HasForeignKey("EventRoleId");
 
                     b.HasOne("DataAccess.Models.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("AssignedByUser");

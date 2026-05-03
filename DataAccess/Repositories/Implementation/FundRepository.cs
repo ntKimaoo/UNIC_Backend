@@ -32,6 +32,14 @@ namespace DataAccess.Repositories.Implementation
                 .FirstOrDefaultAsync(f => f.FundId == id && (includeDeleted || !f.IsDeleted));
         }
 
+        public async Task<ClubFund?> GetFundByPublicIdAsync(Guid publicId, bool includeDeleted = false)
+        {
+            return await _context.ClubFunds
+                .AsNoTracking()
+                .Include(f => f.FundType)
+                .FirstOrDefaultAsync(f => f.PublicId == publicId && (includeDeleted || !f.IsDeleted));
+        }
+
         public async Task<bool> ExistsNonRejectedFundNameInClubAsync(int clubId, string fundNameNormalized)
         {
             var normalized = (fundNameNormalized ?? string.Empty).Trim().ToUpperInvariant();

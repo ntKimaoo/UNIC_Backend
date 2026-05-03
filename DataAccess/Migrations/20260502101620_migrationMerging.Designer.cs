@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DataAccess.Migrations
 {
     [DbContext(typeof(UnicContext))]
-    [Migration("20260502034413_SyncEventMemberModel")]
-    partial class SyncEventMemberModel
+    [Migration("20260502101620_migrationMerging")]
+    partial class migrationMerging
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -213,7 +213,6 @@ namespace DataAccess.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubId"));
 
                     b.Property<string>("Address")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ClubName")
@@ -222,22 +221,18 @@ namespace DataAccess.Migrations
                         .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("CoverImageUrl")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Description")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Email")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FacebookUrl")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("FoundedDate")
@@ -253,15 +248,12 @@ namespace DataAccess.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("LogoUrl")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PhoneNumber")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ShortName")
-                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
@@ -274,7 +266,6 @@ namespace DataAccess.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("WebsiteUrl")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("ClubId");
@@ -334,6 +325,9 @@ namespace DataAccess.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("RejectReason")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
@@ -354,6 +348,9 @@ namespace DataAccess.Migrations
                     b.HasIndex("ClubId");
 
                     b.HasIndex("FundTypeId");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique();
 
                     b.ToTable("ClubFunds");
                 });
@@ -748,12 +745,11 @@ namespace DataAccess.Migrations
 
                     b.HasIndex("AssignedBy");
 
+                    b.HasIndex("EventId");
+
                     b.HasIndex("EventRoleId");
 
                     b.HasIndex("UserId");
-
-                    b.HasIndex("EventId", "UserId")
-                        .IsUnique();
 
                     b.ToTable("EventMembers");
                 });
@@ -1862,8 +1858,7 @@ namespace DataAccess.Migrations
                 {
                     b.HasOne("DataAccess.Models.User", "AssignedByUser")
                         .WithMany()
-                        .HasForeignKey("AssignedBy")
-                        .OnDelete(DeleteBehavior.NoAction);
+                        .HasForeignKey("AssignedBy");
 
                     b.HasOne("DataAccess.Models.Event", "Event")
                         .WithMany("EventMembers")
@@ -1873,13 +1868,12 @@ namespace DataAccess.Migrations
 
                     b.HasOne("DataAccess.Models.EventRole", "EventRole")
                         .WithMany("EventMembers")
-                        .HasForeignKey("EventRoleId")
-                        .OnDelete(DeleteBehavior.NoAction);
+                        .HasForeignKey("EventRoleId");
 
                     b.HasOne("DataAccess.Models.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.NoAction)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("AssignedByUser");
