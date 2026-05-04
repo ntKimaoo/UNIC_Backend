@@ -700,14 +700,14 @@ namespace BusinessLogic.Services.Implementation
         public async Task<bool> SendCheckInSuccessAsync(string toEmail, string fullName, string eventName, DateTime? checkInTime)
         {
             var timeStr = checkInTime.HasValue ? checkInTime.Value.ToString("HH:mm, dd/MM/yyyy") : "N/A";
-            var subject = $"✅ Điểm danh thành công: {eventName}";
+            var subject = $"[UniClub] Điểm danh thành công: {eventName}";
             var body = $@"
             <html>
             <body style='font-family: Arial, sans-serif;'>
                 <h2>Chào {fullName}!</h2>
                 <p>Bạn đã <strong>điểm danh thành công</strong> tại sự kiện: <strong>{eventName}</strong>.</p>
                 <div style='background-color: #f0fdf4; border: 1px solid #86efac; padding: 16px; border-radius: 8px; margin: 16px 0;'>
-                    <p style='margin: 0; color: #166534; font-weight: bold;'>⏰ Thời gian điểm danh: {timeStr}</p>
+                    <p style='margin: 0; color: #166534; font-weight: bold;'>Thời gian điểm danh: {timeStr}</p>
                 </div>
                 <p>Chúc bạn có một buổi trải nghiệm tuyệt vời!</p>
                 <br>
@@ -728,8 +728,8 @@ namespace BusinessLogic.Services.Implementation
                 <h2>Chào {fullName}!</h2>
                 <p>Bạn đã được giao vai trò <strong>{roleName}</strong> trong sự kiện: <strong>{eventName}</strong>.</p>
                 <div style='background-color: #f5f3ff; border: 1px solid #c4b5fd; padding: 16px; border-radius: 8px; margin: 16px 0;'>
-                    <p style='margin: 0 0 8px; color: #5b21b6; font-weight: bold;'>🎯 Vai trò: {roleName}</p>
-                    <p style='margin: 0; color: #5b21b6;'>📌 Sự kiện: {eventName}</p>
+                    <p style='margin: 0 0 8px; color: #5b21b6; font-weight: bold;'>Vai trò: {roleName}</p>
+                    <p style='margin: 0; color: #5b21b6;'>Sự kiện: {eventName}</p>
                 </div>
                 <p>Vui lòng truy cập hệ thống để xem chi tiết quyền hạn và nhiệm vụ của bạn trong sự kiện.</p>
                 <p><a href='{_appBaseUrl}' style='background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold;'>Xem chi tiết →</a></p>
