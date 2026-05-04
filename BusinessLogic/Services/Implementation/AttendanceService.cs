@@ -263,6 +263,19 @@ namespace BusinessLogic.Services.Implementation
             _unitOfWork.Attendances.Update(attendance);
             await _unitOfWork.SaveChangesAsync();
 
+            // Gửi email điểm danh thành công (fire-and-forget)
+            var user = attendance.User;
+            if (user != null)
+            {
+                var evName = eventEntity.EventName;
+                var ciTime = attendance.CheckInTime;
+                _ = Task.Run(async () =>
+                {
+                    try { await _emailService.SendCheckInSuccessAsync(user.Email, user.FullName, evName, ciTime); }
+                    catch (Exception ex) { Console.WriteLine($"[Email] CheckInSuccess email failed: {ex.Message}"); }
+                });
+            }
+
             return new CheckInResult
             {
                 Success = true,

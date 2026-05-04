@@ -21,5 +21,7 @@ namespace BusinessLogic.Services.Interface
         Task<bool> SendClubAcceptanceEmailAsync(string toEmail, string fullName, string campaignName);
         Task<bool> SendApplicationSuccessEmailAsync(string toEmail, string fullName, string campaignName);
         Task<bool> SendApplicationRejectedEmailAsync(string toEmail, string fullName, string campaignName);
+        Task<bool> SendCheckInSuccessAsync(string toEmail, string fullName, string eventName, DateTime? checkInTime);
+        Task<bool> SendEventRoleAssignedAsync(string toEmail, string fullName, string eventName, string roleName);
     }
 }
