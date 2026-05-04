@@ -143,6 +143,9 @@ namespace BusinessLogic.Services.Implementation
                 var selectedSlot = slots.FirstOrDefault(s => s.Id == dto.SelectedTimeSlotId.Value);
                 if (selectedSlot != null)
                 {
+                    if (selectedSlot.ProposedAt <= DateTime.UtcNow.AddHours(5))
+                        throw new InvalidOperationException("Không thể xác nhận lịch phỏng vấn này vì đã sát giờ (cần xác nhận trước ít nhất 5 tiếng).");
+
                     schedule.ScheduledAt = selectedSlot.ProposedAt;
                     // Cập nhật trạng thái IsSelected cho tất cả slots
                     foreach (var slot in slots)
@@ -181,6 +184,8 @@ namespace BusinessLogic.Services.Implementation
                 case InterviewStatus.Confirmed:
                     if (schedule.Status != InterviewStatus.Scheduled && schedule.Status != InterviewStatus.Rescheduled)
                         throw new InvalidOperationException("Chỉ có thể Confirm từ Scheduled hoặc Rescheduled.");
+                    if (!schedule.ScheduledAt.HasValue || schedule.ScheduledAt.Value <= DateTime.UtcNow.AddHours(5))
+                        throw new InvalidOperationException("Không thể xác nhận lịch phỏng vấn này vì đã sát giờ (cần xác nhận trước ít nhất 5 tiếng) hoặc chưa chọn giờ cụ thể.");
                     break;
 
                 case InterviewStatus.InProgress:
@@ -204,6 +209,34 @@ namespace BusinessLogic.Services.Implementation
                 case InterviewStatus.Rescheduled:
                     if (schedule.Status == InterviewStatus.Completed || schedule.Status == InterviewStatus.Cancelled)
                         throw new InvalidOperationException("Không thể Reschedule lịch đã Completed hoặc Cancelled.");
+
+                    if (dto.ProposedTimeSlots != null && dto.ProposedTimeSlots.Count > 0)
+                    {
+                        await _repo.DeleteTimeSlotsByScheduleIdAsync(id);
+                        foreach (var slot in dto.ProposedTimeSlots)
+                        {
+                            if (DateTime.TryParse($"{slot.Date}T{slot.Time}", out var proposedAt))
+                            {
+                                var timeSlot = new ProposedTimeSlot
+                                {
+                                    InterviewScheduleId = id,
+                                    ProposedAt = proposedAt,
+                                    IsSelected = false,
+                                    CreatedAt = DateTime.UtcNow
+                                };
+                                await _repo.CreateTimeSlotAsync(timeSlot);
+                            }
+                        }
+                        // Xóa ScheduledAt cũ để ứng viên phải chọn lại
+                        schedule.ScheduledAt = null;
+                        
+                        // Đóng phòng họp nếu đang có vì lịch đã thay đổi
+                        var oldRoom = await _repo.GetRoomByScheduleIdAsync(id);
+                        if (oldRoom != null && oldRoom.Status != RoomStatus.Closed)
+                        {
+                            await CloseRoomAsync(oldRoom.RoomCode);
+                        }
+                    }
                     break;
 
                 default:

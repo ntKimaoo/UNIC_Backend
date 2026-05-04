@@ -51,6 +51,9 @@ namespace BusinessLogic.Services.Background
                     // ── 3. Auto-complete expired interviews ────────────────────
                     await AutoCompleteExpiredAsync(interviewRepo, userRepo);
 
+                    // ── 4. Auto-cancel unconfirmed interviews (20 mins before) ──
+                    await AutoCancelUnconfirmedAsync(interviewRepo);
+
                     // ── 4. Send feedback nudge emails ─────────────────────────
                     await SendFeedbackNudgeEmailsAsync(interviewRepo, userRepo);
                 }
@@ -261,6 +264,25 @@ namespace BusinessLogic.Services.Background
             catch (Exception ex)
             {
                 _logger.LogError(ex, "InterviewRoomActivationService: error sending feedback nudge emails.");
+            }
+        }
+        
+        // ═══════════════════════════════════════════════════════════
+        //  5. Auto-cancel unconfirmed interviews
+        // ═══════════════════════════════════════════════════════════
+        private async Task AutoCancelUnconfirmedAsync(IInterviewRepository interviewRepo)
+        {
+            try
+            {
+                int cancelledCount = await interviewRepo.AutoCancelUnconfirmedInterviewsAsync(TimeSpan.FromDays(1), TimeSpan.FromHours(5));
+                if (cancelledCount > 0)
+                {
+                    _logger.LogInformation("InterviewRoomActivationService: auto-cancelled {Count} unconfirmed interview(s).", cancelledCount);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "InterviewRoomActivationService: error auto-cancelling unconfirmed interviews.");
             }
         }
     }

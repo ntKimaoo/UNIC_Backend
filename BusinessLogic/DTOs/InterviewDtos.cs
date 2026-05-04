@@ -104,6 +104,8 @@ namespace BusinessLogic.DTOs
         /// Bắt buộc khi status = Cancelled
         /// </summary>
         public string? CancelReason { get; set; }
+
+        public List<ProposedTimeSlotItemDto>? ProposedTimeSlots { get; set; }
     }
 
     public class InterviewScheduleResponseDto
