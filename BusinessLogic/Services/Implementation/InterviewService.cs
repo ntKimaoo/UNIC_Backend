@@ -99,6 +99,19 @@ namespace BusinessLogic.Services.Implementation
                         AssignedAt = DateTime.UtcNow
                     };
                     await _repo.CreateAssignmentAsync(assignment);
+
+                    var interviewer = await _userRepo.GetByIdAsync(item.InterviewerUserId);
+                    if (interviewer != null)
+                    {
+                        EmailQueueService.EnqueueEmail(new EmailQueueItem
+                        {
+                            ToEmail = interviewer.Email,
+                            FullName = interviewer.FullName,
+                            EmailType = EmailType.InterviewerAssigned,
+                            InterviewTitle = dto.Title,
+                            InterviewScheduledAt = dto.ScheduledAt
+                        });
+                    }
                 }
             }
 
@@ -369,6 +382,19 @@ namespace BusinessLogic.Services.Implementation
 
                 var created = await _repo.CreateAssignmentAsync(assignment);
                 result.Add(MapAssignmentToDto(created));
+
+                var interviewer = await _userRepo.GetByIdAsync(item.InterviewerUserId);
+                if (interviewer != null)
+                {
+                    EmailQueueService.EnqueueEmail(new EmailQueueItem
+                    {
+                        ToEmail = interviewer.Email,
+                        FullName = interviewer.FullName,
+                        EmailType = EmailType.InterviewerAssigned,
+                        InterviewTitle = schedule.Title,
+                        InterviewScheduledAt = schedule.ScheduledAt
+                    });
+                }
             }
 
             return result;

@@ -697,6 +697,52 @@ namespace BusinessLogic.Services.Implementation
             return await SendEmailAsync(toEmail, subject, body);
         }
 
+        public async Task<bool> SendInterviewerAssignedEmailAsync(string toEmail, string fullName, string interviewTitle, DateTime? scheduledAt)
+        {
+            var subject = $"[UniClub] Thông báo: Bạn được phân công phỏng vấn \"{interviewTitle}\"";
+            
+            var timeHtml = "";
+            if (scheduledAt.HasValue)
+            {
+                var vnTime = scheduledAt.Value.AddHours(7);
+                var dateStr = vnTime.ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"));
+                timeHtml = $"<tr><td style='padding:8px 0;font-size:13px;color:#64748b;width:110px;font-family:Arial,sans-serif;'>Thời gian dự kiến</td><td style='padding:8px 0 8px 12px;font-size:13px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>{dateStr}</td></tr>";
+            }
+
+            string body = $@"
+    <html>
+    <body style='margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;'>
+        <table width='100%' cellpadding='0' cellspacing='0' style='padding:32px 16px;'>
+            <tr><td align='center'>
+                <table width='560' cellpadding='0' cellspacing='0' style='background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;'>
+                    <tr><td style='background:#fdf4ff;padding:28px 32px 24px;'>
+                        <table cellpadding='0' cellspacing='0' style='margin-bottom:12px;'>
+                            <tr><td style='background:#f3e8ff;color:#7e22ce;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:bold;font-family:Arial,sans-serif;'>Phân công mới</td></tr>
+                        </table>
+                        <div style='font-size:19px;font-weight:bold;color:#581c87;line-height:1.3;margin-bottom:4px;font-family:Arial,sans-serif;'>{interviewTitle}</div>
+                        <div style='font-size:12px;color:#9333ea;font-family:Arial,sans-serif;'>UniClub &middot; Thông báo tự động</div>
+                    </td></tr>
+                    <tr><td style='padding:26px 32px;'>
+                        <p style='font-size:15px;color:#1e293b;margin:0 0 14px;font-family:Arial,sans-serif;'>Chào <strong>{fullName}</strong>,</p>
+                        <p style='font-size:15px;color:#1e293b;margin-bottom:14px;font-family:Arial,sans-serif;'>Bạn vừa được chỉ định làm phỏng vấn viên cho buổi phỏng vấn <strong>{interviewTitle}</strong>.</p>
+                        <table width='100%' cellpadding='0' cellspacing='0' style='background:#fdf4ff;border:1px solid #d8b4fe;border-radius:10px;padding:12px 18px;margin-bottom:18px;'>
+                            {timeHtml}
+                            <tr><td style='padding:8px 0;font-size:13px;color:#64748b;width:110px;font-family:Arial,sans-serif;'>Vai trò</td><td style='padding:8px 0 8px 12px;font-size:13px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>Phỏng vấn viên</td></tr>
+                        </table>
+                        <p style='font-size:14px;color:#555;line-height:1.65;font-family:Arial,sans-serif;'>Vui lòng đăng nhập hệ thống để xem chi tiết ứng viên và tài liệu đánh giá trước khi phỏng vấn bắt đầu.</p>
+                    </td></tr>
+                    <tr><td style='padding:18px 32px 24px;border-top:1px solid #e2e8f0;'>
+                        <p style='font-size:11px;color:#94a3b8;line-height:1.6;margin:0;font-family:Arial,sans-serif;'>Email này được gửi tự động từ hệ thống UniClub.</p>
+                    </td></tr>
+                </table>
+            </td></tr>
+        </table>
+    </body>
+    </html>";
+
+            return await SendEmailAsync(toEmail, subject, body);
+        }
+
         private async Task<bool> SendEmailAsync(string toEmail, string subject, string body, string? inlineContentId = null, byte[]? inlineImageBytes = null)
         {
             try
