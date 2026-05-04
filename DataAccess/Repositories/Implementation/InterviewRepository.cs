@@ -121,6 +121,67 @@ namespace DataAccess.Repositories.Implementation
             return expiredSchedules.Count;
         }
 
+        public async Task<int> AutoCancelUnconfirmedInterviewsAsync(TimeSpan maxWaitTime, TimeSpan minTimeBeforeEarliestSlot)
+        {
+            var now = DateTime.UtcNow;
+
+            var unconfirmedSchedules = await _context.InterviewSchedules
+                .Include(s => s.ProposedTimeSlots)
+                .Where(s => s.Status == InterviewStatus.Scheduled || s.Status == InterviewStatus.Rescheduled)
+                .ToListAsync();
+
+            var schedulesToCancel = new List<InterviewSchedule>();
+
+            foreach (var schedule in unconfirmedSchedules)
+            {
+                bool shouldCancel = false;
+
+                // Điều kiện 1: Đã quá thời gian chờ từ lúc tạo/cập nhật lịch (vd 1 ngày)
+                var lastUpdated = schedule.UpdatedAt ?? schedule.CreatedAt ?? now;
+                if (now - lastUpdated > maxWaitTime)
+                {
+                    shouldCancel = true;
+                }
+                else
+                {
+                    // Điều kiện 2: Gần đến thời gian của slot gần nhất (vd trước 5 tiếng)
+                    DateTime? earliestProposedTime = null;
+                    
+                    if (schedule.ProposedTimeSlots != null && schedule.ProposedTimeSlots.Any())
+                    {
+                        earliestProposedTime = schedule.ProposedTimeSlots.Min(p => p.ProposedAt);
+                    }
+                    else if (schedule.ScheduledAt.HasValue)
+                    {
+                        earliestProposedTime = schedule.ScheduledAt.Value;
+                    }
+
+                    if (earliestProposedTime.HasValue && earliestProposedTime.Value <= now.Add(minTimeBeforeEarliestSlot))
+                    {
+                        shouldCancel = true;
+                    }
+                }
+
+                if (shouldCancel)
+                {
+                    schedulesToCancel.Add(schedule);
+                }
+            }
+
+            if (!schedulesToCancel.Any())
+                return 0;
+
+            foreach (var schedule in schedulesToCancel)
+            {
+                schedule.Status = InterviewStatus.Cancelled;
+                schedule.CancelReason = "Hệ thống tự động hủy do ứng viên không xác nhận lịch phỏng vấn đúng hạn.";
+                schedule.UpdatedAt = now;
+            }
+
+            await _context.SaveChangesAsync();
+            return schedulesToCancel.Count;
+        }
+
         public async Task<IEnumerable<InterviewSchedule>> GetSchedulesNeedingReminderAsync(TimeSpan reminderBefore)
         {
             var now = DateTime.UtcNow;

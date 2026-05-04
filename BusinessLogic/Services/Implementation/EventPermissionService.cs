@@ -14,13 +14,16 @@ namespace BusinessLogic.Services.Implementation
     {
         private readonly IEventPermissionRepository _eventPermRepo;
         private readonly IEventRepository _eventRepo;
+        private readonly IEmailService _emailService;
 
         public EventPermissionService(
             IEventPermissionRepository eventPermRepo,
-            IEventRepository eventRepo)
+            IEventRepository eventRepo,
+            IEmailService emailService)
         {
             _eventPermRepo = eventPermRepo;
             _eventRepo = eventRepo;
+            _emailService = emailService;
         }
 
         /// <summary>
@@ -81,6 +84,21 @@ namespace BusinessLogic.Services.Implementation
             await _eventPermRepo.AddEventMemberAsync(member);
 
             var saved = await _eventPermRepo.GetEventMemberByUserAsync(eventId, request.UserId);
+
+            // Gửi email thông báo giao quyền (fire-and-forget)
+            if (saved?.User != null && saved?.EventRole != null)
+            {
+                var ev = await _eventRepo.GetByIdAsync(eventId);
+                var u = saved.User;
+                var roleName = saved.EventRole.RoleName;
+                var evName = ev?.EventName ?? "N/A";
+                _ = Task.Run(async () =>
+                {
+                    try { await _emailService.SendEventRoleAssignedAsync(u.Email, u.FullName, evName, roleName); }
+                    catch (Exception ex) { Console.WriteLine($"[Email] EventRoleAssigned email failed: {ex.Message}"); }
+                });
+            }
+
             return MapToDto(saved!);
         }
 

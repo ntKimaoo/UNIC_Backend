@@ -41,6 +41,62 @@ namespace DataAccess.Repositories.Implementation
                 .ToListAsync();
         }
 
+        public async Task<(IEnumerable<RecruitmentCampaign> Items, int TotalCount)> GetPagedAsync(
+            int page, int pageSize, string? search, string? filterBy, bool ascending)
+        {
+            var query = _context.RecruitmentCampaigns
+                .Include(rc => rc.Club)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(rc =>
+                    rc.CampaignName.Contains(search) ||
+                    (rc.Description != null && rc.Description.Contains(search)));
+
+            if (!string.IsNullOrWhiteSpace(filterBy))
+                query = query.Where(rc => rc.Status.ToLower() == filterBy.ToLower());
+
+            query = ascending
+                ? query.OrderBy(rc => rc.CreatedAt)
+                : query.OrderByDescending(rc => rc.CreatedAt);
+
+            var total = await query.CountAsync();
+            var items = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, total);
+        }
+
+        public async Task<(IEnumerable<RecruitmentCampaign> Items, int TotalCount)> GetPagedByClubIdAsync(
+            int clubId, int page, int pageSize, string? search, string? filterBy, bool ascending)
+        {
+            var query = _context.RecruitmentCampaigns
+                .Include(rc => rc.Club)
+                .Where(rc => rc.ClubId == clubId);
+
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(rc =>
+                    rc.CampaignName.Contains(search) ||
+                    (rc.Description != null && rc.Description.Contains(search)));
+
+            if (!string.IsNullOrWhiteSpace(filterBy))
+                query = query.Where(rc => rc.Status.ToLower() == filterBy.ToLower());
+
+            query = ascending
+                ? query.OrderBy(rc => rc.CreatedAt)
+                : query.OrderByDescending(rc => rc.CreatedAt);
+
+            var total = await query.CountAsync();
+            var items = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (items, total);
+        }
+
         public async Task<RecruitmentCampaign> CreateAsync(RecruitmentCampaign campaign)
         {
             await _context.RecruitmentCampaigns.AddAsync(campaign);
