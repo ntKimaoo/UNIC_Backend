@@ -19,26 +19,46 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
-        /// Get all recruitment campaigns (all clubs)
+        /// Get all recruitment campaigns across all clubs (with pagination, search, filter, sort)
         /// </summary>
-        [HttpGet("[controller]")]
-        public async Task<IActionResult> GetAll()
+        [HttpGet("api/[controller]")]
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int? page,
+            [FromQuery] int? pageSize,
+            [FromQuery] string? search,
+            [FromQuery] string? filterBy,
+            [FromQuery] bool? ascending)
         {
-            var campaigns = await _service.GetAllAsync();
-            return Ok(new
-            {
-                success = true,
-                data = campaigns
-            });
+            var result = await _service.GetPagedAsync(
+                page ?? 1,
+                pageSize ?? 8,
+                search,
+                filterBy,
+                ascending ?? false);
+
+            return Ok(new { success = true, data = result });
         }
         /// <summary>
-        /// Get all recruitment campaigns for a specific club
+        /// Get all recruitment campaigns for a specific club (with pagination, search, filter, sort)
         /// </summary>
         [HttpGet("api/club/{clubId}/RecruitmentCampaign")]
-        public async Task<IActionResult> GetAllByClubId(int clubId)
+        public async Task<IActionResult> GetAllByClubId(
+            int clubId,
+            [FromQuery] int? page,
+            [FromQuery] int? pageSize,
+            [FromQuery] string? search,
+            [FromQuery] string? filterBy,
+            [FromQuery] bool? ascending)
         {
-            var campaigns = await _service.GetByClubIdAsync(clubId);
-            return Ok(new { success = true, data = campaigns });
+            var result = await _service.GetPagedByClubIdAsync(
+                clubId,
+                page ?? 1,
+                pageSize ?? 8,
+                search,
+                filterBy,
+                ascending ?? false);
+
+            return Ok(new { success = true, data = result });
         }
 
         /// <summary>

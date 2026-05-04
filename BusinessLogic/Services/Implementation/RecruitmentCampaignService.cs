@@ -44,6 +44,42 @@ namespace BusinessLogic.Services.Implementation
             return campaigns.Select(MapToResponseDto);
         }
 
+        public async Task<PagedResultDto<RecruitmentCampaignResponseDto>> GetPagedAsync(
+            int page, int pageSize, string? search, string? filterBy, bool ascending)
+        {
+            var (items, total) = await _repository.GetPagedAsync(page, pageSize, search, filterBy, ascending);
+            var totalPages = (int)Math.Ceiling(total / (double)pageSize);
+            return new PagedResultDto<RecruitmentCampaignResponseDto>
+            {
+                Items = items.Select(MapToResponseDto),
+                PageNumber = page,
+                PageSize = pageSize,
+                TotalCount = total,
+                TotalPages = totalPages,
+                HasPreviousPage = page > 1,
+                HasNextPage = page < totalPages
+            };
+        }
+
+        public async Task<PagedResultDto<RecruitmentCampaignResponseDto>> GetPagedByClubIdAsync(
+            int clubId, int page, int pageSize, string? search, string? filterBy, bool ascending)
+        {
+            var (items, total) = await _repository.GetPagedByClubIdAsync(
+                clubId, page, pageSize, search, filterBy, ascending);
+
+            var totalPages = (int)Math.Ceiling(total / (double)pageSize);
+            return new PagedResultDto<RecruitmentCampaignResponseDto>
+            {
+                Items = items.Select(MapToResponseDto),
+                PageNumber = page,
+                PageSize = pageSize,
+                TotalCount = total,
+                TotalPages = totalPages,
+                HasPreviousPage = page > 1,
+                HasNextPage = page < totalPages
+            };
+        }
+
         public async Task<RecruitmentCampaignResponseDto> CreateAsync(CreateRecruitmentCampaignDto dto)
         {
             var clubExists = await _clubRepository.ExistsAsync(dto.ClubId);
