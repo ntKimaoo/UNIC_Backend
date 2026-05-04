@@ -290,6 +290,51 @@ namespace BusinessLogic.Services.Implementation
             _unitOfWork.Events.Update(eventEntity);
             await _unitOfWork.SaveChangesAsync();
 
+            // ── Auto-promote WAITLIST → REGISTERED khi có slot trống ──
+            if (eventEntity.MaxAttendees.HasValue && eventEntity.AvailableSlots.HasValue && eventEntity.AvailableSlots.Value > 0)
+            {
+                var promoted = 0;
+                var slotsToFill = eventEntity.AvailableSlots.Value;
+                for (int i = 0; i < slotsToFill; i++)
+                {
+                    bool ok = await _unitOfWork.Events
+                        .TryDirectPromoteOldestWaitlistAsync(request.EventId, nameof(AttendanceStatus.REGISTERED));
+                    if (!ok) break; // không còn ai trong WAITLIST
+                    promoted++;
+                }
+
+                if (promoted > 0)
+                {
+                    // Cập nhật lại AvailableSlots sau khi promote
+                    eventEntity.AvailableSlots -= promoted;
+                    _unitOfWork.Events.Update(eventEntity);
+                    await _unitOfWork.SaveChangesAsync();
+
+                    Console.WriteLine($"[OpenRegistration] Auto-promoted {promoted} waitlisted members for event {request.EventId}");
+
+                    // Gửi email cho các thành viên được promote (fire-and-forget)
+                    var promotedAttendances = (await _unitOfWork.Attendances.GetAttendeesByEventAsync(request.EventId))
+                        .Where(a => a.AttendanceStatus == nameof(AttendanceStatus.REGISTERED))
+                        .OrderByDescending(a => a.RegistrationDate)
+                        .Take(promoted);
+
+                    foreach (var att in promotedAttendances)
+                    {
+                        var u = att.User;
+                        var ev = eventEntity;
+                        var token = att.CheckInToken;
+                        if (u != null)
+                        {
+                            _ = Task.Run(async () =>
+                            {
+                                try { await _emailService.SendEventRegistrationSuccessAsync(u.Email, u.FullName, ev.EventName, ev.StartDate, token); }
+                                catch (Exception ex) { Console.WriteLine($"[Email] WaitlistPromote email failed: {ex.Message}"); }
+                            });
+                        }
+                    }
+                }
+            }
+
             // Return updated DTO
             var updatedEvent = await _unitOfWork.Events.GetByIdWithDetailsAsync(request.EventId);
             return _mapper.Map<EventDetailDto>(updatedEvent);
