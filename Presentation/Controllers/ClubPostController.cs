@@ -1,6 +1,7 @@
 using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Mvc;
+using Presentation.Authorization;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -17,7 +18,7 @@ public class ClubPostController : ControllerBase
 
     /// <summary>Get all club posts</summary>
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult>    ()
     {
         var posts = await _clubPostService.GetAllAsync();
         return Ok(new { success = true, data = posts });
@@ -72,6 +73,7 @@ public class ClubPostController : ControllerBase
     [Consumes("multipart/form-data")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireClubPolicyOrRole("Club Manager", "CreatePost")]
     public async Task<IActionResult> Create([FromForm] CreateClubPostDto dto, IFormFile? imageFile)
     {
         if (!ModelState.IsValid)
@@ -100,6 +102,7 @@ public class ClubPostController : ControllerBase
     [Consumes("multipart/form-data")]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [RequireClubPolicyOrRole("Club Manager", "EditPost")]
     public async Task<IActionResult> Update(int id, [FromForm] UpdateClubPostDto dto, IFormFile? imageFile)
     {
         if (!ModelState.IsValid)
