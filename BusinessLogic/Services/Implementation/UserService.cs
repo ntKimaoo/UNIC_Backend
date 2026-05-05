@@ -131,24 +131,7 @@ namespace BusinessLogic.Services.Implementation
 
             if (!string.IsNullOrEmpty(request.Status))
             {
-                var oldStatus = user.Status;
                 user.Status = request.Status;
-
-                // Auto-cancel all event registrations when user is deactivated
-                if (string.Equals(oldStatus, "Active", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(request.Status, "Active", StringComparison.OrdinalIgnoreCase))
-                {
-                    try
-                    {
-                        var cancelled = await _attendanceService.CancelAllRegistrationsByUserAsync(id);
-                        if (cancelled > 0)
-                            Console.WriteLine($"[UserDeactivation] Auto-cancelled {cancelled} event registrations for user {id}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[UserDeactivation] Failed to cancel registrations for user {id}: {ex.Message}");
-                    }
-                }
             }
 
             user.UpdatedAt = DateTime.UtcNow;
@@ -158,6 +141,18 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<bool> DeleteUserAsync(Guid id)
         {
+            // Auto-cancel all active event registrations before deleting user
+            try
+            {
+                var cancelled = await _attendanceService.CancelAllRegistrationsByUserAsync(id);
+                if (cancelled > 0)
+                    Console.WriteLine($"[UserDeletion] Auto-cancelled {cancelled} event registrations for user {id}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[UserDeletion] Failed to cancel registrations for user {id}: {ex.Message}");
+            }
+
             return await _userRepository.DeleteAsync(id);
         }
         public async Task<IEnumerable<Club>> GetAllClubsById(Guid UserId)
