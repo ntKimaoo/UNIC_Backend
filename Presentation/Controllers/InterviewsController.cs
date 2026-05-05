@@ -54,7 +54,6 @@ namespace Presentation.Controllers
         /// GET /api/interviews – Danh sách lịch (filter theo campaignId, status, date)
         /// </summary>
         [HttpGet]
-        [RequireClubPolicyOrRole("manageinterview", "Admin")]
         public async Task<IActionResult> GetAll(
             [FromQuery] int? campaignId,
             [FromQuery] string? status,
