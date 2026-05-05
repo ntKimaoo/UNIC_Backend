@@ -164,8 +164,10 @@ namespace BusinessLogic.Services.Implementation
                 await txn.CommitAsync();
 
                 // Email ngoài transaction — lỗi email KHÔNG rollback DB
+                // Lấy đúng token đã lưu vào DB (từ existingAttendance hoặc attendance mới)
                 var checkInToken = existingAttendance?.CheckInToken
-                    ?? Guid.NewGuid().ToString("N"); // fallback nhưng đã set ở trên
+                    ?? (await _unitOfWork.Attendances.GetByEventAndUserAsync(request.EventId, request.UserId))?.CheckInToken
+                    ?? Guid.NewGuid().ToString("N");
                 if (status == nameof(AttendanceStatus.REGISTERED))
                 {
                     _ = Task.Run(async () =>
