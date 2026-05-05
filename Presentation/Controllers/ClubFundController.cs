@@ -299,7 +299,6 @@ namespace Presentation.Controllers
         }
 
         [HttpGet("{fundId:int}")]
-        [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetFund(int fundId)
         {
             var userId = GetCurrentUserId();
@@ -375,7 +374,6 @@ namespace Presentation.Controllers
         }
 
         [HttpGet("my")]
-        [RequireClubPolicy("viewfinance")]
         public async Task<IActionResult> GetMyFunds(
             int clubId,
             [FromQuery] string? mineType,
