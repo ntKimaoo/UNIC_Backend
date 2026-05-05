@@ -2,6 +2,7 @@
 using BusinessLogic.Services.Interface;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Presentation.Authorization;
 
 namespace Presentation.Controllers
 {
@@ -39,12 +40,14 @@ namespace Presentation.Controllers
             return Ok(new { message = "Đã đánh dấu tất cả thông báo là đã đọc." });
         }
         [HttpPost("send")]
+        [RequireClubPolicyOrRole("Club Manager", "CreateNotification")]
         public async Task<IActionResult> SendNotification(Guid userId, string title, string message, string type)
         {
             await _notificationService.SendNotificationAsync(userId, title, message, type);
             return Ok(new { message = "Đã gửi thông báo." });
         }
         [HttpPost("send-bulk")]
+        [RequireClubPolicyOrRole("Club Manager", "CreateNotification")]
         public async Task<IActionResult> SendBulkNotification([FromBody] BulkNotificationDto dto)
         {
             foreach (var userId in dto.UserIds)
