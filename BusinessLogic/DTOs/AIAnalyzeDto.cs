@@ -22,6 +22,7 @@ namespace UNIC.BusinessLogic.DTOs
         public int CriterionId { get; set; }
         public string? CriterionName { get; set; }
         public string? Result { get; set; }
+        public string? Reason { get; set; }
     }
 
     public class AiSearchRawResponse

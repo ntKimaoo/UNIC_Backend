@@ -74,8 +74,11 @@ namespace DataAccess.Repositories.Interface
         Task DeleteTimeSlotsByScheduleIdAsync(int scheduleId);
         // ── AiAnalysisResult ────────────────────────────────────
         Task<IEnumerable<AiCandidateAnalysisResult>> GetAiAnalysisResultsByCampaignIdAsync(int campaignId);
+        Task<AiCandidateAnalysisResult?> GetAiAnalysisResultByScheduleIdAsync(int scheduleId);
         Task<AiCandidateAnalysisResult> CreateAiAnalysisResultAsync(AiCandidateAnalysisResult result);
         Task<IEnumerable<AiCandidateAnalysisResult>> CreateAiAnalysisResultsAsync(IEnumerable<AiCandidateAnalysisResult> results);
+        Task DeleteAiAnalysisResultsByCampaignIdAsync(int campaignId);
+        Task DeleteAiAnalysisResultsByScheduleIdAsync(int scheduleId);
     }
 }
 

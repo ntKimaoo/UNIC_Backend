@@ -501,11 +501,28 @@ namespace Presentation.Controllers
         /// POST /api/interviews/campaign/{campaignId}/ai-analysis/generate – Scan ứng viên chưa được phân tích, gọi AI & lưu DB
         /// </summary>
         [HttpPost("campaign/{campaignId}/ai-analysis/generate")]
-        public async Task<IActionResult> GenerateAiAnalysis(int campaignId)
+        public async Task<IActionResult> GenerateAiAnalysis(int campaignId, [FromQuery] bool force = false)
         {
             try
             {
-                var result = await _aiService.GenerateAiAnalysisAsync(campaignId);
+                var result = await _aiService.GenerateAiAnalysisAsync(campaignId, force);
+                return Ok(new { success = true, data = result });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// POST /api/interviews/schedule/{scheduleId}/ai-analysis/generate – Scan 1 ứng viên, gọi AI & lưu DB
+        /// </summary>
+        [HttpPost("schedule/{scheduleId}/ai-analysis/generate")]
+        public async Task<IActionResult> GenerateSingleAiAnalysis(int scheduleId, [FromQuery] bool force = false)
+        {
+            try
+            {
+                var result = await _aiService.GenerateSingleAiAnalysisAsync(scheduleId, force);
                 return Ok(new { success = true, data = result });
             }
             catch (Exception ex)

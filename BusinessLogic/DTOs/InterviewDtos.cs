@@ -553,6 +553,9 @@ namespace BusinessLogic.DTOs
 
         /// <summary> Pass, Fail, Hold </summary>
         public string Result { get; set; } = "Hold";
+
+        /// <summary> AI explanation for the result </summary>
+        public string Reason { get; set; } = string.Empty;
     }
 
     /// <summary>

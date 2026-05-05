@@ -601,6 +601,38 @@ namespace DataAccess.Repositories.Implementation
             await _context.SaveChangesAsync();
             return results;
         }
+
+        public async Task DeleteAiAnalysisResultsByCampaignIdAsync(int campaignId)
+        {
+            var existing = await _context.AiCandidateAnalysisResults
+                .Where(r => r.CampaignId == campaignId)
+                .ToListAsync();
+            
+            if (existing.Any())
+            {
+                _context.AiCandidateAnalysisResults.RemoveRange(existing);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task<AiCandidateAnalysisResult?> GetAiAnalysisResultByScheduleIdAsync(int scheduleId)
+        {
+            return await _context.AiCandidateAnalysisResults
+                .FirstOrDefaultAsync(r => r.InterviewScheduleId == scheduleId);
+        }
+
+        public async Task DeleteAiAnalysisResultsByScheduleIdAsync(int scheduleId)
+        {
+            var existing = await _context.AiCandidateAnalysisResults
+                .Where(r => r.InterviewScheduleId == scheduleId)
+                .ToListAsync();
+            
+            if (existing.Any())
+            {
+                _context.AiCandidateAnalysisResults.RemoveRange(existing);
+                await _context.SaveChangesAsync();
+            }
+        }
     }
 }
 

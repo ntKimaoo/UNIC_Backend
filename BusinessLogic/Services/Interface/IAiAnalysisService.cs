@@ -13,7 +13,12 @@ namespace BusinessLogic.Services.Interface
         /// <summary>
         /// Scan các ứng viên (Status = Completed) chưa được phân tích, gọi AI để tạo phân tích mới rồi lưu vào DB.
         /// </summary>
-        Task<AiCampaignAnalysisResponseDto> GenerateAiAnalysisAsync(int campaignId);
+        Task<AiCampaignAnalysisResponseDto> GenerateAiAnalysisAsync(int campaignId, bool forceReanalyze = false);
+
+        /// <summary>
+        /// Phân tích AI cho 1 ứng viên cụ thể.
+        /// </summary>
+        Task<AiCandidateAnalysisDto> GenerateSingleAiAnalysisAsync(int scheduleId, bool forceReanalyze = false);
 
         /// <summary>
         /// Tìm kiếm ứng viên bằng ngôn ngữ tự nhiên.
