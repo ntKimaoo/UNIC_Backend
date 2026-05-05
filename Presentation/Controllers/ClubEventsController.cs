@@ -25,6 +25,18 @@ namespace UNIC.Presentation.Controllers
     [Authorize]
     public class ClubEventsController : ControllerBase
     {
+        private static readonly TimeZoneInfo VnTz =
+            TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+
+        /// <summary>
+        /// Multipart form-data dates bypass the JSON converter.
+        /// FE sends .toISOString() (UTC), but the service layer compares against VnTimeHelper.Now.
+        /// This helper converts UTC DateTimes to Vietnam local time.
+        /// </summary>
+        private static DateTime NormalizeToVn(DateTime dt)
+            => dt.Kind == DateTimeKind.Utc ? TimeZoneInfo.ConvertTimeFromUtc(dt, VnTz) : dt;
+        private static DateTime? NormalizeToVn(DateTime? dt)
+            => dt.HasValue ? NormalizeToVn(dt.Value) : null;
         private readonly IEventService _eventService;
         private readonly IFileStorageService _fileStorageService;
         private readonly IEventPermissionService _eventPermissionService;
@@ -84,6 +96,10 @@ namespace UNIC.Presentation.Controllers
                 // Override ClubId from route
                 request.ClubId = clubId;
 
+                // Normalize UTC dates from multipart form to Vietnam time
+                request.StartDate = NormalizeToVn(request.StartDate);
+                request.EndDate = NormalizeToVn(request.EndDate);
+
                 string? imageUrl = null;
                 if (image != null && image.Length > 0)
                 {
@@ -117,6 +133,10 @@ namespace UNIC.Presentation.Controllers
             try
             {
                 if (id != request.EventId) return BadRequest(new { error = "Event ID mismatch" });
+
+                // Normalize UTC dates from multipart form to Vietnam time
+                if (request.StartDate.HasValue) request.StartDate = NormalizeToVn(request.StartDate);
+                if (request.EndDate.HasValue) request.EndDate = NormalizeToVn(request.EndDate);
 
                 // Verify the event belongs to this club
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
