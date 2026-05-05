@@ -126,7 +126,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPut("{id}/status")]
-        [RequireRole("Admin")]
+        [RequireRole("Admin")]  
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateClubRequestStatusDto dto)
         {
             var request = await _service.UpdateStatusAsync(id, dto);

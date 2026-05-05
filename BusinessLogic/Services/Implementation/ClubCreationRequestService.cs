@@ -13,12 +13,14 @@ namespace BusinessLogic.Services
         private readonly IClubCreationRequestRepository _repository;
         private readonly IClubService _clubService;
         private readonly UnicContext _context;
+        private readonly INotificationService _notificationService;
 
-        public ClubCreationRequestService(IClubCreationRequestRepository repository, IClubService clubService, UnicContext context)
+        public ClubCreationRequestService(IClubCreationRequestRepository repository, IClubService clubService, UnicContext context, INotificationService notificationService)
         {
             _repository = repository;
             _clubService = clubService;
             _context = context;
+            _notificationService = notificationService;
         }
 
         public async Task<IEnumerable<ClubCreationRequestDto>> GetAllAsync()
@@ -134,6 +136,23 @@ namespace BusinessLogic.Services
                         Description = request.Description,
                         Status = "Active"
                     });
+
+                    await _notificationService.SendNotificationAsync(
+                        request.UserId,
+                        "Yêu cầu thành lập CLB được phê duyệt",
+                        $"Câu lạc bộ \"{request.ClubName}\" đã được phê duyệt. Vui lòng cập nhật thông tin chi tiết (email, số điện thoại, địa chỉ, website).",
+                        "CLUB_APPROVED"
+                    );
+                }
+                else if (dto.Status.Equals("rejected", StringComparison.OrdinalIgnoreCase))
+                {
+                    await _notificationService.SendNotificationAsync(
+                        request.UserId,
+                        "Yêu cầu thành lập CLB bị từ chối",
+                        $"Yêu cầu thành lập CLB \"{request.ClubName}\" đã bị từ chối." +
+                        (string.IsNullOrEmpty(dto.AdminComment) ? "" : $" Lý do: {dto.AdminComment}"),
+                        "CLUB_REJECTED"
+                    );
                 }
 
                 await transaction.CommitAsync();
