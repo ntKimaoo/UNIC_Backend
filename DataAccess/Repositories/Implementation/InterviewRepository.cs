@@ -435,12 +435,29 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<IEnumerable<EvaluationCriterion>> GetCriteriaForAssignmentAsync(int campaignId, int assignmentId)
         {
-            // Chỉ trả criteria đã được assign cho interviewer này (có CriteriaScore)
+            // Non-draft criteria explicitly assigned to this interviewer
+            var assignedNonDraftIds = await _context.CriteriaScores
+                .Where(s => s.InterviewAssignmentId == assignmentId && !s.EvaluationCriterion.IsDraft)
+                .Select(s => s.EvaluationCriterionId)
+                .Distinct()
+                .ToListAsync();
+
+            if (assignedNonDraftIds.Count == 0)
+            {
+                // No specific assignment → show ALL non-draft criteria + any drafts for this assignment
+                return await _context.EvaluationCriteria
+                    .Where(c => c.CampaignId == campaignId &&
+                                (!c.IsDraft || c.CriteriaScores.Any(s => s.InterviewAssignmentId == assignmentId)))
+                    .OrderBy(c => c.IsDraft).ThenBy(c => c.Name)
+                    .ToListAsync();
+            }
+
+            // Specific assignment → return only those non-draft criteria + any drafts for this assignment
             return await _context.EvaluationCriteria
                 .Where(c => c.CampaignId == campaignId &&
-                            c.CriteriaScores.Any(s => s.InterviewAssignmentId == assignmentId))
-                .OrderBy(c => c.IsDraft)
-                .ThenBy(c => c.Name)
+                            (assignedNonDraftIds.Contains(c.Id) ||
+                             (c.IsDraft && c.CriteriaScores.Any(s => s.InterviewAssignmentId == assignmentId))))
+                .OrderBy(c => c.IsDraft).ThenBy(c => c.Name)
                 .ToListAsync();
         }
 
