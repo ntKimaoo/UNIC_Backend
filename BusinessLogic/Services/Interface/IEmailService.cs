@@ -24,5 +24,6 @@ namespace BusinessLogic.Services.Interface
         Task<bool> SendCheckInSuccessAsync(string toEmail, string fullName, string eventName, DateTime? checkInTime);
         Task<bool> SendEventRoleAssignedAsync(string toEmail, string fullName, string eventName, string roleName);
         Task<bool> SendInterviewerAssignedEmailAsync(string toEmail, string fullName, string interviewTitle, DateTime? scheduledAt);
+        Task<bool> SendNoInterviewerRescheduleEmailAsync(string toEmail, string fullName, string interviewTitle, DateTime oldScheduledAt, DateTime newScheduledAt);
     }
 }

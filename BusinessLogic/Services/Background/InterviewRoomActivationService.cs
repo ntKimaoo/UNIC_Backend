@@ -51,7 +51,10 @@ namespace BusinessLogic.Services.Background
                     // ── 3. Auto-complete expired interviews ────────────────────
                     await AutoCompleteExpiredAsync(interviewRepo, userRepo);
 
-                    // ── 4. Auto-cancel unconfirmed interviews (20 mins before) ──
+                    // ── 4. Auto-reschedule confirmed interviews with no interviewer ──
+                    await AutoRescheduleNoInterviewerAsync(interviewRepo, userRepo);
+
+                    // ── 5. Auto-cancel unconfirmed interviews (20 mins before) ──
                     await AutoCancelUnconfirmedAsync(interviewRepo);
 
                     // ── 4. Send feedback nudge emails ─────────────────────────
@@ -267,6 +270,41 @@ namespace BusinessLogic.Services.Background
             }
         }
         
+        // ═══════════════════════════════════════════════════════════
+        //  4. Auto-reschedule confirmed interviews with no interviewer
+        // ═══════════════════════════════════════════════════════════
+        private async Task AutoRescheduleNoInterviewerAsync(IInterviewRepository interviewRepo, IUserRepository userRepo)
+        {
+            try
+            {
+                var rescheduled = (await interviewRepo.AutoRescheduleNoInterviewerAsync(TimeSpan.FromHours(2))).ToList();
+                if (!rescheduled.Any()) return;
+
+                foreach (var schedule in rescheduled)
+                {
+                    var creator = await userRepo.GetByIdAsync(schedule.CreatedByUserId);
+                    if (creator == null) continue;
+
+                    var oldTime = schedule.ScheduledAt!.Value.AddDays(-1);
+                    EmailQueueService.EnqueueEmail(new EmailQueueItem
+                    {
+                        ToEmail = creator.Email,
+                        FullName = creator.FullName,
+                        EmailType = EmailType.NoInterviewerReschedule,
+                        InterviewTitle = schedule.Title,
+                        InterviewScheduledAt = oldTime,
+                        NewScheduledAt = schedule.ScheduledAt.Value
+                    });
+                }
+
+                _logger.LogInformation("InterviewRoomActivationService: auto-rescheduled {Count} interview(s) due to no interviewer.", rescheduled.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "InterviewRoomActivationService: error auto-rescheduling no-interviewer interviews.");
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════
         //  5. Auto-cancel unconfirmed interviews
         // ═══════════════════════════════════════════════════════════

@@ -15,6 +15,7 @@ namespace DataAccess.Repositories.Interface
         Task<bool> DeleteScheduleAsync(int id);
         Task<int> AutoCompleteExpiredInterviewsAsync(int gracePeriodMinutes);
         Task<int> AutoCancelUnconfirmedInterviewsAsync(TimeSpan maxWaitTime, TimeSpan minTimeBeforeEarliestSlot);
+        Task<IEnumerable<InterviewSchedule>> AutoRescheduleNoInterviewerAsync(TimeSpan hoursBeforeStart);
         Task<IEnumerable<InterviewSchedule>> GetSchedulesNeedingReminderAsync(TimeSpan reminderBefore);
         Task<IEnumerable<InterviewSchedule>> GetCompletedSchedulesWithPendingFeedbackAsync();
 

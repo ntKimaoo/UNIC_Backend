@@ -29,6 +29,7 @@ namespace BusinessLogic.DTOs
         public string? RoomCode { get; set; }
         public string? CampaignName { get; set; }
         public List<DateTime>? ProposedTimes { get; set; }
+        public DateTime? NewScheduledAt { get; set; }
     }
 
     public enum EmailType
@@ -44,6 +45,7 @@ namespace BusinessLogic.DTOs
         InterviewFeedbackNudge,
         ApplicationSuccess,
         ApplicationRejected,
-        InterviewerAssigned
+        InterviewerAssigned,
+        NoInterviewerReschedule
     }
 }

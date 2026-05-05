@@ -182,6 +182,37 @@ namespace DataAccess.Repositories.Implementation
             return schedulesToCancel.Count;
         }
 
+        public async Task<IEnumerable<InterviewSchedule>> AutoRescheduleNoInterviewerAsync(TimeSpan hoursBeforeStart)
+        {
+            var now = DateTime.UtcNow.AddHours(7);
+            var threshold = now.Add(hoursBeforeStart);
+
+            var schedules = await _context.InterviewSchedules
+                .Include(s => s.Assignments)
+                .Where(s => s.Status == InterviewStatus.Confirmed
+                            && s.ScheduledAt.HasValue
+                            && s.ScheduledAt.Value > now
+                            && s.ScheduledAt.Value <= threshold
+                            && !s.Assignments.Any())
+                .ToListAsync();
+
+            if (!schedules.Any())
+                return schedules;
+
+            foreach (var s in schedules)
+            {
+                s.ScheduledAt = s.ScheduledAt!.Value.AddDays(1);
+                s.Status = InterviewStatus.Rescheduled;
+                s.RescheduleReason = "Hệ thống tự động dời lịch do chưa có phỏng vấn viên được phân công.";
+                s.UpdatedAt = now;
+                s.ReminderSentAt = null;
+                s.RoomOpenedEmailSentAt = null;
+            }
+
+            await _context.SaveChangesAsync();
+            return schedules;
+        }
+
         public async Task<IEnumerable<InterviewSchedule>> GetSchedulesNeedingReminderAsync(TimeSpan reminderBefore)
         {
             var now = DateTime.UtcNow.AddHours(7);

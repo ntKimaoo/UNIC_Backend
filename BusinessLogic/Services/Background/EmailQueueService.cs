@@ -104,6 +104,10 @@ namespace BusinessLogic.Services.Background
                         item.ToEmail, item.FullName, item.CampaignName ?? "Campaign"),
                     EmailType.InterviewerAssigned => await emailService.SendInterviewerAssignedEmailAsync(
                         item.ToEmail, item.FullName, item.InterviewTitle!, item.InterviewScheduledAt),
+                    EmailType.NoInterviewerReschedule => await emailService.SendNoInterviewerRescheduleEmailAsync(
+                        item.ToEmail, item.FullName, item.InterviewTitle!,
+                        item.InterviewScheduledAt ?? DateTime.UtcNow.AddHours(7),
+                        item.NewScheduledAt ?? DateTime.UtcNow.AddHours(7).AddDays(1)),
                     _ => false
                 };
 

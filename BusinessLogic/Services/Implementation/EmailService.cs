@@ -788,6 +788,65 @@ namespace BusinessLogic.Services.Implementation
             return await SendEmailAsync(toEmail, subject, body);
         }
 
+        public async Task<bool> SendNoInterviewerRescheduleEmailAsync(
+            string toEmail, string fullName, string interviewTitle,
+            DateTime oldScheduledAt, DateTime newScheduledAt)
+        {
+            var oldStr = oldScheduledAt.ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"));
+            var newStr = newScheduledAt.ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"));
+            var subject = $"[UniClub] Lịch phỏng vấn \"{interviewTitle}\" đã bị dời do chưa có phỏng vấn viên";
+
+            var body = $@"
+    <html>
+    <body style='margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif;'>
+        <table width='100%' cellpadding='0' cellspacing='0' style='padding:32px 16px;'>
+            <tr><td align='center'>
+                <table width='560' cellpadding='0' cellspacing='0' style='background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0;'>
+                    <tr><td style='background:#fff7ed;padding:28px 32px 24px;'>
+                        <table cellpadding='0' cellspacing='0' style='margin-bottom:12px;'>
+                            <tr><td style='background:#ffedd5;color:#9a3412;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:bold;font-family:Arial,sans-serif;'>Lịch bị dời</td></tr>
+                        </table>
+                        <div style='font-size:19px;font-weight:bold;color:#7c2d12;line-height:1.3;margin-bottom:4px;font-family:Arial,sans-serif;'>{interviewTitle}</div>
+                        <div style='font-size:12px;color:#ea580c;font-family:Arial,sans-serif;'>UniClub &middot; Thông báo tự động</div>
+                    </td></tr>
+                    <tr><td style='padding:26px 32px;'>
+                        <p style='font-size:15px;color:#1e293b;margin:0 0 14px;font-family:Arial,sans-serif;'>Chào <strong>{fullName}</strong>,</p>
+                        <p style='font-size:15px;color:#1e293b;margin-bottom:14px;font-family:Arial,sans-serif;'>
+                            Hệ thống đã tự động dời buổi phỏng vấn <strong>{interviewTitle}</strong> sang ngày hôm sau vì chưa có phỏng vấn viên nào được phân công.
+                        </p>
+                        <table width='100%' cellpadding='0' cellspacing='0' style='background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:6px 18px;margin-bottom:18px;'>
+                            <tr>
+                                <td style='padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:13px;color:#64748b;width:130px;font-family:Arial,sans-serif;'>Lịch cũ</td>
+                                <td style='padding:8px 0 8px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;font-weight:bold;color:#9a3412;font-family:Arial,sans-serif;'>{oldStr}</td>
+                            </tr>
+                            <tr>
+                                <td style='padding:8px 0;font-size:13px;color:#64748b;font-family:Arial,sans-serif;'>Lịch mới</td>
+                                <td style='padding:8px 0 8px 12px;font-size:13px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>{newStr}</td>
+                            </tr>
+                        </table>
+                        <table width='100%' cellpadding='0' cellspacing='0' style='margin-bottom:20px;'>
+                            <tr><td style='background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;font-size:13px;font-weight:bold;color:#92400e;font-family:Arial,sans-serif;'>
+                                Vui lòng phân công phỏng vấn viên cho buổi mới ngay để tránh bị dời thêm lần nữa.
+                            </td></tr>
+                        </table>
+                        <table cellpadding='0' cellspacing='0' align='center'>
+                            <tr><td style='background:#ea580c;border-radius:8px;text-align:center;'>
+                                <a href='{_appBaseUrl}/interview/schedule' style='display:inline-block;padding:12px 28px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;font-family:Arial,sans-serif;'>Phân công ngay &rarr;</a>
+                            </td></tr>
+                        </table>
+                    </td></tr>
+                    <tr><td style='padding:18px 32px 24px;border-top:1px solid #e2e8f0;'>
+                        <p style='font-size:11px;color:#94a3b8;line-height:1.6;margin:0;font-family:Arial,sans-serif;'>Email này được gửi tự động từ hệ thống UniClub.</p>
+                    </td></tr>
+                </table>
+            </td></tr>
+        </table>
+    </body>
+    </html>";
+
+            return await SendEmailAsync(toEmail, subject, body);
+        }
+
         private async Task<bool> SendEmailAsync(string toEmail, string subject, string body, string? inlineContentId = null, byte[]? inlineImageBytes = null)
         {
             try
