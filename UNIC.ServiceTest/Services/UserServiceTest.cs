@@ -2,6 +2,7 @@ using BusinessLogic.DTOs;
 using BusinessLogic.Services.Implementation;
 using DataAccess.Models;
 using DataAccess.Repositories.Interface;
+using BusinessLogic.Services.Interface;
 using Moq;
 using System;
 using System.Collections.Generic;
@@ -14,12 +15,14 @@ namespace UNIC.ServiceTest.Services
     public class UserServiceTest
     {
         private readonly Mock<IUserRepository> _mockUserRepository;
+        private readonly Mock<IAttendanceService> _mockAttendanceService;
         private readonly UserService _userService;
 
         public UserServiceTest()
         {
             _mockUserRepository = new Mock<IUserRepository>();
-            _userService = new UserService(_mockUserRepository.Object);
+            _mockAttendanceService = new Mock<IAttendanceService>();
+            _userService = new UserService(_mockUserRepository.Object, _mockAttendanceService.Object);
         }
 
         [Fact]

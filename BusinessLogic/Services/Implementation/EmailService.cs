@@ -742,6 +742,31 @@ namespace BusinessLogic.Services.Implementation
             return await SendEmailAsync(toEmail, subject, body);
         }
 
+        public async Task<bool> SendRegistrationCancelledDueToDeactivationAsync(string toEmail, string fullName, List<string> eventNames)
+        {
+            var subject = "[UniClub] Đăng ký sự kiện đã bị hủy do tài khoản bị vô hiệu hóa";
+            var eventListHtml = string.Join("", eventNames.Select(n => $"<li style='margin-bottom: 4px;'>{n}</li>"));
+            var body = $@"
+            <html>
+            <body style='font-family: Arial, sans-serif;'>
+                <h2>Xin chào {fullName},</h2>
+                <p>Tài khoản của bạn đã bị <strong>vô hiệu hóa</strong> bởi quản trị viên.</p>
+                <p>Do đó, các đăng ký sự kiện sau đây đã bị <strong>hủy tự động</strong>:</p>
+                <div style='background-color: #fef2f2; border: 1px solid #fca5a5; padding: 16px; border-radius: 8px; margin: 16px 0;'>
+                    <ul style='margin: 0; padding-left: 20px; color: #991b1b;'>
+                        {eventListHtml}
+                    </ul>
+                </div>
+                <p>Nếu bạn cho rằng đây là một nhầm lẫn, vui lòng liên hệ quản trị viên để được hỗ trợ.</p>
+                <br>
+                <p>Trân trọng,</p>
+                <p>Hệ thống UniClub</p>
+            </body>
+            </html>
+        ";
+            return await SendEmailAsync(toEmail, subject, body);
+        }
+
         private async Task<bool> SendEmailAsync(string toEmail, string subject, string body, string? inlineContentId = null, byte[]? inlineImageBytes = null)
         {
             try

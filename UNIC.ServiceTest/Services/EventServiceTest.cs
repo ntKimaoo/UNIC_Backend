@@ -684,7 +684,8 @@ namespace UNIC.ServiceTest.Services
                 new EventDetailDto { EventId = 2 }
             };
 
-            _mockUnitOfWork.Setup(u => u.Events.GetAllAsync(1, 10, null, null)).ReturnsAsync(events);
+            _mockUnitOfWork.Setup(u => u.Events.GetAllAsync(
+                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<Guid?>())).ReturnsAsync(events);
             _mockMapper.Setup(m => m.Map<IEnumerable<EventDetailDto>>(events)).Returns(expectedDtos);
 
             var result = await _eventService.GetAllEventsAsync(1, 10);

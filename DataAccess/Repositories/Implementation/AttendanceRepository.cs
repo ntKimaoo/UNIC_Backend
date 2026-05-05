@@ -100,5 +100,19 @@ namespace DataAccess.Repositories.Implementation
                 .OrderBy(a => a.RegistrationDate)
                 .FirstOrDefaultAsync();
         }
+
+        public async Task<IEnumerable<Attendance>> GetActiveRegistrationsByUserAsync(Guid userId)
+        {
+            var activeStatuses = new[] { "REGISTERED", "PENDING", "WAITLIST" };
+            var terminalEventStatuses = new[] { "ENDED", "CANCELED", "COMPLETED" };
+
+            return await _context.Attendances
+                .Include(a => a.User)
+                .Include(a => a.Event)
+                .Where(a => a.UserId == userId
+                    && activeStatuses.Contains(a.AttendanceStatus)
+                    && !terminalEventStatuses.Contains(a.Event.Status))
+                .ToListAsync();
+        }
     }
 }

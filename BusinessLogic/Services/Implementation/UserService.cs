@@ -13,10 +13,12 @@ namespace BusinessLogic.Services.Implementation
     public class UserService : IUserService
     {
         private readonly IUserRepository _userRepository;
+        private readonly IAttendanceService _attendanceService;
 
-        public UserService(IUserRepository userRepository)
+        public UserService(IUserRepository userRepository, IAttendanceService attendanceService)
         {
             _userRepository = userRepository;
+            _attendanceService = attendanceService;
         }
 
         private UserResponseDto MapToDto(User user)
@@ -129,7 +131,24 @@ namespace BusinessLogic.Services.Implementation
 
             if (!string.IsNullOrEmpty(request.Status))
             {
+                var oldStatus = user.Status;
                 user.Status = request.Status;
+
+                // Auto-cancel all event registrations when user is deactivated
+                if (string.Equals(oldStatus, "Active", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(request.Status, "Active", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        var cancelled = await _attendanceService.CancelAllRegistrationsByUserAsync(id);
+                        if (cancelled > 0)
+                            Console.WriteLine($"[UserDeactivation] Auto-cancelled {cancelled} event registrations for user {id}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[UserDeactivation] Failed to cancel registrations for user {id}: {ex.Message}");
+                    }
+                }
             }
 
             user.UpdatedAt = DateTime.UtcNow;
