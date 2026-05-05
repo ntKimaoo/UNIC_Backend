@@ -62,10 +62,12 @@ namespace BusinessLogic.Services.Implementation
             // Set ImageUrl from Cloudinary upload (null if no image provided)
             eventEntity.ImageUrl = imageUrl;
 
-            if (!eventEntity.IsPublic)
+            // Sự kiện online mặc định không công khai (chỉ thành viên CLB)
+            if (eventEntity.IsOnline)
             {
-                // Online/private events → generate a WebRTC room code
-                eventEntity.Location = $"/webrtc/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+                eventEntity.IsPublic = false;
+                // Generate WebRTC room code — must match FE route: /meeting-room/:roomCode
+                eventEntity.Location = $"/meeting-room/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
             }
 
             // Add to repository
@@ -107,10 +109,10 @@ namespace BusinessLogic.Services.Implementation
             // Handle Type switch (Offline <-> Online)
             if (request.IsOnline)
             {
-                // If switching to or staying Online, ensure we have a WebRTC link
-                if (string.IsNullOrEmpty(existingEvent.Location) || !existingEvent.Location.StartsWith("/webrtc/"))
+                // If switching to or staying Online, ensure we have a meeting room link
+                if (string.IsNullOrEmpty(existingEvent.Location) || !existingEvent.Location.StartsWith("/meeting-room/"))
                 {
-                    existingEvent.Location = $"/webrtc/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+                    existingEvent.Location = $"/meeting-room/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
                 }
             }
             else
@@ -354,9 +356,9 @@ namespace BusinessLogic.Services.Implementation
             return _mapper.Map<EventDetailDto>(eventEntity);
         }
 
-        public async Task<IEnumerable<EventDetailDto>> GetAllEventsAsync(int pageNumber = 1, int pageSize = 10, string? status = null, int? clubId = null)
+        public async Task<IEnumerable<EventDetailDto>> GetAllEventsAsync(int pageNumber = 1, int pageSize = 10, string? status = null, int? clubId = null, Guid? userId = null)
         {
-            var events = await _unitOfWork.Events.GetAllAsync(pageNumber, pageSize, status, clubId);
+            var events = await _unitOfWork.Events.GetAllAsync(pageNumber, pageSize, status, clubId, userId);
 
             // Lazily correct stale statuses for all returned events
             bool anyChanged = false;
@@ -370,9 +372,9 @@ namespace BusinessLogic.Services.Implementation
             return _mapper.Map<IEnumerable<EventDetailDto>>(events);
         }
 
-        public async Task<int> GetTotalEventsCountAsync(string? status = null, int? clubId = null)
+        public async Task<int> GetTotalEventsCountAsync(string? status = null, int? clubId = null, Guid? userId = null)
         {
-            return await _unitOfWork.Events.GetTotalCountAsync(status, clubId);
+            return await _unitOfWork.Events.GetTotalCountAsync(status, clubId, userId);
         }
 
         public async Task RegisterForEventAsync(int eventId, string userId, string? apiBaseUrl = null)

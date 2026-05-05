@@ -1,4 +1,5 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.Helpers;
 using FluentValidation;
 using System;
 
@@ -24,10 +25,12 @@ namespace BusinessLogic.Validators
 
             RuleFor(x => x.StartDate)
                 .NotEmpty().WithMessage("Start date is required")
+                .GreaterThan(VnTimeHelper.Now).WithMessage("Ngày bắt đầu phải ở tương lai")
                 .LessThan(x => x.EndDate).WithMessage("Start date must be before end date");
 
             RuleFor(x => x.EndDate)
                 .NotEmpty().WithMessage("End date is required")
+                .GreaterThan(VnTimeHelper.Now).WithMessage("Ngày kết thúc phải ở tương lai")
                 .GreaterThan(x => x.StartDate).WithMessage("End date must be after start date");
 
             RuleFor(x => x.ClubId)
@@ -59,10 +62,12 @@ namespace BusinessLogic.Validators
                 .When(x => !string.IsNullOrEmpty(x.Location));
 
             RuleFor(x => x.StartDate)
+                .GreaterThan(VnTimeHelper.Now).WithMessage("Ngày bắt đầu phải ở tương lai")
                 .LessThan(x => x.EndDate).WithMessage("Start date must be before end date")
                 .When(x => x.StartDate.HasValue && x.EndDate.HasValue);
 
             RuleFor(x => x.EndDate)
+                .GreaterThan(VnTimeHelper.Now).WithMessage("Ngày kết thúc phải ở tương lai")
                 .GreaterThan(x => x.StartDate).WithMessage("End date must be after start date")
                 .When(x => x.StartDate.HasValue && x.EndDate.HasValue);
         }
@@ -85,6 +90,7 @@ namespace BusinessLogic.Validators
 
             RuleFor(x => x.StartTime)
                 .NotEmpty().WithMessage("Start time is required")
+                .GreaterThan(VnTimeHelper.Now).WithMessage("Thời gian bắt đầu phiên phải ở tương lai")
                 .LessThan(x => x.EndTime).WithMessage("Start time must be before end time");
 
             RuleFor(x => x.EndTime)
@@ -110,10 +116,12 @@ namespace BusinessLogic.Validators
 
             RuleFor(x => x.RegistrationStartDate)
                 .NotEmpty().WithMessage("Registration start date is required")
+                .GreaterThanOrEqualTo(VnTimeHelper.Now.Date).WithMessage("Ngày mở đăng ký không được ở quá khứ")
                 .LessThan(x => x.RegistrationEndDate).WithMessage("Registration start date must be before registration end date");
 
             RuleFor(x => x.RegistrationEndDate)
                 .NotEmpty().WithMessage("Registration end date is required")
+                .GreaterThan(VnTimeHelper.Now).WithMessage("Ngày đóng đăng ký phải ở tương lai")
                 .GreaterThan(x => x.RegistrationStartDate).WithMessage("Registration end date must be after registration start date");
 
             // Note: Validation that RegistrationEndDate < Event.StartDate should be done in the service layer
