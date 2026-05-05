@@ -122,6 +122,21 @@ namespace BusinessLogic.Services.Implementation
                 throw new InvalidOperationException("Cannot change the Creator's role.");
 
             await _eventPermRepo.UpdateEventMemberRoleAsync(eventMemberId, eventRoleId);
+
+            // Gửi email thông báo thay đổi quyền (fire-and-forget)
+            var updated = await _eventPermRepo.GetEventMemberByIdAsync(eventMemberId);
+            if (updated?.User != null && updated?.EventRole != null)
+            {
+                var ev = await _eventRepo.GetByIdAsync(updated.EventId);
+                var u = updated.User;
+                var roleName = updated.EventRole.RoleName;
+                var evName = ev?.EventName ?? "N/A";
+                _ = Task.Run(async () =>
+                {
+                    try { await _emailService.SendEventRoleAssignedAsync(u.Email, u.FullName, evName, roleName); }
+                    catch (Exception ex) { Console.WriteLine($"[Email] EventRoleUpdated email failed: {ex.Message}"); }
+                });
+            }
         }
 
         // ── EventRole CRUD ──
