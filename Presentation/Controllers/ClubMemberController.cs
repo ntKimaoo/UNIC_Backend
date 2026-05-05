@@ -40,7 +40,7 @@ namespace Presentation.Controllers
         /// Lấy danh sách members của club (hỗ trợ phân trang, lọc, sắp xếp)
         /// </summary>
         [HttpGet("api/clubs/{clubId}/members")]
-        [RequireClubPolicyOrRole("User", "Admin", "Club Manager")]
+        [RequireClubPolicyOrRole("viewmember","User", "Admin")]
         public async Task<IActionResult> GetMembers(
             int clubId,
             [FromQuery] int? pagination,
