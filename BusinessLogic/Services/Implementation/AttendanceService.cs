@@ -979,5 +979,74 @@ namespace BusinessLogic.Services.Implementation
                 checkInTime = attendance.CheckInTime
             };
         }
+
+        /// <summary>
+        /// Cancel all active event registrations for a deactivated user.
+        /// Releases occupied slots and promotes WAITLIST members.
+        /// Sends email notification listing all cancelled events.
+        /// </summary>
+        public async Task<int> CancelAllRegistrationsByUserAsync(Guid userId)
+        {
+            var activeRegistrations = await _unitOfWork.Attendances.GetActiveRegistrationsByUserAsync(userId);
+            var registrationList = activeRegistrations.ToList();
+
+            if (registrationList.Count == 0)
+                return 0;
+
+            var slotOccupyingStatuses = new[] { "REGISTERED", "CHECKED_IN", "PRESENT" };
+            var cancelledEventNames = new List<string>();
+            string? userEmail = null;
+            string? userFullName = null;
+
+            foreach (var attendance in registrationList)
+            {
+                var wasOccupying = slotOccupyingStatuses.Contains(attendance.AttendanceStatus);
+
+                // Cancel the registration
+                attendance.AttendanceStatus = nameof(AttendanceStatus.CANCELLED);
+                _unitOfWork.Attendances.Update(attendance);
+
+                // Collect event names for email
+                cancelledEventNames.Add(attendance.Event?.EventName ?? $"Event #{attendance.EventId}");
+
+                // Get user info for email (same user for all)
+                if (userEmail == null && attendance.User != null)
+                {
+                    userEmail = attendance.User.Email;
+                    userFullName = attendance.User.FullName;
+                }
+
+                // Release slot if was occupying (REGISTERED)
+                if (wasOccupying)
+                {
+                    var eventEntity = attendance.Event ?? await _unitOfWork.Events.GetByIdAsync(attendance.EventId);
+                    if (eventEntity?.MaxAttendees.HasValue == true)
+                    {
+                        // Save first so HandleSlotRelease sees the CANCELLED status
+                        await _unitOfWork.SaveChangesAsync();
+                        await HandleSlotReleaseAsync(attendance.EventId, eventEntity.RequiresApproval);
+                    }
+                }
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+
+            Console.WriteLine($"[UserDeactivation] Cancelled {registrationList.Count} event registrations for user {userId}");
+
+            // Send email notification (fire-and-forget)
+            if (!string.IsNullOrEmpty(userEmail) && cancelledEventNames.Count > 0)
+            {
+                var email = userEmail;
+                var name = userFullName ?? "Người dùng";
+                var events = cancelledEventNames.ToList();
+                _ = Task.Run(async () =>
+                {
+                    try { await _emailService.SendRegistrationCancelledDueToDeactivationAsync(email, name, events); }
+                    catch (Exception ex) { Console.WriteLine($"[Email] Deactivation cancellation email failed: {ex.Message}"); }
+                });
+            }
+
+            return registrationList.Count;
+        }
     }
 }

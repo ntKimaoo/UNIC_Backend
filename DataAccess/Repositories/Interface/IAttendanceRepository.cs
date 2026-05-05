@@ -19,5 +19,12 @@ namespace DataAccess.Repositories.Interface
         Task AddAsync(Attendance attendance);
         void Update(Attendance attendance);
         Task<Attendance?> GetOldestWaitlistedAttendeeAsync(int eventId);
+
+        /// <summary>
+        /// Get all active registrations (REGISTERED, PENDING, WAITLIST) for a user
+        /// in events that are not yet ended/canceled/completed.
+        /// Used when deactivating a user account to cancel their registrations.
+        /// </summary>
+        Task<IEnumerable<Attendance>> GetActiveRegistrationsByUserAsync(Guid userId);
     }
 }

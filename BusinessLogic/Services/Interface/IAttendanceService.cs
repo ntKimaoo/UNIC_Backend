@@ -36,5 +36,12 @@ namespace BusinessLogic.Services.Interface
 
         // Get current user's registration status for an event
         Task<object?> GetMyRegistrationAsync(int eventId, Guid userId);
+
+        /// <summary>
+        /// Cancel all active event registrations for a deactivated user.
+        /// Releases occupied slots and promotes WAITLIST members.
+        /// Returns the number of registrations cancelled.
+        /// </summary>
+        Task<int> CancelAllRegistrationsByUserAsync(Guid userId);
     }
 }
