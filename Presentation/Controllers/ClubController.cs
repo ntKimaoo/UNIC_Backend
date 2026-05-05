@@ -448,7 +448,7 @@ namespace Presentation.Controllers
         /// standalone roles (no department) and departments with their manager and member roles
         /// </summary>
         [HttpGet("{clubId}/club-structure")]
-        [RequireClubPolicyOrRole("ViewClubStructure", "Club Manager")]
+        [RequireClubPolicyOrRole("ViewClubStructure","User", "Club Manager")]
         public async Task<IActionResult> GetClubStructure(int clubId)
         {
             try
