@@ -69,6 +69,8 @@ namespace BusinessLogic.DTOs
 
         [Range(1, int.MaxValue, ErrorMessage = "So luong nguoi phai lon hon 0")]
         public int? MaxAttendees { get; set; }
+
+        public bool IsPublic { get; set; } = true;
     }
 
     /// <summary>

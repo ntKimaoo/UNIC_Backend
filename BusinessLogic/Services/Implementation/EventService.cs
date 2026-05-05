@@ -127,6 +127,8 @@ namespace BusinessLogic.Services.Implementation
             
             existingEvent.StartDate = request.StartDate;
             existingEvent.EndDate = request.EndDate;
+            existingEvent.MaxAttendees = request.MaxAttendees;
+            existingEvent.IsPublic = request.IsPublic;
             // Only update ImageUrl if a new one was provided (preserve existing if no new image)
             if (request.ImageUrl != null)
                 existingEvent.ImageUrl = request.ImageUrl;
