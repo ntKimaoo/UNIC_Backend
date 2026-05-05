@@ -83,7 +83,7 @@ namespace DataAccess.Repositories.Implementation
             if (isClubManager) return true;
             // Check policy from club role (within this specific club)
             var hasRolePolicy = await _context.UserClubRoleAssignments
-                .Where(ura => ura.ClubMember.UserId == userId && ura.ClubMember.ClubId == clubId)
+                .Where(ura => ura.ClubMember.UserId == userId && ura.ClubMember.ClubId == clubId&&!ura.ClubRole.IsDeleted)
                 .SelectMany(ura => ura.ClubRole!.ClubRolePolicies)
                 .AnyAsync(crp => crp.Policy.Name == normalizedTitle);
 
