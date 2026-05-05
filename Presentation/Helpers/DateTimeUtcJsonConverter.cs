@@ -10,19 +10,28 @@ namespace UNIC.Presentation.Helpers
     /// The system stores all dates in Vietnam local time (UTC+7) in the database.
     /// SQL Server returns these as DateTimeKind.Unspecified.
     /// 
-    /// Previously, this converter stamped them with 'Z' (UTC), causing browsers
-    /// in UTC+7 to add another +7 hours (double offset).
-    /// 
-    /// Now it stamps with '+07:00' so the browser knows the value is already
-    /// in Vietnam time and displays it correctly.
+    /// Write: stamps with '+07:00' so browsers display correctly.
+    /// Read:  converts incoming UTC ('Z') dates to Vietnam local time,
+    ///        so service-layer comparisons with VnTimeHelper.Now are consistent.
     /// </summary>
     public class DateTimeUtcJsonConverter : JsonConverter<DateTime>
     {
+        private static readonly TimeZoneInfo VnTz =
+            TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+
         public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var str = reader.GetString();
             if (DateTime.TryParse(str, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
-                return dt;
+            {
+                // Frontend sends .toISOString() → UTC ('Z').
+                // Convert to Vietnam local time so comparisons with VnTimeHelper.Now work.
+                if (dt.Kind == DateTimeKind.Utc)
+                    return TimeZoneInfo.ConvertTimeFromUtc(dt, VnTz);
+                // If it already has an offset (+07:00), parse strips it → Local kind.
+                // The numeric value is already correct (Vietnam time).
+                return DateTime.SpecifyKind(dt, DateTimeKind.Unspecified);
+            }
             return reader.GetDateTime();
         }
 
@@ -39,12 +48,19 @@ namespace UNIC.Presentation.Helpers
     /// </summary>
     public class NullableDateTimeUtcJsonConverter : JsonConverter<DateTime?>
     {
+        private static readonly TimeZoneInfo VnTz =
+            TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+
         public override DateTime? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType == JsonTokenType.Null) return null;
             var str = reader.GetString();
             if (DateTime.TryParse(str, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
-                return dt;
+            {
+                if (dt.Kind == DateTimeKind.Utc)
+                    return TimeZoneInfo.ConvertTimeFromUtc(dt, VnTz);
+                return DateTime.SpecifyKind(dt, DateTimeKind.Unspecified);
+            }
             return reader.GetDateTime();
         }
 
