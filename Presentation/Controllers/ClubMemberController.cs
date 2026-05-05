@@ -40,7 +40,7 @@ namespace Presentation.Controllers
         /// Lấy danh sách members của club (hỗ trợ phân trang, lọc, sắp xếp)
         /// </summary>
         [HttpGet("api/clubs/{clubId}/members")]
-        [RequireRole("User", "Admin", "Club Manager")]
+        [RequireClubPolicyOrRole("User", "Admin", "Club Manager")]
         public async Task<IActionResult> GetMembers(
             int clubId,
             [FromQuery] int? pagination,
@@ -81,7 +81,7 @@ namespace Presentation.Controllers
         /// Lấy thông tin một member theo ID
         /// </summary>
         [HttpGet("api/clubs/{clubId}/members/{memberId}")]
-        [RequireRole("ViewMember", "Admin", "Club Manager")]
+        [RequireClubPolicyOrRole("ViewMember", "Admin", "Club Manager")]
         public async Task<IActionResult> GetMember(int clubId, int memberId)
         {
             var member = await _service.GetMemberByIdAsync(memberId);
@@ -196,8 +196,13 @@ namespace Presentation.Controllers
             if (member == null || member.ClubId != clubId)
                 return NotFound(new { success = false, message = "Member not found" });
 
+            // Không cho phép tự xóa bản thân
+            var currentUserId = GetCurrentUserId();
+            if (currentUserId.HasValue && member.UserId == currentUserId.Value)
+                return Conflict(new { success = false, message = "Không thể tự xóa bản thân khỏi câu lạc bộ." });
+
             if (member.Roles.Any(r => r.Level == 0))
-                return Conflict(new { success = false, message = "Không thể xóa Club Manager ra khỏi câu lạc bộ." });
+                return Conflict(new { success = false, message = "Không thể xóa Club Manager ra khỏi câu lạc bộ. Hãy dùng chức năng bàn giao trước." });
 
             var result = await _service.RemoveMemberAsync(memberId);
             if (!result)
