@@ -321,6 +321,78 @@ public class AuthService : IAuthService
         return result;
     }
 
+        public async Task<LoginResponseDto?> GoogleLoginAsync(string idToken, string? ipAddress)
+    {
+        using var client = new HttpClient();
+        var response = await client.GetAsync($"https://oauth2.googleapis.com/tokeninfo?id_token={idToken}");
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        var content = await response.Content.ReadAsStringAsync();
+        using var document = System.Text.Json.JsonDocument.Parse(content);
+        var root = document.RootElement;
+
+        if (!root.TryGetProperty("email", out var emailElement))
+        {
+            return null;
+        }
+
+        var email = emailElement.GetString();
+        var name = root.TryGetProperty("name", out var nameElement) ? nameElement.GetString() : "Google User";
+
+        if (string.IsNullOrEmpty(email)) return null;
+
+        var user = await _userRepository.GetByEmailAsync(email);
+        if (user == null)
+        {
+            // Auto register
+            user = new User
+            {
+                FullName = name ?? "Google User",
+                Email = email,
+                PasswordHash = HashPassword(Guid.NewGuid().ToString()), // Random password
+                JoinDate = DateOnly.FromDateTime(DateTime.UtcNow),
+                Status = "Active",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            user = await _userRepository.CreateAsync(user);
+        }
+        else if (user.Status?.ToLower() != "active")
+        {
+            user.Status = "Active";
+            await _userRepository.UpdateAsync(user);
+        }
+
+        var accessToken = _jwtService.GenerateAccessToken(user);
+        var refreshToken = _jwtService.GenerateRefreshToken();
+        var refreshTokenExpiration = DateTime.UtcNow.AddDays(
+            double.Parse(_configuration["Jwt:ExpireMinutes"] ?? "7"));
+
+        var tokenHash = HashToken(refreshToken);
+        var refreshTokenEntity = new RefreshToken
+        {
+            UserId = user.UserId,
+            TokenHash = tokenHash,
+            DeviceInfo = "Google Auth",
+            Ipaddress = ipAddress,
+            ExpiresAt = refreshTokenExpiration,
+            IsRevoked = false,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _refreshTokenRepository.AddAsync(refreshTokenEntity);
+
+        return new LoginResponseDto
+        {
+            AccessToken = accessToken,
+            RefreshToken = refreshToken,
+            User = MapToUserInfoDto(user)
+        };
+    }
+
     public async Task<bool> ResendVerificationEmailAsync(string email)
     {
         var user = await _userRepository.GetByEmailAsync(email);
@@ -408,3 +480,4 @@ public class AuthService : IAuthService
         };
     }
 }
+

@@ -57,6 +57,45 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
+        /// Login with Google ID Token
+        /// </summary>
+        /// <param name="request">Google Login credentials</param>
+        /// <returns>Access token and refresh token</returns>
+        [HttpPost("google-login")]
+        [ProducesResponseType(typeof(LoginResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginRequestDto request)
+        {
+            if (!ModelState.IsValid || string.IsNullOrEmpty(request.IdToken))
+            {
+                return BadRequest(new
+                {
+                    message = "Invalid request data",
+                    errors = ModelState.Values.SelectMany(v => v.Errors.Select(e => e.ErrorMessage))
+                });
+            }
+
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var result = await _authService.GoogleLoginAsync(request.IdToken, ipAddress);
+
+            if (result == null)
+            {
+                return Unauthorized(new
+                {
+                    message = "Invalid Google token or account could not be created."
+                });
+            }
+
+            return Ok(new
+            {
+                success = true,
+                message = "Login successful",
+                data = result
+            });
+        }
+
+        /// <summary>
         /// Refresh access token using refresh token
         /// </summary>
         /// <param name="request">Refresh token</param>
@@ -440,3 +479,4 @@ namespace Presentation.Controllers
         }
     }
 }
+

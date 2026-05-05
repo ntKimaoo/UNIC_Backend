@@ -20,5 +20,6 @@ namespace BusinessLogic.Services.Interface
         Task<bool> ResetPasswordAsync(ResetPasswordRequestDto request);
         Task<bool> VerifyEmailAsync(VerifyEmailRequestDto request);
         Task<bool> ResendVerificationEmailAsync(string email);
+        Task<LoginResponseDto?> GoogleLoginAsync(string idToken, string? ipAddress);
     }
 }
