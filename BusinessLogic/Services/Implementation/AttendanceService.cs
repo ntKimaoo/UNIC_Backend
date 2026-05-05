@@ -499,7 +499,16 @@ namespace BusinessLogic.Services.Implementation
                 await RecalcAvailableSlotsAsync(eventId, eventEntity);
                 bool gotSlot = await _unitOfWork.Events.TryDecrementSlotAsync(eventId);
                 if (!gotSlot)
-                    throw new DomainException("Không còn slot trống. Không thể duyệt thêm.");
+                {
+                    // Hết slot → chuyển sang WAITLIST thay vì throw
+                    if (attendance.AttendanceStatus != nameof(AttendanceStatus.WAITLIST))
+                    {
+                        attendance.AttendanceStatus = nameof(AttendanceStatus.WAITLIST);
+                        _unitOfWork.Attendances.Update(attendance);
+                        await _unitOfWork.SaveChangesAsync();
+                    }
+                    throw new DomainException("Không còn slot trống. Người dùng đã được chuyển sang danh sách chờ (WAITLIST).");
+                }
             }
 
             attendance.AttendanceStatus = nameof(AttendanceStatus.REGISTERED);
@@ -550,8 +559,14 @@ namespace BusinessLogic.Services.Implementation
                         bool gotSlot = await _unitOfWork.Events.TryDecrementSlotAsync(eventId);
                         if (!gotSlot)
                         {
+                            // Hết slot → chuyển sang WAITLIST thay vì bỏ qua
+                            if (attendance.AttendanceStatus != nameof(AttendanceStatus.WAITLIST))
+                            {
+                                attendance.AttendanceStatus = nameof(AttendanceStatus.WAITLIST);
+                                _unitOfWork.Attendances.Update(attendance);
+                            }
                             skippedDueToSlot++;
-                            continue; // skip thay vì break, để đếm tổng
+                            continue;
                         }
                     }
 
@@ -581,7 +596,7 @@ namespace BusinessLogic.Services.Implementation
                 var remaining = updatedEvent?.AvailableSlots ?? 0;
 
                 var message = skippedDueToSlot > 0
-                    ? $"Đã duyệt {approved}/{userIds.Count} đăng ký. {skippedDueToSlot} bị bỏ qua do hết slot."
+                    ? $"Đã duyệt {approved}/{userIds.Count} đăng ký. {skippedDueToSlot} người được chuyển sang danh sách chờ (WAITLIST) do hết slot."
                     : $"Đã duyệt {approved}/{userIds.Count} đăng ký.";
 
                 return new BulkApproveResult
