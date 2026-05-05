@@ -164,8 +164,10 @@ namespace BusinessLogic.Services.Implementation
                 await txn.CommitAsync();
 
                 // Email ngoài transaction — lỗi email KHÔNG rollback DB
+                // Lấy đúng token đã lưu vào DB (từ existingAttendance hoặc attendance mới)
                 var checkInToken = existingAttendance?.CheckInToken
-                    ?? Guid.NewGuid().ToString("N"); // fallback nhưng đã set ở trên
+                    ?? (await _unitOfWork.Attendances.GetByEventAndUserAsync(request.EventId, request.UserId))?.CheckInToken
+                    ?? Guid.NewGuid().ToString("N");
                 if (status == nameof(AttendanceStatus.REGISTERED))
                 {
                     _ = Task.Run(async () =>
@@ -262,6 +264,19 @@ namespace BusinessLogic.Services.Implementation
 
             _unitOfWork.Attendances.Update(attendance);
             await _unitOfWork.SaveChangesAsync();
+
+            // Gửi email điểm danh thành công (fire-and-forget)
+            var user = attendance.User;
+            if (user != null)
+            {
+                var evName = eventEntity.EventName;
+                var ciTime = attendance.CheckInTime;
+                _ = Task.Run(async () =>
+                {
+                    try { await _emailService.SendCheckInSuccessAsync(user.Email, user.FullName, evName, ciTime); }
+                    catch (Exception ex) { Console.WriteLine($"[Email] CheckInSuccess email failed: {ex.Message}"); }
+                });
+            }
 
             return new CheckInResult
             {
@@ -484,7 +499,16 @@ namespace BusinessLogic.Services.Implementation
                 await RecalcAvailableSlotsAsync(eventId, eventEntity);
                 bool gotSlot = await _unitOfWork.Events.TryDecrementSlotAsync(eventId);
                 if (!gotSlot)
-                    throw new DomainException("Không còn slot trống. Không thể duyệt thêm.");
+                {
+                    // Hết slot → chuyển sang WAITLIST thay vì throw
+                    if (attendance.AttendanceStatus != nameof(AttendanceStatus.WAITLIST))
+                    {
+                        attendance.AttendanceStatus = nameof(AttendanceStatus.WAITLIST);
+                        _unitOfWork.Attendances.Update(attendance);
+                        await _unitOfWork.SaveChangesAsync();
+                    }
+                    throw new DomainException("Không còn slot trống. Người dùng đã được chuyển sang danh sách chờ (WAITLIST).");
+                }
             }
 
             attendance.AttendanceStatus = nameof(AttendanceStatus.REGISTERED);
@@ -535,8 +559,14 @@ namespace BusinessLogic.Services.Implementation
                         bool gotSlot = await _unitOfWork.Events.TryDecrementSlotAsync(eventId);
                         if (!gotSlot)
                         {
+                            // Hết slot → chuyển sang WAITLIST thay vì bỏ qua
+                            if (attendance.AttendanceStatus != nameof(AttendanceStatus.WAITLIST))
+                            {
+                                attendance.AttendanceStatus = nameof(AttendanceStatus.WAITLIST);
+                                _unitOfWork.Attendances.Update(attendance);
+                            }
                             skippedDueToSlot++;
-                            continue; // skip thay vì break, để đếm tổng
+                            continue;
                         }
                     }
 
@@ -566,7 +596,7 @@ namespace BusinessLogic.Services.Implementation
                 var remaining = updatedEvent?.AvailableSlots ?? 0;
 
                 var message = skippedDueToSlot > 0
-                    ? $"Đã duyệt {approved}/{userIds.Count} đăng ký. {skippedDueToSlot} bị bỏ qua do hết slot."
+                    ? $"Đã duyệt {approved}/{userIds.Count} đăng ký. {skippedDueToSlot} người được chuyển sang danh sách chờ (WAITLIST) do hết slot."
                     : $"Đã duyệt {approved}/{userIds.Count} đăng ký.";
 
                 return new BulkApproveResult

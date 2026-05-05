@@ -42,12 +42,27 @@ namespace DataAccess.Repositories.Implementation
                 .FirstOrDefaultAsync(e => e.EventId == eventId);
         }
 
-        public async Task<IEnumerable<Event>> GetAllAsync(int pageNumber = 1, int pageSize = 10, string? status = null, int? clubId = null)
+        public async Task<IEnumerable<Event>> GetAllAsync(int pageNumber = 1, int pageSize = 10, string? status = null, int? clubId = null, Guid? userId = null)
         {
             var query = _context.Events
                 .Include(e => e.Attendances)
                 .Include(e => e.EventSchedules)
+                .Include(e => e.Club)
+                .Where(e => e.Club.IsActive)
                 .AsQueryable();
+
+            // Visibility: IsPublic OR user là thành viên CLB tổ chức
+            if (userId.HasValue)
+            {
+                var memberClubIds = _context.Set<UserClubRole>()
+                    .Where(ucr => ucr.UserId == userId.Value)
+                    .Select(ucr => ucr.ClubId);
+                query = query.Where(e => e.IsPublic || (e.ClubId.HasValue && memberClubIds.Contains(e.ClubId.Value)));
+            }
+            else
+            {
+                query = query.Where(e => e.IsPublic);
+            }
 
             if (!string.IsNullOrEmpty(status))
                 query = query.Where(e => e.Status == status);
@@ -62,9 +77,23 @@ namespace DataAccess.Repositories.Implementation
                 .ToListAsync();
         }
 
-        public async Task<int> GetTotalCountAsync(string? status = null, int? clubId = null)
+        public async Task<int> GetTotalCountAsync(string? status = null, int? clubId = null, Guid? userId = null)
         {
-            var query = _context.Events.AsQueryable();
+            var query = _context.Events.Where(e => e.Club.IsActive).AsQueryable();
+
+            // Visibility: IsPublic OR user là thành viên CLB tổ chức
+            if (userId.HasValue)
+            {
+                var memberClubIds = _context.Set<UserClubRole>()
+                    .Where(ucr => ucr.UserId == userId.Value)
+                    .Select(ucr => ucr.ClubId);
+                query = query.Where(e => e.IsPublic || (e.ClubId.HasValue && memberClubIds.Contains(e.ClubId.Value)));
+            }
+            else
+            {
+                query = query.Where(e => e.IsPublic);
+            }
+
             if (!string.IsNullOrEmpty(status))
                 query = query.Where(e => e.Status == status);
             if (clubId.HasValue)

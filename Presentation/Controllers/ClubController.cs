@@ -242,7 +242,7 @@ namespace Presentation.Controllers
         /// Create a new club
         /// </summary>
         [HttpPost]
-        [RequireClubPolicyOrRole("CreateRole", "Admin", "Club Manager")]
+        //[RequireClubPolicyOrRole("CreateRole", "Admin", "Club Manager")]
         public async Task<IActionResult> Create([FromBody] CreateClubDto dto)
         {
             if (!ModelState.IsValid)
@@ -294,6 +294,7 @@ namespace Presentation.Controllers
         /// Update an existing club
         /// </summary>
         [HttpPut("{id}")]
+        [RequireClubPolicyOrRole("Club Manager", "UpdateClub")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateClubDto dto)
         {
             if (!ModelState.IsValid)
@@ -348,6 +349,7 @@ namespace Presentation.Controllers
         /// Change status of a club (active/inactive)
         /// </summary>
         [HttpPut("changeStatus/{id}")]
+        [RequireRole("Admin")]
         public async Task<IActionResult> ChangeStatus(int id)
         {
             try
@@ -374,6 +376,7 @@ namespace Presentation.Controllers
         /// Soft delete a club (mark as deleted)
         /// </summary>
         [HttpDelete("{id}/soft")]
+        [RequireRole("Admin")]
         public async Task<IActionResult> SoftDelete(int id)
         {
             try
@@ -445,6 +448,7 @@ namespace Presentation.Controllers
         /// standalone roles (no department) and departments with their manager and member roles
         /// </summary>
         [HttpGet("{clubId}/club-structure")]
+        [RequireClubPolicyOrRole("ViewClubStructure", "Club Manager")]
         public async Task<IActionResult> GetClubStructure(int clubId)
         {
             try
@@ -477,6 +481,7 @@ namespace Presentation.Controllers
             }
         }
         [HttpPost("{clubId}/add-members")]
+        [RequireClubPolicyOrRole("Club Manager", "AddMember")]
         public async Task<IActionResult> AddMembers(int clubId, [FromBody] List<string> emails)
         {
             try

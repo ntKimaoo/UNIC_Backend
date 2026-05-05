@@ -1,4 +1,5 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.Services.Interface;
 using DataAccess.Models.Meeting;
 using DataAccess.Repositories.Interface;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +43,10 @@ namespace BusinessLogic.Services.Background
                     var interviewRepo = scope.ServiceProvider.GetRequiredService<IInterviewRepository>();
                     var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
 
+                    // ── 0. Process scheduled result announcements ─────────────
+                    var interviewService = scope.ServiceProvider.GetRequiredService<IInterviewService>();
+                    await ProcessScheduledPublishAsync(interviewService);
+
                     // ── 1. Send reminder emails (2 hours before) ──────────────
                     await SendReminderEmailsAsync(interviewRepo, userRepo);
 
@@ -50,6 +55,12 @@ namespace BusinessLogic.Services.Background
 
                     // ── 3. Auto-complete expired interviews ────────────────────
                     await AutoCompleteExpiredAsync(interviewRepo, userRepo);
+
+                    // ── 4. Auto-reschedule confirmed interviews with no interviewer ──
+                    await AutoRescheduleNoInterviewerAsync(interviewRepo, userRepo);
+
+                    // ── 5. Auto-cancel unconfirmed interviews (20 mins before) ──
+                    await AutoCancelUnconfirmedAsync(interviewRepo);
 
                     // ── 4. Send feedback nudge emails ─────────────────────────
                     await SendFeedbackNudgeEmailsAsync(interviewRepo, userRepo);
@@ -119,7 +130,7 @@ namespace BusinessLogic.Services.Background
                     }
 
                     // Mark reminder as sent
-                    schedule.ReminderSentAt = DateTime.UtcNow;
+                    schedule.ReminderSentAt = DateTime.UtcNow.AddHours(7);
                     await interviewRepo.UpdateScheduleAsync(schedule);
                 }
 
@@ -186,7 +197,7 @@ namespace BusinessLogic.Services.Background
                     }
 
                     // Mark room-opened email as sent
-                    schedule.RoomOpenedEmailSentAt = DateTime.UtcNow;
+                    schedule.RoomOpenedEmailSentAt = DateTime.UtcNow.AddHours(7);
                     await interviewRepo.UpdateScheduleAsync(schedule);
                 }
 
@@ -252,7 +263,7 @@ namespace BusinessLogic.Services.Background
                     }
 
                     // Mark feedback nudge as sent
-                    schedule.FeedbackNudgeSentAt = DateTime.UtcNow;
+                    schedule.FeedbackNudgeSentAt = DateTime.UtcNow.AddHours(7);
                     await interviewRepo.UpdateScheduleAsync(schedule);
                 }
 
@@ -261,6 +272,75 @@ namespace BusinessLogic.Services.Background
             catch (Exception ex)
             {
                 _logger.LogError(ex, "InterviewRoomActivationService: error sending feedback nudge emails.");
+            }
+        }
+        
+        // ═══════════════════════════════════════════════════════════
+        //  0. Process scheduled result announcements
+        // ═══════════════════════════════════════════════════════════
+        private async Task ProcessScheduledPublishAsync(IInterviewService interviewService)
+        {
+            try
+            {
+                await interviewService.ProcessScheduledPublishAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "InterviewRoomActivationService: error processing scheduled publish.");
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  4. Auto-reschedule confirmed interviews with no interviewer
+        // ═══════════════════════════════════════════════════════════
+        private async Task AutoRescheduleNoInterviewerAsync(IInterviewRepository interviewRepo, IUserRepository userRepo)
+        {
+            try
+            {
+                var rescheduled = (await interviewRepo.AutoRescheduleNoInterviewerAsync(TimeSpan.FromHours(2))).ToList();
+                if (!rescheduled.Any()) return;
+
+                foreach (var schedule in rescheduled)
+                {
+                    var creator = await userRepo.GetByIdAsync(schedule.CreatedByUserId);
+                    if (creator == null) continue;
+
+                    var oldTime = schedule.ScheduledAt!.Value.AddDays(-1);
+                    EmailQueueService.EnqueueEmail(new EmailQueueItem
+                    {
+                        ToEmail = creator.Email,
+                        FullName = creator.FullName,
+                        EmailType = EmailType.NoInterviewerReschedule,
+                        InterviewTitle = schedule.Title,
+                        InterviewScheduledAt = oldTime,
+                        NewScheduledAt = schedule.ScheduledAt.Value
+                    });
+                }
+
+                _logger.LogInformation("InterviewRoomActivationService: auto-rescheduled {Count} interview(s) due to no interviewer.", rescheduled.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "InterviewRoomActivationService: error auto-rescheduling no-interviewer interviews.");
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  5. Auto-cancel unconfirmed interviews
+        // ═══════════════════════════════════════════════════════════
+        private async Task AutoCancelUnconfirmedAsync(IInterviewRepository interviewRepo)
+        {
+            try
+            {
+                int cancelledCount = await interviewRepo.AutoCancelUnconfirmedInterviewsAsync(TimeSpan.FromDays(1), TimeSpan.FromHours(5));
+                if (cancelledCount > 0)
+                {
+                    _logger.LogInformation("InterviewRoomActivationService: auto-cancelled {Count} unconfirmed interview(s).", cancelledCount);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "InterviewRoomActivationService: error auto-cancelling unconfirmed interviews.");
             }
         }
     }

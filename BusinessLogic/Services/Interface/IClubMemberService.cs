@@ -21,5 +21,6 @@ namespace BusinessLogic.Services.Interface
         Task<bool> IsMemberActiveAsync(Guid userId, int clubId);
         Task<bool> IsUserInClubAsync(Guid userId, int clubId);
         Task<int> CountMembersAsync(int clubId);
+        Task<bool> TransferClubAsync(int clubId, int newManagerMemberId, Guid? transferredBy);
     }
 }

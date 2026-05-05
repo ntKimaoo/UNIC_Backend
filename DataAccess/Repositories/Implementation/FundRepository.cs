@@ -24,6 +24,32 @@ namespace DataAccess.Repositories.Implementation
                 .FirstOrDefaultAsync(t => t.TransactionId == id);
         }
 
+        public async Task<FundTransaction?> GetTransactionForExternalCheckoutCompletionAsync(long externalOrLegacyOrderCode)
+        {
+            var byExternal = await _context.FundTransactions
+                .AsNoTracking()
+                .Include(t => t.ClubFund)
+                .Include(t => t.Creator)
+                .FirstOrDefaultAsync(t => t.ExternalOrderCode == externalOrLegacyOrderCode);
+            if (byExternal != null)
+                return byExternal;
+
+            if (externalOrLegacyOrderCode < 1 || externalOrLegacyOrderCode > int.MaxValue)
+                return null;
+
+            var legacyId = (int)externalOrLegacyOrderCode;
+            return await _context.FundTransactions
+                .AsNoTracking()
+                .Include(t => t.ClubFund)
+                .Include(t => t.Creator)
+                .FirstOrDefaultAsync(t =>
+                    t.TransactionId == legacyId
+                    && t.ExternalOrderCode == null
+                    && t.IsMemberContribution
+                    && t.TransactionType != null
+                    && t.TransactionType.ToUpper() == "INCOME");
+        }
+
         public async Task<ClubFund?> GetFundByIdAsync(int id, bool includeDeleted = false)
         {
             return await _context.ClubFunds

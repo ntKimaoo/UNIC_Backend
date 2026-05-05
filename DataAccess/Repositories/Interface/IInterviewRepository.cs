@@ -14,6 +14,8 @@ namespace DataAccess.Repositories.Interface
         Task<bool> UpdateScheduleAsync(InterviewSchedule schedule);
         Task<bool> DeleteScheduleAsync(int id);
         Task<int> AutoCompleteExpiredInterviewsAsync(int gracePeriodMinutes);
+        Task<int> AutoCancelUnconfirmedInterviewsAsync(TimeSpan maxWaitTime, TimeSpan minTimeBeforeEarliestSlot);
+        Task<IEnumerable<InterviewSchedule>> AutoRescheduleNoInterviewerAsync(TimeSpan hoursBeforeStart);
         Task<IEnumerable<InterviewSchedule>> GetSchedulesNeedingReminderAsync(TimeSpan reminderBefore);
         Task<IEnumerable<InterviewSchedule>> GetCompletedSchedulesWithPendingFeedbackAsync();
 
@@ -46,6 +48,7 @@ namespace DataAccess.Repositories.Interface
 
         // ── EvaluationCriterion ──────────────────────────────────
         Task<IEnumerable<EvaluationCriterion>> GetCriteriaByCampaignIdAsync(int campaignId);
+        Task<IEnumerable<EvaluationCriterion>> GetCriteriaForAssignmentAsync(int campaignId, int assignmentId);
         Task<EvaluationCriterion?> GetCriterionByIdAsync(int id);
         Task<EvaluationCriterion> CreateCriterionAsync(EvaluationCriterion criterion);
         Task<bool> UpdateCriterionAsync(EvaluationCriterion criterion);
@@ -61,6 +64,7 @@ namespace DataAccess.Repositories.Interface
 
         // ── CampaignDecision ─────────────────────────────────────
         Task<IEnumerable<CampaignDecision>> GetDecisionsByCampaignIdAsync(int campaignId);
+        Task<IEnumerable<CampaignDecision>> GetScheduledDecisionsDueAsync(DateTime now);
         Task<CampaignDecision?> GetDecisionByScheduleIdAsync(int scheduleId);
         Task<CampaignDecision> CreateDecisionAsync(CampaignDecision decision);
         Task<bool> UpdateDecisionAsync(CampaignDecision decision);
@@ -70,10 +74,14 @@ namespace DataAccess.Repositories.Interface
         Task<ProposedTimeSlot?> GetTimeSlotByIdAsync(int id);
         Task<ProposedTimeSlot> CreateTimeSlotAsync(ProposedTimeSlot slot);
         Task<bool> UpdateTimeSlotAsync(ProposedTimeSlot slot);
+        Task DeleteTimeSlotsByScheduleIdAsync(int scheduleId);
         // ── AiAnalysisResult ────────────────────────────────────
         Task<IEnumerable<AiCandidateAnalysisResult>> GetAiAnalysisResultsByCampaignIdAsync(int campaignId);
+        Task<AiCandidateAnalysisResult?> GetAiAnalysisResultByScheduleIdAsync(int scheduleId);
         Task<AiCandidateAnalysisResult> CreateAiAnalysisResultAsync(AiCandidateAnalysisResult result);
         Task<IEnumerable<AiCandidateAnalysisResult>> CreateAiAnalysisResultsAsync(IEnumerable<AiCandidateAnalysisResult> results);
+        Task DeleteAiAnalysisResultsByCampaignIdAsync(int campaignId);
+        Task DeleteAiAnalysisResultsByScheduleIdAsync(int scheduleId);
     }
 }
 

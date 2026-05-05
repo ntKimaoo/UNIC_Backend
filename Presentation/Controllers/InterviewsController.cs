@@ -383,6 +383,27 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
+        /// GET /api/interviews/{id}/assignments/{assignmentId}/criteria – Tiêu chí dành riêng cho interviewer (non-draft + draft của assignment này)
+        /// </summary>
+        [HttpGet("{id}/assignments/{assignmentId}/criteria")]
+        public async Task<IActionResult> GetCriteriaForAssignment(int id, int assignmentId)
+        {
+            try
+            {
+                var criteria = await _service.GetCriteriaForAssignmentAsync(id, assignmentId);
+                return Ok(new { success = true, data = criteria });
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { success = false, message = "Assignment not found" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// GET /api/interviews/{id}/assignments/{assignmentId}/criteria-scores – Lấy danh sách điểm tiêu chí đã chấm
         /// </summary>
         [HttpGet("{id}/assignments/{assignmentId}/criteria-scores")]
@@ -501,11 +522,28 @@ namespace Presentation.Controllers
         /// POST /api/interviews/campaign/{campaignId}/ai-analysis/generate – Scan ứng viên chưa được phân tích, gọi AI & lưu DB
         /// </summary>
         [HttpPost("campaign/{campaignId}/ai-analysis/generate")]
-        public async Task<IActionResult> GenerateAiAnalysis(int campaignId)
+        public async Task<IActionResult> GenerateAiAnalysis(int campaignId, [FromQuery] bool force = false)
         {
             try
             {
-                var result = await _aiService.GenerateAiAnalysisAsync(campaignId);
+                var result = await _aiService.GenerateAiAnalysisAsync(campaignId, force);
+                return Ok(new { success = true, data = result });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// POST /api/interviews/schedule/{scheduleId}/ai-analysis/generate – Scan 1 ứng viên, gọi AI & lưu DB
+        /// </summary>
+        [HttpPost("schedule/{scheduleId}/ai-analysis/generate")]
+        public async Task<IActionResult> GenerateSingleAiAnalysis(int scheduleId, [FromQuery] bool force = false)
+        {
+            try
+            {
+                var result = await _aiService.GenerateSingleAiAnalysisAsync(scheduleId, force);
                 return Ok(new { success = true, data = result });
             }
             catch (Exception ex)

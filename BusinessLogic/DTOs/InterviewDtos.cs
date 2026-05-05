@@ -104,6 +104,8 @@ namespace BusinessLogic.DTOs
         /// Bắt buộc khi status = Cancelled
         /// </summary>
         public string? CancelReason { get; set; }
+
+        public List<ProposedTimeSlotItemDto>? ProposedTimeSlots { get; set; }
     }
 
     public class InterviewScheduleResponseDto
@@ -323,6 +325,7 @@ namespace BusinessLogic.DTOs
         public string Name { get; set; } = null!;
         public string? Description { get; set; }
         public bool IsDefault { get; set; }
+        public bool IsDraft { get; set; }
     }
 
     public class CreateEvaluationCriterionDto
@@ -332,6 +335,14 @@ namespace BusinessLogic.DTOs
         public string Name { get; set; } = null!;
 
         public string? Description { get; set; }
+
+        /// <summary>
+        /// Nếu true → tiêu chí draft, chỉ hiện với assignment được chỉ định.
+        /// Bắt buộc kèm AssignmentId.
+        /// </summary>
+        public bool IsDraft { get; set; } = false;
+
+        public int? AssignmentId { get; set; }
     }
 
     public class UpdateEvaluationCriterionDto
@@ -483,11 +494,6 @@ namespace BusinessLogic.DTOs
         public DateTime? ScheduledAt { get; set; }
 
         /// <summary>
-        /// Kênh gửi thông báo, VD: "Email,InApp"
-        /// </summary>
-        public string? NotificationChannels { get; set; }
-
-        /// <summary>
         /// Danh sách ID quyết định cần công bố. Nếu null/rỗng → công bố tất cả.
         /// </summary>
         public List<int>? DecisionIds { get; set; }
@@ -551,6 +557,9 @@ namespace BusinessLogic.DTOs
 
         /// <summary> Pass, Fail, Hold </summary>
         public string Result { get; set; } = "Hold";
+
+        /// <summary> AI explanation for the result </summary>
+        public string Reason { get; set; } = string.Empty;
     }
 
     /// <summary>

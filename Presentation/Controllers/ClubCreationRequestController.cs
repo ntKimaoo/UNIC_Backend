@@ -19,7 +19,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpGet]
-        [RequireClubPolicyOrRole("Admin")]
+        [RequireRole("Admin")]
         public async Task<IActionResult> GetAll(int pageSize, string? searchQuery, string? status, string pageIndex)
         {
             try
@@ -80,7 +80,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpGet("{id}")]
-        [RequireClubPolicyOrRole("Admin")]
+        [RequireRole("Admin")]
         public async Task<IActionResult> GetById(int id)
         {
             var request = await _service.GetByIdAsync(id);
@@ -92,7 +92,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpGet("user/{userId}")]
-        [RequireClubPolicyOrRole("User")]
+        [RequireRole("User")]
         public async Task<IActionResult> GetByUserId(Guid userId)
         {
             var requests = await _service.GetByUserIdAsync(userId);
@@ -107,7 +107,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPost]
-        [RequireClubPolicyOrRole("User")]
+        [RequireRole("User")]
         public async Task<IActionResult> Create([FromBody] CreateClubCreationRequestDto dto)
         {
             await _service.CreateAsync(dto);
@@ -126,7 +126,7 @@ namespace UNIC.Presentation.Controllers
         }
 
         [HttpPut("{id}/status")]
-        [RequireClubPolicyOrRole("Admin")]
+        [RequireRole("Admin")]  
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateClubRequestStatusDto dto)
         {
             var request = await _service.UpdateStatusAsync(id, dto);

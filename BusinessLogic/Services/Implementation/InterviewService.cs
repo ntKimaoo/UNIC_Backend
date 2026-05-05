@@ -17,16 +17,20 @@ namespace BusinessLogic.Services.Implementation
         private readonly IUserRepository _userRepo;
         private readonly IEmailService _emailService;
         private readonly IRecruitmentCampaignRepository _campaignRepo;
+        private readonly IClubMemberService _clubMemberService;
+
         public InterviewService(
             IInterviewRepository repo,
             IUserRepository userRepo,
             IEmailService emailService,
-            IRecruitmentCampaignRepository campaignRepo)
+            IRecruitmentCampaignRepository campaignRepo,
+            IClubMemberService clubMemberService)
         {
             _repo = repo;
             _userRepo = userRepo;
             _emailService = emailService;
             _campaignRepo = campaignRepo;
+            _clubMemberService = clubMemberService;
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -99,6 +103,19 @@ namespace BusinessLogic.Services.Implementation
                         AssignedAt = DateTime.UtcNow
                     };
                     await _repo.CreateAssignmentAsync(assignment);
+
+                    var interviewer = await _userRepo.GetByIdAsync(item.InterviewerUserId);
+                    if (interviewer != null)
+                    {
+                        EmailQueueService.EnqueueEmail(new EmailQueueItem
+                        {
+                            ToEmail = interviewer.Email,
+                            FullName = interviewer.FullName,
+                            EmailType = EmailType.InterviewerAssigned,
+                            InterviewTitle = dto.Title,
+                            InterviewScheduledAt = dto.ScheduledAt
+                        });
+                    }
                 }
             }
 
@@ -143,6 +160,9 @@ namespace BusinessLogic.Services.Implementation
                 var selectedSlot = slots.FirstOrDefault(s => s.Id == dto.SelectedTimeSlotId.Value);
                 if (selectedSlot != null)
                 {
+                    if (selectedSlot.ProposedAt <= DateTime.UtcNow.AddHours(5))
+                        throw new InvalidOperationException("Không thể xác nhận lịch phỏng vấn này vì đã sát giờ (cần xác nhận trước ít nhất 5 tiếng).");
+
                     schedule.ScheduledAt = selectedSlot.ProposedAt;
                     // Cập nhật trạng thái IsSelected cho tất cả slots
                     foreach (var slot in slots)
@@ -181,6 +201,8 @@ namespace BusinessLogic.Services.Implementation
                 case InterviewStatus.Confirmed:
                     if (schedule.Status != InterviewStatus.Scheduled && schedule.Status != InterviewStatus.Rescheduled)
                         throw new InvalidOperationException("Chỉ có thể Confirm từ Scheduled hoặc Rescheduled.");
+                    if (!schedule.ScheduledAt.HasValue || schedule.ScheduledAt.Value <= DateTime.UtcNow.AddHours(5))
+                        throw new InvalidOperationException("Không thể xác nhận lịch phỏng vấn này vì đã sát giờ (cần xác nhận trước ít nhất 5 tiếng) hoặc chưa chọn giờ cụ thể.");
                     break;
 
                 case InterviewStatus.InProgress:
@@ -204,6 +226,34 @@ namespace BusinessLogic.Services.Implementation
                 case InterviewStatus.Rescheduled:
                     if (schedule.Status == InterviewStatus.Completed || schedule.Status == InterviewStatus.Cancelled)
                         throw new InvalidOperationException("Không thể Reschedule lịch đã Completed hoặc Cancelled.");
+
+                    if (dto.ProposedTimeSlots != null && dto.ProposedTimeSlots.Count > 0)
+                    {
+                        await _repo.DeleteTimeSlotsByScheduleIdAsync(id);
+                        foreach (var slot in dto.ProposedTimeSlots)
+                        {
+                            if (DateTime.TryParse($"{slot.Date}T{slot.Time}", out var proposedAt))
+                            {
+                                var timeSlot = new ProposedTimeSlot
+                                {
+                                    InterviewScheduleId = id,
+                                    ProposedAt = proposedAt,
+                                    IsSelected = false,
+                                    CreatedAt = DateTime.UtcNow
+                                };
+                                await _repo.CreateTimeSlotAsync(timeSlot);
+                            }
+                        }
+                        // Xóa ScheduledAt cũ để ứng viên phải chọn lại
+                        schedule.ScheduledAt = null;
+                        
+                        // Đóng phòng họp nếu đang có vì lịch đã thay đổi
+                        var oldRoom = await _repo.GetRoomByScheduleIdAsync(id);
+                        if (oldRoom != null && oldRoom.Status != RoomStatus.Closed)
+                        {
+                            await CloseRoomAsync(oldRoom.RoomCode);
+                        }
+                    }
                     break;
 
                 default:
@@ -336,6 +386,19 @@ namespace BusinessLogic.Services.Implementation
 
                 var created = await _repo.CreateAssignmentAsync(assignment);
                 result.Add(MapAssignmentToDto(created));
+
+                var interviewer = await _userRepo.GetByIdAsync(item.InterviewerUserId);
+                if (interviewer != null)
+                {
+                    EmailQueueService.EnqueueEmail(new EmailQueueItem
+                    {
+                        ToEmail = interviewer.Email,
+                        FullName = interviewer.FullName,
+                        EmailType = EmailType.InterviewerAssigned,
+                        InterviewTitle = schedule.Title,
+                        InterviewScheduledAt = schedule.ScheduledAt
+                    });
+                }
             }
 
             return result;
@@ -546,8 +609,8 @@ namespace BusinessLogic.Services.Implementation
             if (room.Status == RoomStatus.Active) return true;
 
             room.Status = RoomStatus.Active;
-            room.EndedAt = DateTime.UtcNow;
-
+            room.StartedAt = DateTime.UtcNow;
+            
             await _repo.UpdateRoomAsync(room);
 
             await _repo.CreateEventAsync(new RoomEvent
@@ -812,17 +875,45 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<EvaluationCriterionDto> CreateCriterionAsync(int campaignId, CreateEvaluationCriterionDto dto)
         {
+            if (dto.IsDraft && !dto.AssignmentId.HasValue)
+                throw new ArgumentException("AssignmentId bắt buộc khi tạo tiêu chí draft.");
+
             var criterion = new EvaluationCriterion
             {
                 CampaignId = campaignId,
                 Name = dto.Name,
                 Description = dto.Description,
                 IsDefault = false,
+                IsDraft = dto.IsDraft,
                 CreatedAt = DateTime.UtcNow
             };
 
             var created = await _repo.CreateCriterionAsync(criterion);
+
+            if (dto.IsDraft && dto.AssignmentId.HasValue)
+            {
+                await _repo.CreateCriteriaScoreAsync(new CriteriaScore
+                {
+                    InterviewAssignmentId = dto.AssignmentId.Value,
+                    EvaluationCriterionId = created.Id,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
             return MapCriterionToDto(created);
+        }
+
+        public async Task<List<EvaluationCriterionDto>> GetCriteriaForAssignmentAsync(int scheduleId, int assignmentId)
+        {
+            var assignment = await _repo.GetAssignmentByIdAsync(assignmentId);
+            if (assignment == null || assignment.InterviewScheduleId != scheduleId)
+                throw new KeyNotFoundException("Assignment not found or does not belong to this schedule.");
+
+            var schedule = await _repo.GetScheduleByIdAsync(scheduleId);
+            if (schedule == null) throw new KeyNotFoundException("Schedule not found.");
+
+            var criteria = await _repo.GetCriteriaForAssignmentAsync(schedule.CampaignId, assignmentId);
+            return criteria.Select(MapCriterionToDto).ToList();
         }
 
         public async Task<EvaluationCriterionDto?> UpdateCriterionAsync(int criterionId, UpdateEvaluationCriterionDto dto)
@@ -1086,21 +1177,8 @@ namespace BusinessLogic.Services.Implementation
                 if (dto.Mode.Equals("Now", StringComparison.OrdinalIgnoreCase))
                 {
                     d.PublishStatus = PublishStatus.Published;
-                    d.PublishedAt = DateTime.UtcNow;
-
-                    if (d.Decision == DecisionResult.Accept)
-                    {
-                        var candidateUser = await _userRepo.GetByIdAsync(d.CandidateUserId);
-                        var campaign = await _campaignRepo.GetByIdAsync(campaignId);
-
-                        if (candidateUser != null && campaign != null)
-                        {
-                            await _emailService.SendClubAcceptanceEmailAsync(
-                                candidateUser.Email,
-                                candidateUser.FullName,
-                                campaign.CampaignName);
-                        }
-                    }
+                    d.PublishedAt = DateTime.UtcNow.AddHours(7);
+                    await ExecuteAcceptDecisionAsync(d, campaignId);
                 }
                 else // Schedule
                 {
@@ -1111,7 +1189,6 @@ namespace BusinessLogic.Services.Implementation
                     d.ScheduledPublishAt = dto.ScheduledAt.Value;
                 }
 
-                d.NotificationChannels = dto.NotificationChannels;
                 await _repo.UpdateDecisionAsync(d);
             }
 
@@ -1138,7 +1215,8 @@ namespace BusinessLogic.Services.Implementation
                 CampaignId = c.CampaignId,
                 Name = c.Name,
                 Description = c.Description,
-                IsDefault = c.IsDefault
+                IsDefault = c.IsDefault,
+                IsDraft = c.IsDraft
             };
         }
 
@@ -1157,6 +1235,46 @@ namespace BusinessLogic.Services.Implementation
                 ScheduledPublishAt = d.ScheduledPublishAt,
                 PublishedAt = d.PublishedAt
             };
+        }
+
+        private async Task ExecuteAcceptDecisionAsync(CampaignDecision d, int campaignId)
+        {
+            if (d.Decision != DecisionResult.Accept) return;
+
+            var candidateUser = await _userRepo.GetByIdAsync(d.CandidateUserId);
+            var campaign = await _campaignRepo.GetByIdAsync(campaignId);
+            if (candidateUser == null || campaign == null) return;
+
+            await _emailService.SendClubAcceptanceEmailAsync(
+                candidateUser.Email, candidateUser.FullName, campaign.CampaignName);
+
+            try
+            {
+                await _clubMemberService.AddUserToClubAsync(
+                    campaign.ClubId,
+                    new AddUserToClubDto { UserId = d.CandidateUserId },
+                    d.DecidedByUserId);
+            }
+            catch (InvalidOperationException)
+            {
+                // Already a member — skip silently
+            }
+        }
+
+        public async Task ProcessScheduledPublishAsync()
+        {
+            var now = DateTime.UtcNow.AddHours(7);
+
+            var allDecisions = await _repo.GetScheduledDecisionsDueAsync(now);
+            if (!allDecisions.Any()) return;
+
+            foreach (var d in allDecisions)
+            {
+                d.PublishStatus = PublishStatus.Published;
+                d.PublishedAt = now;
+                await ExecuteAcceptDecisionAsync(d, d.CampaignId);
+                await _repo.UpdateDecisionAsync(d);
+            }
         }
 
         private static PublishStatusResponseDto BuildPublishStatus(int campaignId, List<CampaignDecision> decisions)

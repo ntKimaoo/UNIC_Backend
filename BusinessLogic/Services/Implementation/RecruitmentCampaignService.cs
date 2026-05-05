@@ -82,12 +82,22 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<RecruitmentCampaignResponseDto> CreateAsync(CreateRecruitmentCampaignDto dto)
         {
-            var clubExists = await _clubRepository.ExistsAsync(dto.ClubId);
-            if (!clubExists)
+            var club = await _clubRepository.GetByIdAsync(dto.ClubId);
+            if (club == null)
                 throw new NotFoundException("Club", dto.ClubId);
+            if (!club.IsActive)
+                throw new InvalidOperationException("Không thể tạo chiến dịch tuyển dụng cho câu lạc bộ đang không hoạt động.");
 
             if (dto.StartDate.HasValue && dto.EndDate.HasValue && dto.StartDate >= dto.EndDate)
                 throw new DomainException("StartDate must be earlier than EndDate.");
+
+            if (dto.StartDate.HasValue && dto.EndDate.HasValue)
+            {
+                var hasOverlap = await _repository.HasOverlappingCampaignAsync(
+                    dto.ClubId, dto.StartDate.Value, dto.EndDate.Value);
+                if (hasOverlap)
+                    throw new DomainException("Câu lạc bộ đã có đợt tuyển dụng trong khoảng thời gian này.");
+            }
 
             var validStatuses = new[] { "OPEN", "CLOSED", "DRAFT" };
             if (!string.IsNullOrEmpty(dto.Status) && !validStatuses.Contains(dto.Status.ToUpper()))

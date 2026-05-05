@@ -675,8 +675,8 @@ namespace Presentation.Controllers
             }
         }
 
-        [HttpGet("~/api/fund-contributions/payos-return/{orderCode:int}")]
-        public async Task<IActionResult> GetPayOsContributionReturn(int orderCode)
+        [HttpGet("~/api/fund-contributions/payos-return/{orderCode:long}")]
+        public async Task<IActionResult> GetPayOsContributionReturn(long orderCode)
         {
             try
             {
@@ -797,11 +797,10 @@ namespace Presentation.Controllers
                     return BadRequest(new { success = false, message = "Missing data or signature" });
 
                 var receivedSignature = sigEl.GetString();
-                var orderCode = dataEl.TryGetProperty("orderCode", out var oc) ? oc.GetInt32() : 0;
-                if (orderCode <= 0)
+                if (!TryReadPayOsWebhookOrderCode(dataEl, out var orderCode))
                     return BadRequest(new { success = false, message = "Invalid orderCode" });
 
-                var tx = await _fundRepository.GetTransactionByIdAsync(orderCode);
+                var tx = await _fundRepository.GetTransactionForExternalCheckoutCompletionAsync(orderCode);
                 if (tx?.ClubFund == null)
                     return Ok(new { success = true });
 
@@ -826,6 +825,28 @@ namespace Presentation.Controllers
             {
                 return StatusCode(500, new { success = false, message = "Webhook processing error" });
             }
+        }
+
+        private static bool TryReadPayOsWebhookOrderCode(JsonElement dataEl, out long orderCode)
+        {
+            orderCode = 0;
+            if (!dataEl.TryGetProperty("orderCode", out var oc))
+                return false;
+            if (oc.ValueKind == JsonValueKind.Number && oc.TryGetInt64(out var n) && n > 0)
+            {
+                orderCode = n;
+                return true;
+            }
+
+            if (oc.ValueKind == JsonValueKind.String
+                && long.TryParse(oc.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var p)
+                && p > 0)
+            {
+                orderCode = p;
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>IPN VNPay (server-to-server). Đăng ký URL này trên cổng VNPay: GET/POST ~/api/vnpay/ipn</summary>
@@ -871,7 +892,7 @@ namespace Presentation.Controllers
                 if (vnpAmountMinor != expectedMinor)
                     return VnpIpnPlain("04", "Invalid amount");
 
-                await _clubFundService.ProcessPayOSPaymentSuccessAsync(txnId);
+                await _fundRepository.TryApproveMemberContributionAsync(txnId);
                 return VnpIpnPlain("00", "Confirm Success");
             }
             catch (Exception)

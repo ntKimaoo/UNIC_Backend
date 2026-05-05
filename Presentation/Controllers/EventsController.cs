@@ -21,15 +21,18 @@ namespace UNIC.Presentation.Controllers
         private readonly IEventService _eventService;
         private readonly IQRCodeGeneratorService _qrCodeGeneratorService;
         private readonly IEventPermissionService _eventPermService;
+        private readonly IClubMemberService _clubMemberService;
 
         public EventsController(
             IEventService eventService,
             IQRCodeGeneratorService qrCodeGeneratorService,
-            IEventPermissionService eventPermService)
+            IEventPermissionService eventPermService,
+            IClubMemberService clubMemberService)
         {
             _eventService = eventService;
             _qrCodeGeneratorService = qrCodeGeneratorService;
             _eventPermService = eventPermService;
+            _clubMemberService = clubMemberService;
         }
 
         private Guid GetUserId()
@@ -74,6 +77,19 @@ namespace UNIC.Presentation.Controllers
             try
             {
                 var eventDto = await _eventService.GetEventByIdAsync(id);
+
+                // If event is private, verify user is a member of the organizing club
+                if (!eventDto.IsPublic && eventDto.ClubId.HasValue)
+                {
+                    var userId = GetUserId();
+                    if (userId == Guid.Empty)
+                        return StatusCode(403, new { error = "Sự kiện này chỉ dành cho thành viên câu lạc bộ. Vui lòng đăng nhập." });
+
+                    var isMember = await _clubMemberService.IsMemberAsync(userId, eventDto.ClubId.Value);
+                    if (!isMember)
+                        return StatusCode(403, new { error = "Sự kiện này chỉ dành cho thành viên câu lạc bộ." });
+                }
+
                 return Ok(eventDto);
             }
             catch (NotFoundException ex) { return NotFound(new { error = ex.Message }); }
@@ -91,8 +107,12 @@ namespace UNIC.Presentation.Controllers
             if (pageSize < 1 || pageSize > 100) return BadRequest(new { error = "Page size must be between 1 and 100." });
             try
             {
-                var events = await _eventService.GetAllEventsAsync(pageNumber, pageSize, status, clubId);
-                var total = await _eventService.GetTotalEventsCountAsync(status, clubId);
+                // Nếu user đã đăng nhập → truyền userId để hiển thị cả event nội bộ CLB
+                var userId = GetUserId();
+                Guid? userIdParam = userId != Guid.Empty ? userId : null;
+
+                var events = await _eventService.GetAllEventsAsync(pageNumber, pageSize, status, clubId, userIdParam);
+                var total = await _eventService.GetTotalEventsCountAsync(status, clubId, userIdParam);
                 return Ok(new { items = events, total, page = pageNumber, pageSize });
             }
             catch (Exception ex) { return StatusCode(500, new { error = "An error occurred", details = ex.Message }); }

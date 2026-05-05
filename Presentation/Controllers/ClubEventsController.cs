@@ -25,6 +25,18 @@ namespace UNIC.Presentation.Controllers
     //[Authorize]
     public class ClubEventsController : ControllerBase
     {
+        private static readonly TimeZoneInfo VnTz =
+            TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+
+        /// <summary>
+        /// Multipart form-data dates bypass the JSON converter.
+        /// FE sends .toISOString() (UTC), but the service layer compares against VnTimeHelper.Now.
+        /// This helper converts UTC DateTimes to Vietnam local time.
+        /// </summary>
+        private static DateTime NormalizeToVn(DateTime dt)
+            => dt.Kind == DateTimeKind.Utc ? TimeZoneInfo.ConvertTimeFromUtc(dt, VnTz) : dt;
+        private static DateTime? NormalizeToVn(DateTime? dt)
+            => dt.HasValue ? NormalizeToVn(dt.Value) : null;
         private readonly IEventService _eventService;
         private readonly IFileStorageService _fileStorageService;
         private readonly IEventPermissionService _eventPermissionService;
@@ -75,15 +87,20 @@ namespace UNIC.Presentation.Controllers
         /// </summary>
         [HttpPost]
         [Consumes("multipart/form-data")]
+        [RequireClubPolicyOrRole("createevent", "Admin", "Club Manager")]
         public async Task<ActionResult<EventDetailDto>> CreateEvent(int clubId, [FromForm] CreateEventRequest request, IFormFile? image)
         {
             try
             {
-                //if (!IsClubManager(clubId))
-                //    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions for this club." });
+                if (!IsClubManager(clubId))
+                    return StatusCode(StatusCodes.Status403Forbidden, new { error = "You do not have Manager permissions for this club." });
 
                 // Override ClubId from route
                 request.ClubId = clubId;
+
+                // Normalize UTC dates from multipart form to Vietnam time
+                request.StartDate = NormalizeToVn(request.StartDate);
+                request.EndDate = NormalizeToVn(request.EndDate);
 
                 string? imageUrl = null;
                 if (image != null && image.Length > 0)
@@ -112,12 +129,16 @@ namespace UNIC.Presentation.Controllers
         /// </summary>
         [HttpPut("{id}")]
         [Consumes("multipart/form-data")]
-        //[RequireEventPolicy("editevent")]
+        [RequireEventPolicy("editevent")]
         public async Task<ActionResult<EventDetailDto>> UpdateEvent(int clubId, int id, [FromForm] UpdateEventRequest request, IFormFile? image)
         {
             try
             {
                 if (id != request.EventId) return BadRequest(new { error = "Event ID mismatch" });
+
+                // Normalize UTC dates from multipart form to Vietnam time
+                if (request.StartDate.HasValue) request.StartDate = NormalizeToVn(request.StartDate);
+                if (request.EndDate.HasValue) request.EndDate = NormalizeToVn(request.EndDate);
 
                 // Verify the event belongs to this club
                 var existingEvent = await _eventService.GetEventByIdAsync(id);
@@ -140,7 +161,7 @@ namespace UNIC.Presentation.Controllers
         /// </summary>
         [HttpPost("{id}/image")]
         [Consumes("multipart/form-data")]
-        //[RequireEventPolicy("editevent")]
+        [RequireEventPolicy("editevent")]
         public async Task<IActionResult> UploadEventImage(int clubId, int id, IFormFile image)
         {
             try
@@ -171,7 +192,7 @@ namespace UNIC.Presentation.Controllers
         /// Create a session for an event within a club
         /// </summary>
         [HttpPost("{id}/sessions")]
-        //[RequireEventPolicy("managesession")]
+        [RequireEventPolicy("managesession")]
         public async Task<ActionResult<SessionDto>> CreateSession(int clubId, int id, [FromBody] CreateSessionRequest request)
         {
             try
@@ -197,7 +218,7 @@ namespace UNIC.Presentation.Controllers
         /// Update an existing session for an event within a club
         /// </summary>
         [HttpPut("{id}/sessions/{scheduleId}")]
-        //[RequireEventPolicy("managesession")]
+        [RequireEventPolicy("managesession")]
         public async Task<ActionResult<SessionDto>> UpdateSession(int clubId, int id, int scheduleId, [FromBody] UpdateSessionRequest request)
         {
             try
@@ -224,7 +245,7 @@ namespace UNIC.Presentation.Controllers
         /// Delete a session for an event within a club
         /// </summary>
         [HttpDelete("{id}/sessions/{scheduleId}")]
-        //[RequireEventPolicy("managesession")]
+        [RequireEventPolicy("managesession")]
         public async Task<IActionResult> DeleteSession(int clubId, int id, int scheduleId)
         {
             try
@@ -249,7 +270,7 @@ namespace UNIC.Presentation.Controllers
         /// Open registration for an event within a club
         /// </summary>
         [HttpPatch("{id}/open-registration")]
-        //[RequireEventPolicy("openregistration")]
+        [RequireEventPolicy("openregistration")]
         public async Task<ActionResult<EventDetailDto>> OpenRegistration(int clubId, int id, [FromBody] OpenRegistrationRequest request)
         {
             try
@@ -270,7 +291,7 @@ namespace UNIC.Presentation.Controllers
         /// Start an event (generates check-in code)
         /// </summary>
         [HttpPut("{id}/start")]
-        //[RequireEventPolicy("startevent")]
+        [RequireEventPolicy("startevent")]
         public async Task<IActionResult> StartEvent(int clubId, int id)
         {
             try
@@ -289,7 +310,7 @@ namespace UNIC.Presentation.Controllers
         /// Complete an event
         /// </summary>
         [HttpPut("{id}/complete")]
-        //[RequireEventPolicy("completeevent")]
+        [RequireEventPolicy("completeevent")]
         public async Task<IActionResult> CompleteEvent(int clubId, int id)
         {
             try
@@ -308,7 +329,7 @@ namespace UNIC.Presentation.Controllers
         /// Cancel an event — sets status to CANCELED, marks all registrations as CANCELLED
         /// </summary>
         [HttpPut("{id}/cancel")]
-        //[RequireEventPolicy("editevent")]
+        [RequireEventPolicy("deleteevent")]
         public async Task<IActionResult> CancelEvent(int clubId, int id)
         {
             try

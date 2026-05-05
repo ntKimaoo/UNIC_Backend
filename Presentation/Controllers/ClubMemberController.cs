@@ -40,7 +40,7 @@ namespace Presentation.Controllers
         /// Lấy danh sách members của club (hỗ trợ phân trang, lọc, sắp xếp)
         /// </summary>
         [HttpGet("api/clubs/{clubId}/members")]
-        
+        [RequireRole("User", "Admin", "Club Manager")]
         public async Task<IActionResult> GetMembers(
             int clubId,
             [FromQuery] int? pagination,
@@ -81,7 +81,7 @@ namespace Presentation.Controllers
         /// Lấy thông tin một member theo ID
         /// </summary>
         [HttpGet("api/clubs/{clubId}/members/{memberId}")]
-       
+        [RequireRole("ViewMember", "Admin", "Club Manager")]
         public async Task<IActionResult> GetMember(int clubId, int memberId)
         {
             var member = await _service.GetMemberByIdAsync(memberId);
@@ -95,7 +95,7 @@ namespace Presentation.Controllers
         /// Thêm user vào club
         /// </summary>
         [HttpPost("api/clubs/{clubId}/members")]
-        
+        [RequireClubPolicyOrRole("Club Manager", "AddMember")]
         public async Task<IActionResult> AddMember(int clubId, [FromBody] AddUserToClubDto dto)
         {
             if (!ModelState.IsValid)
@@ -131,7 +131,7 @@ namespace Presentation.Controllers
         /// Cập nhật role của member trong club
         /// </summary>
         [HttpPut("api/clubs/{clubId}/members/{memberId}/role")]
-        
+        [RequireClubPolicyOrRole("Club Manager", "UpdateMemberRole")]
         public async Task<IActionResult> UpdateMemberRole(int clubId, int memberId, [FromBody] UpdateMemberRoleDto? dto)
         {
             if (!ModelState.IsValid)
@@ -155,6 +155,7 @@ namespace Presentation.Controllers
         /// Active/deactive member trong club
         /// </summary>
         [HttpPut("api/clubs/{clubId}/members/{memberId}/status")]
+        [RequireClubPolicyOrRole("Club Manager", "UpdateMemberStatus")]
         public async Task<IActionResult> UpdateMemberStatus(int clubId, int memberId, [FromBody] UpdateMemberStatusDto dto)
         {
             if (!ModelState.IsValid)
@@ -187,7 +188,7 @@ namespace Presentation.Controllers
         /// Xóa member khỏi club
         /// </summary>
         [HttpDelete("api/clubs/{clubId}/members/{memberId}")]
-        
+        [RequireClubPolicyOrRole("Club Manager", "RemoveMember")]
         public async Task<IActionResult> RemoveMember(int clubId, int memberId)
         {
             // Kiểm tra member có thuộc club này không
@@ -211,6 +212,7 @@ namespace Presentation.Controllers
         /// Gán thêm 1 role cho member
         /// </summary>
         [HttpPost("api/clubs/{clubId}/members/{memberId}/roles/{roleId}")]
+        [RequireClubPolicyOrRole("Club Manager", "AddMemberRole")]
         public async Task<IActionResult> AddMemberRole(int clubId, int memberId, int roleId)
         {
             var member = await _service.GetMemberByIdAsync(memberId);
@@ -230,6 +232,7 @@ namespace Presentation.Controllers
         /// Xóa 1 role khỏi member
         /// </summary>
         [HttpDelete("api/clubs/{clubId}/members/{memberId}/roles/{roleId}")]
+        [RequireClubPolicyOrRole("Club Manager", "RemoveMemberRole")]
         public async Task<IActionResult> RemoveMemberRole(int clubId, int memberId, int roleId)
         {
             var member = await _service.GetMemberByIdAsync(memberId);
@@ -298,6 +301,7 @@ namespace Presentation.Controllers
         /// Body: { "policyIds": [1, 2, 3] }
         /// </summary>
         [HttpPost("api/clubs/{clubId}/members/{memberId}/policies")]
+        [RequireClubPolicyOrRole("Club Manager", "AddPolicy")]
         public async Task<IActionResult> AssignPolicies(int clubId, int memberId, [FromBody] MemberPolicyDto dto)
         {
             if (!ModelState.IsValid)
@@ -319,6 +323,7 @@ namespace Presentation.Controllers
         /// Body: { "policyIds": [1, 2] }
         /// </summary>
         [HttpPut("api/clubs/{clubId}/members/{memberId}/policies")]
+        [RequireClubPolicyOrRole("Club Manager", "SetPolicy")]
         public async Task<IActionResult> SetPolicies(int clubId, int memberId, [FromBody] MemberPolicyDto dto)
         {
             if (!ModelState.IsValid)
@@ -339,6 +344,7 @@ namespace Presentation.Controllers
         /// DELETE /api/clubs/{clubId}/members/{memberId}/policies/{policyId}
         /// </summary>
         [HttpDelete("api/clubs/{clubId}/members/{memberId}/policies/{policyId}")]
+        [RequireClubPolicyOrRole("Club Manager", "RevokePolicy")]
         public async Task<IActionResult> RevokePolicy(int clubId, int memberId, int policyId)
         {
             var member = await _service.GetMemberByIdAsync(memberId);
@@ -357,6 +363,7 @@ namespace Presentation.Controllers
         /// GET /api/clubs/{clubId}/members/{memberId}/departments/joined
         /// </summary>
         [HttpGet("api/clubs/{clubId}/members/{memberId}/departments/joined")]
+        [RequireClubPolicyOrRole("Admin", "Club Manager", "User")]
         public async Task<IActionResult> GetJoinedDepartments(int clubId, int memberId)
         {
             var departments = await _departmentService.GetDepartmentsJoinedByMemberAsync(clubId, memberId);
@@ -370,12 +377,45 @@ namespace Presentation.Controllers
         /// GET /api/clubs/{clubId}/members/{memberId}/departments/not-joined
         /// </summary>
         [HttpGet("api/clubs/{clubId}/members/{memberId}/departments/not-joined")]
+        [RequireClubPolicyOrRole("Admin", "Club Manager", "User")]
         public async Task<IActionResult> GetNotJoinedDepartments(int clubId, int memberId)
         {
             var departments = await _departmentService.GetDepartmentsNotJoinedByMemberAsync(clubId, memberId);
             if (departments == null)
                 return NotFound(new { success = false, message = "Member not found in this club" });
             return Ok(new { success = true, data = departments });
+        }
+
+        /// <summary>
+        /// Chuyển giao quyền Club Manager sang thành viên khác (atomic)
+        /// PUT /api/clubs/{clubId}/transfer
+        /// Body: { "newManagerMemberId": 123 }
+        /// </summary>
+        [HttpPut("api/clubs/{clubId}/transfer")]
+        [RequireClubPolicyOrRole("Club Manager")]
+        public async Task<IActionResult> TransferClub(int clubId, [FromBody] TransferClubDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid data", errors = ModelState });
+
+            try
+            {
+                var transferredBy = GetCurrentUserId();
+                await _service.TransferClubAsync(clubId, dto.NewManagerMemberId, transferredBy);
+                return Ok(new { success = true, message = "Chuyển giao câu lạc bộ thành công." });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(new { success = false, message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "An error occurred", error = ex.Message });
+            }
         }
 
         /// <summary>

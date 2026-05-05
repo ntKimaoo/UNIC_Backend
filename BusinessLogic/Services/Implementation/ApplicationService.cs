@@ -19,11 +19,19 @@ namespace UNIC.BusinessLogic.Services.Implementation
     {
         private readonly IApplicationRepository _applicationRepository;
         private readonly IUserRepository _userRepository;
+        private readonly IRecruitmentCampaignRepository _campaignRepository;
+        private readonly IClubRepository _clubRepository;
 
-        public ApplicationService(IApplicationRepository applicationRepository, IUserRepository userRepository)
+        public ApplicationService(
+            IApplicationRepository applicationRepository,
+            IUserRepository userRepository,
+            IRecruitmentCampaignRepository campaignRepository,
+            IClubRepository clubRepository)
         {
             _applicationRepository = applicationRepository;
             _userRepository = userRepository;
+            _campaignRepository = campaignRepository;
+            _clubRepository = clubRepository;
         }
 
         private ApplicationResponseDto MapToDto(Application application)
@@ -87,6 +95,14 @@ namespace UNIC.BusinessLogic.Services.Implementation
 
         public async Task<ApplicationResponseDto> CreateApplicationAsync(CreateApplicationDto request)
         {
+            var campaign = await _campaignRepository.GetByFormIdAsync(request.FormId);
+            if (campaign != null)
+            {
+                var club = await _clubRepository.GetByIdAsync(campaign.ClubId);
+                if (club != null && !club.IsActive)
+                    throw new InvalidOperationException("Câu lạc bộ này hiện không hoạt động, không thể nộp đơn.");
+            }
+
             var application = new Application
             {
                 FormId = request.FormId,

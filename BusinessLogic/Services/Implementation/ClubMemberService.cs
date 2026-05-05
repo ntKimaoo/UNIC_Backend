@@ -82,6 +82,8 @@ namespace BusinessLogic.Services.Implementation
         {
             var club = await _clubRepository.GetByIdAsync(clubId);
             if (club == null) throw new KeyNotFoundException($"Club with ID {clubId} not found.");
+            if (!club.IsActive)
+                throw new InvalidOperationException("Không thể thêm thành viên vào câu lạc bộ đang không hoạt động.");
 
             var user = await _userRepository.GetByIdAsync(dto.UserId);
             if (user == null) throw new KeyNotFoundException($"User with ID {dto.UserId} not found.");
@@ -112,7 +114,7 @@ namespace BusinessLogic.Services.Implementation
         {
             var member = await _memberRepository.GetMemberByIdAsync(clubMemberId);
             if (member == null) return null;
-            
+
             var currentRoleIds = member.RoleAssignments.Select(ra => ra.ClubRoleId).ToHashSet();
             var newRoleIds = (dto.ClubRoleIds ?? new List<int>()).ToHashSet();
             var rolesToAdd = newRoleIds.Where(id => !currentRoleIds.Contains(id)).ToList();
@@ -263,6 +265,48 @@ namespace BusinessLogic.Services.Implementation
         public async Task<bool> IsUserInClubAsync(Guid userId, int clubId)
         {
             return await _memberRepository.IsMemberAsync(userId, clubId);
+        }
+        public async Task<bool> TransferClubAsync(int clubId, int newManagerMemberId, Guid? transferredBy)
+        {
+            // Validate new manager is a member of this club
+            var newManager = await _memberRepository.GetMemberByIdAsync(newManagerMemberId);
+            if (newManager == null || newManager.ClubId != clubId)
+                throw new KeyNotFoundException("Thành viên không thuộc câu lạc bộ này.");
+
+            // Find the Level 0 (Club Manager) role for the club
+            var allRoles = await _clubRoleRepo.GetAllAsync(clubId);
+            var managerRole = allRoles.FirstOrDefault(r => r.Level == 0);
+            if (managerRole == null)
+                throw new InvalidOperationException("Câu lạc bộ chưa có role Club Manager (Level 0).");
+
+            // Prevent transferring to someone who is already the manager
+            if (newManager.RoleAssignments.Any(ra => ra.ClubRole?.Level == 0))
+                throw new InvalidOperationException("Thành viên này đã là Club Manager của câu lạc bộ.");
+
+            // Find current Club Manager to strip the role from them
+            var allMembers = await _memberRepository.GetMembersByClubIdAsync(clubId);
+            var currentManager = allMembers.FirstOrDefault(m =>
+                m.RoleAssignments.Any(ra => ra.ClubRole != null && ra.ClubRole.Level == 0));
+
+            // Step 1: Remove Club Manager role from current manager, keep other roles
+            if (currentManager != null)
+            {
+                var remainingRoles = currentManager.RoleAssignments
+                    .Where(ra => ra.ClubRole?.Level != 0)
+                    .Select(ra => ra.ClubRoleId)
+                    .ToList();
+                await _clubRoleRepo.SetMemberRolesAsync(currentManager.ClubMemberId, remainingRoles);
+            }
+
+            // Step 2: Add Club Manager role to new manager, keep their existing roles
+            var newManagerRoles = newManager.RoleAssignments
+                .Select(ra => ra.ClubRoleId)
+                .ToList();
+            if (!newManagerRoles.Contains(managerRole.ClubRoleId))
+                newManagerRoles.Add(managerRole.ClubRoleId);
+            await _clubRoleRepo.SetMemberRolesAsync(newManagerMemberId, newManagerRoles);
+
+            return true;
         }
     }
 }

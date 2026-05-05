@@ -90,7 +90,7 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<int> AutoCompleteExpiredInterviewsAsync(int gracePeriodMinutes)
         {
-            var now = DateTime.UtcNow;
+            var now = DateTime.UtcNow.AddHours(7);
             var maxPossibleStartDate = now.AddMinutes(-gracePeriodMinutes);
 
             var candidates = await _context.InterviewSchedules
@@ -121,9 +121,101 @@ namespace DataAccess.Repositories.Implementation
             return expiredSchedules.Count;
         }
 
+        public async Task<int> AutoCancelUnconfirmedInterviewsAsync(TimeSpan maxWaitTime, TimeSpan minTimeBeforeEarliestSlot)
+        {
+            var now = DateTime.UtcNow.AddHours(7);
+
+            var unconfirmedSchedules = await _context.InterviewSchedules
+                .Include(s => s.ProposedTimeSlots)
+                .Where(s => s.Status == InterviewStatus.Scheduled || s.Status == InterviewStatus.Rescheduled)
+                .ToListAsync();
+
+            var schedulesToCancel = new List<InterviewSchedule>();
+
+            foreach (var schedule in unconfirmedSchedules)
+            {
+                bool shouldCancel = false;
+
+                // Điều kiện 1: Đã quá thời gian chờ từ lúc tạo/cập nhật lịch (vd 1 ngày)
+                var lastUpdated = schedule.UpdatedAt ?? schedule.CreatedAt ?? now;
+                if (now - lastUpdated > maxWaitTime)
+                {
+                    shouldCancel = true;
+                }
+                else
+                {
+                    // Điều kiện 2: Gần đến thời gian của slot gần nhất (vd trước 5 tiếng)
+                    DateTime? earliestProposedTime = null;
+                    
+                    if (schedule.ProposedTimeSlots != null && schedule.ProposedTimeSlots.Any())
+                    {
+                        earliestProposedTime = schedule.ProposedTimeSlots.Min(p => p.ProposedAt);
+                    }
+                    else if (schedule.ScheduledAt.HasValue)
+                    {
+                        earliestProposedTime = schedule.ScheduledAt.Value;
+                    }
+
+                    if (earliestProposedTime.HasValue && earliestProposedTime.Value <= now.Add(minTimeBeforeEarliestSlot))
+                    {
+                        shouldCancel = true;
+                    }
+                }
+
+                if (shouldCancel)
+                {
+                    schedulesToCancel.Add(schedule);
+                }
+            }
+
+            if (!schedulesToCancel.Any())
+                return 0;
+
+            foreach (var schedule in schedulesToCancel)
+            {
+                schedule.Status = InterviewStatus.Cancelled;
+                schedule.CancelReason = "Hệ thống tự động hủy do ứng viên không xác nhận lịch phỏng vấn đúng hạn.";
+                schedule.UpdatedAt = now;
+            }
+
+            await _context.SaveChangesAsync();
+            return schedulesToCancel.Count;
+        }
+
+        public async Task<IEnumerable<InterviewSchedule>> AutoRescheduleNoInterviewerAsync(TimeSpan hoursBeforeStart)
+        {
+            var now = DateTime.UtcNow.AddHours(7);
+            var threshold = now.Add(hoursBeforeStart);
+
+            var schedules = await _context.InterviewSchedules
+                .Include(s => s.Assignments)
+                .Where(s => s.Status == InterviewStatus.Confirmed
+                            && s.ScheduledAt.HasValue
+                            && s.ScheduledAt.Value > now
+                            && s.ScheduledAt.Value <= threshold
+                            && !s.Assignments.Any())
+                .ToListAsync();
+
+            if (!schedules.Any())
+                return schedules;
+
+            foreach (var s in schedules)
+            {
+                s.ScheduledAt = s.ScheduledAt!.Value.AddDays(1);
+                s.Status = InterviewStatus.Rescheduled;
+                s.RescheduleReason = "Hệ thống tự động dời lịch do chưa có phỏng vấn viên được phân công.";
+                s.UpdatedAt = now;
+                s.ReminderSentAt = null;
+                s.RoomOpenedEmailSentAt = null;
+            }
+
+            await _context.SaveChangesAsync();
+            return schedules;
+        }
+
         public async Task<IEnumerable<InterviewSchedule>> GetSchedulesNeedingReminderAsync(TimeSpan reminderBefore)
         {
-            var now = DateTime.UtcNow;
+            var now = DateTime.UtcNow.AddHours(7);
             var reminderThreshold = now.Add(reminderBefore);
 
             return await _context.InterviewSchedules
@@ -246,14 +338,16 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<int> SyncRoomStatusesAsync(TimeSpan preOpenDuration)
         {
-            var thresholdTime = DateTime.UtcNow.Add(preOpenDuration);
+            var thresholdTime = DateTime.UtcNow.AddHours(7).Add(preOpenDuration);
             var roomsToActivate = await _context.MeetingRooms
                 .Include(r => r.InterviewSchedule)
-                .Where(r => r.Status == RoomStatus.Idle 
+                    .ThenInclude(s => s!.Assignments)
+                .Where(r => r.Status == RoomStatus.Idle
                             && r.RoomType == RoomType.Interview
                             && r.InterviewSchedule != null
                             && r.InterviewSchedule.Status == InterviewStatus.Confirmed
-                            && r.InterviewSchedule.ScheduledAt <= thresholdTime)
+                            && r.InterviewSchedule.ScheduledAt <= thresholdTime
+                            && r.InterviewSchedule.Assignments.Any())
                 .ToListAsync();
 
             if (!roomsToActivate.Any())
@@ -265,7 +359,7 @@ namespace DataAccess.Repositories.Implementation
                 if (room.InterviewSchedule != null)
                 {
                     room.InterviewSchedule.Status = InterviewStatus.InProgress;
-                    room.InterviewSchedule.UpdatedAt = DateTime.UtcNow;
+                    room.InterviewSchedule.UpdatedAt = DateTime.UtcNow.AddHours(7);
                 }
             }
 
@@ -334,8 +428,36 @@ namespace DataAccess.Repositories.Implementation
         public async Task<IEnumerable<EvaluationCriterion>> GetCriteriaByCampaignIdAsync(int campaignId)
         {
             return await _context.EvaluationCriteria
-                .Where(c => c.CampaignId == campaignId)
+                .Where(c => c.CampaignId == campaignId && !c.IsDraft)
                 .OrderBy(c => c.Name)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<EvaluationCriterion>> GetCriteriaForAssignmentAsync(int campaignId, int assignmentId)
+        {
+            // Non-draft criteria explicitly assigned to this interviewer
+            var assignedNonDraftIds = await _context.CriteriaScores
+                .Where(s => s.InterviewAssignmentId == assignmentId && !s.EvaluationCriterion.IsDraft)
+                .Select(s => s.EvaluationCriterionId)
+                .Distinct()
+                .ToListAsync();
+
+            if (assignedNonDraftIds.Count == 0)
+            {
+                // No specific assignment → show ALL non-draft criteria + any drafts for this assignment
+                return await _context.EvaluationCriteria
+                    .Where(c => c.CampaignId == campaignId &&
+                                (!c.IsDraft || c.CriteriaScores.Any(s => s.InterviewAssignmentId == assignmentId)))
+                    .OrderBy(c => c.IsDraft).ThenBy(c => c.Name)
+                    .ToListAsync();
+            }
+
+            // Specific assignment → return only those non-draft criteria + any drafts for this assignment
+            return await _context.EvaluationCriteria
+                .Where(c => c.CampaignId == campaignId &&
+                            (assignedNonDraftIds.Contains(c.Id) ||
+                             (c.IsDraft && c.CriteriaScores.Any(s => s.InterviewAssignmentId == assignmentId))))
+                .OrderBy(c => c.IsDraft).ThenBy(c => c.Name)
                 .ToListAsync();
         }
 
@@ -420,8 +542,10 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task DeleteCriteriaScoresByAssignmentIdAsync(int assignmentId)
         {
+            // Chỉ xóa non-draft scores; draft scores được quản lý riêng
             var scores = await _context.CriteriaScores
-                .Where(cs => cs.InterviewAssignmentId == assignmentId)
+                .Include(cs => cs.EvaluationCriterion)
+                .Where(cs => cs.InterviewAssignmentId == assignmentId && !cs.EvaluationCriterion.IsDraft)
                 .ToListAsync();
 
             if (scores.Any())
@@ -440,6 +564,15 @@ namespace DataAccess.Repositories.Implementation
             return await _context.CampaignDecisions
                 .Where(d => d.CampaignId == campaignId)
                 .OrderBy(d => d.DecidedAt)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<CampaignDecision>> GetScheduledDecisionsDueAsync(DateTime now)
+        {
+            return await _context.CampaignDecisions
+                .Where(d => d.PublishStatus == PublishStatus.Scheduled
+                            && d.ScheduledPublishAt.HasValue
+                            && d.ScheduledPublishAt.Value <= now)
                 .ToListAsync();
         }
 
@@ -539,6 +672,38 @@ namespace DataAccess.Repositories.Implementation
             await _context.AiCandidateAnalysisResults.AddRangeAsync(results);
             await _context.SaveChangesAsync();
             return results;
+        }
+
+        public async Task DeleteAiAnalysisResultsByCampaignIdAsync(int campaignId)
+        {
+            var existing = await _context.AiCandidateAnalysisResults
+                .Where(r => r.CampaignId == campaignId)
+                .ToListAsync();
+            
+            if (existing.Any())
+            {
+                _context.AiCandidateAnalysisResults.RemoveRange(existing);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task<AiCandidateAnalysisResult?> GetAiAnalysisResultByScheduleIdAsync(int scheduleId)
+        {
+            return await _context.AiCandidateAnalysisResults
+                .FirstOrDefaultAsync(r => r.InterviewScheduleId == scheduleId);
+        }
+
+        public async Task DeleteAiAnalysisResultsByScheduleIdAsync(int scheduleId)
+        {
+            var existing = await _context.AiCandidateAnalysisResults
+                .Where(r => r.InterviewScheduleId == scheduleId)
+                .ToListAsync();
+            
+            if (existing.Any())
+            {
+                _context.AiCandidateAnalysisResults.RemoveRange(existing);
+                await _context.SaveChangesAsync();
+            }
         }
     }
 }

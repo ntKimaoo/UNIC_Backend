@@ -26,7 +26,7 @@ namespace BusinessLogic.Services.Implementation
         private readonly ILogger<AiAnalysisService> _logger;
         private readonly IUserRepository _userRepo;
 
-        private const int BatchSize = 10;
+        private const int BatchSize = 3; // Giảm xuống 3 để tránh prompt quá dài và giảm tải server AI
 
         private static readonly JsonSerializerOptions JsonOpts = new()
         {
@@ -82,10 +82,16 @@ namespace BusinessLogic.Services.Implementation
             };
         }
 
-        public async Task<AiCampaignAnalysisResponseDto> GenerateAiAnalysisAsync(int campaignId)
+        public async Task<AiCampaignAnalysisResponseDto> GenerateAiAnalysisAsync(int campaignId, bool forceReanalyze = false)
         {
             var allSchedules = (await _repo.GetSchedulesAsync(campaignId, null, null, null)).ToList();
             var criteria = (await _repo.GetCriteriaByCampaignIdAsync(campaignId)).ToList();
+            
+            if (forceReanalyze)
+            {
+                await _repo.DeleteAiAnalysisResultsByCampaignIdAsync(campaignId);
+            }
+
             var existingResults = (await _repo.GetAiAnalysisResultsByCampaignIdAsync(campaignId)).ToList();
             var existingScheduleIds = existingResults.Select(r => r.InterviewScheduleId).ToHashSet();
 
@@ -158,10 +164,18 @@ namespace BusinessLogic.Services.Implementation
                         .Select(g => g.Select(x => x.c).ToList())
                         .ToList();
 
-                    var batchTasks = batches.Select(batch => ProcessAnalysisBatchAsync(batch, criteriaNames));
-                    var batchResults = await Task.WhenAll(batchTasks);
-
-                    var allCandidates = batchResults.SelectMany(r => r).ToList();
+                    // Chạy tuần tự thay vì song song để tránh bị 503 Service Unavailable từ Gemini do Rate Limit
+                    var allCandidates = new List<AiCandidateAnalysisDto>();
+                    foreach (var batch in batches)
+                    {
+                        var batchResult = await ProcessAnalysisBatchAsync(batch, criteriaNames);
+                        allCandidates.AddRange(batchResult);
+                        
+                        if (batch != batches.Last())
+                        {
+                            await Task.Delay(2500); // Đợi 2.5s giữa các batch
+                        }
+                    }
 
                     // Save to DB
                     var newDbResults = allCandidates.Select(c => new AiCandidateAnalysisResult
@@ -201,6 +215,81 @@ namespace BusinessLogic.Services.Implementation
 
             // Cuối cùng return lại tất cả bao gồm cũ và mới từ DB
             return await AnalyzeCampaignCandidatesAsync(campaignId);
+        }
+
+        public async Task<AiCandidateAnalysisDto> GenerateSingleAiAnalysisAsync(int scheduleId, bool forceReanalyze = false)
+        {
+            var schedule = await _repo.GetScheduleByIdAsync(scheduleId);
+            if (schedule == null) throw new ArgumentException("Schedule not found");
+
+            if (forceReanalyze)
+            {
+                await _repo.DeleteAiAnalysisResultsByScheduleIdAsync(scheduleId);
+            }
+
+            var existingResult = await _repo.GetAiAnalysisResultByScheduleIdAsync(scheduleId);
+            if (existingResult != null)
+            {
+                var cand = new AiCandidateAnalysisDto
+                {
+                    InterviewScheduleId = existingResult.InterviewScheduleId,
+                    CandidateUserId = existingResult.CandidateUserId,
+                    Result = existingResult.Result,
+                    CriteriaEvaluations = JsonSerializer.Deserialize<List<AiCriteriaEvaluationDto>>(existingResult.CriteriaEvaluationsJson, JsonOpts) ?? new(),
+                    Strengths = JsonSerializer.Deserialize<List<string>>(existingResult.StrengthsJson, JsonOpts) ?? new(),
+                    Weaknesses = JsonSerializer.Deserialize<List<string>>(existingResult.WeaknessesJson, JsonOpts) ?? new()
+                };
+                var user = await _userRepo.GetByIdAsync(cand.CandidateUserId);
+                if (user != null) cand.CandidateName = user.FullName;
+                return cand;
+            }
+
+            var criteria = (await _repo.GetCriteriaByCampaignIdAsync(schedule.CampaignId)).ToList();
+            var allNotes = (await _repo.GetCriteriaScoresByScheduleIdAsync(schedule.Id)).ToList();
+            
+            var criteriaDetails = criteria.Select(c =>
+            {
+                var notes = allNotes
+                    .Where(s => s.EvaluationCriterionId == c.Id && !string.IsNullOrEmpty(s.Note))
+                    .Select(s => s.Note!)
+                    .ToList();
+                return new CriterionPromptData { CriterionId = c.Id, CriterionName = c.Name, Notes = notes };
+            }).ToList();
+
+            var assignments = await _repo.GetAssignmentsByScheduleIdAsync(schedule.Id);
+            var feedbackNotes = assignments.Where(a => !string.IsNullOrEmpty(a.FeedbackNotes)).Select(a => a.FeedbackNotes!).ToList();
+            var interviewerResults = assignments.Where(a => a.Result != null).Select(a => a.Result!.ToString()).ToList();
+            var userFind = await _userRepo.GetByIdAsync(schedule.CandidateUserId);
+
+            var candidateData = new CandidatePromptData
+            {
+                InterviewScheduleId = schedule.Id,
+                CandidateUserId = schedule.CandidateUserId.ToString(),
+                CandidateName = userFind!.FullName,
+                CriteriaDetails = criteriaDetails,
+                FeedbackNotes = feedbackNotes,
+                InterviewerResults = interviewerResults!
+            };
+
+            var criteriaNames = criteria.Select(c => c.Name).ToList();
+            var batchResult = await ProcessAnalysisBatchAsync(new List<CandidatePromptData> { candidateData }, criteriaNames);
+            var result = batchResult.First();
+
+            var newDbResult = new AiCandidateAnalysisResult
+            {
+                CampaignId = schedule.CampaignId,
+                InterviewScheduleId = result.InterviewScheduleId,
+                CandidateUserId = result.CandidateUserId,
+                Result = result.Result,
+                CriteriaEvaluationsJson = JsonSerializer.Serialize(result.CriteriaEvaluations, JsonOpts),
+                StrengthsJson = JsonSerializer.Serialize(result.Strengths, JsonOpts),
+                WeaknessesJson = JsonSerializer.Serialize(result.Weaknesses, JsonOpts),
+                AnalyzedAt = DateTime.UtcNow
+            };
+            
+            await _repo.CreateAiAnalysisResultAsync(newDbResult);
+
+            return result;
         }
 
         public async Task<AiSearchResponseDto> SearchCandidatesAsync(int campaignId, AiSearchRequestDto dto)
@@ -409,8 +498,17 @@ namespace BusinessLogic.Services.Implementation
 
             var dataJson = JsonSerializer.Serialize(compactData, JsonOpts);
 
-            return $@"Đánh giá ứng viên. Tiêu chí: {string.Join(", ", criteriaNames)}
-Trả JSON: [{{""interviewScheduleId"":n,""candidateUserId"":""s"",""candidateName"":""s"",""result"":""Pass|Fail|Consider"",""criteriaEvaluations"":[{{""criterionId"":n,""criterionName"":""s"",""result"":""Pass|Fail|Hold""}}],""strengths"":[""s""],""weaknesses"":[""s""]}}]
+            return $@"Bạn là HR Manager. Đánh giá ứng viên dựa trên nhận xét của người phỏng vấn.
+Thay vì dùng các tiêu chí con, hãy gom nhóm và phân tích theo 6 tiêu chí cha cố định sau:
+1. Năng lực & Kỹ năng thực tế
+2. Kinh nghiệm & Dấu ấn cá nhân
+3. Kỹ năng giao tiếp & Tương tác
+4. Nhiệt huyết & Cam kết
+5. Tinh thần đồng đội & Phối hợp
+6. Phù hợp văn hóa & Cá tính
+
+Trả JSON format: [{{""interviewScheduleId"":n,""candidateUserId"":""s"",""candidateName"":""s"",""result"":""Pass|Fail|Consider"",""criteriaEvaluations"":[{{""criterionId"":1..6,""criterionName"":""s"",""result"":""Pass|Fail|Hold"",""reason"":""s""}}],""strengths"":[""s""],""weaknesses"":[""s""]}}]
+Với criteriaEvaluations, PHẢI chứa ĐÚNG 6 object tương ứng với 6 tiêu chí cha ở trên (criterionId tương ứng từ 1 đến 6). Hãy cung cấp `reason` (ngắn gọn 1-2 câu) giải thích tại sao lại đánh giá như vậy.
 DATA:{dataJson}";
         }
 
@@ -448,7 +546,8 @@ DATA:{dataJson}";
                         {
                             CriterionId = ce.CriterionId,
                             CriterionName = ce.CriterionName ?? "",
-                            Result = NormalizeCriteriaResult(ce.Result)
+                            Result = NormalizeCriteriaResult(ce.Result),
+                            Reason = ce.Reason ?? ""
                         }).ToList() ?? new(),
                         Strengths = item.Strengths ?? new(),
                         Weaknesses = item.Weaknesses ?? new()
@@ -536,12 +635,15 @@ DATA:{dataJson}";
             else
                 fallbackResult = "Consider";
 
-            var evaluations = c.CriteriaDetails.Select(cr => new AiCriteriaEvaluationDto
+            var evaluations = new List<AiCriteriaEvaluationDto>
             {
-                CriterionId = cr.CriterionId,
-                CriterionName = cr.CriterionName,
-                Result = cr.Notes.Any() ? "Hold" : "Hold"
-            }).ToList();
+                new() { CriterionId = 1, CriterionName = "Năng lực & Kỹ năng thực tế", Result = "Hold", Reason = "[Fallback] AI không khả dụng" },
+                new() { CriterionId = 2, CriterionName = "Kinh nghiệm & Dấu ấn cá nhân", Result = "Hold", Reason = "[Fallback] AI không khả dụng" },
+                new() { CriterionId = 3, CriterionName = "Kỹ năng giao tiếp & Tương tác", Result = "Hold", Reason = "[Fallback] AI không khả dụng" },
+                new() { CriterionId = 4, CriterionName = "Nhiệt huyết & Cam kết", Result = "Hold", Reason = "[Fallback] AI không khả dụng" },
+                new() { CriterionId = 5, CriterionName = "Tinh thần đồng đội & Phối hợp", Result = "Hold", Reason = "[Fallback] AI không khả dụng" },
+                new() { CriterionId = 6, CriterionName = "Phù hợp văn hóa & Cá tính", Result = "Hold", Reason = "[Fallback] AI không khả dụng" }
+            };
 
             return new AiCandidateAnalysisDto
             {

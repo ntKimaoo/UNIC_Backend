@@ -1,4 +1,4 @@
-﻿using BusinessLogic.DTOs;
+using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -102,6 +102,12 @@ namespace BusinessLogic.Services.Background
                         item.ToEmail, item.FullName, item.CampaignName ?? "Campaign"),
                     EmailType.ApplicationRejected => await emailService.SendApplicationRejectedEmailAsync(
                         item.ToEmail, item.FullName, item.CampaignName ?? "Campaign"),
+                    EmailType.InterviewerAssigned => await emailService.SendInterviewerAssignedEmailAsync(
+                        item.ToEmail, item.FullName, item.InterviewTitle!, item.InterviewScheduledAt),
+                    EmailType.NoInterviewerReschedule => await emailService.SendNoInterviewerRescheduleEmailAsync(
+                        item.ToEmail, item.FullName, item.InterviewTitle!,
+                        item.InterviewScheduledAt ?? DateTime.UtcNow.AddHours(7),
+                        item.NewScheduledAt ?? DateTime.UtcNow.AddHours(7).AddDays(1)),
                     _ => false
                 };
 

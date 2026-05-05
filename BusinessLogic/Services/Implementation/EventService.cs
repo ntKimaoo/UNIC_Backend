@@ -24,6 +24,7 @@ namespace BusinessLogic.Services.Implementation
         private readonly IValidator<OpenRegistrationRequest> _registrationValidator;
         private readonly IEmailService _emailService;
         private readonly IAttendanceService _attendanceService;
+        private readonly IClubRepository _clubRepository;
 
         public EventService(
             IUnitOfWork unitOfWork,
@@ -33,7 +34,8 @@ namespace BusinessLogic.Services.Implementation
             IValidator<CreateSessionRequest> sessionValidator,
             IValidator<OpenRegistrationRequest> registrationValidator,
             IEmailService emailService,
-            IAttendanceService attendanceService)
+            IAttendanceService attendanceService,
+            IClubRepository clubRepository)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -43,6 +45,7 @@ namespace BusinessLogic.Services.Implementation
             _registrationValidator = registrationValidator;
             _emailService = emailService;
             _attendanceService = attendanceService;
+            _clubRepository = clubRepository;
         }
 
         public async Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null)
@@ -54,6 +57,15 @@ namespace BusinessLogic.Services.Implementation
                 throw new DomainException(string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
             }
 
+            if (request.ClubId.HasValue)
+            {
+                var club = await _clubRepository.GetByIdAsync(request.ClubId.Value);
+                if (club == null)
+                    throw new NotFoundException("Club", request.ClubId.Value);
+                if (!club.IsActive)
+                    throw new InvalidOperationException("Không thể tạo sự kiện cho câu lạc bộ đang không hoạt động.");
+            }
+
             // Map to entity
             var eventEntity = _mapper.Map<Event>(request);
             eventEntity.CreatedAt = VnTimeHelper.Now;
@@ -62,10 +74,12 @@ namespace BusinessLogic.Services.Implementation
             // Set ImageUrl from Cloudinary upload (null if no image provided)
             eventEntity.ImageUrl = imageUrl;
 
-            if (!eventEntity.IsPublic)
+            // Sự kiện online mặc định không công khai (chỉ thành viên CLB)
+            if (eventEntity.IsOnline)
             {
-                // Online/private events → generate a WebRTC room code
-                eventEntity.Location = $"/webrtc/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+                eventEntity.IsPublic = false;
+                // Generate WebRTC room code — must match FE route: /meeting-room/:roomCode
+                eventEntity.Location = $"/meeting-room/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
             }
 
             // Add to repository
@@ -107,10 +121,10 @@ namespace BusinessLogic.Services.Implementation
             // Handle Type switch (Offline <-> Online)
             if (request.IsOnline)
             {
-                // If switching to or staying Online, ensure we have a WebRTC link
-                if (string.IsNullOrEmpty(existingEvent.Location) || !existingEvent.Location.StartsWith("/webrtc/"))
+                // If switching to or staying Online, ensure we have a meeting room link
+                if (string.IsNullOrEmpty(existingEvent.Location) || !existingEvent.Location.StartsWith("/meeting-room/"))
                 {
-                    existingEvent.Location = $"/webrtc/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+                    existingEvent.Location = $"/meeting-room/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
                 }
             }
             else
@@ -125,6 +139,8 @@ namespace BusinessLogic.Services.Implementation
             
             existingEvent.StartDate = request.StartDate;
             existingEvent.EndDate = request.EndDate;
+            existingEvent.MaxAttendees = request.MaxAttendees;
+            existingEvent.IsPublic = request.IsPublic;
             // Only update ImageUrl if a new one was provided (preserve existing if no new image)
             if (request.ImageUrl != null)
                 existingEvent.ImageUrl = request.ImageUrl;
@@ -187,6 +203,21 @@ namespace BusinessLogic.Services.Implementation
 
             if (schedule.EventId != request.EventId)
                 throw new DomainException("Phiên không thuộc sự kiện này.");
+
+            // Validate session time is within event time (only for 'main' type)
+            var sessionType = (request.SessionType ?? schedule.SessionType ?? "main").ToLower();
+            if (sessionType == "main")
+            {
+                var eventEntity = await _unitOfWork.Events.GetByIdAsync(request.EventId);
+                if (eventEntity != null)
+                {
+                    if (eventEntity.StartDate.HasValue && request.StartTime < eventEntity.StartDate.Value)
+                        throw new DomainException("Session start time cannot be before event start date");
+
+                    if (eventEntity.EndDate.HasValue && request.EndTime > eventEntity.EndDate.Value)
+                        throw new DomainException("Session end time cannot be after event end date");
+                }
+            }
 
             schedule.ScheduleName = request.SessionName;
             schedule.StartTime    = request.StartTime;
@@ -275,6 +306,51 @@ namespace BusinessLogic.Services.Implementation
             _unitOfWork.Events.Update(eventEntity);
             await _unitOfWork.SaveChangesAsync();
 
+            // ── Auto-promote WAITLIST → REGISTERED khi có slot trống ──
+            if (eventEntity.MaxAttendees.HasValue && eventEntity.AvailableSlots.HasValue && eventEntity.AvailableSlots.Value > 0)
+            {
+                var promoted = 0;
+                var slotsToFill = eventEntity.AvailableSlots.Value;
+                for (int i = 0; i < slotsToFill; i++)
+                {
+                    bool ok = await _unitOfWork.Events
+                        .TryDirectPromoteOldestWaitlistAsync(request.EventId, nameof(AttendanceStatus.REGISTERED));
+                    if (!ok) break; // không còn ai trong WAITLIST
+                    promoted++;
+                }
+
+                if (promoted > 0)
+                {
+                    // Cập nhật lại AvailableSlots sau khi promote
+                    eventEntity.AvailableSlots -= promoted;
+                    _unitOfWork.Events.Update(eventEntity);
+                    await _unitOfWork.SaveChangesAsync();
+
+                    Console.WriteLine($"[OpenRegistration] Auto-promoted {promoted} waitlisted members for event {request.EventId}");
+
+                    // Gửi email cho các thành viên được promote (fire-and-forget)
+                    var promotedAttendances = (await _unitOfWork.Attendances.GetAttendeesByEventAsync(request.EventId))
+                        .Where(a => a.AttendanceStatus == nameof(AttendanceStatus.REGISTERED))
+                        .OrderByDescending(a => a.RegistrationDate)
+                        .Take(promoted);
+
+                    foreach (var att in promotedAttendances)
+                    {
+                        var u = att.User;
+                        var ev = eventEntity;
+                        var token = att.CheckInToken;
+                        if (u != null)
+                        {
+                            _ = Task.Run(async () =>
+                            {
+                                try { await _emailService.SendEventRegistrationSuccessAsync(u.Email, u.FullName, ev.EventName, ev.StartDate, token); }
+                                catch (Exception ex) { Console.WriteLine($"[Email] WaitlistPromote email failed: {ex.Message}"); }
+                            });
+                        }
+                    }
+                }
+            }
+
             // Return updated DTO
             var updatedEvent = await _unitOfWork.Events.GetByIdWithDetailsAsync(request.EventId);
             return _mapper.Map<EventDetailDto>(updatedEvent);
@@ -294,9 +370,9 @@ namespace BusinessLogic.Services.Implementation
             return _mapper.Map<EventDetailDto>(eventEntity);
         }
 
-        public async Task<IEnumerable<EventDetailDto>> GetAllEventsAsync(int pageNumber = 1, int pageSize = 10, string? status = null, int? clubId = null)
+        public async Task<IEnumerable<EventDetailDto>> GetAllEventsAsync(int pageNumber = 1, int pageSize = 10, string? status = null, int? clubId = null, Guid? userId = null)
         {
-            var events = await _unitOfWork.Events.GetAllAsync(pageNumber, pageSize, status, clubId);
+            var events = await _unitOfWork.Events.GetAllAsync(pageNumber, pageSize, status, clubId, userId);
 
             // Lazily correct stale statuses for all returned events
             bool anyChanged = false;
@@ -310,9 +386,9 @@ namespace BusinessLogic.Services.Implementation
             return _mapper.Map<IEnumerable<EventDetailDto>>(events);
         }
 
-        public async Task<int> GetTotalEventsCountAsync(string? status = null, int? clubId = null)
+        public async Task<int> GetTotalEventsCountAsync(string? status = null, int? clubId = null, Guid? userId = null)
         {
-            return await _unitOfWork.Events.GetTotalCountAsync(status, clubId);
+            return await _unitOfWork.Events.GetTotalCountAsync(status, clubId, userId);
         }
 
         public async Task RegisterForEventAsync(int eventId, string userId, string? apiBaseUrl = null)
