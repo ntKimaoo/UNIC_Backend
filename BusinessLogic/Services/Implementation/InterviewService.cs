@@ -17,16 +17,20 @@ namespace BusinessLogic.Services.Implementation
         private readonly IUserRepository _userRepo;
         private readonly IEmailService _emailService;
         private readonly IRecruitmentCampaignRepository _campaignRepo;
+        private readonly IClubMemberService _clubMemberService;
+
         public InterviewService(
             IInterviewRepository repo,
             IUserRepository userRepo,
             IEmailService emailService,
-            IRecruitmentCampaignRepository campaignRepo)
+            IRecruitmentCampaignRepository campaignRepo,
+            IClubMemberService clubMemberService)
         {
             _repo = repo;
             _userRepo = userRepo;
             _emailService = emailService;
             _campaignRepo = campaignRepo;
+            _clubMemberService = clubMemberService;
         }
 
         // ═══════════════════════════════════════════════════════════
@@ -1145,21 +1149,8 @@ namespace BusinessLogic.Services.Implementation
                 if (dto.Mode.Equals("Now", StringComparison.OrdinalIgnoreCase))
                 {
                     d.PublishStatus = PublishStatus.Published;
-                    d.PublishedAt = DateTime.UtcNow;
-
-                    if (d.Decision == DecisionResult.Accept)
-                    {
-                        var candidateUser = await _userRepo.GetByIdAsync(d.CandidateUserId);
-                        var campaign = await _campaignRepo.GetByIdAsync(campaignId);
-
-                        if (candidateUser != null && campaign != null)
-                        {
-                            await _emailService.SendClubAcceptanceEmailAsync(
-                                candidateUser.Email,
-                                candidateUser.FullName,
-                                campaign.CampaignName);
-                        }
-                    }
+                    d.PublishedAt = DateTime.UtcNow.AddHours(7);
+                    await ExecuteAcceptDecisionAsync(d, campaignId);
                 }
                 else // Schedule
                 {
@@ -1170,7 +1161,6 @@ namespace BusinessLogic.Services.Implementation
                     d.ScheduledPublishAt = dto.ScheduledAt.Value;
                 }
 
-                d.NotificationChannels = dto.NotificationChannels;
                 await _repo.UpdateDecisionAsync(d);
             }
 
@@ -1216,6 +1206,46 @@ namespace BusinessLogic.Services.Implementation
                 ScheduledPublishAt = d.ScheduledPublishAt,
                 PublishedAt = d.PublishedAt
             };
+        }
+
+        private async Task ExecuteAcceptDecisionAsync(CampaignDecision d, int campaignId)
+        {
+            if (d.Decision != DecisionResult.Accept) return;
+
+            var candidateUser = await _userRepo.GetByIdAsync(d.CandidateUserId);
+            var campaign = await _campaignRepo.GetByIdAsync(campaignId);
+            if (candidateUser == null || campaign == null) return;
+
+            await _emailService.SendClubAcceptanceEmailAsync(
+                candidateUser.Email, candidateUser.FullName, campaign.CampaignName);
+
+            try
+            {
+                await _clubMemberService.AddUserToClubAsync(
+                    campaign.ClubId,
+                    new AddUserToClubDto { UserId = d.CandidateUserId },
+                    d.DecidedByUserId);
+            }
+            catch (InvalidOperationException)
+            {
+                // Already a member — skip silently
+            }
+        }
+
+        public async Task ProcessScheduledPublishAsync()
+        {
+            var now = DateTime.UtcNow.AddHours(7);
+
+            var allDecisions = await _repo.GetScheduledDecisionsDueAsync(now);
+            if (!allDecisions.Any()) return;
+
+            foreach (var d in allDecisions)
+            {
+                d.PublishStatus = PublishStatus.Published;
+                d.PublishedAt = now;
+                await ExecuteAcceptDecisionAsync(d, d.CampaignId);
+                await _repo.UpdateDecisionAsync(d);
+            }
         }
 
         private static PublishStatusResponseDto BuildPublishStatus(int campaignId, List<CampaignDecision> decisions)

@@ -58,6 +58,7 @@ namespace BusinessLogic.Services.Interface
         Task<List<CampaignDecisionResponseDto>> SubmitDecisionsAsync(int campaignId, SubmitDecisionsDto dto);
         Task<PublishStatusResponseDto> PublishResultsAsync(int campaignId, PublishResultDto dto);
         Task<PublishStatusResponseDto?> GetPublishStatusAsync(int campaignId);
+        Task ProcessScheduledPublishAsync();
     }
 }
 

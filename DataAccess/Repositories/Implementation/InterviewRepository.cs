@@ -537,6 +537,15 @@ namespace DataAccess.Repositories.Implementation
                 .ToListAsync();
         }
 
+        public async Task<IEnumerable<CampaignDecision>> GetScheduledDecisionsDueAsync(DateTime now)
+        {
+            return await _context.CampaignDecisions
+                .Where(d => d.PublishStatus == PublishStatus.Scheduled
+                            && d.ScheduledPublishAt.HasValue
+                            && d.ScheduledPublishAt.Value <= now)
+                .ToListAsync();
+        }
+
         public async Task<CampaignDecision?> GetDecisionByScheduleIdAsync(int scheduleId)
         {
             return await _context.CampaignDecisions

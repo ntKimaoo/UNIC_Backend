@@ -63,6 +63,7 @@ namespace DataAccess.Repositories.Interface
 
         // ── CampaignDecision ─────────────────────────────────────
         Task<IEnumerable<CampaignDecision>> GetDecisionsByCampaignIdAsync(int campaignId);
+        Task<IEnumerable<CampaignDecision>> GetScheduledDecisionsDueAsync(DateTime now);
         Task<CampaignDecision?> GetDecisionByScheduleIdAsync(int scheduleId);
         Task<CampaignDecision> CreateDecisionAsync(CampaignDecision decision);
         Task<bool> UpdateDecisionAsync(CampaignDecision decision);

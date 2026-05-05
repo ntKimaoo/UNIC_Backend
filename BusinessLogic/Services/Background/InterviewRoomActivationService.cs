@@ -1,4 +1,5 @@
 using BusinessLogic.DTOs;
+using BusinessLogic.Services.Interface;
 using DataAccess.Models.Meeting;
 using DataAccess.Repositories.Interface;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,6 +42,10 @@ namespace BusinessLogic.Services.Background
                     using var scope = _serviceProvider.CreateScope();
                     var interviewRepo = scope.ServiceProvider.GetRequiredService<IInterviewRepository>();
                     var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+
+                    // ── 0. Process scheduled result announcements ─────────────
+                    var interviewService = scope.ServiceProvider.GetRequiredService<IInterviewService>();
+                    await ProcessScheduledPublishAsync(interviewService);
 
                     // ── 1. Send reminder emails (2 hours before) ──────────────
                     await SendReminderEmailsAsync(interviewRepo, userRepo);
@@ -270,6 +275,21 @@ namespace BusinessLogic.Services.Background
             }
         }
         
+        // ═══════════════════════════════════════════════════════════
+        //  0. Process scheduled result announcements
+        // ═══════════════════════════════════════════════════════════
+        private async Task ProcessScheduledPublishAsync(IInterviewService interviewService)
+        {
+            try
+            {
+                await interviewService.ProcessScheduledPublishAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "InterviewRoomActivationService: error processing scheduled publish.");
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════
         //  4. Auto-reschedule confirmed interviews with no interviewer
         // ═══════════════════════════════════════════════════════════
