@@ -66,8 +66,8 @@ namespace BusinessLogic.Services.Implementation
             if (eventEntity.IsOnline)
             {
                 eventEntity.IsPublic = false;
-                // Generate WebRTC room code
-                eventEntity.Location = $"/webrtc/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+                // Generate WebRTC room code — must match FE route: /meeting-room/:roomCode
+                eventEntity.Location = $"/meeting-room/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
             }
 
             // Add to repository
@@ -109,10 +109,10 @@ namespace BusinessLogic.Services.Implementation
             // Handle Type switch (Offline <-> Online)
             if (request.IsOnline)
             {
-                // If switching to or staying Online, ensure we have a WebRTC link
-                if (string.IsNullOrEmpty(existingEvent.Location) || !existingEvent.Location.StartsWith("/webrtc/"))
+                // If switching to or staying Online, ensure we have a meeting room link
+                if (string.IsNullOrEmpty(existingEvent.Location) || !existingEvent.Location.StartsWith("/meeting-room/"))
                 {
-                    existingEvent.Location = $"/webrtc/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
+                    existingEvent.Location = $"/meeting-room/{Guid.NewGuid().ToString("N").Substring(0, 10)}";
                 }
             }
             else
