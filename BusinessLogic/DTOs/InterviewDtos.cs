@@ -167,6 +167,7 @@ namespace BusinessLogic.DTOs
     {
         public int Id { get; set; }
         public int EvaluationCriterionId { get; set; }
+        public string? CriterionName { get; set; }
         public string? Note { get; set; }
         public DateTime CreatedAt { get; set; }
     }

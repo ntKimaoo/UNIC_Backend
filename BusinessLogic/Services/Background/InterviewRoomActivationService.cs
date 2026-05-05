@@ -50,6 +50,9 @@ namespace BusinessLogic.Services.Background
                     // ── 1. Send reminder emails (2 hours before) ──────────────
                     await SendReminderEmailsAsync(interviewRepo, userRepo);
 
+                    // ── 1.5. Auto-remove unconfirmed secondary interviewers ──
+                    await AutoRemoveUnconfirmedInterviewersAsync(interviewRepo);
+
                     // ── 2. Activate rooms (20 min before) + send room-opened emails ──
                     await ActivateRoomsAndNotifyAsync(interviewRepo, userRepo);
 
@@ -341,6 +344,27 @@ namespace BusinessLogic.Services.Background
             catch (Exception ex)
             {
                 _logger.LogError(ex, "InterviewRoomActivationService: error auto-cancelling unconfirmed interviews.");
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  1.5. Auto-remove unconfirmed secondary interviewers
+        // ═══════════════════════════════════════════════════════════
+        private async Task AutoRemoveUnconfirmedInterviewersAsync(IInterviewRepository interviewRepo)
+        {
+            try
+            {
+                int removedCount = await interviewRepo.AutoRemoveUnconfirmedSecondaryInterviewersAsync(_preOpenDuration);
+                if (removedCount > 0)
+                {
+                    _logger.LogInformation(
+                        "InterviewRoomActivationService: auto-removed {Count} unconfirmed secondary interviewer(s).",
+                        removedCount);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "InterviewRoomActivationService: error auto-removing unconfirmed secondary interviewers.");
             }
         }
     }

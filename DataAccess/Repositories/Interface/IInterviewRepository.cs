@@ -82,6 +82,9 @@ namespace DataAccess.Repositories.Interface
         Task<IEnumerable<AiCandidateAnalysisResult>> CreateAiAnalysisResultsAsync(IEnumerable<AiCandidateAnalysisResult> results);
         Task DeleteAiAnalysisResultsByCampaignIdAsync(int campaignId);
         Task DeleteAiAnalysisResultsByScheduleIdAsync(int scheduleId);
+
+        // ── Auto-remove unconfirmed secondary interviewers ────
+        Task<int> AutoRemoveUnconfirmedSecondaryInterviewersAsync(TimeSpan beforeStart);
     }
 }
 

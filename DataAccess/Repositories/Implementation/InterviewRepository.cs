@@ -28,6 +28,7 @@ namespace DataAccess.Repositories.Implementation
             return await _context.InterviewSchedules
                 .Include(s => s.Assignments)
                     .ThenInclude(a => a.CriteriaScores)
+                        .ThenInclude(cs => cs.EvaluationCriterion)
                 .Include(s => s.MeetingRoom)
                 .Include(s => s.ProposedTimeSlots)
                 .FirstOrDefaultAsync(s => s.Id == id);
@@ -39,6 +40,7 @@ namespace DataAccess.Repositories.Implementation
             var query = _context.InterviewSchedules
                 .Include(s => s.Assignments)
                     .ThenInclude(a => a.CriteriaScores)
+                        .ThenInclude(cs => cs.EvaluationCriterion)
                 .Include(s => s.MeetingRoom)
                 .Include(s => s.ProposedTimeSlots)
                 .AsQueryable();
@@ -704,6 +706,57 @@ namespace DataAccess.Repositories.Implementation
                 _context.AiCandidateAnalysisResults.RemoveRange(existing);
                 await _context.SaveChangesAsync();
             }
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        //  Auto-remove unconfirmed secondary interviewers
+        // ═══════════════════════════════════════════════════════════
+
+        public async Task<int> AutoRemoveUnconfirmedSecondaryInterviewersAsync(TimeSpan beforeStart)
+        {
+            var now = DateTime.UtcNow.AddHours(7);
+            var threshold = now.Add(beforeStart);
+
+            // Lấy các lịch Confirmed sắp diễn ra (trong khoảng beforeStart)
+            var schedules = await _context.InterviewSchedules
+                .Include(s => s.Assignments)
+                .Where(s => s.Status == InterviewStatus.Confirmed
+                            && s.ScheduledAt.HasValue
+                            && s.ScheduledAt.Value > now
+                            && s.ScheduledAt.Value <= threshold
+                            && s.Assignments.Count > 1) // Chỉ xử lý khi có > 1 interviewer
+                .ToListAsync();
+
+            if (!schedules.Any())
+                return 0;
+
+            int removedCount = 0;
+
+            foreach (var schedule in schedules)
+            {
+                var confirmedOrLead = schedule.Assignments
+                    .Where(a => a.HasConfirmed || a.Role == InterviewerRole.Lead)
+                    .ToList();
+
+                // Chỉ xóa nếu sau khi xóa vẫn còn ít nhất 1 interviewer
+                if (confirmedOrLead.Count == 0) continue;
+
+                var toRemove = schedule.Assignments
+                    .Where(a => !a.HasConfirmed && a.Role != InterviewerRole.Lead)
+                    .ToList();
+
+                if (!toRemove.Any()) continue;
+
+                _context.InterviewAssignments.RemoveRange(toRemove);
+                removedCount += toRemove.Count;
+            }
+
+            if (removedCount > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            return removedCount;
         }
     }
 }

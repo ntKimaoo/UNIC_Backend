@@ -73,7 +73,9 @@ namespace DataAccess.Repositories.Implementation
             // Bypass cho Admin hệ thống
             var userRoles = await GetUserRoleAsync(userId);
             if (userRoles.Any(r => string.Equals(r, "Admin", StringComparison.OrdinalIgnoreCase))) return true;
-
+            var isMember = await _context.UserClubRoles
+                .AnyAsync(ucr => ucr.UserId == userId && ucr.ClubId == clubId);
+            if (!isMember) return false;
             // Check xem user có phải Club Manager của CLB này không (Level 0)
             var isClubManager = await _context.UserClubRoleAssignments
                 .AnyAsync(ura => ura.ClubMember.UserId == userId && ura.ClubMember.ClubId == clubId && ura.ClubRole.Level == 0);

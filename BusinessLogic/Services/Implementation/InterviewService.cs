@@ -208,6 +208,9 @@ namespace BusinessLogic.Services.Implementation
                 case InterviewStatus.InProgress:
                     if (schedule.Status != InterviewStatus.Confirmed && schedule.Status != InterviewStatus.Rescheduled)
                         throw new InvalidOperationException("Chỉ có thể bắt đầu phỏng vấn khi đã Confirm hoặc Reschedule.");
+                    // Validate: phải có ít nhất 1 phỏng vấn viên
+                    if (schedule.Assignments == null || !schedule.Assignments.Any())
+                        throw new InvalidOperationException("Cần ít nhất 1 phỏng vấn viên để bắt đầu phỏng vấn.");
                     break;
 
                 case InterviewStatus.Completed:
@@ -771,6 +774,7 @@ namespace BusinessLogic.Services.Implementation
                 {
                     Id = cs.Id,
                     EvaluationCriterionId = cs.EvaluationCriterionId,
+                    CriterionName = cs.EvaluationCriterion?.Name,
                     Note = cs.Note,
                     CreatedAt = cs.CreatedAt
                 }).ToList() ?? new()
