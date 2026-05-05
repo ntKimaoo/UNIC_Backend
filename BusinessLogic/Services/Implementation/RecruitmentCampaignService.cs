@@ -82,9 +82,11 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<RecruitmentCampaignResponseDto> CreateAsync(CreateRecruitmentCampaignDto dto)
         {
-            var clubExists = await _clubRepository.ExistsAsync(dto.ClubId);
-            if (!clubExists)
+            var club = await _clubRepository.GetByIdAsync(dto.ClubId);
+            if (club == null)
                 throw new NotFoundException("Club", dto.ClubId);
+            if (!club.IsActive)
+                throw new InvalidOperationException("Không thể tạo chiến dịch tuyển dụng cho câu lạc bộ đang không hoạt động.");
 
             if (dto.StartDate.HasValue && dto.EndDate.HasValue && dto.StartDate >= dto.EndDate)
                 throw new DomainException("StartDate must be earlier than EndDate.");

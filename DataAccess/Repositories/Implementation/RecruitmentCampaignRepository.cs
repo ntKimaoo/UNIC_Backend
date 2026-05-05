@@ -28,6 +28,7 @@ namespace DataAccess.Repositories.Implementation
         {
             return await _context.RecruitmentCampaigns
                 .Include(rc => rc.Club)
+                .Where(rc => rc.Club.IsActive)
                 .OrderByDescending(rc => rc.CreatedAt)
                 .ToListAsync();
         }
@@ -46,6 +47,7 @@ namespace DataAccess.Repositories.Implementation
         {
             var query = _context.RecruitmentCampaigns
                 .Include(rc => rc.Club)
+                .Where(rc => rc.Club.IsActive)
                 .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -169,6 +171,13 @@ namespace DataAccess.Repositories.Implementation
 
             await _context.SaveChangesAsync();
             return expired.Count;
+        }
+
+        public async Task<RecruitmentCampaign?> GetByFormIdAsync(int formId)
+        {
+            return await _context.RecruitmentCampaigns
+                .Include(rc => rc.Club)
+                .FirstOrDefaultAsync(rc => rc.ApplicationForms.Any(f => f.FormId == formId));
         }
     }
 }

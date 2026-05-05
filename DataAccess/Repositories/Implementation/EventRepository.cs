@@ -48,6 +48,7 @@ namespace DataAccess.Repositories.Implementation
                 .Include(e => e.Attendances)
                 .Include(e => e.EventSchedules)
                 .Include(e => e.Club)
+                .Where(e => e.Club.IsActive)
                 .AsQueryable();
 
             // Visibility: IsPublic OR user là thành viên CLB tổ chức
@@ -78,7 +79,7 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<int> GetTotalCountAsync(string? status = null, int? clubId = null, Guid? userId = null)
         {
-            var query = _context.Events.AsQueryable();
+            var query = _context.Events.Where(e => e.Club.IsActive).AsQueryable();
 
             // Visibility: IsPublic OR user là thành viên CLB tổ chức
             if (userId.HasValue)
