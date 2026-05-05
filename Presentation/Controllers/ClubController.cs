@@ -309,7 +309,7 @@ namespace Presentation.Controllers
 
             try
             {
-                var club = await _service.UpdateAsync(id, dto);
+                var club = await _service.UpdateAsync(clubId, dto);
                 if (club == null)
                 {
                     return NotFound(new
