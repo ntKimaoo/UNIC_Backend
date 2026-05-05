@@ -18,7 +18,7 @@ public class ClubPostController : ControllerBase
 
     /// <summary>Get all club posts</summary>
     [HttpGet]
-    public async Task<IActionResult>    ()
+    public async Task<IActionResult> GetAll()
     {
         var posts = await _clubPostService.GetAllAsync();
         return Ok(new { success = true, data = posts });
