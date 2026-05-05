@@ -21,12 +21,8 @@ namespace UNIC.Presentation.Helpers
 
         public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
         {
-            // Treat Unspecified kind as UTC (SQL Server stores as Unspecified)
-            var utc = value.Kind == DateTimeKind.Unspecified
-                ? DateTime.SpecifyKind(value, DateTimeKind.Utc)
-                : value.ToUniversalTime();
-
-            writer.WriteStringValue(utc.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
+            // Data is stored as Vietnam time (UTC+7). Emit +07:00 so browsers display the correct local time.
+            writer.WriteStringValue(value.ToString("yyyy-MM-ddTHH:mm:ss.fff+07:00"));
         }
     }
 
@@ -47,10 +43,7 @@ namespace UNIC.Presentation.Helpers
         public override void Write(Utf8JsonWriter writer, DateTime? value, JsonSerializerOptions options)
         {
             if (value == null) { writer.WriteNullValue(); return; }
-            var utc = value.Value.Kind == DateTimeKind.Unspecified
-                ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
-                : value.Value.ToUniversalTime();
-            writer.WriteStringValue(utc.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
+            writer.WriteStringValue(value.Value.ToString("yyyy-MM-ddTHH:mm:ss.fff+07:00"));
         }
     }
 }

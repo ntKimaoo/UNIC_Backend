@@ -207,7 +207,7 @@ namespace BusinessLogic.Services.Implementation
     List<DateTime>? proposedTimes = null,
     string? cancelReason = null, string? confirmDeadline = null)
         {
-            var vnTime = scheduledAt.AddHours(7);
+            var vnTime = scheduledAt;
             var dateStr = vnTime.ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"));
             var endTimeStr = vnTime.AddMinutes(durationMinutes).ToString("HH:mm");
             var subject = $"[UniClub] Cập nhật lịch phỏng vấn: {interviewTitle}";
@@ -257,7 +257,7 @@ namespace BusinessLogic.Services.Implementation
                     {
                         var slotsHtml = string.Join("", proposedTimes.Select(t => $@"
                         <tr><td style='padding:10px 14px;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>
-                            {t.AddHours(7).ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"))}
+                            {t.ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"))}
                         </td></tr>
                         <tr><td style='height:6px;'></td></tr>"));
 
@@ -357,7 +357,7 @@ namespace BusinessLogic.Services.Implementation
                     {
                         var slotsHtml = string.Join("", proposedTimes.Select(t => $@"
                         <tr><td style='padding:10px 14px;background:#ffffff;border:1px solid #f3e8ff;border-radius:8px;font-size:13px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>
-                            {t.AddHours(7).ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"))}
+                            {t.ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"))}
                         </td></tr>
                         <tr><td style='height:6px;'></td></tr>"));
 
@@ -440,7 +440,7 @@ namespace BusinessLogic.Services.Implementation
             string toEmail, string fullName, string interviewTitle,
             DateTime scheduledAt, int durationMinutes)
         {
-            var vnTime = scheduledAt.AddHours(7);
+            var vnTime = scheduledAt;
             var dateStr = vnTime.ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"));
             var endTimeStr = vnTime.AddMinutes(durationMinutes).ToString("HH:mm");
             var subject = $"[UniClub] Nhắc nhở: Buổi phỏng vấn \"{interviewTitle}\" diễn ra lúc {vnTime:HH:mm} hôm nay";
@@ -488,7 +488,7 @@ namespace BusinessLogic.Services.Implementation
             string toEmail, string fullName, string interviewTitle,
             DateTime scheduledAt, string roomCode)
         {
-            var vnTime = scheduledAt.AddHours(7);
+            var vnTime = scheduledAt;
             var dateStr = vnTime.ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"));
             var roomUrl = $"{_appBaseUrl}/interview/room/{roomCode}";
             var subject = $"[UniClub] Phòng phỏng vấn \"{interviewTitle}\" đã mở – Hãy vào chuẩn bị!";
@@ -534,7 +534,7 @@ namespace BusinessLogic.Services.Implementation
         public async Task<bool> SendInterviewFeedbackNudgeEmailAsync(
             string toEmail, string fullName, string interviewTitle, DateTime scheduledAt)
         {
-            var vnTime = scheduledAt.AddHours(7);
+            var vnTime = scheduledAt;
             var dateStr = vnTime.ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"));
             var subject = $"[UniClub] Nhắc nhở: Hãy gửi đánh giá cho buổi phỏng vấn \"{interviewTitle}\"";
 
@@ -749,7 +749,7 @@ namespace BusinessLogic.Services.Implementation
             var timeHtml = "";
             if (scheduledAt.HasValue)
             {
-                var vnTime = scheduledAt.Value.AddHours(7);
+                var vnTime = scheduledAt.Value;
                 var dateStr = vnTime.ToString("HH:mm, dddd, dd/MM/yyyy", new CultureInfo("vi-VN"));
                 timeHtml = $"<tr><td style='padding:8px 0;font-size:13px;color:#64748b;width:110px;font-family:Arial,sans-serif;'>Thời gian dự kiến</td><td style='padding:8px 0 8px 12px;font-size:13px;font-weight:bold;color:#1e293b;font-family:Arial,sans-serif;'>{dateStr}</td></tr>";
             }
