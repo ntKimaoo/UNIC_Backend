@@ -21,15 +21,18 @@ namespace UNIC.Presentation.Controllers
         private readonly IEventService _eventService;
         private readonly IQRCodeGeneratorService _qrCodeGeneratorService;
         private readonly IEventPermissionService _eventPermService;
+        private readonly IClubMemberService _clubMemberService;
 
         public EventsController(
             IEventService eventService,
             IQRCodeGeneratorService qrCodeGeneratorService,
-            IEventPermissionService eventPermService)
+            IEventPermissionService eventPermService,
+            IClubMemberService clubMemberService)
         {
             _eventService = eventService;
             _qrCodeGeneratorService = qrCodeGeneratorService;
             _eventPermService = eventPermService;
+            _clubMemberService = clubMemberService;
         }
 
         private Guid GetUserId()
@@ -74,6 +77,19 @@ namespace UNIC.Presentation.Controllers
             try
             {
                 var eventDto = await _eventService.GetEventByIdAsync(id);
+
+                // If event is private, verify user is a member of the organizing club
+                if (!eventDto.IsPublic && eventDto.ClubId.HasValue)
+                {
+                    var userId = GetUserId();
+                    if (userId == Guid.Empty)
+                        return StatusCode(403, new { error = "Sự kiện này chỉ dành cho thành viên câu lạc bộ. Vui lòng đăng nhập." });
+
+                    var isMember = await _clubMemberService.IsMemberAsync(userId, eventDto.ClubId.Value);
+                    if (!isMember)
+                        return StatusCode(403, new { error = "Sự kiện này chỉ dành cho thành viên câu lạc bộ." });
+                }
+
                 return Ok(eventDto);
             }
             catch (NotFoundException ex) { return NotFound(new { error = ex.Message }); }
