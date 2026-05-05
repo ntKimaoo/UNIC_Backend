@@ -443,7 +443,6 @@ namespace Presentation.Controllers
         /// GET /api/interviews/campaign/{campaignId}/comparison – So sánh ứng viên
         /// </summary>
         [HttpGet("campaign/{campaignId}/comparison")]
-        [RequireClubPolicyOrRole("manageresults", "Admin")]
         public async Task<IActionResult> GetCampaignComparison(int campaignId)
         {
             var comparison = await _service.GetCampaignComparisonAsync(campaignId);
