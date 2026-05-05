@@ -191,6 +191,7 @@ namespace UNIC.Presentation.Controllers
         ///Add member to department
         /// </summary>
         [HttpPost("{departmentId}/members/{memberId}/add")]
+        [RequireClubPolicyOrRole("editdepartment","Admin")]
         public async Task<IActionResult> AddMemberToDepartment(int clubId, int departmentId, int memberId)
         {
             try
@@ -208,6 +209,7 @@ namespace UNIC.Presentation.Controllers
         ///Remove member from department
         /// </summary>
         [HttpDelete("{departmentId}/members/{memberId}/remove")]
+        [RequireClubPolicyOrRole("editdepartment", "Admin")]
         public async Task<IActionResult> RemoveMemberFromDepartment(int clubId, int departmentId, int memberId)
         {
             try
