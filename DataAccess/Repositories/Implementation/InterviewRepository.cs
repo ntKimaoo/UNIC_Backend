@@ -90,7 +90,7 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<int> AutoCompleteExpiredInterviewsAsync(int gracePeriodMinutes)
         {
-            var now = DateTime.UtcNow;
+            var now = DateTime.UtcNow.AddHours(7);
             var maxPossibleStartDate = now.AddMinutes(-gracePeriodMinutes);
 
             var candidates = await _context.InterviewSchedules
@@ -123,7 +123,7 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<int> AutoCancelUnconfirmedInterviewsAsync(TimeSpan maxWaitTime, TimeSpan minTimeBeforeEarliestSlot)
         {
-            var now = DateTime.UtcNow;
+            var now = DateTime.UtcNow.AddHours(7);
 
             var unconfirmedSchedules = await _context.InterviewSchedules
                 .Include(s => s.ProposedTimeSlots)
@@ -184,7 +184,7 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<IEnumerable<InterviewSchedule>> GetSchedulesNeedingReminderAsync(TimeSpan reminderBefore)
         {
-            var now = DateTime.UtcNow;
+            var now = DateTime.UtcNow.AddHours(7);
             var reminderThreshold = now.Add(reminderBefore);
 
             return await _context.InterviewSchedules
@@ -307,7 +307,7 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<int> SyncRoomStatusesAsync(TimeSpan preOpenDuration)
         {
-            var thresholdTime = DateTime.UtcNow.Add(preOpenDuration);
+            var thresholdTime = DateTime.UtcNow.AddHours(7).Add(preOpenDuration);
             var roomsToActivate = await _context.MeetingRooms
                 .Include(r => r.InterviewSchedule)
                 .Where(r => r.Status == RoomStatus.Idle 
@@ -326,7 +326,7 @@ namespace DataAccess.Repositories.Implementation
                 if (room.InterviewSchedule != null)
                 {
                     room.InterviewSchedule.Status = InterviewStatus.InProgress;
-                    room.InterviewSchedule.UpdatedAt = DateTime.UtcNow;
+                    room.InterviewSchedule.UpdatedAt = DateTime.UtcNow.AddHours(7);
                 }
             }
 

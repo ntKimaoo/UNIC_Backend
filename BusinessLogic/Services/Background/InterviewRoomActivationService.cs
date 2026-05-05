@@ -122,7 +122,7 @@ namespace BusinessLogic.Services.Background
                     }
 
                     // Mark reminder as sent
-                    schedule.ReminderSentAt = DateTime.UtcNow;
+                    schedule.ReminderSentAt = DateTime.UtcNow.AddHours(7);
                     await interviewRepo.UpdateScheduleAsync(schedule);
                 }
 
@@ -189,7 +189,7 @@ namespace BusinessLogic.Services.Background
                     }
 
                     // Mark room-opened email as sent
-                    schedule.RoomOpenedEmailSentAt = DateTime.UtcNow;
+                    schedule.RoomOpenedEmailSentAt = DateTime.UtcNow.AddHours(7);
                     await interviewRepo.UpdateScheduleAsync(schedule);
                 }
 
@@ -255,7 +255,7 @@ namespace BusinessLogic.Services.Background
                     }
 
                     // Mark feedback nudge as sent
-                    schedule.FeedbackNudgeSentAt = DateTime.UtcNow;
+                    schedule.FeedbackNudgeSentAt = DateTime.UtcNow.AddHours(7);
                     await interviewRepo.UpdateScheduleAsync(schedule);
                 }
 
