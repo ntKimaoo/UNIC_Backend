@@ -88,6 +88,7 @@ namespace DataAccess.Repositories.Implementation
         public async Task<EventMember?> GetEventMemberByUserAsync(int eventId, Guid userId)
         {
             return await _context.EventMembers
+                .Include(em => em.User)
                 .Include(em => em.EventRole)
                 .FirstOrDefaultAsync(em => em.EventId == eventId && em.UserId == userId);
         }
