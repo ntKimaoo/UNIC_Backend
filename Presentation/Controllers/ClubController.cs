@@ -294,7 +294,7 @@ namespace Presentation.Controllers
         /// Update an existing club
         /// </summary>
         [HttpPut("{id}")]
-        [RequireClubPolicyOrRole("Club Manager", "UpdateClub")]
+        [RequireClubPolicyOrRole("Admin", "UpdateClub")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateClubDto dto)
         {
             if (!ModelState.IsValid)
