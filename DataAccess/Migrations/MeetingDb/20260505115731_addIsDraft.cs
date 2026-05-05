@@ -1,11 +1,13 @@
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace UNIC.DataAccess.Migrations.MeetingDb
 {
-    public partial class AddIsDraftToEvaluationCriterion : Migration
+    /// <inheritdoc />
+    public partial class addIsDraft : Migration
     {
+        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<bool>(
@@ -16,6 +18,7 @@ namespace UNIC.DataAccess.Migrations.MeetingDb
                 defaultValue: false);
         }
 
+        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
