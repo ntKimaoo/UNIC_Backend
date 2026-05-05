@@ -97,7 +97,7 @@ namespace UNIC.Presentation.Controllers
         /// Update a department in a club
         /// </summary>
         [HttpPut("{id}")]
-        [RequireClubPolicyOrRole("editdepartment")]
+        [RequireClubPolicyOrRole("editdepartment","Admin")]
 
         public async Task<IActionResult> UpdateDepartment(int clubId, int id, [FromBody] UpdateDepartmentDto request)
         {

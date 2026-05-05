@@ -73,7 +73,7 @@ public class ClubPostController : ControllerBase
     [Consumes("multipart/form-data")]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [RequireClubPolicyOrRole("Club Manager", "CreatePost")]
+    [RequireClubPolicyOrRole("CreatePost", "Admin")]
     public async Task<IActionResult> Create([FromForm] CreateClubPostDto dto, IFormFile? imageFile)
     {
         if (!ModelState.IsValid)

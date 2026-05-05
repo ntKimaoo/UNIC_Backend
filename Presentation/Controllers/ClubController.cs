@@ -294,7 +294,7 @@ namespace Presentation.Controllers
         /// Update an existing club
         /// </summary>
         [HttpPut("{clubId}")]
-        [RequireClubPolicyOrRole("Admin", "UpdateClub")]
+        [RequireClubPolicyOrRole("UpdateClub","Admin")]
         public async Task<IActionResult> Update(int clubId, [FromBody] UpdateClubDto dto)
         {
             if (!ModelState.IsValid)
@@ -481,7 +481,7 @@ namespace Presentation.Controllers
             }
         }
         [HttpPost("{clubId}/add-members")]
-        [RequireClubPolicyOrRole("Club Manager", "AddMember")]
+        [RequireClubPolicyOrRole("AddMember","Admin")]
         public async Task<IActionResult> AddMembers(int clubId, [FromBody] List<string> emails)
         {
             try

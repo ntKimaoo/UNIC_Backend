@@ -40,14 +40,14 @@ namespace Presentation.Controllers
             return Ok(new { message = "Đã đánh dấu tất cả thông báo là đã đọc." });
         }
         [HttpPost("send")]
-        [RequireClubPolicyOrRole("CreateNotification", "Club Manager")]
+        [RequireClubPolicyOrRole("CreateNotification", "Admin")]
         public async Task<IActionResult> SendNotification(Guid userId, string title, string message, string type)
         {
             await _notificationService.SendNotificationAsync(userId, title, message, type);
             return Ok(new { message = "Đã gửi thông báo." });
         }
         [HttpPost("send-bulk")]
-        [RequireClubPolicyOrRole("CreateNotification", "Club Manager")]
+        [RequireClubPolicyOrRole("CreateNotification", "Admin")]
         public async Task<IActionResult> SendBulkNotification([FromBody] BulkNotificationDto dto)
         {
             foreach (var userId in dto.UserIds)
