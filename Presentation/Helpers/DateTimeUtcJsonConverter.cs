@@ -5,9 +5,16 @@ using System.Text.Json.Serialization;
 namespace UNIC.Presentation.Helpers
 {
     /// <summary>
-    /// Ensures DateTime values are always serialized as UTC ISO-8601 with 'Z' suffix.
-    /// Without this, .NET serializes "Unspecified" DateTimes without any timezone indicator,
-    /// causing browsers in UTC+7 to display them 7 hours off (e.g. 01:00 instead of 08:00).
+    /// Serializes DateTime values with Vietnam timezone offset (+07:00).
+    /// 
+    /// The system stores all dates in Vietnam local time (UTC+7) in the database.
+    /// SQL Server returns these as DateTimeKind.Unspecified.
+    /// 
+    /// Previously, this converter stamped them with 'Z' (UTC), causing browsers
+    /// in UTC+7 to add another +7 hours (double offset).
+    /// 
+    /// Now it stamps with '+07:00' so the browser knows the value is already
+    /// in Vietnam time and displays it correctly.
     /// </summary>
     public class DateTimeUtcJsonConverter : JsonConverter<DateTime>
     {
@@ -21,12 +28,9 @@ namespace UNIC.Presentation.Helpers
 
         public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
         {
-            // Treat Unspecified kind as UTC (SQL Server stores as Unspecified)
-            var utc = value.Kind == DateTimeKind.Unspecified
-                ? DateTime.SpecifyKind(value, DateTimeKind.Utc)
-                : value.ToUniversalTime();
-
-            writer.WriteStringValue(utc.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
+            // DB stores Vietnam local time (UTC+7) as Unspecified kind.
+            // Stamp with +07:00 offset so browsers display the correct time.
+            writer.WriteStringValue(value.ToString("yyyy-MM-ddTHH:mm:ss.fff+07:00"));
         }
     }
 
@@ -47,10 +51,7 @@ namespace UNIC.Presentation.Helpers
         public override void Write(Utf8JsonWriter writer, DateTime? value, JsonSerializerOptions options)
         {
             if (value == null) { writer.WriteNullValue(); return; }
-            var utc = value.Value.Kind == DateTimeKind.Unspecified
-                ? DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
-                : value.Value.ToUniversalTime();
-            writer.WriteStringValue(utc.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"));
+            writer.WriteStringValue(value.Value.ToString("yyyy-MM-ddTHH:mm:ss.fff+07:00"));
         }
     }
 }
