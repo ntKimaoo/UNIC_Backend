@@ -2,6 +2,7 @@ using BusinessLogic.DTOs;
 using BusinessLogic.Services.Interface;
 using DataAccess.Models.Meeting.Enums;
 using Microsoft.AspNetCore.Mvc;
+using Presentation.Authorization;
 using System;
 using System.Threading.Tasks;
 
@@ -53,6 +54,7 @@ namespace Presentation.Controllers
         /// GET /api/interviews – Danh sách lịch (filter theo campaignId, status, date)
         /// </summary>
         [HttpGet]
+        [RequireClubPolicyOrRole("manageinterview", "Admin")]
         public async Task<IActionResult> GetAll(
             [FromQuery] int? campaignId,
             [FromQuery] string? status,
@@ -441,6 +443,7 @@ namespace Presentation.Controllers
         /// GET /api/interviews/campaign/{campaignId}/comparison – So sánh ứng viên
         /// </summary>
         [HttpGet("campaign/{campaignId}/comparison")]
+        [RequireClubPolicyOrRole("manageresults", "Admin")]
         public async Task<IActionResult> GetCampaignComparison(int campaignId)
         {
             var comparison = await _service.GetCampaignComparisonAsync(campaignId);
