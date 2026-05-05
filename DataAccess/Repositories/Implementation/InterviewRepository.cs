@@ -428,8 +428,18 @@ namespace DataAccess.Repositories.Implementation
         public async Task<IEnumerable<EvaluationCriterion>> GetCriteriaByCampaignIdAsync(int campaignId)
         {
             return await _context.EvaluationCriteria
-                .Where(c => c.CampaignId == campaignId)
+                .Where(c => c.CampaignId == campaignId && !c.IsDraft)
                 .OrderBy(c => c.Name)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<EvaluationCriterion>> GetCriteriaForAssignmentAsync(int campaignId, int assignmentId)
+        {
+            return await _context.EvaluationCriteria
+                .Where(c => c.CampaignId == campaignId &&
+                            (!c.IsDraft || c.CriteriaScores.Any(s => s.InterviewAssignmentId == assignmentId)))
+                .OrderBy(c => c.IsDraft)
+                .ThenBy(c => c.Name)
                 .ToListAsync();
         }
 

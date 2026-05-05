@@ -36,6 +36,11 @@ public class EvaluationCriterion
     /// </summary>
     public bool IsDefault { get; set; } = true;
 
+    /// <summary>
+    /// Tiêu chí tạm thời, chỉ hiện với interviewer được giao và người giao.
+    /// </summary>
+    public bool IsDraft { get; set; } = false;
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation

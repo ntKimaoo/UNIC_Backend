@@ -48,6 +48,7 @@ namespace DataAccess.Repositories.Interface
 
         // ── EvaluationCriterion ──────────────────────────────────
         Task<IEnumerable<EvaluationCriterion>> GetCriteriaByCampaignIdAsync(int campaignId);
+        Task<IEnumerable<EvaluationCriterion>> GetCriteriaForAssignmentAsync(int campaignId, int assignmentId);
         Task<EvaluationCriterion?> GetCriterionByIdAsync(int id);
         Task<EvaluationCriterion> CreateCriterionAsync(EvaluationCriterion criterion);
         Task<bool> UpdateCriterionAsync(EvaluationCriterion criterion);

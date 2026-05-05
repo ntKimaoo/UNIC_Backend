@@ -875,17 +875,45 @@ namespace BusinessLogic.Services.Implementation
 
         public async Task<EvaluationCriterionDto> CreateCriterionAsync(int campaignId, CreateEvaluationCriterionDto dto)
         {
+            if (dto.IsDraft && !dto.AssignmentId.HasValue)
+                throw new ArgumentException("AssignmentId bắt buộc khi tạo tiêu chí draft.");
+
             var criterion = new EvaluationCriterion
             {
                 CampaignId = campaignId,
                 Name = dto.Name,
                 Description = dto.Description,
                 IsDefault = false,
+                IsDraft = dto.IsDraft,
                 CreatedAt = DateTime.UtcNow
             };
 
             var created = await _repo.CreateCriterionAsync(criterion);
+
+            if (dto.IsDraft && dto.AssignmentId.HasValue)
+            {
+                await _repo.CreateCriteriaScoreAsync(new CriteriaScore
+                {
+                    InterviewAssignmentId = dto.AssignmentId.Value,
+                    EvaluationCriterionId = created.Id,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
             return MapCriterionToDto(created);
+        }
+
+        public async Task<List<EvaluationCriterionDto>> GetCriteriaForAssignmentAsync(int scheduleId, int assignmentId)
+        {
+            var assignment = await _repo.GetAssignmentByIdAsync(assignmentId);
+            if (assignment == null || assignment.InterviewScheduleId != scheduleId)
+                throw new KeyNotFoundException("Assignment not found or does not belong to this schedule.");
+
+            var schedule = await _repo.GetScheduleByIdAsync(scheduleId);
+            if (schedule == null) throw new KeyNotFoundException("Schedule not found.");
+
+            var criteria = await _repo.GetCriteriaForAssignmentAsync(schedule.CampaignId, assignmentId);
+            return criteria.Select(MapCriterionToDto).ToList();
         }
 
         public async Task<EvaluationCriterionDto?> UpdateCriterionAsync(int criterionId, UpdateEvaluationCriterionDto dto)
@@ -1187,7 +1215,8 @@ namespace BusinessLogic.Services.Implementation
                 CampaignId = c.CampaignId,
                 Name = c.Name,
                 Description = c.Description,
-                IsDefault = c.IsDefault
+                IsDefault = c.IsDefault,
+                IsDraft = c.IsDraft
             };
         }
 

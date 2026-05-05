@@ -325,6 +325,7 @@ namespace BusinessLogic.DTOs
         public string Name { get; set; } = null!;
         public string? Description { get; set; }
         public bool IsDefault { get; set; }
+        public bool IsDraft { get; set; }
     }
 
     public class CreateEvaluationCriterionDto
@@ -334,6 +335,14 @@ namespace BusinessLogic.DTOs
         public string Name { get; set; } = null!;
 
         public string? Description { get; set; }
+
+        /// <summary>
+        /// Nếu true → tiêu chí draft, chỉ hiện với assignment được chỉ định.
+        /// Bắt buộc kèm AssignmentId.
+        /// </summary>
+        public bool IsDraft { get; set; } = false;
+
+        public int? AssignmentId { get; set; }
     }
 
     public class UpdateEvaluationCriterionDto

@@ -44,6 +44,7 @@ namespace BusinessLogic.Services.Interface
         // ── Evaluation Criteria ──────────────────────────────────
         Task<List<EvaluationCriterionDto>> GetCampaignCriteriaAsync(int campaignId);
         Task<EvaluationCriterionDto> CreateCriterionAsync(int campaignId, CreateEvaluationCriterionDto dto);
+        Task<List<EvaluationCriterionDto>> GetCriteriaForAssignmentAsync(int scheduleId, int assignmentId);
         Task<EvaluationCriterionDto?> UpdateCriterionAsync(int criterionId, UpdateEvaluationCriterionDto dto);
         Task<bool> DeleteCriterionAsync(int criterionId);
         Task<bool> AssignCriteriaToInterviewerAsync(int scheduleId, int assignmentId, AssignCriteriaDto dto);

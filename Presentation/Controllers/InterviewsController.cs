@@ -383,6 +383,27 @@ namespace Presentation.Controllers
         }
 
         /// <summary>
+        /// GET /api/interviews/{id}/assignments/{assignmentId}/criteria – Tiêu chí dành riêng cho interviewer (non-draft + draft của assignment này)
+        /// </summary>
+        [HttpGet("{id}/assignments/{assignmentId}/criteria")]
+        public async Task<IActionResult> GetCriteriaForAssignment(int id, int assignmentId)
+        {
+            try
+            {
+                var criteria = await _service.GetCriteriaForAssignmentAsync(id, assignmentId);
+                return Ok(new { success = true, data = criteria });
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound(new { success = false, message = "Assignment not found" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// GET /api/interviews/{id}/assignments/{assignmentId}/criteria-scores – Lấy danh sách điểm tiêu chí đã chấm
         /// </summary>
         [HttpGet("{id}/assignments/{assignmentId}/criteria-scores")]
