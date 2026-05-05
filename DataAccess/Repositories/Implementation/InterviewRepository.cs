@@ -435,9 +435,10 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<IEnumerable<EvaluationCriterion>> GetCriteriaForAssignmentAsync(int campaignId, int assignmentId)
         {
+            // Chỉ trả criteria đã được assign cho interviewer này (có CriteriaScore)
             return await _context.EvaluationCriteria
                 .Where(c => c.CampaignId == campaignId &&
-                            (!c.IsDraft || c.CriteriaScores.Any(s => s.InterviewAssignmentId == assignmentId)))
+                            c.CriteriaScores.Any(s => s.InterviewAssignmentId == assignmentId))
                 .OrderBy(c => c.IsDraft)
                 .ThenBy(c => c.Name)
                 .ToListAsync();
@@ -524,8 +525,10 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task DeleteCriteriaScoresByAssignmentIdAsync(int assignmentId)
         {
+            // Chỉ xóa non-draft scores; draft scores được quản lý riêng
             var scores = await _context.CriteriaScores
-                .Where(cs => cs.InterviewAssignmentId == assignmentId)
+                .Include(cs => cs.EvaluationCriterion)
+                .Where(cs => cs.InterviewAssignmentId == assignmentId && !cs.EvaluationCriterion.IsDraft)
                 .ToListAsync();
 
             if (scores.Any())
