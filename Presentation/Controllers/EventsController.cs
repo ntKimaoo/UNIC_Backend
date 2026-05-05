@@ -91,8 +91,12 @@ namespace UNIC.Presentation.Controllers
             if (pageSize < 1 || pageSize > 100) return BadRequest(new { error = "Page size must be between 1 and 100." });
             try
             {
-                var events = await _eventService.GetAllEventsAsync(pageNumber, pageSize, status, clubId);
-                var total = await _eventService.GetTotalEventsCountAsync(status, clubId);
+                // Nếu user đã đăng nhập → truyền userId để hiển thị cả event nội bộ CLB
+                var userId = GetUserId();
+                Guid? userIdParam = userId != Guid.Empty ? userId : null;
+
+                var events = await _eventService.GetAllEventsAsync(pageNumber, pageSize, status, clubId, userIdParam);
+                var total = await _eventService.GetTotalEventsCountAsync(status, clubId, userIdParam);
                 return Ok(new { items = events, total, page = pageNumber, pageSize });
             }
             catch (Exception ex) { return StatusCode(500, new { error = "An error occurred", details = ex.Message }); }
