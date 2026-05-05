@@ -341,11 +341,13 @@ namespace DataAccess.Repositories.Implementation
             var thresholdTime = DateTime.UtcNow.AddHours(7).Add(preOpenDuration);
             var roomsToActivate = await _context.MeetingRooms
                 .Include(r => r.InterviewSchedule)
-                .Where(r => r.Status == RoomStatus.Idle 
+                    .ThenInclude(s => s!.Assignments)
+                .Where(r => r.Status == RoomStatus.Idle
                             && r.RoomType == RoomType.Interview
                             && r.InterviewSchedule != null
                             && r.InterviewSchedule.Status == InterviewStatus.Confirmed
-                            && r.InterviewSchedule.ScheduledAt <= thresholdTime)
+                            && r.InterviewSchedule.ScheduledAt <= thresholdTime
+                            && r.InterviewSchedule.Assignments.Any())
                 .ToListAsync();
 
             if (!roomsToActivate.Any())
