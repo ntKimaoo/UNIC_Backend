@@ -82,6 +82,8 @@ namespace BusinessLogic.Services.Implementation
         {
             var club = await _clubRepository.GetByIdAsync(clubId);
             if (club == null) throw new KeyNotFoundException($"Club with ID {clubId} not found.");
+            if (!club.IsActive)
+                throw new InvalidOperationException("Không thể thêm thành viên vào câu lạc bộ đang không hoạt động.");
 
             var user = await _userRepository.GetByIdAsync(dto.UserId);
             if (user == null) throw new KeyNotFoundException($"User with ID {dto.UserId} not found.");

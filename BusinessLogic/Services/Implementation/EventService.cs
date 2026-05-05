@@ -24,6 +24,7 @@ namespace BusinessLogic.Services.Implementation
         private readonly IValidator<OpenRegistrationRequest> _registrationValidator;
         private readonly IEmailService _emailService;
         private readonly IAttendanceService _attendanceService;
+        private readonly IClubRepository _clubRepository;
 
         public EventService(
             IUnitOfWork unitOfWork,
@@ -33,7 +34,8 @@ namespace BusinessLogic.Services.Implementation
             IValidator<CreateSessionRequest> sessionValidator,
             IValidator<OpenRegistrationRequest> registrationValidator,
             IEmailService emailService,
-            IAttendanceService attendanceService)
+            IAttendanceService attendanceService,
+            IClubRepository clubRepository)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -43,6 +45,7 @@ namespace BusinessLogic.Services.Implementation
             _registrationValidator = registrationValidator;
             _emailService = emailService;
             _attendanceService = attendanceService;
+            _clubRepository = clubRepository;
         }
 
         public async Task<EventDetailDto> CreateEventAsync(CreateEventRequest request, string? imageUrl = null)
@@ -52,6 +55,15 @@ namespace BusinessLogic.Services.Implementation
             if (!validationResult.IsValid)
             {
                 throw new DomainException(string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
+            }
+
+            if (request.ClubId.HasValue)
+            {
+                var club = await _clubRepository.GetByIdAsync(request.ClubId.Value);
+                if (club == null)
+                    throw new NotFoundException("Club", request.ClubId.Value);
+                if (!club.IsActive)
+                    throw new InvalidOperationException("Không thể tạo sự kiện cho câu lạc bộ đang không hoạt động.");
             }
 
             // Map to entity

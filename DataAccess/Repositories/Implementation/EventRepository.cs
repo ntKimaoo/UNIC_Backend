@@ -48,6 +48,7 @@ namespace DataAccess.Repositories.Implementation
                 .Include(e => e.Attendances)
                 .Include(e => e.EventSchedules)
                 .Include(e => e.Club)
+                .Where(e => e.Club.IsActive)
                 .AsQueryable();
 
             if (!string.IsNullOrEmpty(status))
@@ -65,7 +66,9 @@ namespace DataAccess.Repositories.Implementation
 
         public async Task<int> GetTotalCountAsync(string? status = null, int? clubId = null)
         {
-            var query = _context.Events.AsQueryable();
+            var query = _context.Events
+                .Where(e => e.Club.IsActive)
+                .AsQueryable();
             if (!string.IsNullOrEmpty(status))
                 query = query.Where(e => e.Status == status);
             if (clubId.HasValue)

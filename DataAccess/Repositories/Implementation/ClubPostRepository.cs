@@ -29,7 +29,9 @@ namespace DataAccess.Repositories.Implementation
             await ActivePosts().FirstOrDefaultAsync(cp => cp.PostId == postId);
 
         public async Task<IEnumerable<ClubPost>> GetAllAsync() =>
-            await ActivePosts().OrderByDescending(cp => cp.PostDate).ToListAsync();
+            await ActivePosts()
+                .Where(cp => cp.Club.IsActive)
+                .OrderByDescending(cp => cp.PostDate).ToListAsync();
 
         public async Task<IEnumerable<ClubPost>> GetByClubIdAsync(int clubId) =>
             await ActivePosts()
