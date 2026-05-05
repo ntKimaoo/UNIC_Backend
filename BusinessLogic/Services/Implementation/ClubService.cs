@@ -162,6 +162,7 @@ namespace BusinessLogic.Services.Implementation
         }
         private ClubResponseDto MapToResponseDto(Club club, int memberCount = 0)
         {
+            memberCount =_memberService.CountMembersAsync(club.ClubId).Result;
             return new ClubResponseDto
             {
                 ClubId = club.ClubId,
